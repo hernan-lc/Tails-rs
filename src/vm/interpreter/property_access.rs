@@ -1,7 +1,7 @@
 use crate::errors::{Error, Result};
 use crate::objects::Value;
 use crate::objects::js_promise::PromiseState;
-use super::{Interpreter, HeapValue, JsObject, JsFunction};
+use super::{Interpreter, HeapValue};
 
 impl Interpreter {
     pub(super) fn get_property(&mut self, object: &Value, key: &Value) -> Result<Value> {
