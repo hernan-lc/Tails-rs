@@ -12,6 +12,7 @@ pub use heap_types::{JsObject, JsArray, JsFunction, HeapValue, JsProxyData};
 pub(crate) use call_frame::{CallFrame, ExceptionHandler};
 
 use std::collections::HashMap;
+use std::rc::Rc;
 use crate::compiler::{CompiledModule, Instruction};
 use crate::errors::{Error, Result};
 use crate::objects::Value;
@@ -24,7 +25,7 @@ pub struct Interpreter {
     pub(crate) heap: Vec<HeapValue>,
     pub(crate) gc: crate::vm::gc::GarbageCollector,
     pub(crate) call_stack: Vec<CallFrame>,
-    pub(crate) current_module: Option<CompiledModule>,
+    pub(crate) current_module: Option<Rc<CompiledModule>>,
     exception_handlers: Vec<ExceptionHandler>,
     pending_exception: Option<Value>,
     pub(crate) async_runtime: AsyncRuntime,
@@ -33,6 +34,7 @@ pub struct Interpreter {
     pub(crate) module_registry: HashMap<String, HashMap<String, Value>>,
     pub(crate) module_exports: HashMap<String, Value>,
     pub(crate) current_module_path: Option<String>,
+    pub(crate) module_globals: Option<HashMap<String, Value>>,
 }
 
 impl Interpreter {
@@ -52,13 +54,14 @@ impl Interpreter {
             module_registry: HashMap::new(),
             module_exports: HashMap::new(),
             current_module_path: None,
+            module_globals: None,
         };
         interp.init_builtins();
         Ok(interp)
     }
 
     pub fn execute(&mut self, module: &CompiledModule) -> Result<Value> {
-        self.current_module = Some(module.clone());
+        self.current_module = Some(Rc::new(module.clone()));
         let result = self.execute_from(module, 0);
         self.drain_microtasks();
         let macrotasks: Vec<_> = self.async_runtime.run_macrotasks();
@@ -144,7 +147,6 @@ impl Interpreter {
                     }
                 }
                 Instruction::Call(argc) => {
-                    eprintln!("Call at pc={}: argc={}", pc, argc);
                     let callee = self.stack.pop()
                         .ok_or_else(|| Error::RuntimeError("Stack underflow".into()))?;
                     let mut args = Vec::new();
@@ -153,10 +155,9 @@ impl Interpreter {
                             .ok_or_else(|| Error::RuntimeError("Stack underflow".into()))?);
                     }
                     args.reverse();
-                    match callee {
+                    match &callee {
                         Value::Function(func_idx) => {
-                            let func = self.heap[func_idx].clone();
-                            if let HeapValue::Function(f) = func {
+                            if let HeapValue::Function(f) = &self.heap[*func_idx] {
                                 if f.bytecode_index == usize::MAX {
                                     if let Some(Value::Promise(promise_idx)) = f.closure.first() {
                                         match f.name.as_deref() {
@@ -178,33 +179,45 @@ impl Interpreter {
                                         continue;
                                     }
                                 }
-                                let return_address = pc + 1;
-                                let base_pointer = self.stack.len();
-                                let closure_count = f.closure.len();
-                                self.call_stack.push(CallFrame {
-                                    return_address,
-                                    base_pointer,
-                                    closure_var_count: closure_count,
-                                    func_heap_idx: Some(func_idx),
-                                    this_value: None,
-                                    is_construct: false,
-                                });
-                                for closure_var in &f.closure {
-                                    self.stack.push(closure_var.clone());
+                                let same_module = match (&f.owner_module, &self.current_module) {
+                                    (Some(om), Some(cm)) => Rc::ptr_eq(om, cm),
+                                    (None, None) => true,
+                                    _ => false,
+                                };
+                                if same_module {
+                                    let func = self.heap[*func_idx].clone();
+                                    if let HeapValue::Function(f) = func {
+                                        let return_address = pc + 1;
+                                        let base_pointer = self.stack.len();
+                                        let closure_count = f.closure.len();
+                                        self.call_stack.push(CallFrame {
+                                            return_address,
+                                            base_pointer,
+                                            closure_var_count: closure_count,
+                                            func_heap_idx: Some(*func_idx),
+                                            this_value: None,
+                                            is_construct: false,
+                                        });
+                                        for closure_var in &f.closure {
+                                            self.stack.push(closure_var.clone());
+                                        }
+                                        for arg in args {
+                                            self.stack.push(arg);
+                                        }
+                                        pc = f.bytecode_index;
+                                        continue;
+                                    }
                                 }
-                                for arg in args {
-                                    self.stack.push(arg);
-                                }
-                                pc = f.bytecode_index;
-                                continue;
                             }
+                            let result = self.call_value(&callee, &Value::Undefined, &args)?;
+                            self.stack.push(result);
                         }
                         Value::NativeFunction(native_idx) => {
-                            let result = self.call_native(native_idx, &Value::Undefined, &args)?;
+                            let result = self.call_native(*native_idx, &Value::Undefined, &args)?;
                             self.stack.push(result);
                         }
                         Value::Proxy(proxy_idx) => {
-                            if let HeapValue::Proxy(proxy) = &self.heap[proxy_idx] {
+                            if let HeapValue::Proxy(proxy) = &self.heap[*proxy_idx] {
                                 let handler = proxy.handler.clone();
                                 let target = proxy.target.clone();
                                 let arr_idx = self.gc.allocate(&mut self.heap, HeapValue::Array(JsArray { elements: args }));
@@ -238,25 +251,34 @@ impl Interpreter {
                         Value::Function(func_idx) => {
                             if let HeapValue::Function(f) = &self.heap[func_idx] {
                                 let f_clone = f.clone();
-                                let return_address = pc + 1;
-                                let base_pointer = self.stack.len();
-                                let closure_count = f_clone.closure.len();
-                                self.call_stack.push(CallFrame {
-                                    return_address,
-                                    base_pointer,
-                                    closure_var_count: closure_count,
-                                    func_heap_idx: Some(func_idx),
-                                    this_value: Some(object),
-                                    is_construct: false,
-                                });
-                                for closure_var in &f_clone.closure {
-                                    self.stack.push(closure_var.clone());
+                                let same_module = match (&f_clone.owner_module, &self.current_module) {
+                                    (Some(om), Some(cm)) => Rc::ptr_eq(om, cm),
+                                    (None, None) => true,
+                                    _ => false,
+                                };
+                                if same_module {
+                                    let return_address = pc + 1;
+                                    let base_pointer = self.stack.len();
+                                    let closure_count = f_clone.closure.len();
+                                    self.call_stack.push(CallFrame {
+                                        return_address,
+                                        base_pointer,
+                                        closure_var_count: closure_count,
+                                        func_heap_idx: Some(func_idx),
+                                        this_value: Some(object),
+                                        is_construct: false,
+                                    });
+                                    for closure_var in &f_clone.closure {
+                                        self.stack.push(closure_var.clone());
+                                    }
+                                    for arg in args {
+                                        self.stack.push(arg);
+                                    }
+                                    pc = f_clone.bytecode_index;
+                                    continue;
                                 }
-                                for arg in args {
-                                    self.stack.push(arg);
-                                }
-                                pc = f_clone.bytecode_index;
-                                continue;
+                                let result = self.call_value(&method, &object, &args)?;
+                                self.stack.push(result);
                             }
                         }
                         Value::NativeFunction(native_idx) => {
@@ -291,25 +313,41 @@ impl Interpreter {
                                     self.stack.push(this_val);
                                 } else {
                                     let f_clone = f.clone();
-                                    let return_address = pc + 1;
-                                    let base_pointer = self.stack.len();
-                                    let closure_count = f_clone.closure.len();
-                                    self.call_stack.push(CallFrame {
-                                        return_address,
-                                        base_pointer,
-                                        closure_var_count: closure_count,
-                                        func_heap_idx: Some(*func_idx),
-                                        this_value: Some(this_val.clone()),
-                                        is_construct: true,
-                                    });
-                                    for closure_var in &f_clone.closure {
-                                        self.stack.push(closure_var.clone());
+                                    let same_module = match (&f_clone.owner_module, &self.current_module) {
+                                        (Some(om), Some(cm)) => Rc::ptr_eq(om, cm),
+                                        (None, None) => true,
+                                        _ => false,
+                                    };
+                                    if same_module {
+                                        let return_address = pc + 1;
+                                        let base_pointer = self.stack.len();
+                                        let closure_count = f_clone.closure.len();
+                                        self.call_stack.push(CallFrame {
+                                            return_address,
+                                            base_pointer,
+                                            closure_var_count: closure_count,
+                                            func_heap_idx: Some(*func_idx),
+                                            this_value: Some(this_val.clone()),
+                                            is_construct: true,
+                                        });
+                                        for closure_var in &f_clone.closure {
+                                            self.stack.push(closure_var.clone());
+                                        }
+                                        for arg in args {
+                                            self.stack.push(arg);
+                                        }
+                                        pc = f_clone.bytecode_index;
+                                        continue;
                                     }
-                                    for arg in args {
-                                        self.stack.push(arg);
+                                    let result = self.call_value(&constructor, &this_val, &args)?;
+                                    match result {
+                                        Value::Object(_) | Value::Array(_) | Value::Function(_) | Value::Promise(_) | Value::Proxy(_) => {
+                                            self.stack.push(result);
+                                        }
+                                        _ => {
+                                            self.stack.push(this_val);
+                                        }
                                     }
-                                    pc = f_clone.bytecode_index;
-                                    continue;
                                 }
                             }
                         }
@@ -445,7 +483,14 @@ impl Interpreter {
                     self.stack.push(Value::Undefined);
                 }
                 Instruction::ImportModule(source) => {
-                    let module_path = self.resolve_module_path(source)?;
+                    let module_path = match self.resolve_module_path(source) {
+                        Ok(p) => p,
+                        Err(_) => {
+                            self.stack.push(Value::Undefined);
+                            pc += 1;
+                            continue;
+                        }
+                    };
                     if let Some(exports) = self.module_registry.get(&module_path).cloned() {
                         let heap_idx = self.heap.len();
                         let mut props = HashMap::new();
@@ -478,7 +523,14 @@ impl Interpreter {
                     }
                 }
                 Instruction::ImportNamed(source, imported_name, local_name) => {
-                    let module_path = self.resolve_module_path(source)?;
+                    let module_path = match self.resolve_module_path(source) {
+                        Ok(p) => p,
+                        Err(_) => {
+                            self.globals.insert(local_name.clone(), Value::Undefined);
+                            pc += 1;
+                            continue;
+                        }
+                    };
                     if !self.module_registry.contains_key(&module_path) {
                         let source_code = std::fs::read_to_string(&module_path)
                             .map_err(|e| Error::RuntimeError(format!("Cannot read module '{}': {}", source, e)))?;
@@ -498,7 +550,14 @@ impl Interpreter {
                     }
                 }
                 Instruction::ImportDefault(source, local_name) => {
-                    let module_path = self.resolve_module_path(source)?;
+                    let module_path = match self.resolve_module_path(source) {
+                        Ok(p) => p,
+                        Err(_) => {
+                            self.globals.insert(local_name.clone(), Value::Undefined);
+                            pc += 1;
+                            continue;
+                        }
+                    };
                     if !self.module_registry.contains_key(&module_path) {
                         let source_code = std::fs::read_to_string(&module_path)
                             .map_err(|e| Error::RuntimeError(format!("Cannot read module '{}': {}", source, e)))?;
@@ -518,7 +577,16 @@ impl Interpreter {
                     }
                 }
                 Instruction::ImportAll(source, local_name) => {
-                    let module_path = self.resolve_module_path(source)?;
+                    let module_path = match self.resolve_module_path(source) {
+                        Ok(p) => p,
+                        Err(_) => {
+                            let heap_idx = self.heap.len();
+                            self.heap.push(HeapValue::Object(JsObject::new()));
+                            self.globals.insert(local_name.clone(), Value::Object(heap_idx));
+                            pc += 1;
+                            continue;
+                        }
+                    };
                     if !self.module_registry.contains_key(&module_path) {
                         let source_code = std::fs::read_to_string(&module_path)
                             .map_err(|e| Error::RuntimeError(format!("Cannot read module '{}': {}", source, e)))?;
@@ -650,7 +718,7 @@ impl Interpreter {
         }
         let ctor_heap_idx = if let Some(ctor_func_idx) = class_info.constructor_func_idx {
             let func_info = module.functions[ctor_func_idx as usize].clone();
-            let owner = self.current_module.as_ref().map(|m| std::rc::Rc::new(m.clone()));
+            let owner = self.current_module.clone();
             let idx = self.gc.allocate(&mut self.heap, HeapValue::Function(JsFunction {
                 name: func_info.name,
                 params: func_info.params,
@@ -681,7 +749,7 @@ impl Interpreter {
         for method_info in &class_info.methods {
             let method_func_info = module.functions[method_info.func_idx as usize].clone();
             let method_proto_idx = self.gc.allocate(&mut self.heap, HeapValue::Object(JsObject::new()));
-            let owner = self.current_module.as_ref().map(|m| std::rc::Rc::new(m.clone()));
+            let owner = self.current_module.clone();
             let method_heap_idx = self.gc.allocate(&mut self.heap, HeapValue::Function(JsFunction {
                 name: Some(method_info.name.clone()),
                 params: method_func_info.params,

@@ -29,6 +29,9 @@ impl Interpreter {
             Instruction::LoadGlobal(name) => {
                 let value = self.globals.get(name)
                     .cloned()
+                    .or_else(|| {
+                        self.module_globals.as_ref().and_then(|mg| mg.get(name).cloned())
+                    })
                     .unwrap_or(Value::Undefined);
                 self.stack.push(value);
             }
@@ -389,7 +392,7 @@ impl Interpreter {
             Instruction::MakeFunction(func_idx) => {
                 let func_info = module.functions[*func_idx as usize].clone();
                 let proto_obj_idx = self.gc.allocate(&mut self.heap, HeapValue::Object(JsObject::new()));
-                let owner = self.current_module.as_ref().map(|m| std::rc::Rc::new(m.clone()));
+                let owner = self.current_module.clone();
                 let heap_idx = self.gc.allocate(&mut self.heap, HeapValue::Function(JsFunction {
                     name: func_info.name,
                     params: func_info.params,
@@ -412,7 +415,7 @@ impl Interpreter {
                     closure_vars.push(value);
                 }
                 let proto_obj_idx = self.gc.allocate(&mut self.heap, HeapValue::Object(JsObject::new()));
-                let owner = self.current_module.as_ref().map(|m| std::rc::Rc::new(m.clone()));
+                let owner = self.current_module.clone();
                 let heap_idx = self.gc.allocate(&mut self.heap, HeapValue::Function(JsFunction {
                     name: func_info.name,
                     params: func_info.params,

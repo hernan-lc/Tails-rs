@@ -1,27 +1,30 @@
+use std::rc::Rc;
 use super::*;
 use crate::errors::Result;
 use crate::objects::Value;
 
+#[derive(Debug, Clone)]
+pub struct ModuleRecord {
+    pub exports: HashMap<String, Value>,
+    pub globals: HashMap<String, Value>,
+}
+
 impl Interpreter {
     pub fn execute_module(&mut self, module: &CompiledModule) -> Result<Value> {
-        eprintln!("execute_module: starting, insns={}", module.instructions.len());
         let saved_module = self.current_module.take();
-        self.current_module = Some(module.clone());
+        self.current_module = Some(Rc::new(module.clone()));
         let prev_exports = std::mem::take(&mut self.module_exports);
-        let pre_keys: std::collections::HashSet<String> = self.globals.keys().cloned().collect();
+        let saved_globals = std::mem::take(&mut self.globals);
         let result = self.execute(module);
-        eprintln!("execute_module: execute returned, result={:?}", result);
-        let post_keys: std::collections::HashSet<String> = self.globals.keys().cloned().collect();
-        let export_keys: std::collections::HashSet<String> = self.module_exports.keys().cloned().collect();
-        for key in post_keys.difference(&pre_keys) {
-            if !export_keys.contains(key) {
-                self.globals.remove(key);
-            }
-        }
+        let module_globals = std::mem::replace(&mut self.globals, saved_globals);
         let exec_exports = std::mem::replace(&mut self.module_exports, prev_exports);
-        for (k, v) in exec_exports {
-            self.module_exports.insert(k, v);
+        for (k, v) in &exec_exports {
+            self.module_exports.insert(k.clone(), v.clone());
         }
+        for (k, v) in exec_exports {
+            self.globals.insert(k, v);
+        }
+        self.module_globals = Some(module_globals);
         self.current_module = saved_module;
         result
     }

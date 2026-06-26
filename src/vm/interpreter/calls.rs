@@ -1,3 +1,4 @@
+use std::rc::Rc;
 use super::*;
 use crate::errors::{Error, Result};
 use crate::objects::Value;
@@ -5,12 +6,13 @@ use crate::runtime_env::native_fns::NATIVE_TABLE;
 
 impl Interpreter {
     pub fn call_value(&mut self, callee: &Value, this: &Value, args: &[Value]) -> Result<Value> {
-        eprintln!("call_value: callee={:?} args={}", callee, args.len());
         match callee {
             Value::Function(func_idx) => {
                 if let HeapValue::Function(f) = &self.heap[*func_idx] {
                     let f_clone = f.clone();
-                    let return_address = self.current_module.as_ref()
+                    let func_module: Option<Rc<CompiledModule>> = f_clone.owner_module.clone()
+                        .or_else(|| self.current_module.clone());
+                    let return_address = func_module.as_ref()
                         .map(|m| m.instructions.len())
                         .unwrap_or(0);
                     let base_pointer = self.stack.len();
@@ -32,7 +34,7 @@ impl Interpreter {
                         self.stack.push(arg.clone());
                     }
 
-                    if let Some(module) = self.current_module.clone() {
+                    if let Some(module) = func_module {
                         self.execute_from(&module, f_clone.bytecode_index)
                     } else {
                         Ok(Value::Undefined)
