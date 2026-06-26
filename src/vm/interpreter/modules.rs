@@ -3,37 +3,21 @@ use super::*;
 use crate::errors::Result;
 use crate::objects::Value;
 
-#[derive(Debug, Clone)]
-pub struct ModuleRecord {
-    pub exports: HashMap<String, Value>,
-    pub globals: HashMap<String, Value>,
-}
-
 impl Interpreter {
     pub fn execute_module(&mut self, module: &CompiledModule) -> Result<Value> {
         let saved_module = self.current_module.take();
         self.current_module = Some(Rc::new(module.clone()));
         let prev_exports = std::mem::take(&mut self.module_exports);
-        let saved_globals = std::mem::take(&mut self.globals);
         let result = self.execute(module);
-        let module_globals = std::mem::replace(&mut self.globals, saved_globals);
         let exec_exports = std::mem::replace(&mut self.module_exports, prev_exports);
         for (k, v) in &exec_exports {
             self.module_exports.insert(k.clone(), v.clone());
         }
-        for (k, v) in exec_exports {
-            self.globals.insert(k, v);
-        }
-        self.module_globals = Some(module_globals);
         self.current_module = saved_module;
         result
     }
 
-    fn resolve_local_from_stack(&self, _name: &str) -> Option<usize> {
-        None
-    }
-
-    fn load_and_run_module(&mut self, source: &str) -> Result<Option<String>> {
+    pub(crate) fn load_and_run_module(&mut self, source: &str) -> Result<Option<String>> {
         let module_path = match self.resolve_module_path(source) {
             Ok(p) => p,
             Err(_) => return Ok(None),
@@ -50,9 +34,22 @@ impl Interpreter {
         let prev_path = self.current_module_path.take();
         self.current_module_path = Some(module_path.clone());
         self.module_registry.insert(module_path.clone(), HashMap::new());
+        let saved_globals = std::mem::take(&mut self.globals);
+        for key in saved_globals.keys() {
+            if key == "console" || key == "Object" || key == "JSON" || key == "Math"
+                || key == "Proxy" || key == "Reflect" || key == "Error" || key == "TypeError"
+                || key == "ReferenceError" || key == "SyntaxError" || key == "RangeError"
+                || key == "Array" || key == "String" || key == "Number" || key == "Boolean"
+                || key == "parseInt" || key == "parseFloat" || key == "isNaN" || key == "isFinite"
+                || key == "setTimeout" || key == "setInterval" || key == "clearTimeout" || key == "clearInterval" {
+                self.globals.insert(key.clone(), saved_globals[key].clone());
+            }
+        }
         let result = self.execute_module(&compiled);
+        let module_globals = std::mem::replace(&mut self.globals, saved_globals);
         let exports = std::mem::take(&mut self.module_exports);
         *self.module_registry.entry(module_path.clone()).or_default() = exports;
+        self.module_globals = Some(module_globals);
         self.current_module_path = prev_path;
         result?;
         Ok(Some(module_path))

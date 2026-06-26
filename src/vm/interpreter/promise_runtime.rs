@@ -21,6 +21,7 @@ impl Interpreter {
             super_class: None,
             properties: HashMap::new(),
             owner_module: None,
+            module_scope: None,
         }));
         Value::Function(heap_idx)
     }
@@ -36,6 +37,7 @@ impl Interpreter {
             super_class: None,
             properties: HashMap::new(),
             owner_module: None,
+            module_scope: None,
         }));
         Value::Function(heap_idx)
     }

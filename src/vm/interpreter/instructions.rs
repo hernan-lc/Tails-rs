@@ -393,6 +393,7 @@ impl Interpreter {
                 let func_info = module.functions[*func_idx as usize].clone();
                 let proto_obj_idx = self.gc.allocate(&mut self.heap, HeapValue::Object(JsObject::new()));
                 let owner = self.current_module.clone();
+                let scope = std::rc::Rc::new(self.globals.clone());
                 let heap_idx = self.gc.allocate(&mut self.heap, HeapValue::Function(JsFunction {
                     name: func_info.name,
                     params: func_info.params,
@@ -402,6 +403,7 @@ impl Interpreter {
                     super_class: None,
                     properties: HashMap::new(),
                     owner_module: owner,
+                    module_scope: Some(scope),
                 }));
                 self.stack.push(Value::Function(heap_idx));
             }
@@ -416,6 +418,7 @@ impl Interpreter {
                 }
                 let proto_obj_idx = self.gc.allocate(&mut self.heap, HeapValue::Object(JsObject::new()));
                 let owner = self.current_module.clone();
+                let scope = std::rc::Rc::new(self.globals.clone());
                 let heap_idx = self.gc.allocate(&mut self.heap, HeapValue::Function(JsFunction {
                     name: func_info.name,
                     params: func_info.params,
@@ -425,6 +428,7 @@ impl Interpreter {
                     super_class: None,
                     properties: HashMap::new(),
                     owner_module: owner,
+                    module_scope: Some(scope),
                 }));
                 self.stack.push(Value::Function(heap_idx));
             }

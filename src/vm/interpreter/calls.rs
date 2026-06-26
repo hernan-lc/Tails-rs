@@ -18,6 +18,11 @@ impl Interpreter {
                     let base_pointer = self.stack.len();
                     let closure_count = f_clone.closure.len();
 
+                    let saved_mg = self.module_globals.take();
+                    if let Some(ref scope) = f_clone.module_scope {
+                        self.module_globals = Some((**scope).clone());
+                    }
+
                     self.call_stack.push(CallFrame {
                         return_address,
                         base_pointer,
@@ -34,11 +39,14 @@ impl Interpreter {
                         self.stack.push(arg.clone());
                     }
 
-                    if let Some(module) = func_module {
+                    let result = if let Some(module) = func_module {
                         self.execute_from(&module, f_clone.bytecode_index)
                     } else {
                         Ok(Value::Undefined)
-                    }
+                    };
+
+                    self.module_globals = saved_mg;
+                    result
                 } else {
                     Err(Error::TypeError("Not a function".into()))
                 }

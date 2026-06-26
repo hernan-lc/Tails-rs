@@ -53,8 +53,8 @@ impl Interpreter {
             timer_id_counter: 1,
             module_registry: HashMap::new(),
             module_exports: HashMap::new(),
-            current_module_path: None,
             module_globals: None,
+            current_module_path: None,
         };
         interp.init_builtins();
         Ok(interp)
@@ -728,6 +728,7 @@ impl Interpreter {
                 super_class: Some(super_val.clone()),
                 properties: HashMap::new(),
                 owner_module: owner,
+                module_scope: None,
             }));
             idx
         } else {
@@ -740,6 +741,7 @@ impl Interpreter {
                 super_class: Some(super_val.clone()),
                 properties: HashMap::new(),
                 owner_module: None,
+                module_scope: None,
             }));
             idx
         };
@@ -759,6 +761,7 @@ impl Interpreter {
                 super_class: None,
                 properties: HashMap::new(),
                 owner_module: owner,
+                module_scope: None,
             }));
             let method_val = Value::Function(method_heap_idx);
             if method_info.is_static {

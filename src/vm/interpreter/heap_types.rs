@@ -41,6 +41,7 @@ pub struct JsFunction {
     pub super_class: Option<Value>,
     pub properties: HashMap<String, Value>,
     pub owner_module: Option<Rc<CompiledModule>>,
+    pub module_scope: Option<Rc<HashMap<String, Value>>>,
 }
 
 #[derive(Debug, Clone)]
