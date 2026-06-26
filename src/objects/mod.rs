@@ -1,3 +1,4 @@
+pub mod js_promise;
 use std::fmt;
 
 #[derive(Debug, Clone)]
@@ -13,6 +14,7 @@ pub enum Value {
     NativeFunction(usize),
     Object(usize),
     Array(usize),
+    Promise(usize),
 }
 
 impl PartialEq for Value {
@@ -29,6 +31,7 @@ impl PartialEq for Value {
             (Value::NativeFunction(a), Value::NativeFunction(b)) => a == b,
             (Value::Object(a), Value::Object(b)) => a == b,
             (Value::Array(a), Value::Array(b)) => a == b,
+            (Value::Promise(a), Value::Promise(b)) => a == b,
             _ => false,
         }
     }
@@ -48,6 +51,7 @@ impl fmt::Display for Value {
             Value::NativeFunction(_) => write!(f, "[Native Function]"),
             Value::Object(_) => write!(f, "[Object]"),
             Value::Array(_) => write!(f, "[Array]"),
+            Value::Promise(_) => write!(f, "[Promise]"),
         }
     }
 }

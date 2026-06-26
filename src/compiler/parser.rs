@@ -804,6 +804,9 @@ impl<'a> Parser<'a> {
                     self.advance();
                     let prop = match self.advance() {
                         Token::Identifier(n) => Expression::Identifier(n),
+                        Token::Catch => Expression::Identifier("catch".to_string()),
+                        Token::Finally => Expression::Identifier("finally".to_string()),
+                        Token::Throw => Expression::Identifier("throw".to_string()),
                         t => return Err(Error::ParseError(format!("Expected property name, got {:?}", t))),
                     };
                     expr = Expression::Member { object: Box::new(expr), property: Box::new(prop), computed: false };
@@ -826,6 +829,9 @@ impl<'a> Parser<'a> {
                 self.advance();
                 let property = match self.advance() {
                     Token::Identifier(name) => Expression::Identifier(name),
+                    Token::Catch => Expression::Identifier("catch".to_string()),
+                    Token::Finally => Expression::Identifier("finally".to_string()),
+                    Token::Throw => Expression::Identifier("throw".to_string()),
                     token => return Err(Error::ParseError(format!("Expected property name, got {:?}", token))),
                 };
                 expr = Expression::Member { object: Box::new(expr), property: Box::new(property), computed: false };

@@ -139,7 +139,7 @@ fn value_to_tails_value(value: Value) -> TailsValue {
                 data: ptr,
             }
         }
-        Value::BigInt(_) | Value::Function(_) | Value::NativeFunction(_) | Value::Object(_) | Value::Array(_) => {
+        Value::BigInt(_) | Value::Function(_) | Value::NativeFunction(_) | Value::Object(_) | Value::Array(_) | Value::Promise(_) => {
             TailsValue {
                 tag: TailsValueType::Object as u32,
                 data: 0,

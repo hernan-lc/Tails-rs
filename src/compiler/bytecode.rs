@@ -530,11 +530,19 @@ impl CodeGenerator {
                     }
                 }
 
+                let superclass_name = superclass.as_ref().and_then(|expr| {
+                    if let Expression::Identifier(name) = expr.as_ref() {
+                        Some(name.clone())
+                    } else {
+                        None
+                    }
+                });
+
                 self.class_infos.push(ClassInfo {
                     name: class_name.clone(),
                     constructor_func_idx,
                     methods,
-                    superclass: None,
+                    superclass: superclass_name,
                 });
 
                 if superclass.is_some() {
@@ -761,8 +769,6 @@ impl CodeGenerator {
                     }
                 } else {
                     if let Expression::Member { object, property, computed } = target.as_ref() {
-                        self.generate_expression(value)?;
-                        self.instructions.push(Instruction::Dup);
                         self.generate_expression(object)?;
                         if *computed {
                             self.generate_expression(property)?;
@@ -772,8 +778,8 @@ impl CodeGenerator {
                         } else {
                             self.generate_expression(property)?;
                         }
+                        self.generate_expression(value)?;
                         self.instructions.push(Instruction::SetProperty);
-                        self.instructions.push(Instruction::Pop);
                     } else if let Expression::Identifier(name) = target.as_ref() {
                         self.generate_expression(value)?;
                         if let Some(local_idx) = self.resolve_local(name) {
@@ -1076,11 +1082,19 @@ impl CodeGenerator {
                     }
                 }
 
+                let superclass_name = superclass.as_ref().and_then(|expr| {
+                    if let Expression::Identifier(name) = expr.as_ref() {
+                        Some(name.clone())
+                    } else {
+                        None
+                    }
+                });
+
                 self.class_infos.push(ClassInfo {
                     name: class_name,
                     constructor_func_idx,
                     methods,
-                    superclass: None,
+                    superclass: superclass_name,
                 });
 
                 if superclass.is_some() {
@@ -1125,9 +1139,9 @@ impl CodeGenerator {
             Expression::ObjectLiteral { properties } => {
                 self.instructions.push(Instruction::NewObject);
                 for (key, value) in properties {
-                    self.generate_expression(value)?;
                     let key_idx = self.add_constant(Value::String(key.clone()));
                     self.instructions.push(Instruction::LoadConst(key_idx));
+                    self.generate_expression(value)?;
                     self.instructions.push(Instruction::SetProperty);
                 }
                 Ok(())
