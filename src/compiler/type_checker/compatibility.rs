@@ -9,7 +9,7 @@ impl TypeChecker {
         matches!(ty, Type::String | Type::StringLiteral(_))
     }
 
-    pub(crate) fn is_boolean_type(&self, ty: &Type) -> bool {
+    pub(crate) fn _is_boolean_type(&self, ty: &Type) -> bool {
         matches!(ty, Type::Boolean | Type::BooleanLiteral(_))
     }
 

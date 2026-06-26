@@ -120,7 +120,7 @@ pub(super) fn native_array_find(interp: &mut Interpreter, this: &Value, args: &[
     let elements = get_array_elements(interp, this)?;
     let callback = args.first().cloned().unwrap_or(Value::Undefined);
     for (i, elem) in elements.iter().enumerate() {
-        let mut call_args = vec![elem.clone(), Value::Integer(i as i64), this.clone()];
+        let call_args = vec![elem.clone(), Value::Integer(i as i64), this.clone()];
         let result = interp.call_value(&callback, &Value::Undefined, &call_args)?;
         if interp.is_truthy(&result) {
             return Ok(elem.clone());
@@ -133,7 +133,7 @@ pub(super) fn native_array_find_index(interp: &mut Interpreter, this: &Value, ar
     let elements = get_array_elements(interp, this)?;
     let callback = args.first().cloned().unwrap_or(Value::Undefined);
     for (i, elem) in elements.iter().enumerate() {
-        let mut call_args = vec![elem.clone(), Value::Integer(i as i64), this.clone()];
+        let call_args = vec![elem.clone(), Value::Integer(i as i64), this.clone()];
         let result = interp.call_value(&callback, &Value::Undefined, &call_args)?;
         if interp.is_truthy(&result) {
             return Ok(Value::Float(i as f64));
@@ -147,7 +147,7 @@ pub(super) fn native_array_map(interp: &mut Interpreter, this: &Value, args: &[V
     let callback = args.first().cloned().unwrap_or(Value::Undefined);
     let mut results = Vec::new();
     for (i, elem) in elements.iter().enumerate() {
-        let mut call_args = vec![elem.clone(), Value::Integer(i as i64), this.clone()];
+        let call_args = vec![elem.clone(), Value::Integer(i as i64), this.clone()];
         let result = interp.call_value(&callback, &Value::Undefined, &call_args)?;
         results.push(result);
     }
@@ -163,7 +163,7 @@ pub(super) fn native_array_filter(interp: &mut Interpreter, this: &Value, args: 
     let callback = args.first().cloned().unwrap_or(Value::Undefined);
     let mut results = Vec::new();
     for (i, elem) in elements.iter().enumerate() {
-        let mut call_args = vec![elem.clone(), Value::Integer(i as i64), this.clone()];
+        let call_args = vec![elem.clone(), Value::Integer(i as i64), this.clone()];
         let result = interp.call_value(&callback, &Value::Undefined, &call_args)?;
         if interp.is_truthy(&result) {
             results.push(elem.clone());
@@ -202,7 +202,7 @@ pub(super) fn native_array_for_each(interp: &mut Interpreter, this: &Value, args
     let elements = get_array_elements(interp, this)?;
     let callback = args.first().cloned().unwrap_or(Value::Undefined);
     for (i, elem) in elements.iter().enumerate() {
-        let mut call_args = vec![elem.clone(), Value::Integer(i as i64), this.clone()];
+        let call_args = vec![elem.clone(), Value::Integer(i as i64), this.clone()];
         interp.call_value(&callback, &Value::Undefined, &call_args)?;
     }
     Ok(Value::Undefined)
@@ -212,7 +212,7 @@ pub(super) fn native_array_some(interp: &mut Interpreter, this: &Value, args: &[
     let elements = get_array_elements(interp, this)?;
     let callback = args.first().cloned().unwrap_or(Value::Undefined);
     for (i, elem) in elements.iter().enumerate() {
-        let mut call_args = vec![elem.clone(), Value::Integer(i as i64), this.clone()];
+        let call_args = vec![elem.clone(), Value::Integer(i as i64), this.clone()];
         let result = interp.call_value(&callback, &Value::Undefined, &call_args)?;
         if interp.is_truthy(&result) {
             return Ok(Value::Boolean(true));
@@ -225,7 +225,7 @@ pub(super) fn native_array_every(interp: &mut Interpreter, this: &Value, args: &
     let elements = get_array_elements(interp, this)?;
     let callback = args.first().cloned().unwrap_or(Value::Undefined);
     for (i, elem) in elements.iter().enumerate() {
-        let mut call_args = vec![elem.clone(), Value::Integer(i as i64), this.clone()];
+        let call_args = vec![elem.clone(), Value::Integer(i as i64), this.clone()];
         let result = interp.call_value(&callback, &Value::Undefined, &call_args)?;
         if !interp.is_truthy(&result) {
             return Ok(Value::Boolean(false));

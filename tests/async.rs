@@ -163,7 +163,7 @@ fn test_promise_basic_resolve() {
     "#).unwrap();
     match &result {
         Value::Promise(_) => {},
-        other => panic!("Expected Promise, got {:?}", result),
+        _other => panic!("Expected Promise, got {:?}", result),
     }
 }
 

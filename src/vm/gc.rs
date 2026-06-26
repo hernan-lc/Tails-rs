@@ -73,7 +73,7 @@ impl GarbageCollector {
         freed
     }
 
-    pub fn collect(
+    pub(crate) fn collect(
         &mut self,
         heap: &mut Vec<HeapValue>,
         globals: &HashMap<String, Value>,
@@ -85,7 +85,7 @@ impl GarbageCollector {
         self.sweep(heap)
     }
 
-    pub fn mark_roots(
+    pub(crate) fn mark_roots(
         &mut self,
         globals: &HashMap<String, Value>,
         stack: &[Value],
