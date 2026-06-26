@@ -413,6 +413,7 @@ mod tests {
             prototype: None,
             super_class: None,
             properties: HashMap::new(),
+            owner_module: None,
         }));
 
         let stack = vec![Value::Function(func_idx)];

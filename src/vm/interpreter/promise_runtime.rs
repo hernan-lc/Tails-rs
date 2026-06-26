@@ -20,6 +20,7 @@ impl Interpreter {
             prototype: Some(proto_idx),
             super_class: None,
             properties: HashMap::new(),
+            owner_module: None,
         }));
         Value::Function(heap_idx)
     }
@@ -34,6 +35,7 @@ impl Interpreter {
             prototype: Some(proto_idx),
             super_class: None,
             properties: HashMap::new(),
+            owner_module: None,
         }));
         Value::Function(heap_idx)
     }

@@ -1,4 +1,6 @@
 use std::collections::HashMap;
+use std::rc::Rc;
+use crate::compiler::CompiledModule;
 use crate::objects::Value;
 use crate::objects::js_promise::JsPromise;
 
@@ -38,6 +40,7 @@ pub struct JsFunction {
     pub prototype: Option<usize>,
     pub super_class: Option<Value>,
     pub properties: HashMap<String, Value>,
+    pub owner_module: Option<Rc<CompiledModule>>,
 }
 
 #[derive(Debug, Clone)]
