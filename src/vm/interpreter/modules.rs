@@ -8,10 +8,29 @@ impl Interpreter {
         let saved_module = self.current_module.take();
         self.current_module = Some(Rc::new(module.clone()));
         let prev_exports = std::mem::take(&mut self.module_exports);
+        let saved_globals = std::mem::take(&mut self.globals);
+        for key in saved_globals.keys() {
+            if key == "console" || key == "Object" || key == "JSON" || key == "Math"
+                || key == "Proxy" || key == "Reflect" || key == "Error" || key == "TypeError"
+                || key == "ReferenceError" || key == "SyntaxError" || key == "RangeError"
+                || key == "Array" || key == "String" || key == "Number" || key == "Boolean"
+                || key == "parseInt" || key == "parseFloat" || key == "isNaN" || key == "isFinite"
+                || key == "setTimeout" || key == "setInterval" || key == "clearTimeout" || key == "clearInterval" {
+                self.globals.insert(key.clone(), saved_globals[key].clone());
+            }
+        }
         let result = self.execute(module);
+        let module_globals = std::mem::replace(&mut self.globals, saved_globals);
         let exec_exports = std::mem::replace(&mut self.module_exports, prev_exports);
         for (k, v) in &exec_exports {
             self.module_exports.insert(k.clone(), v.clone());
+        }
+        for (k, v) in &exec_exports {
+            if let Some(mv) = module_globals.get(k) {
+                self.globals.insert(k.clone(), mv.clone());
+            } else {
+                self.globals.insert(k.clone(), v.clone());
+            }
         }
         self.current_module = saved_module;
         result

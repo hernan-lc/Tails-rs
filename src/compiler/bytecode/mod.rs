@@ -608,6 +608,13 @@ impl CodeGenerator {
                     Statement::FunctionDeclaration { name, .. } => {
                         self.generate_statement(declaration, false)?;
                         self.instructions.push(Instruction::StoreModuleExport(name.clone()));
+                        self.instructions.push(Instruction::LoadGlobal(name.clone()));
+                        self.instructions.push(Instruction::ExportDefault);
+                    }
+                    Statement::ClassDeclaration { name, .. } => {
+                        self.generate_statement(declaration, false)?;
+                        self.instructions.push(Instruction::StoreModuleExport(name.clone()));
+                        self.instructions.push(Instruction::LoadGlobal(name.clone()));
                         self.instructions.push(Instruction::ExportDefault);
                     }
                     _ => {
