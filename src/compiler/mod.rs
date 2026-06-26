@@ -32,6 +32,30 @@ pub struct CompiledModule {
     pub instructions: Vec<Instruction>,
     pub constants: Vec<Value>,
     pub functions: Vec<CompiledFunction>,
+    pub class_infos: Vec<ClassInfo>,
+}
+
+#[derive(Debug, Clone)]
+pub struct ClassInfo {
+    pub name: String,
+    pub constructor_func_idx: Option<u32>,
+    pub methods: Vec<ClassMethodInfo>,
+    pub superclass: Option<String>,
+}
+
+#[derive(Debug, Clone)]
+pub struct ClassMethodInfo {
+    pub name: String,
+    pub func_idx: u32,
+    pub is_static: bool,
+    pub kind: ClassMethodKind,
+}
+
+#[derive(Debug, Clone)]
+pub enum ClassMethodKind {
+    Method,
+    Getter,
+    Setter,
 }
 
 #[derive(Debug, Clone)]
@@ -97,6 +121,12 @@ pub enum Instruction {
     Void,
     Throw,
     MakeClass(u32),
+    SuperConstruct(u16),
+    SuperGet,
     ToString,
+    TryJump(u32, u32),
+    PopTryHandler,
+    LoadException,
+    ReThrowIfPending,
     NotImplementedError(String),
 }

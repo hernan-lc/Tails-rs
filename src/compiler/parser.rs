@@ -126,6 +126,17 @@ pub enum ClassMember {
         params: Vec<String>,
         body: Vec<Statement>,
     },
+    Getter {
+        name: String,
+        body: Vec<Statement>,
+        is_static: bool,
+    },
+    Setter {
+        name: String,
+        param: String,
+        body: Vec<Statement>,
+        is_static: bool,
+    },
 }
 
 #[derive(Debug, Clone)]
@@ -214,6 +225,13 @@ pub enum Expression {
     },
     AwaitExpression {
         argument: Box<Expression>,
+    },
+    SuperCall {
+        args: Vec<Expression>,
+    },
+    SuperMember {
+        property: Box<Expression>,
+        computed: bool,
     },
     ArrayLiteral {
         elements: Vec<Expression>,
@@ -980,6 +998,29 @@ impl<'a> Parser<'a> {
                 self.expect(&Token::RightBrace)?;
                 Ok(Expression::ClassExpression { name, superclass: superclass.map(Box::new), body })
             }
+            Token::Super => {
+                self.advance();
+                if self.peek() == &Token::LeftParen {
+                    self.advance();
+                    let args = self.parse_args()?;
+                    self.expect(&Token::RightParen)?;
+                    Ok(Expression::SuperCall { args })
+                } else if self.peek() == &Token::Dot {
+                    self.advance();
+                    let property = match self.advance() {
+                        Token::Identifier(name) => Expression::Identifier(name),
+                        t => return Err(Error::ParseError(format!("Expected property name after 'super', got {:?}", t))),
+                    };
+                    Ok(Expression::SuperMember { property: Box::new(property), computed: false })
+                } else if self.peek() == &Token::LeftBracket {
+                    self.advance();
+                    let property = self.parse_expression()?;
+                    self.expect(&Token::RightBracket)?;
+                    Ok(Expression::SuperMember { property: Box::new(property), computed: true })
+                } else {
+                    Err(Error::ParseError("Expected '.' or '(' after 'super'".into()))
+                }
+            }
             Token::This => {
                 self.advance();
                 Ok(Expression::Identifier("this".into()))
@@ -1270,11 +1311,37 @@ impl<'a> Parser<'a> {
                 let body = self.parse_block_body()?;
                 self.expect(&Token::RightBrace)?;
                 members.push(ClassMember::Constructor { params, body });
+            } else if self.peek() == &Token::Get && !is_async {
+                self.advance();
+                let name = match self.advance() {
+                    Token::Identifier(name) => name,
+                    t => return Err(Error::ParseError(format!("Expected property name after 'get', got {:?}", t))),
+                };
+                self.expect(&Token::LeftParen)?;
+                self.expect(&Token::RightParen)?;
+                self.expect(&Token::LeftBrace)?;
+                let body = self.parse_block_body()?;
+                self.expect(&Token::RightBrace)?;
+                members.push(ClassMember::Getter { name, body, is_static });
+            } else if self.peek() == &Token::Set && !is_async {
+                self.advance();
+                let name = match self.advance() {
+                    Token::Identifier(name) => name,
+                    t => return Err(Error::ParseError(format!("Expected property name after 'set', got {:?}", t))),
+                };
+                self.expect(&Token::LeftParen)?;
+                let param = match self.advance() {
+                    Token::Identifier(name) => name,
+                    t => return Err(Error::ParseError(format!("Expected parameter name, got {:?}", t))),
+                };
+                self.expect(&Token::RightParen)?;
+                self.expect(&Token::LeftBrace)?;
+                let body = self.parse_block_body()?;
+                self.expect(&Token::RightBrace)?;
+                members.push(ClassMember::Setter { name, param, body, is_static });
             } else {
                 let name = match self.advance() {
                     Token::Identifier(name) => name,
-                    Token::Get => "get".to_string(),
-                    Token::Set => "set".to_string(),
                     t => return Err(Error::ParseError(format!("Expected method name, got {:?}", t))),
                 };
                 if self.peek() == &Token::LeftParen {

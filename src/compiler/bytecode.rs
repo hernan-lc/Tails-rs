@@ -1,6 +1,6 @@
 use std::collections::HashSet;
-use crate::compiler::parser::{AstNode, Statement, Expression, BinaryOperator, UnaryOperator, ForInit, ForInLeft, CompoundAssignmentOp, UpdateOperator, ArrowFunctionBody};
-use crate::compiler::{CompiledModule, CompiledFunction, Instruction};
+use crate::compiler::parser::{AstNode, Statement, Expression, BinaryOperator, UnaryOperator, ForInit, ForInLeft, CompoundAssignmentOp, UpdateOperator, ArrowFunctionBody, ClassMember};
+use crate::compiler::{CompiledModule, CompiledFunction, Instruction, ClassInfo, ClassMethodInfo, ClassMethodKind};
 use crate::errors::Result;
 use crate::objects::Value;
 
@@ -19,6 +19,7 @@ struct CodeGenerator {
     local_start_idx: usize,
     break_targets: Vec<usize>,
     continue_targets: Vec<usize>,
+    class_infos: Vec<ClassInfo>,
 }
 
 impl CodeGenerator {
@@ -33,6 +34,7 @@ impl CodeGenerator {
             local_start_idx: 0,
             break_targets: Vec::new(),
             continue_targets: Vec::new(),
+            class_infos: Vec::new(),
         }
     }
 
@@ -54,6 +56,7 @@ impl CodeGenerator {
             instructions: self.instructions.clone(),
             constants: self.constants.clone(),
             functions: self.functions.clone(),
+            class_infos: self.class_infos.clone(),
         })
     }
 
@@ -416,17 +419,60 @@ impl CodeGenerator {
                 self.scope_depth += 1;
                 let prev_locals_count = self.locals.len();
 
+                let has_catch = handler.is_some();
+                let has_finally = finalizer.is_some();
+
+                self.instructions.push(Instruction::TryJump(0, 0));
+                let try_jump_idx = self.instructions.len() - 1;
+
                 for stmt in block {
                     self.generate_statement(stmt, false)?;
                 }
 
-                if handler.is_some() {
-                    let _catch_param = handler.as_ref().map(|h| h.param.clone());
+                self.instructions.push(Instruction::PopTryHandler);
+
+                let jump_past_catch = if has_catch {
+                    let j = self.instructions.len();
+                    self.instructions.push(Instruction::Jump(0));
+                    Some(j)
+                } else {
+                    None
+                };
+
+                let catch_pc = if has_catch {
+                    self.instructions.len() as u32
+                } else {
+                    0
+                };
+
+                if let Some(catch_clause) = handler {
+                    self.locals.push(catch_clause.param.clone());
+                    let slot = (self.locals.len() - 1) as u16;
+                    self.instructions.push(Instruction::LoadException);
+                    self.instructions.push(Instruction::StoreLocal(slot));
+                    let last_idx = catch_clause.body.len().saturating_sub(1);
+                    for (i, stmt) in catch_clause.body.iter().enumerate() {
+                        self.generate_statement(stmt, i == last_idx && !has_finally)?;
+                    }
                 }
 
-                if let Some(finally_block) = finalizer {
-                    for stmt in finally_block {
+                let finally_pc = self.instructions.len() as u32;
+
+                if let Some(j) = jump_past_catch {
+                    self.patch_jump(j, finally_pc as usize);
+                }
+
+                if let Instruction::TryJump(ref mut c, ref mut f) = self.instructions[try_jump_idx] {
+                    *c = catch_pc;
+                    *f = finally_pc;
+                }
+
+                if has_finally {
+                    for stmt in finalizer.as_ref().unwrap() {
                         self.generate_statement(stmt, false)?;
+                    }
+                    if !has_catch {
+                        self.instructions.push(Instruction::ReThrowIfPending);
                     }
                 }
 
@@ -445,12 +491,57 @@ impl CodeGenerator {
             }
             Statement::ClassDeclaration { name, superclass, body } => {
                 let class_name = name.clone();
-                let _ = superclass;
-                let _ = body;
 
-                let class_name_idx = self.add_constant(Value::String(class_name.clone()));
-                self.instructions.push(Instruction::LoadConst(class_name_idx));
-                self.instructions.push(Instruction::NewObject);
+                let class_info_idx = self.class_infos.len() as u32;
+
+                let constructor_func_idx = self.compile_class_constructor(body)?;
+
+                let mut methods = Vec::new();
+                for member in body {
+                    match member {
+                        ClassMember::Method { name: mname, params, body: mbody, is_static, is_async: _ } => {
+                            let func_idx = self.compile_function(Some(mname.clone()), params, mbody)?;
+                            methods.push(ClassMethodInfo {
+                                name: mname.clone(),
+                                func_idx,
+                                is_static: *is_static,
+                                kind: ClassMethodKind::Method,
+                            });
+                        }
+                        ClassMember::Getter { name: mname, body: mbody, is_static } => {
+                            let func_idx = self.compile_function(Some(format!("get_{}", mname)), &vec![], mbody)?;
+                            methods.push(ClassMethodInfo {
+                                name: mname.clone(),
+                                func_idx,
+                                is_static: *is_static,
+                                kind: ClassMethodKind::Getter,
+                            });
+                        }
+                        ClassMember::Setter { name: mname, param, body: mbody, is_static } => {
+                            let func_idx = self.compile_function(Some(format!("set_{}", mname)), &vec![param.clone()], mbody)?;
+                            methods.push(ClassMethodInfo {
+                                name: mname.clone(),
+                                func_idx,
+                                is_static: *is_static,
+                                kind: ClassMethodKind::Setter,
+                            });
+                        }
+                        ClassMember::Constructor { .. } | ClassMember::Property { .. } => {}
+                    }
+                }
+
+                self.class_infos.push(ClassInfo {
+                    name: class_name.clone(),
+                    constructor_func_idx,
+                    methods,
+                    superclass: None,
+                });
+
+                if superclass.is_some() {
+                    self.generate_expression(superclass.as_ref().unwrap())?;
+                }
+
+                self.instructions.push(Instruction::MakeClass(class_info_idx));
 
                 if self.scope_depth == 0 {
                     self.instructions.push(Instruction::StoreGlobal(class_name));
@@ -945,18 +1036,83 @@ impl CodeGenerator {
                 }
                 Ok(())
             }
-            Expression::ClassExpression { name, superclass: _, body: _ } => {
-                if let Some(n) = name {
-                    let idx = self.add_constant(Value::String(n.clone()));
-                    self.instructions.push(Instruction::LoadConst(idx));
-                } else {
-                    self.instructions.push(Instruction::LoadNull);
+            Expression::ClassExpression { name, superclass, body } => {
+                let class_info_idx = self.class_infos.len() as u32;
+                let class_name = name.clone().unwrap_or_else(|| "anonymous".to_string());
+
+                let constructor_func_idx = self.compile_class_constructor(body)?;
+
+                let mut methods = Vec::new();
+                for member in body {
+                    match member {
+                        ClassMember::Method { name: mname, params, body: mbody, is_static, is_async: _ } => {
+                            let func_idx = self.compile_function(Some(mname.clone()), params, mbody)?;
+                            methods.push(ClassMethodInfo {
+                                name: mname.clone(),
+                                func_idx,
+                                is_static: *is_static,
+                                kind: ClassMethodKind::Method,
+                            });
+                        }
+                        ClassMember::Getter { name: mname, body: mbody, is_static } => {
+                            let func_idx = self.compile_function(Some(format!("get_{}", mname)), &vec![], mbody)?;
+                            methods.push(ClassMethodInfo {
+                                name: mname.clone(),
+                                func_idx,
+                                is_static: *is_static,
+                                kind: ClassMethodKind::Getter,
+                            });
+                        }
+                        ClassMember::Setter { name: mname, param, body: mbody, is_static } => {
+                            let func_idx = self.compile_function(Some(format!("set_{}", mname)), &vec![param.clone()], mbody)?;
+                            methods.push(ClassMethodInfo {
+                                name: mname.clone(),
+                                func_idx,
+                                is_static: *is_static,
+                                kind: ClassMethodKind::Setter,
+                            });
+                        }
+                        ClassMember::Constructor { .. } | ClassMember::Property { .. } => {}
+                    }
                 }
-                self.instructions.push(Instruction::NewObject);
+
+                self.class_infos.push(ClassInfo {
+                    name: class_name,
+                    constructor_func_idx,
+                    methods,
+                    superclass: None,
+                });
+
+                if superclass.is_some() {
+                    self.generate_expression(superclass.as_ref().unwrap())?;
+                }
+
+                self.instructions.push(Instruction::MakeClass(class_info_idx));
                 Ok(())
             }
             Expression::AwaitExpression { argument } => {
                 self.generate_expression(argument)?;
+                Ok(())
+            }
+            Expression::SuperCall { args } => {
+                self.instructions.push(Instruction::LoadThis);
+                for arg in args {
+                    self.generate_expression(arg)?;
+                }
+                self.instructions.push(Instruction::SuperConstruct(args.len() as u16));
+                Ok(())
+            }
+            Expression::SuperMember { property, computed } => {
+                self.instructions.push(Instruction::LoadThis);
+                if *computed {
+                    self.generate_expression(property)?;
+                } else if let Expression::Identifier(name) = property.as_ref() {
+                    let idx = self.add_constant(Value::String(name.clone()));
+                    self.instructions.push(Instruction::LoadConst(idx));
+                } else {
+                    self.generate_expression(property)?;
+                }
+                self.instructions.push(Instruction::SuperGet);
                 Ok(())
             }
             Expression::ArrayLiteral { elements } => {
@@ -1002,6 +1158,63 @@ impl CodeGenerator {
             _ => {}
         }
         Ok(())
+    }
+
+    fn compile_function(&mut self, name: Option<String>, params: &[String], body: &[Statement]) -> Result<u32> {
+        let func_idx = self.functions.len() as u32;
+        let parent_locals_snapshot = self.locals.clone();
+        let outer_refs = find_outer_refs(body, params, &parent_locals_snapshot);
+        let num_captures = outer_refs.len();
+
+        self.functions.push(CompiledFunction {
+            name: name.clone(),
+            params: params.to_vec(),
+            bytecode_index: 0,
+            param_count: params.len(),
+            closure_var_count: num_captures,
+        });
+
+        let jump_over = self.instructions.len();
+        self.instructions.push(Instruction::Jump(0));
+
+        let func_start = self.instructions.len();
+        self.functions[func_idx as usize].bytecode_index = func_start;
+
+        self.scope_depth += 1;
+        let prev_locals = self.locals.len();
+
+        let saved_captured = std::mem::take(&mut self.captured_var_names);
+        let saved_start = self.local_start_idx;
+        self.captured_var_names = outer_refs.iter().map(|(n, _)| n.clone()).collect();
+        self.local_start_idx = self.locals.len();
+
+        for param in params {
+            self.locals.push(param.clone());
+        }
+
+        for stmt in body {
+            self.generate_statement(stmt, false)?;
+        }
+
+        self.instructions.push(Instruction::LoadUndefined);
+        self.instructions.push(Instruction::Return);
+
+        self.scope_depth -= 1;
+        self.locals.truncate(prev_locals);
+        self.captured_var_names = saved_captured;
+        self.local_start_idx = saved_start;
+
+        self.patch_jump(jump_over, self.instructions.len());
+        Ok(func_idx)
+    }
+
+    fn compile_class_constructor(&mut self, body: &[ClassMember]) -> Result<Option<u32>> {
+        for member in body {
+            if let ClassMember::Constructor { params, body } = member {
+                return Ok(Some(self.compile_function(Some("constructor".to_string()), params, body)?));
+            }
+        }
+        Ok(None)
     }
 
     fn resolve_local(&self, name: &str) -> Option<u16> {

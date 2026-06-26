@@ -77,6 +77,11 @@ pub static NATIVE_TABLE: &[NativeFn] = &[
     native_number_parse_float,
     native_number_is_nan,
     native_number_is_finite,
+    native_error_constructor,
+    native_type_error_constructor,
+    native_reference_error_constructor,
+    native_syntax_error_constructor,
+    native_range_error_constructor,
 ];
 
 // ---- Helper ----
@@ -1042,4 +1047,115 @@ fn native_number_is_nan(interp: &mut Interpreter, this: &Value, args: &[Value]) 
 
 fn native_number_is_finite(interp: &mut Interpreter, this: &Value, args: &[Value]) -> Result<Value> {
     native_is_finite(interp, this, args)
+}
+
+// ---- Error constructors ----
+
+fn native_error_constructor(interp: &mut Interpreter, _this: &Value, args: &[Value]) -> Result<Value> {
+    let message = args.first().map(|v| to_string_value(interp, v)).unwrap_or_default();
+    let obj_idx = interp.heap.len();
+    let mut props = std::collections::HashMap::new();
+    props.insert("message".into(), Value::String(message.clone()));
+    props.insert("name".into(), Value::String("Error".into()));
+    props.insert("stack".into(), Value::String(format!("Error{}", if message.is_empty() { String::new() } else { format!(": {}", message) })));
+
+    let proto_idx = find_error_ctor_proto(interp);
+
+    interp.heap.push(crate::vm::interpreter::HeapValue::Object(crate::vm::interpreter::JsObject {
+        properties: props,
+        prototype: proto_idx,
+    }));
+    Ok(Value::Object(obj_idx))
+}
+
+fn native_type_error_constructor(interp: &mut Interpreter, _this: &Value, args: &[Value]) -> Result<Value> {
+    let message = args.first().map(|v| to_string_value(interp, v)).unwrap_or_default();
+    let obj_idx = interp.heap.len();
+    let mut props = std::collections::HashMap::new();
+    props.insert("message".into(), Value::String(message));
+    props.insert("name".into(), Value::String("TypeError".into()));
+    props.insert("stack".into(), Value::String("TypeError".into()));
+    
+    let proto_idx = find_error_proto(interp, "TypeError");
+    interp.heap.push(crate::vm::interpreter::HeapValue::Object(crate::vm::interpreter::JsObject {
+        properties: props,
+        prototype: proto_idx,
+    }));
+    Ok(Value::Object(obj_idx))
+}
+
+fn native_reference_error_constructor(interp: &mut Interpreter, _this: &Value, args: &[Value]) -> Result<Value> {
+    let message = args.first().map(|v| to_string_value(interp, v)).unwrap_or_default();
+    let obj_idx = interp.heap.len();
+    let mut props = std::collections::HashMap::new();
+    props.insert("message".into(), Value::String(message));
+    props.insert("name".into(), Value::String("ReferenceError".into()));
+    props.insert("stack".into(), Value::String("ReferenceError".into()));
+    
+    let proto_idx = find_error_proto(interp, "ReferenceError");
+    interp.heap.push(crate::vm::interpreter::HeapValue::Object(crate::vm::interpreter::JsObject {
+        properties: props,
+        prototype: proto_idx,
+    }));
+    Ok(Value::Object(obj_idx))
+}
+
+fn native_syntax_error_constructor(interp: &mut Interpreter, _this: &Value, args: &[Value]) -> Result<Value> {
+    let message = args.first().map(|v| to_string_value(interp, v)).unwrap_or_default();
+    let obj_idx = interp.heap.len();
+    let mut props = std::collections::HashMap::new();
+    props.insert("message".into(), Value::String(message));
+    props.insert("name".into(), Value::String("SyntaxError".into()));
+    props.insert("stack".into(), Value::String("SyntaxError".into()));
+    
+    let proto_idx = find_error_proto(interp, "SyntaxError");
+    interp.heap.push(crate::vm::interpreter::HeapValue::Object(crate::vm::interpreter::JsObject {
+        properties: props,
+        prototype: proto_idx,
+    }));
+    Ok(Value::Object(obj_idx))
+}
+
+fn native_range_error_constructor(interp: &mut Interpreter, _this: &Value, args: &[Value]) -> Result<Value> {
+    let message = args.first().map(|v| to_string_value(interp, v)).unwrap_or_default();
+    let obj_idx = interp.heap.len();
+    let mut props = std::collections::HashMap::new();
+    props.insert("message".into(), Value::String(message));
+    props.insert("name".into(), Value::String("RangeError".into()));
+    props.insert("stack".into(), Value::String("RangeError".into()));
+    
+    let proto_idx = find_error_proto(interp, "RangeError");
+    interp.heap.push(crate::vm::interpreter::HeapValue::Object(crate::vm::interpreter::JsObject {
+        properties: props,
+        prototype: proto_idx,
+    }));
+    Ok(Value::Object(obj_idx))
+}
+
+fn find_error_ctor_proto(interp: &Interpreter) -> Option<usize> {
+    for hv in &interp.heap {
+        if let crate::vm::interpreter::HeapValue::Object(obj) = hv {
+            if obj.properties.contains_key("prototype")
+                && !obj.properties.contains_key("name")
+            {
+                if let Some(Value::Object(proto_idx)) = obj.properties.get("prototype") {
+                    return Some(*proto_idx);
+                }
+            }
+        }
+    }
+    None
+}
+
+fn find_error_proto(interp: &Interpreter, type_name: &str) -> Option<usize> {
+    for (i, hv) in interp.heap.iter().enumerate() {
+        if let crate::vm::interpreter::HeapValue::Object(obj) = hv {
+            if let Some(Value::String(name)) = obj.properties.get("name") {
+                if name == type_name {
+                    return Some(i);
+                }
+            }
+        }
+    }
+    None
 }

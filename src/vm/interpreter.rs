@@ -38,6 +38,8 @@ pub struct JsFunction {
     pub bytecode_index: usize,
     pub closure: Vec<Value>,
     pub prototype: Option<usize>,
+    pub super_class: Option<Value>,
+    pub properties: HashMap<String, Value>,
 }
 
 #[derive(Debug, Clone)]
@@ -58,12 +60,21 @@ struct CallFrame {
     is_construct: bool,
 }
 
+#[derive(Debug, Clone)]
+struct ExceptionHandler {
+    catch_pc: u32,
+    finally_pc: u32,
+    stack_depth: usize,
+}
+
 pub struct Interpreter {
     pub(crate) globals: HashMap<String, Value>,
     pub(crate) stack: Vec<Value>,
     pub(crate) heap: Vec<HeapValue>,
     call_stack: Vec<CallFrame>,
     current_module: Option<CompiledModule>,
+    exception_handlers: Vec<ExceptionHandler>,
+    pending_exception: Option<Value>,
 }
 
 impl Interpreter {
@@ -74,6 +85,8 @@ impl Interpreter {
             heap: Vec::new(),
             call_stack: Vec::new(),
             current_module: None,
+            exception_handlers: Vec::new(),
+            pending_exception: None,
         };
         interp.init_builtins();
         Ok(interp)
@@ -150,6 +163,59 @@ impl Interpreter {
         number_props.insert("parseInt".into(), Value::NativeFunction(10));
         self.heap.push(HeapValue::Object(JsObject { properties: number_props, prototype: None }));
         self.globals.insert("Number".into(), Value::Object(number_obj_idx));
+
+        // Error constructor
+        let error_proto_idx = self.heap.len();
+        self.heap.push(HeapValue::Object(JsObject::new()));
+        let _error_ctor_idx = self.heap.len();
+        let mut error_ctor_props = HashMap::new();
+        error_ctor_props.insert("prototype".into(), Value::Object(error_proto_idx));
+        self.heap.push(HeapValue::Object(JsObject { properties: error_ctor_props, prototype: None }));
+        self.globals.insert("Error".into(), Value::NativeFunction(72));
+
+        // TypeError constructor
+        let type_error_proto_idx = self.heap.len();
+        let mut type_error_proto_props = HashMap::new();
+        type_error_proto_props.insert("name".into(), Value::String("TypeError".into()));
+        self.heap.push(HeapValue::Object(JsObject { properties: type_error_proto_props, prototype: Some(error_proto_idx) }));
+        let _type_error_ctor_idx = self.heap.len();
+        let mut type_error_ctor_props = HashMap::new();
+        type_error_ctor_props.insert("prototype".into(), Value::Object(type_error_proto_idx));
+        self.heap.push(HeapValue::Object(JsObject { properties: type_error_ctor_props, prototype: None }));
+        self.globals.insert("TypeError".into(), Value::NativeFunction(73));
+
+        // ReferenceError constructor
+        let ref_error_proto_idx = self.heap.len();
+        let mut ref_error_proto_props = HashMap::new();
+        ref_error_proto_props.insert("name".into(), Value::String("ReferenceError".into()));
+        self.heap.push(HeapValue::Object(JsObject { properties: ref_error_proto_props, prototype: Some(error_proto_idx) }));
+        let _ref_error_ctor_idx = self.heap.len();
+        let mut ref_error_ctor_props = HashMap::new();
+        ref_error_ctor_props.insert("prototype".into(), Value::Object(ref_error_proto_idx));
+        self.heap.push(HeapValue::Object(JsObject { properties: ref_error_ctor_props, prototype: None }));
+        self.globals.insert("ReferenceError".into(), Value::NativeFunction(74));
+
+        // SyntaxError constructor
+        let syntax_error_proto_idx = self.heap.len();
+        let mut syntax_error_proto_props = HashMap::new();
+        syntax_error_proto_props.insert("name".into(), Value::String("SyntaxError".into()));
+        self.heap.push(HeapValue::Object(JsObject { properties: syntax_error_proto_props, prototype: Some(error_proto_idx) }));
+        let _syntax_error_ctor_idx = self.heap.len();
+        let mut syntax_error_ctor_props = HashMap::new();
+        syntax_error_ctor_props.insert("prototype".into(), Value::Object(syntax_error_proto_idx));
+        self.heap.push(HeapValue::Object(JsObject { properties: syntax_error_ctor_props, prototype: None }));
+        self.globals.insert("SyntaxError".into(), Value::NativeFunction(75));
+
+        // RangeError constructor
+        let range_error_proto_idx = self.heap.len();
+        let mut range_error_proto_props = HashMap::new();
+        range_error_proto_props.insert("name".into(), Value::String("RangeError".into()));
+        self.heap.push(HeapValue::Object(JsObject { properties: range_error_proto_props, prototype: Some(error_proto_idx) }));
+        let _range_error_ctor_idx = self.heap.len();
+        let mut range_error_ctor_props = HashMap::new();
+        range_error_ctor_props.insert("prototype".into(), Value::Object(range_error_proto_idx));
+        self.heap.push(HeapValue::Object(JsObject { properties: range_error_ctor_props, prototype: None }));
+        self.globals.insert("RangeError".into(), Value::NativeFunction(76));
     }
 
     pub fn execute(&mut self, module: &CompiledModule) -> Result<Value> {
@@ -160,7 +226,7 @@ impl Interpreter {
     fn execute_from(&mut self, module: &CompiledModule, start_pc: usize) -> Result<Value> {
         let mut pc = start_pc;
 
-        loop {
+        'main: loop {
             if pc >= module.instructions.len() {
                 break;
             }
@@ -487,46 +553,62 @@ impl Interpreter {
                     let constructor = self.stack.pop()
                         .ok_or_else(|| Error::RuntimeError("Stack underflow".into()))?;
 
-                    let proto_idx = if let Value::Function(func_idx) = &constructor {
-                        if let Value::Object(proto_obj_idx) = self.get_property(&constructor, &Value::String("prototype".to_string()))? {
-                            Some(proto_obj_idx)
-                        } else {
-                            None
+                    match &constructor {
+                        Value::Function(func_idx) => {
+                            let proto_idx = if let Value::Object(proto_obj_idx) = self.get_property(&constructor, &Value::String("prototype".to_string()))? {
+                                Some(proto_obj_idx)
+                            } else {
+                                None
+                            };
+
+                            let new_obj_heap_idx = self.heap.len();
+                            self.heap.push(HeapValue::Object(JsObject::with_prototype(proto_idx)));
+                            let this_val = Value::Object(new_obj_heap_idx);
+
+                            if let HeapValue::Function(f) = &self.heap[*func_idx] {
+                                let f_clone = f.clone();
+                                let return_address = pc + 1;
+                                let base_pointer = self.stack.len();
+                                let closure_count = f_clone.closure.len();
+
+                                self.call_stack.push(CallFrame {
+                                    return_address,
+                                    base_pointer,
+                                    closure_var_count: closure_count,
+                                    func_heap_idx: Some(*func_idx),
+                                    this_value: Some(this_val.clone()),
+                                    is_construct: true,
+                                });
+
+                                for closure_var in &f_clone.closure {
+                                    self.stack.push(closure_var.clone());
+                                }
+
+                                for arg in args {
+                                    self.stack.push(arg);
+                                }
+
+                                pc = f_clone.bytecode_index;
+                                continue;
+                            }
                         }
-                    } else {
-                        return Err(Error::TypeError(format!("{} is not a constructor", self.value_to_string(&constructor))));
-                    };
-
-                    let new_obj_heap_idx = self.heap.len();
-                    self.heap.push(HeapValue::Object(JsObject::with_prototype(proto_idx)));
-                    let this_val = Value::Object(new_obj_heap_idx);
-
-                    if let Value::Function(func_idx) = constructor {
-                        if let HeapValue::Function(f) = &self.heap[func_idx] {
-                            let f_clone = f.clone();
-                            let return_address = pc + 1;
-                            let base_pointer = self.stack.len();
-                            let closure_count = f_clone.closure.len();
-
-                            self.call_stack.push(CallFrame {
-                                return_address,
-                                base_pointer,
-                                closure_var_count: closure_count,
-                                func_heap_idx: Some(func_idx),
-                                this_value: Some(this_val.clone()),
-                                is_construct: true,
-                            });
-
-                            for closure_var in &f_clone.closure {
-                                self.stack.push(closure_var.clone());
+                        Value::NativeFunction(native_idx) => {
+                            let proto_idx = self.find_native_prototype(*native_idx);
+                            let new_obj_heap_idx = self.heap.len();
+                            self.heap.push(HeapValue::Object(JsObject::with_prototype(proto_idx)));
+                            let this_val = Value::Object(new_obj_heap_idx);
+                            let result = self.call_native(*native_idx, &this_val, &args)?;
+                            match result {
+                                Value::Object(_) | Value::Array(_) | Value::Function(_) => {
+                                    self.stack.push(result);
+                                }
+                                _ => {
+                                    self.stack.push(this_val);
+                                }
                             }
-
-                            for arg in args {
-                                self.stack.push(arg);
-                            }
-
-                            pc = f_clone.bytecode_index;
-                            continue;
+                        }
+                        _ => {
+                            return Err(Error::TypeError(format!("{} is not a constructor", self.value_to_string(&constructor))));
                         }
                     }
                 }
@@ -594,6 +676,8 @@ impl Interpreter {
                         bytecode_index: func_info.bytecode_index,
                         closure: Vec::new(),
                         prototype: Some(proto_obj_idx),
+                        super_class: None,
+                        properties: HashMap::new(),
                     }));
 
                     self.stack.push(Value::Function(heap_idx));
@@ -619,6 +703,8 @@ impl Interpreter {
                         bytecode_index: func_info.bytecode_index,
                         closure: closure_vars,
                         prototype: Some(proto_obj_idx),
+                        super_class: None,
+                        properties: HashMap::new(),
                     }));
 
                     self.stack.push(Value::Function(heap_idx));
@@ -640,6 +726,12 @@ impl Interpreter {
                         if let HeapValue::Object(obj) = &mut self.heap[*obj_idx] {
                             if let Value::String(key_str) = &key {
                                 obj.properties.insert(key_str.clone(), value);
+                            }
+                        }
+                    } else if let Value::Function(func_idx) = &object {
+                        if let HeapValue::Function(f) = &mut self.heap[*func_idx] {
+                            if let Value::String(key_str) = &key {
+                                f.properties.insert(key_str.clone(), value);
                             }
                         }
                     }
@@ -719,13 +811,349 @@ impl Interpreter {
                 Instruction::Throw => {
                     let value = self.stack.pop()
                         .ok_or_else(|| Error::RuntimeError("Stack underflow".into()))?;
+                    self.pending_exception = Some(value.clone());
+
+                    while let Some(handler) = self.exception_handlers.last().cloned() {
+                        if handler.catch_pc != 0 {
+                            self.exception_handlers.pop();
+                            self.stack.truncate(handler.stack_depth);
+                            pc = handler.catch_pc as usize;
+                            continue 'main;
+                        } else if handler.finally_pc != 0 {
+                            self.exception_handlers.pop();
+                            self.stack.truncate(handler.stack_depth);
+                            pc = handler.finally_pc as usize;
+                            continue 'main;
+                        } else {
+                            self.exception_handlers.pop();
+                        }
+                    }
+
                     return Err(Error::RuntimeError(format!("Thrown: {}", self.value_to_string(&value))));
+                }
+                Instruction::TryJump(catch_pc, finally_pc) => {
+                    let handler = ExceptionHandler {
+                        catch_pc: *catch_pc,
+                        finally_pc: *finally_pc,
+                        stack_depth: self.stack.len(),
+                    };
+                    self.exception_handlers.push(handler);
+                }
+                Instruction::PopTryHandler => {
+                    self.exception_handlers.pop();
+                    if self.pending_exception.is_some() {
+                        while let Some(handler) = self.exception_handlers.last().cloned() {
+                            if handler.catch_pc != 0 {
+                                self.exception_handlers.pop();
+                                self.stack.truncate(handler.stack_depth);
+                                pc = handler.catch_pc as usize;
+                                continue 'main;
+                            } else if handler.finally_pc != 0 {
+                                self.exception_handlers.pop();
+                                self.stack.truncate(handler.stack_depth);
+                                pc = handler.finally_pc as usize;
+                                continue 'main;
+                            } else {
+                                self.exception_handlers.pop();
+                            }
+                        }
+                        let exc = self.pending_exception.take()
+                            .unwrap_or(Value::Undefined);
+                        return Err(Error::RuntimeError(format!("Thrown: {}", self.value_to_string(&exc))));
+                    }
+                }
+                Instruction::LoadException => {
+                    let exc = self.pending_exception.take()
+                        .unwrap_or(Value::Undefined);
+                    self.stack.push(exc);
+                }
+                Instruction::ReThrowIfPending => {
+                    if self.pending_exception.is_some() {
+                        while let Some(handler) = self.exception_handlers.last().cloned() {
+                            if handler.catch_pc != 0 {
+                                self.exception_handlers.pop();
+                                self.stack.truncate(handler.stack_depth);
+                                pc = handler.catch_pc as usize;
+                                continue 'main;
+                            } else if handler.finally_pc != 0 {
+                                self.exception_handlers.pop();
+                                self.stack.truncate(handler.stack_depth);
+                                pc = handler.finally_pc as usize;
+                                continue 'main;
+                            } else {
+                                self.exception_handlers.pop();
+                            }
+                        }
+                        let exc = self.pending_exception.take()
+                            .unwrap_or(Value::Undefined);
+                        return Err(Error::RuntimeError(format!("Thrown: {}", self.value_to_string(&exc))));
+                    }
                 }
                 Instruction::ToString => {
                     let value = self.stack.pop()
                         .ok_or_else(|| Error::RuntimeError("Stack underflow".into()))?;
                     let s = self.value_to_string_raw(&value);
                     self.stack.push(Value::String(s));
+                }
+                Instruction::MakeClass(class_info_idx) => {
+                    let class_info = module.class_infos[*class_info_idx as usize].clone();
+
+                    let super_val = if class_info.superclass.is_some() {
+                        self.stack.pop().ok_or_else(|| Error::RuntimeError("Stack underflow".into()))?
+                    } else {
+                        Value::Undefined
+                    };
+
+                    let proto_obj_idx = self.heap.len();
+                    self.heap.push(HeapValue::Object(JsObject::new()));
+
+                    if let Value::Object(super_obj_idx) = &super_val {
+                        if let HeapValue::Object(super_obj) = &self.heap[*super_obj_idx] {
+                            if let Some(Value::Object(sp_idx)) = super_obj.properties.get("prototype") {
+                                self.heap[proto_obj_idx] = HeapValue::Object(JsObject::with_prototype(Some(*sp_idx)));
+                            }
+                        }
+                    }
+
+                    if let Some(ctor_func_idx) = class_info.constructor_func_idx {
+                        let func_info = module.functions[ctor_func_idx as usize].clone();
+
+                        let ctor_heap_idx = self.heap.len();
+                        self.heap.push(HeapValue::Function(JsFunction {
+                            name: func_info.name,
+                            params: func_info.params,
+                            bytecode_index: func_info.bytecode_index,
+                            closure: Vec::new(),
+                            prototype: Some(proto_obj_idx),
+                            super_class: Some(super_val.clone()),
+                            properties: HashMap::new(),
+                        }));
+
+                        if let HeapValue::Object(proto_obj) = &mut self.heap[proto_obj_idx] {
+                            proto_obj.properties.insert("constructor".to_string(), Value::Function(ctor_heap_idx));
+                        }
+
+                        for method_info in &class_info.methods {
+                            let method_func_info = module.functions[method_info.func_idx as usize].clone();
+
+                            let method_proto_idx = self.heap.len();
+                            self.heap.push(HeapValue::Object(JsObject::new()));
+
+                            let method_heap_idx = self.heap.len();
+                            self.heap.push(HeapValue::Function(JsFunction {
+                                name: Some(method_info.name.clone()),
+                                params: method_func_info.params,
+                                bytecode_index: method_func_info.bytecode_index,
+                                closure: Vec::new(),
+                                prototype: Some(method_proto_idx),
+                                super_class: None,
+                                properties: HashMap::new(),
+                            }));
+                            let method_val = Value::Function(method_heap_idx);
+
+                            if method_info.is_static {
+                                if let HeapValue::Function(ctor_func) = &mut self.heap[ctor_heap_idx] {
+                                    ctor_func.properties.insert(method_info.name.clone(), method_val);
+                                }
+                            } else {
+                                match &method_info.kind {
+                                    crate::compiler::ClassMethodKind::Getter => {
+                                        if let HeapValue::Object(proto_obj) = &mut self.heap[proto_obj_idx] {
+                                            proto_obj.properties.insert(
+                                                format!("__getter_{}", method_info.name),
+                                                method_val,
+                                            );
+                                        }
+                                    }
+                                    crate::compiler::ClassMethodKind::Setter => {
+                                        if let HeapValue::Object(proto_obj) = &mut self.heap[proto_obj_idx] {
+                                            proto_obj.properties.insert(
+                                                format!("__setter_{}", method_info.name),
+                                                method_val,
+                                            );
+                                        }
+                                    }
+                                    crate::compiler::ClassMethodKind::Method => {
+                                        if let HeapValue::Object(proto_obj) = &mut self.heap[proto_obj_idx] {
+                                            proto_obj.properties.insert(method_info.name.clone(), method_val);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        self.stack.push(Value::Function(ctor_heap_idx));
+                    } else {
+                        let ctor_heap_idx = self.heap.len();
+                        self.heap.push(HeapValue::Function(JsFunction {
+                            name: Some(class_info.name.clone()),
+                            params: Vec::new(),
+                            bytecode_index: 0,
+                            closure: Vec::new(),
+                            prototype: Some(proto_obj_idx),
+                            super_class: Some(super_val.clone()),
+                            properties: HashMap::new(),
+                        }));
+
+                        if let HeapValue::Object(proto_obj) = &mut self.heap[proto_obj_idx] {
+                            proto_obj.properties.insert("constructor".to_string(), Value::Function(ctor_heap_idx));
+                        }
+
+                        for method_info in &class_info.methods {
+                            let method_func_info = module.functions[method_info.func_idx as usize].clone();
+
+                            let method_proto_idx = self.heap.len();
+                            self.heap.push(HeapValue::Object(JsObject::new()));
+
+                            let method_heap_idx = self.heap.len();
+                            self.heap.push(HeapValue::Function(JsFunction {
+                                name: Some(method_info.name.clone()),
+                                params: method_func_info.params,
+                                bytecode_index: method_func_info.bytecode_index,
+                                closure: Vec::new(),
+                                prototype: Some(method_proto_idx),
+                                super_class: None,
+                                properties: HashMap::new(),
+                            }));
+                            let method_val = Value::Function(method_heap_idx);
+
+                            if method_info.is_static {
+                                if let HeapValue::Function(ctor_func) = &mut self.heap[ctor_heap_idx] {
+                                    ctor_func.properties.insert(method_info.name.clone(), method_val);
+                                }
+                            } else {
+                                match &method_info.kind {
+                                    crate::compiler::ClassMethodKind::Getter => {
+                                        if let HeapValue::Object(proto_obj) = &mut self.heap[proto_obj_idx] {
+                                            proto_obj.properties.insert(
+                                                format!("__getter_{}", method_info.name),
+                                                method_val,
+                                            );
+                                        }
+                                    }
+                                    crate::compiler::ClassMethodKind::Setter => {
+                                        if let HeapValue::Object(proto_obj) = &mut self.heap[proto_obj_idx] {
+                                            proto_obj.properties.insert(
+                                                format!("__setter_{}", method_info.name),
+                                                method_val,
+                                            );
+                                        }
+                                    }
+                                    crate::compiler::ClassMethodKind::Method => {
+                                        if let HeapValue::Object(proto_obj) = &mut self.heap[proto_obj_idx] {
+                                            proto_obj.properties.insert(method_info.name.clone(), method_val);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        self.stack.push(Value::Function(ctor_heap_idx));
+                    }
+                }
+                Instruction::SuperConstruct(argc) => {
+                    let mut args = Vec::new();
+                    for _ in 0..*argc {
+                        args.push(self.stack.pop()
+                            .ok_or_else(|| Error::RuntimeError("Stack underflow".into()))?);
+                    }
+                    args.reverse();
+
+                    let this_val = self.stack.pop()
+                        .ok_or_else(|| Error::RuntimeError("Stack underflow".into()))?;
+
+                    let super_class = {
+                        let mut found = Value::Undefined;
+                        for frame in self.call_stack.iter().rev() {
+                            if let Some(func_idx) = frame.func_heap_idx {
+                                if let HeapValue::Function(f) = &self.heap[func_idx] {
+                                    if let Some(ref sc) = f.super_class {
+                                        found = sc.clone();
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                        found
+                    };
+
+                    match super_class {
+                        Value::Function(func_idx) => {
+                            if let HeapValue::Function(f) = &self.heap[func_idx] {
+                                let f_clone = f.clone();
+
+                                let new_obj_heap_idx = self.heap.len();
+                                let proto_val = self.get_property(&super_class, &Value::String("prototype".to_string()))?;
+                                let proto_idx = if let Value::Object(pi) = proto_val { Some(pi) } else { None };
+                                self.heap.push(HeapValue::Object(JsObject::with_prototype(proto_idx)));
+
+                                let constructed = Value::Object(new_obj_heap_idx);
+
+                                let return_address = pc + 1;
+                                let base_pointer = self.stack.len();
+                                let closure_count = f_clone.closure.len();
+
+                                self.call_stack.push(CallFrame {
+                                    return_address,
+                                    base_pointer,
+                                    closure_var_count: closure_count,
+                                    func_heap_idx: Some(func_idx),
+                                    this_value: Some(this_val.clone()),
+                                    is_construct: true,
+                                });
+
+                                for closure_var in &f_clone.closure {
+                                    self.stack.push(closure_var.clone());
+                                }
+                                for arg in args {
+                                    self.stack.push(arg);
+                                }
+
+                                pc = f_clone.bytecode_index;
+                                continue;
+                            }
+                        }
+                        Value::NativeFunction(native_idx) => {
+                            let result = self.call_native(native_idx, &this_val, &args)?;
+                            self.stack.push(result);
+                        }
+                        _ => {
+                            return Err(Error::TypeError("Superclass is not a constructor".into()));
+                        }
+                    }
+                }
+                Instruction::SuperGet => {
+                    let key = self.stack.pop()
+                        .ok_or_else(|| Error::RuntimeError("Stack underflow".into()))?;
+                    let _this = self.stack.pop()
+                        .ok_or_else(|| Error::RuntimeError("Stack underflow".into()))?;
+
+                    let mut super_val = Value::Undefined;
+                    for frame in self.call_stack.iter().rev() {
+                        if let Some(func_idx) = frame.func_heap_idx {
+                            if let HeapValue::Function(f) = &self.heap[func_idx] {
+                                if let Some(ref sc) = f.super_class {
+                                    super_val = sc.clone();
+                                    break;
+                                }
+                            }
+                        }
+                    }
+
+                    match &super_val {
+                        Value::Function(func_idx) => {
+                            if let HeapValue::Function(f) = &self.heap[*func_idx] {
+                                if let Some(proto_idx) = f.prototype {
+                                    let proto_val = Value::Object(proto_idx);
+                                    let result = self.get_property(&proto_val, &key)?;
+                                    self.stack.push(result);
+                                    continue;
+                                }
+                            }
+                        }
+                        _ => {}
+                    }
+                    self.stack.push(Value::Undefined);
                 }
                 _ => {
                     return Err(Error::RuntimeError(format!("Unhandled instruction: {:?}", instruction)));
@@ -796,6 +1224,27 @@ impl Interpreter {
             Err(Error::RuntimeError(format!("Unknown native function index: {}", idx)))
         }
     }
+
+    fn find_native_prototype(&self, native_idx: usize) -> Option<usize> {
+        let ctor_name = match native_idx {
+            72 => "Error",
+            73 => "TypeError",
+            74 => "ReferenceError",
+            75 => "SyntaxError",
+            76 => "RangeError",
+            _ => return None,
+        };
+        for (i, hv) in self.heap.iter().enumerate() {
+            if let HeapValue::Object(obj) = hv {
+                if let Some(Value::String(name)) = obj.properties.get("name") {
+                    if name == ctor_name {
+                        return Some(i);
+                    }
+                }
+            }
+        }
+        None
+    }
     
     fn get_property(&self, object: &Value, key: &Value) -> Result<Value> {
         match object {
@@ -859,6 +1308,11 @@ impl Interpreter {
                             if let Some(proto_idx) = f.prototype {
                                 return Ok(Value::Object(proto_idx));
                             }
+                        }
+                    }
+                    if let HeapValue::Function(f) = &self.heap[*func_idx] {
+                        if let Some(val) = f.properties.get(key_str) {
+                            return Ok(val.clone());
                         }
                     }
                 }
