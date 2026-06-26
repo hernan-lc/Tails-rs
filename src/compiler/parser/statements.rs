@@ -417,7 +417,7 @@ impl<'a> Parser<'a> {
                 Token::Identifier(name) => name,
                 t => return Err(Error::ParseError(format!("Expected identifier, got {:?}", t))),
             };
-            specifiers.push(ImportSpecifier { local, imported: None });
+            specifiers.push(ImportSpecifier { local, imported: Some("*".to_string()) });
         } else if matches!(self.peek(), Token::Identifier(_)) {
             let local = match self.advance() {
                 Token::Identifier(name) => name,

@@ -596,12 +596,15 @@ impl Interpreter {
                         // handled
                     } else if self.exec_make_function(&instruction, module)? {
                         // handled
-                    } else if self.exec_exception(&instruction, &mut pc)? {
-                        if pc != start_pc + 1 {
-                            continue;
-                        }
                     } else {
-                        return Err(Error::RuntimeError(format!("Unhandled instruction: {:?}", instruction)));
+                        let saved_pc = pc;
+                        if self.exec_exception(&instruction, &mut pc)? {
+                            if pc != saved_pc {
+                                continue;
+                            }
+                        } else {
+                            return Err(Error::RuntimeError(format!("Unhandled instruction: {:?}", instruction)));
+                        }
                     }
                 }
             }
