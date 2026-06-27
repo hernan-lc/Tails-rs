@@ -1,5 +1,5 @@
-use crate::compiler::Compiler;
 use crate::compiler::type_checker::Type;
+use crate::compiler::Compiler;
 use crate::errors::Result;
 use crate::objects::Value;
 use crate::vm::Interpreter;
@@ -43,11 +43,15 @@ impl TailsRuntime {
     }
 
     pub fn eval_module(&mut self, source: &str, base_path: &Path) -> Result<Value> {
+        let module_key = base_path.to_string_lossy().to_string();
         let prev = self.interpreter.current_module_path.clone();
-        self.interpreter.current_module_path = Some(base_path.to_string_lossy().to_string());
+        self.interpreter.current_module_path = Some(module_key.clone());
         let compiler = Compiler::new(self.config.enable_type_checking);
         let compiled = compiler.compile(source)?;
         let result = self.interpreter.execute_module(&compiled);
+        // Register module exports
+        let exports = std::mem::take(&mut self.interpreter.module_exports);
+        self.interpreter.module_registry.insert(module_key, exports);
         self.interpreter.current_module_path = prev;
         result
     }
@@ -56,8 +60,7 @@ impl TailsRuntime {
         let source = std::fs::read_to_string(module_path).map_err(|e| {
             crate::errors::Error::RuntimeError(format!("Failed to read module: {}", e))
         })?;
-        let base = module_path.parent().unwrap_or(Path::new("."));
-        self.eval_module(&source, base)
+        self.eval_module(&source, module_path)
     }
 
     pub fn get_global(&self, name: &str) -> Option<Value> {

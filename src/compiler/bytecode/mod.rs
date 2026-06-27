@@ -3,7 +3,8 @@ mod expressions;
 
 use crate::compiler::parser::{
     ArrayBindingElement, ArrowFunctionBody, AstNode, BinaryOperator, BindingPattern, ClassMember,
-    CompoundAssignmentOp, Expression, ForInLeft, ForInit, Statement, UnaryOperator, UpdateOperator,
+    CompoundAssignmentOp, ExportDeclarationKind, Expression, ForInLeft, ForInit,
+    Statement, UnaryOperator, UpdateOperator,
 };
 use crate::compiler::{
     ClassInfo, ClassMethodInfo, ClassMethodKind, CompiledFunction, CompiledModule, Instruction,
@@ -704,34 +705,57 @@ impl CodeGenerator {
                 }
                 Ok(())
             }
-            Statement::ExportDeclaration { declaration } => {
-                match declaration.as_ref() {
-                    Statement::VariableDeclaration { declarations, .. } => {
-                        let names: Vec<String> = declarations
-                            .iter()
-                            .filter_map(|d| Self::extract_identifier_from_pattern(&d.id))
-                            .collect();
-                        self.generate_statement(declaration, false)?;
-                        for name in &names {
-                            self.instructions
-                                .push(Instruction::StoreModuleExport(name.clone()));
+            Statement::ExportDeclaration { kind } => {
+                match kind {
+                    ExportDeclarationKind::Local(declaration) => {
+                        match declaration.as_ref() {
+                            Statement::VariableDeclaration { declarations, .. } => {
+                                let names: Vec<String> = declarations
+                                    .iter()
+                                    .filter_map(|d| Self::extract_identifier_from_pattern(&d.id))
+                                    .collect();
+                                self.generate_statement(declaration, false)?;
+                                for name in &names {
+                                    self.instructions
+                                        .push(Instruction::StoreModuleExport(name.clone()));
+                                }
+                            }
+                            Statement::FunctionDeclaration { name, .. } => {
+                                self.generate_statement(declaration, false)?;
+                                self.instructions
+                                    .push(Instruction::StoreModuleExport(name.clone()));
+                            }
+                            Statement::ClassDeclaration { name, .. } => {
+                                self.generate_statement(declaration, false)?;
+                                self.instructions
+                                    .push(Instruction::StoreModuleExport(name.clone()));
+                            }
+                            _ => {
+                                self.generate_statement(declaration, false)?;
+                            }
                         }
+                        Ok(())
                     }
-                    Statement::FunctionDeclaration { name, .. } => {
-                        self.generate_statement(declaration, false)?;
+                    ExportDeclarationKind::ReExport { specifiers, source } => {
+                        // Re-export: export { a as b } from "./module";
+                        // Load the module first
                         self.instructions
-                            .push(Instruction::StoreModuleExport(name.clone()));
-                    }
-                    Statement::ClassDeclaration { name, .. } => {
-                        self.generate_statement(declaration, false)?;
-                        self.instructions
-                            .push(Instruction::StoreModuleExport(name.clone()));
-                    }
-                    _ => {
-                        self.generate_statement(declaration, false)?;
+                            .push(Instruction::ImportModule(source.clone()));
+                        // Import and re-export each specifier
+                        for spec in specifiers {
+                            let imported_name = spec.exported.as_ref().unwrap_or(&spec.local);
+                            let local_name = &spec.local;
+                            self.instructions.push(Instruction::ImportNamed(
+                                source.clone(),
+                                imported_name.clone(),
+                                local_name.clone(),
+                            ));
+                            self.instructions
+                                .push(Instruction::StoreModuleExport(local_name.clone()));
+                        }
+                        Ok(())
                     }
                 }
-                Ok(())
             }
             Statement::InterfaceDeclaration { .. } => Ok(()),
             Statement::TypeAliasDeclaration { .. } => Ok(()),

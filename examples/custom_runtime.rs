@@ -3,7 +3,7 @@
 // Run:  cargo run --example custom_runtime
 // ============================================================
 
-use tails::{TailsRuntime, RuntimeConfig, Value};
+use tails::{RuntimeConfig, TailsRuntime, Value};
 
 fn main() -> anyhow::Result<()> {
     println!("=== Custom Runtime Demo ===\n");
@@ -52,16 +52,10 @@ fn main() -> anyhow::Result<()> {
     let import_path = std::path::Path::new("examples/math_utils.ts");
     let import_result = rt.import(import_path)?;
     println!("imported math_utils: {:?}", import_result);
-    if let Some(add_val) = rt.get_module_export(
-        import_path.to_string_lossy().as_ref(),
-        "add",
-    ) {
+    if let Some(add_val) = rt.get_module_export(import_path.to_string_lossy().as_ref(), "add") {
         println!("math_utils.add: {:?}", add_val);
     }
-    if let Some(pi_val) = rt.get_module_export(
-        import_path.to_string_lossy().as_ref(),
-        "PI",
-    ) {
+    if let Some(pi_val) = rt.get_module_export(import_path.to_string_lossy().as_ref(), "PI") {
         println!("math_utils.PI: {}", pi_val);
     }
 

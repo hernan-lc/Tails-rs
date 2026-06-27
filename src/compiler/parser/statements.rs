@@ -753,6 +753,7 @@ impl<'a> Parser<'a> {
         self.expect(&Token::Import)?;
         let mut specifiers = Vec::new();
 
+        // Side-effect import: import "module";
         if matches!(self.peek(), Token::String(_)) {
             let source = match self.advance() {
                 Token::String(s) => s,
@@ -767,8 +768,67 @@ impl<'a> Parser<'a> {
             });
         }
 
-        if self.peek() == &Token::LeftBrace {
-            self.advance();
+        // Check for default import: import DefaultName, ... or import DefaultName from ...
+        let has_default_import = matches!(self.peek(), Token::Identifier(_));
+        let default_local_name = if has_default_import {
+            match self.advance() {
+                Token::Identifier(name) => Some(name),
+                _ => None,
+            }
+        } else {
+            None
+        };
+        let has_default = default_local_name.is_some();
+
+        if let Some(default_name) = default_local_name {
+            specifiers.push(ImportSpecifier {
+                local: default_name.clone(),
+                imported: Some("default".to_string()),
+            });
+        }
+
+        // Check for named imports after default: import DefaultName, { ... } from ...
+        if self.peek() == &Token::Comma {
+            self.advance(); // consume comma
+            if self.peek() == &Token::LeftBrace {
+                self.advance(); // consume {
+                while self.peek() != &Token::RightBrace {
+                    let imported = match self.advance() {
+                        Token::Identifier(name) => name,
+                        t => {
+                            return Err(Error::ParseError(format!(
+                                "Expected identifier, got {:?}",
+                                t
+                            )))
+                        }
+                    };
+                    let local = if self.peek() == &Token::As {
+                        self.advance();
+                        match self.advance() {
+                            Token::Identifier(name) => name,
+                            t => {
+                                return Err(Error::ParseError(format!(
+                                    "Expected identifier, got {:?}",
+                                    t
+                                )))
+                            }
+                        }
+                    } else {
+                        imported.clone()
+                    };
+                    specifiers.push(ImportSpecifier {
+                        local,
+                        imported: Some(imported),
+                    });
+                    if self.peek() == &Token::Comma {
+                        self.advance();
+                    }
+                }
+                self.expect(&Token::RightBrace)?;
+            }
+        } else if self.peek() == &Token::LeftBrace {
+            // Named imports only: import { ... } from ...
+            self.advance(); // consume {
             while self.peek() != &Token::RightBrace {
                 let imported = match self.advance() {
                     Token::Identifier(name) => name,
@@ -803,6 +863,7 @@ impl<'a> Parser<'a> {
             }
             self.expect(&Token::RightBrace)?;
         } else if self.peek() == &Token::Star {
+            // Namespace import: import * as Name from ...
             self.advance();
             self.expect(&Token::As)?;
             let local = match self.advance() {
@@ -818,24 +879,15 @@ impl<'a> Parser<'a> {
                 local,
                 imported: Some("*".to_string()),
             });
-        } else if matches!(self.peek(), Token::Identifier(_)) {
-            let local = match self.advance() {
-                Token::Identifier(name) => name,
-                t => {
-                    return Err(Error::ParseError(format!(
-                        "Expected identifier, got {:?}",
-                        t
-                    )))
-                }
-            };
-            specifiers.push(ImportSpecifier {
-                local: local.clone(),
-                imported: Some(local),
-            });
+        } else if !has_default {
+            // No default import, no named imports, no namespace import
+            return Err(Error::ParseError("Expected import specifier".into()));
         }
 
         if self.peek() == &Token::From {
             self.advance();
+        } else {
+            return Err(Error::ParseError("Expected 'from' keyword".into()));
         }
         let source = match self.advance() {
             Token::String(s) => s,
@@ -860,28 +912,76 @@ impl<'a> Parser<'a> {
 
         if self.peek() == &Token::LeftBrace {
             self.advance();
+            let mut specifiers = Vec::new();
             while self.peek() != &Token::RightBrace {
-                self.advance();
+                if self.peek() == &Token::Comma {
+                    self.advance();
+                    continue;
+                }
+                let local = match self.advance() {
+                    Token::Identifier(name) => name,
+                    t => {
+                        return Err(Error::ParseError(format!(
+                            "Expected identifier, got {:?}",
+                            t
+                        )))
+                    }
+                };
+                let exported = if self.peek() == &Token::As {
+                    self.advance();
+                    match self.advance() {
+                        Token::Identifier(name) => Some(name),
+                        t => {
+                            return Err(Error::ParseError(format!(
+                                "Expected identifier after 'as', got {:?}",
+                                t
+                            )))
+                        }
+                    }
+                } else {
+                    None
+                };
+                specifiers.push(ExportSpecifier { local, exported });
                 if self.peek() == &Token::Comma {
                     self.advance();
                 }
             }
             self.expect(&Token::RightBrace)?;
+
             if self.peek() == &Token::From {
                 self.advance();
-                self.advance();
+                let source = match self.advance() {
+                    Token::String(s) => s,
+                    t => {
+                        return Err(Error::ParseError(format!(
+                            "Expected string literal after 'from', got {:?}",
+                            t
+                        )))
+                    }
+                };
+                if self.peek() == &Token::Semicolon {
+                    self.advance();
+                }
+                return Ok(Statement::ExportDeclaration {
+                    kind: ExportDeclarationKind::ReExport { specifiers, source },
+                });
             }
+
             if self.peek() == &Token::Semicolon {
                 self.advance();
             }
+            // This is an export of local bindings: export { a, b };
+            // For now, treat as empty - would need to look up local bindings
             return Ok(Statement::ExportDeclaration {
-                declaration: Box::new(Statement::Expression(Expression::UndefinedLiteral)),
+                kind: ExportDeclarationKind::Local(Box::new(Statement::Expression(
+                    Expression::UndefinedLiteral,
+                ))),
             });
         }
 
         let decl = self.parse_statement()?;
         Ok(Statement::ExportDeclaration {
-            declaration: Box::new(decl),
+            kind: ExportDeclarationKind::Local(Box::new(decl)),
         })
     }
 

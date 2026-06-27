@@ -132,7 +132,7 @@ pub enum Statement {
         source: String,
     },
     ExportDeclaration {
-        declaration: Box<Statement>,
+        kind: ExportDeclarationKind,
     },
     ExportDefaultDeclaration {
         declaration: Box<Statement>,
@@ -235,6 +235,21 @@ pub enum ClassMember {
 pub struct ImportSpecifier {
     pub local: String,
     pub imported: Option<String>,
+}
+
+#[derive(Debug, Clone)]
+pub struct ExportSpecifier {
+    pub local: String,
+    pub exported: Option<String>,
+}
+
+#[derive(Debug, Clone)]
+pub enum ExportDeclarationKind {
+    Local(Box<Statement>),
+    ReExport {
+        specifiers: Vec<ExportSpecifier>,
+        source: String,
+    },
 }
 
 #[derive(Debug, Clone)]
