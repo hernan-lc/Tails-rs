@@ -1,4 +1,4 @@
-use tails::compiler::lexer::{tokenize, Token};
+use tails::compiler::lexer::{tokenize, Token, TemplatePart};
 
 #[test]
 fn test_numbers() {
@@ -42,7 +42,8 @@ fn test_keywords() {
 #[test]
 fn test_operators() {
     let tokens = tokenize("+ - * / % = == === != !== < > <= >=").unwrap();
-    assert_eq!(tokens.len(), 13);
+    // + - * / % = == === != !== < > <= >= Eof = 15 tokens
+    assert_eq!(tokens.len(), 15);
     assert_eq!(tokens[0], Token::Plus);
     assert_eq!(tokens[1], Token::Minus);
     assert_eq!(tokens[2], Token::Star);
@@ -56,12 +57,15 @@ fn test_operators() {
     assert_eq!(tokens[10], Token::Less);
     assert_eq!(tokens[11], Token::Greater);
     assert_eq!(tokens[12], Token::LessEqual);
+    assert_eq!(tokens[13], Token::GreaterEqual);
+    assert_eq!(tokens[14], Token::Eof);
 }
 
 #[test]
 fn test_punctuation() {
     let tokens = tokenize("( ) { } [ ] ; : , . ?").unwrap();
-    assert_eq!(tokens.len(), 11);
+    // ( ) { } [ ] ; : , . ? Eof = 12 tokens
+    assert_eq!(tokens.len(), 12);
     assert_eq!(tokens[0], Token::LeftParen);
     assert_eq!(tokens[1], Token::RightParen);
     assert_eq!(tokens[2], Token::LeftBrace);
@@ -73,6 +77,7 @@ fn test_punctuation() {
     assert_eq!(tokens[8], Token::Comma);
     assert_eq!(tokens[9], Token::Dot);
     assert_eq!(tokens[10], Token::Question);
+    assert_eq!(tokens[11], Token::Eof);
 }
 
 #[test]
@@ -93,12 +98,14 @@ fn test_multiline_comment() {
 #[test]
 fn test_complex_expression() {
     let tokens = tokenize("2 + 3 * 4").unwrap();
-    assert_eq!(tokens.len(), 5);
+    // 2 + 3 * 4 Eof = 6 tokens
+    assert_eq!(tokens.len(), 6);
     assert_eq!(tokens[0], Token::Number(2.0));
     assert_eq!(tokens[1], Token::Plus);
     assert_eq!(tokens[2], Token::Number(3.0));
     assert_eq!(tokens[3], Token::Star);
     assert_eq!(tokens[4], Token::Number(4.0));
+    assert_eq!(tokens[5], Token::Eof);
 }
 
 #[test]
@@ -155,7 +162,24 @@ fn test_spread_operator() {
 fn test_template_string() {
     let tokens = tokenize(r#"`hello ${name}`"#).unwrap();
     assert_eq!(tokens.len(), 2);
-    assert_eq!(tokens[0], Token::String("hello ${name}".to_string()));
+    match &tokens[0] {
+        Token::TemplateLiteral(parts) => {
+            assert_eq!(parts.len(), 2);
+            match &parts[0] {
+                TemplatePart::Text(text) => assert_eq!(text, "hello "),
+                _ => panic!("Expected text part"),
+            }
+            match &parts[1] {
+                TemplatePart::Expression(tokens) => {
+                    assert_eq!(tokens.len(), 1); // Just Identifier (Eof is filtered)
+                    assert_eq!(tokens[0], Token::Identifier("name".to_string()));
+                }
+                _ => panic!("Expected expression part"),
+            }
+        }
+        _ => panic!("Expected TemplateLiteral"),
+    }
+    assert_eq!(tokens[1], Token::Eof);
 }
 
 #[test]

@@ -2,14 +2,14 @@ use tails::TailsRuntime;
 
 #[test]
 fn test_load_constant() {
-    let mut runtime = TailsRuntime::default().unwrap();
+    let mut runtime = TailsRuntime::default();
     let result = runtime.eval("42").unwrap();
     assert_eq!(result, tails::Value::Float(42.0));
 }
 
 #[test]
 fn test_store_global() {
-    let mut runtime = TailsRuntime::default().unwrap();
+    let mut runtime = TailsRuntime::default();
     runtime.eval("const x = 10").unwrap();
     let result = runtime.get_global("x").unwrap();
     assert_eq!(result, tails::Value::Float(10.0));
@@ -17,7 +17,7 @@ fn test_store_global() {
 
 #[test]
 fn test_load_global() {
-    let mut runtime = TailsRuntime::default().unwrap();
+    let mut runtime = TailsRuntime::default();
     runtime.set_global("myVar", tails::Value::Float(100.0));
     let result = runtime.eval("myVar").unwrap();
     assert_eq!(result, tails::Value::Float(100.0));
@@ -25,63 +25,63 @@ fn test_load_global() {
 
 #[test]
 fn test_addition() {
-    let mut runtime = TailsRuntime::default().unwrap();
+    let mut runtime = TailsRuntime::default();
     let result = runtime.eval("2 + 3").unwrap();
     assert_eq!(result, tails::Value::Float(5.0));
 }
 
 #[test]
 fn test_subtraction() {
-    let mut runtime = TailsRuntime::default().unwrap();
+    let mut runtime = TailsRuntime::default();
     let result = runtime.eval("10 - 4").unwrap();
     assert_eq!(result, tails::Value::Float(6.0));
 }
 
 #[test]
 fn test_multiplication() {
-    let mut runtime = TailsRuntime::default().unwrap();
+    let mut runtime = TailsRuntime::default();
     let result = runtime.eval("3 * 4").unwrap();
     assert_eq!(result, tails::Value::Float(12.0));
 }
 
 #[test]
 fn test_division() {
-    let mut runtime = TailsRuntime::default().unwrap();
+    let mut runtime = TailsRuntime::default();
     let result = runtime.eval("10 / 2").unwrap();
     assert_eq!(result, tails::Value::Float(5.0));
 }
 
 #[test]
 fn test_modulo() {
-    let mut runtime = TailsRuntime::default().unwrap();
+    let mut runtime = TailsRuntime::default();
     let result = runtime.eval("10 % 3").unwrap();
     assert_eq!(result, tails::Value::Float(1.0));
 }
 
 #[test]
 fn test_negate() {
-    let mut runtime = TailsRuntime::default().unwrap();
+    let mut runtime = TailsRuntime::default();
     let result = runtime.eval("-5").unwrap();
     assert_eq!(result, tails::Value::Float(-5.0));
 }
 
 #[test]
 fn test_not() {
-    let mut runtime = TailsRuntime::default().unwrap();
+    let mut runtime = TailsRuntime::default();
     let result = runtime.eval("!true").unwrap();
     assert_eq!(result, tails::Value::Boolean(false));
 }
 
 #[test]
 fn test_string_addition() {
-    let mut runtime = TailsRuntime::default().unwrap();
+    let mut runtime = TailsRuntime::default();
     let result = runtime.eval(r#""hello" + " ""#).unwrap();
     assert_eq!(result, tails::Value::String("hello ".to_string()));
 }
 
 #[test]
 fn test_boolean_operations() {
-    let mut runtime = TailsRuntime::default().unwrap();
+    let mut runtime = TailsRuntime::default();
     
     let result = runtime.eval("true && false").unwrap();
     assert_eq!(result, tails::Value::Boolean(false));
@@ -92,7 +92,7 @@ fn test_boolean_operations() {
 
 #[test]
 fn test_comparison_operations() {
-    let mut runtime = TailsRuntime::default().unwrap();
+    let mut runtime = TailsRuntime::default();
     
     let result = runtime.eval("5 > 3").unwrap();
     assert_eq!(result, tails::Value::Boolean(true));
@@ -109,7 +109,7 @@ fn test_comparison_operations() {
 
 #[test]
 fn test_if_else() {
-    let mut runtime = TailsRuntime::default().unwrap();
+    let mut runtime = TailsRuntime::default();
     
     let result = runtime.eval(r#"
         if (true) { 1 } else { 2 }
@@ -124,7 +124,7 @@ fn test_if_else() {
 
 #[test]
 fn test_while_loop() {
-    let mut runtime = TailsRuntime::default().unwrap();
+    let mut runtime = TailsRuntime::default();
     let result = runtime.eval(r#"
         let sum = 0;
         let i = 1;
@@ -139,7 +139,7 @@ fn test_while_loop() {
 
 #[test]
 fn test_function_declaration_and_call() {
-    let mut runtime = TailsRuntime::default().unwrap();
+    let mut runtime = TailsRuntime::default();
     let result = runtime.eval(r#"
         function add(a, b) {
             return a + b;
@@ -151,7 +151,7 @@ fn test_function_declaration_and_call() {
 
 #[test]
 fn test_nested_function_calls() {
-    let mut runtime = TailsRuntime::default().unwrap();
+    let mut runtime = TailsRuntime::default();
     let result = runtime.eval(r#"
         function square(x) {
             return x * x;
@@ -166,7 +166,7 @@ fn test_nested_function_calls() {
 
 #[test]
 fn test_recursive_function() {
-    let mut runtime = TailsRuntime::default().unwrap();
+    let mut runtime = TailsRuntime::default();
     let result = runtime.eval(r#"
         function factorial(n) {
             if (n <= 1) {
@@ -181,7 +181,7 @@ fn test_recursive_function() {
 
 #[test]
 fn test_fibonacci() {
-    let mut runtime = TailsRuntime::default().unwrap();
+    let mut runtime = TailsRuntime::default();
     let result = runtime.eval(r#"
         function fibonacci(n) {
             if (n <= 1) {
@@ -196,7 +196,7 @@ fn test_fibonacci() {
 
 #[test]
 fn test_global_variable_manipulation() {
-    let mut runtime = TailsRuntime::default().unwrap();
+    let mut runtime = TailsRuntime::default();
     
     runtime.set_global("x", tails::Value::Float(10.0));
     let result = runtime.eval("x + 5").unwrap();
@@ -209,7 +209,7 @@ fn test_global_variable_manipulation() {
 
 #[test]
 fn test_multiple_variables() {
-    let mut runtime = TailsRuntime::default().unwrap();
+    let mut runtime = TailsRuntime::default();
     let result = runtime.eval(r#"
         const a = 10;
         const b = 20;
@@ -221,7 +221,7 @@ fn test_multiple_variables() {
 
 #[test]
 fn test_complex_program() {
-    let mut runtime = TailsRuntime::default().unwrap();
+    let mut runtime = TailsRuntime::default();
     let result = runtime.eval(r#"
         function isEven(n) {
             return n % 2 === 0;
@@ -253,21 +253,21 @@ fn test_complex_program() {
 
 #[test]
 fn test_error_handling() {
-    let mut runtime = TailsRuntime::default().unwrap();
+    let mut runtime = TailsRuntime::default();
     let result = runtime.eval("undefinedVariable");
     assert!(result.is_err());
 }
 
 #[test]
 fn test_division_by_zero() {
-    let mut runtime = TailsRuntime::default().unwrap();
+    let mut runtime = TailsRuntime::default();
     let result = runtime.eval("10 / 0");
     assert!(result.is_err());
 }
 
 #[test]
 fn test_nested_blocks() {
-    let mut runtime = TailsRuntime::default().unwrap();
+    let mut runtime = TailsRuntime::default();
     let result = runtime.eval(r#"
         const x = 10;
         {
@@ -283,7 +283,7 @@ fn test_nested_blocks() {
 
 #[test]
 fn test_complex_control_flow() {
-    let mut runtime = TailsRuntime::default().unwrap();
+    let mut runtime = TailsRuntime::default();
     let result = runtime.eval(r#"
         let result = 0;
         for (let i = 0; i < 10; i = i + 1) {

@@ -60,7 +60,7 @@ fn test_binary_operation() {
 
 #[test]
 fn test_variable_declaration() {
-    let tokens = tokenize("const x = 42").unwrap();
+    let tokens = tokenize("const x = 42;").unwrap();
     let ast = parse(&tokens).unwrap();
     
     match ast {
@@ -84,7 +84,7 @@ fn test_variable_declaration() {
 
 #[test]
 fn test_function_declaration() {
-    let tokens = tokenize("function add(a, b) { return a + b }").unwrap();
+    let tokens = tokenize("function add(a, b) { return a + b; }").unwrap();
     let ast = parse(&tokens).unwrap();
     
     match ast {
@@ -112,7 +112,7 @@ fn test_if_statement() {
         AstNode::Program(stmts) => {
             assert_eq!(stmts.len(), 1);
             match &stmts[0] {
-                Statement::IfStatement { condition, consequent, alternate } => {
+                Statement::IfStatement { condition, consequent: _, alternate } => {
                     assert!(matches!(condition, Expression::BooleanLiteral(true)));
                     assert!(alternate.is_some());
                 }
@@ -290,7 +290,7 @@ fn test_block_statement() {
 
 #[test]
 fn test_return_statement() {
-    let tokens = tokenize("return 42").unwrap();
+    let tokens = tokenize("return 42;").unwrap();
     let ast = parse(&tokens).unwrap();
     
     match ast {
@@ -309,7 +309,7 @@ fn test_return_statement() {
 
 #[test]
 fn test_return_without_value() {
-    let tokens = tokenize("return").unwrap();
+    let tokens = tokenize("return;").unwrap();
     let ast = parse(&tokens).unwrap();
     
     match ast {
