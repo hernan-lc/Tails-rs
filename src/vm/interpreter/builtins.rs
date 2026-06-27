@@ -358,7 +358,7 @@ impl Interpreter {
                 HeapValue::Object(JsObject {
                     properties: proto_props,
                     prototype: None,
-                extensible: true,
+                    extensible: true,
                 }),
             );
 
@@ -376,7 +376,7 @@ impl Interpreter {
                 HeapValue::Object(JsObject {
                     properties: ctor_props,
                     prototype: None,
-                extensible: true,
+                    extensible: true,
                 }),
             );
             self.globals

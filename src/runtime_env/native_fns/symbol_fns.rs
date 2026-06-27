@@ -25,11 +25,11 @@ pub(super) fn native_symbol_for(
         Value::String(s) => s,
         other => format!("{}", other),
     };
-    
+
     if let Some(&id) = interp.symbol_registry.get(&key) {
         return Ok(Value::Symbol(id));
     }
-    
+
     let id = interp.next_symbol_id;
     interp.next_symbol_id += 1;
     interp.symbol_registry.insert(key, id);
@@ -52,6 +52,8 @@ pub(super) fn native_symbol_key_for(
             }
             Ok(Value::Undefined)
         }
-        _ => Err(Error::TypeError("Symbol.keyFor requires a Symbol argument".into())),
+        _ => Err(Error::TypeError(
+            "Symbol.keyFor requires a Symbol argument".into(),
+        )),
     }
 }

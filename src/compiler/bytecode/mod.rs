@@ -373,7 +373,8 @@ impl CodeGenerator {
 
                 // Patch IteratorNext jump target (when done)
                 let loop_end = self.instructions.len() as u32;
-                if let Instruction::IteratorNext(ref mut target) = self.instructions[iter_next_pos] {
+                if let Instruction::IteratorNext(ref mut target) = self.instructions[iter_next_pos]
+                {
                     *target = loop_end;
                 }
 
@@ -609,8 +610,12 @@ impl CodeGenerator {
                             is_static,
                             ..
                         } => {
-                            let func_idx =
-                                self.compile_function(Some(format!("get_{}", mname)), &[], mbody, false)?;
+                            let func_idx = self.compile_function(
+                                Some(format!("get_{}", mname)),
+                                &[],
+                                mbody,
+                                false,
+                            )?;
                             methods.push(ClassMethodInfo {
                                 name: mname.clone(),
                                 func_idx,
@@ -818,7 +823,7 @@ impl CodeGenerator {
                     bytecode_index: 0,
                     param_count: params.len(),
                     closure_var_count: num_captures,
-is_generator: *is_generator,
+                    is_generator: *is_generator,
                 });
 
                 let jump_over = self.instructions.len();

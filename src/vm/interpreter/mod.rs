@@ -224,12 +224,16 @@ impl Interpreter {
                     match &callee {
                         Value::Function(func_idx) => {
                             // Clone needed values before any heap mutation
-                            let (is_generator, bytecode_index, has_promise_resolve) = if let HeapValue::Function(f) = &self.heap[*func_idx] {
-                                let has_promise = f.bytecode_index == usize::MAX && f.closure.first().map_or(false, |v| matches!(v, Value::Promise(_)));
-                                (f.is_generator, f.bytecode_index, has_promise)
-                            } else {
-                                (false, 0, false)
-                            };
+                            let (is_generator, bytecode_index, has_promise_resolve) =
+                                if let HeapValue::Function(f) = &self.heap[*func_idx] {
+                                    let has_promise = f.bytecode_index == usize::MAX
+                                        && f.closure
+                                            .first()
+                                            .is_some_and(|v| matches!(v, Value::Promise(_)));
+                                    (f.is_generator, f.bytecode_index, has_promise)
+                                } else {
+                                    (false, 0, false)
+                                };
 
                             if is_generator {
                                 // Create a generator object instead of executing immediately
@@ -281,7 +285,11 @@ impl Interpreter {
                                         // Combine bound args with call args
                                         let mut combined_args = bound_args;
                                         combined_args.extend(args);
-                                        let result = self.call_value(&original_fn, &bound_this, &combined_args)?;
+                                        let result = self.call_value(
+                                            &original_fn,
+                                            &bound_this,
+                                            &combined_args,
+                                        )?;
                                         self.stack.push(result);
                                         pc += 1;
                                         continue;
@@ -289,15 +297,16 @@ impl Interpreter {
                                 }
                                 self.stack.push(Value::Undefined);
                             } else {
-                                let same_module = if let HeapValue::Function(f) = &self.heap[*func_idx] {
-                                    match (&f.owner_module, &self.current_module) {
-                                        (Some(om), Some(cm)) => Rc::ptr_eq(om, cm),
-                                        (None, None) => true,
-                                        _ => false,
-                                    }
-                                } else {
-                                    false
-                                };
+                                let same_module =
+                                    if let HeapValue::Function(f) = &self.heap[*func_idx] {
+                                        match (&f.owner_module, &self.current_module) {
+                                            (Some(om), Some(cm)) => Rc::ptr_eq(om, cm),
+                                            (None, None) => true,
+                                            _ => false,
+                                        }
+                                    } else {
+                                        false
+                                    };
                                 if same_module {
                                     let func = self.heap[*func_idx].clone();
                                     if let HeapValue::Function(f) = func {
@@ -691,7 +700,7 @@ impl Interpreter {
                         self.heap.push(HeapValue::Object(JsObject {
                             properties: props,
                             prototype: None,
-                extensible: true,
+                            extensible: true,
                         }));
                         self.stack.push(Value::Object(heap_idx));
                     }
@@ -750,7 +759,7 @@ impl Interpreter {
                             self.heap.push(HeapValue::Object(JsObject {
                                 properties: props,
                                 prototype: None,
-                extensible: true,
+                                extensible: true,
                             }));
                             self.globals
                                 .insert(local_name.clone(), Value::Object(heap_idx));
@@ -812,7 +821,7 @@ impl Interpreter {
                         .stack
                         .pop()
                         .ok_or_else(|| Error::RuntimeError("Stack underflow".into()))?;
-                    
+
                     // Check for built-in iterables (arrays, strings)
                     match &iterable {
                         Value::Array(arr_idx) => {
@@ -824,7 +833,9 @@ impl Interpreter {
                             };
                             let data_idx = self.gc.allocate(
                                 &mut self.heap,
-                                HeapValue::Array(JsArray { elements: arr_clone }),
+                                HeapValue::Array(JsArray {
+                                    elements: arr_clone,
+                                }),
                             );
                             let mut props = HashMap::new();
                             props.insert("__type".to_string(), Value::String("array".to_string()));
@@ -842,7 +853,8 @@ impl Interpreter {
                         }
                         Value::String(s) => {
                             // Create a string iterator object
-                            let chars: Vec<Value> = s.chars().map(|c| Value::String(c.to_string())).collect();
+                            let chars: Vec<Value> =
+                                s.chars().map(|c| Value::String(c.to_string())).collect();
                             let data_idx = self.gc.allocate(
                                 &mut self.heap,
                                 HeapValue::Array(JsArray { elements: chars }),
@@ -886,11 +898,13 @@ impl Interpreter {
                         .last()
                         .cloned()
                         .ok_or_else(|| Error::RuntimeError("Stack underflow".into()))?;
-                    
+
                     // Check if this is a built-in iterator (has __type property)
                     if let Value::Object(iter_idx) = &iterator {
                         if let HeapValue::Object(iter_obj) = &self.heap[*iter_idx] {
-                            if let Some(Value::String(iter_type)) = iter_obj.properties.get("__type") {
+                            if let Some(Value::String(iter_type)) =
+                                iter_obj.properties.get("__type")
+                            {
                                 let index = match iter_obj.properties.get("__index") {
                                     Some(Value::Integer(i)) => *i as usize,
                                     _ => 0,
@@ -907,22 +921,34 @@ impl Interpreter {
                                                 }
                                                 let value = arr.elements[index].clone();
                                                 // Update index
-                                                if let HeapValue::Object(iter_obj_mut) = &mut self.heap[*iter_idx] {
-                                                    iter_obj_mut.properties.insert("__index".to_string(), Value::Integer((index + 1) as i64));
+                                                if let HeapValue::Object(iter_obj_mut) =
+                                                    &mut self.heap[*iter_idx]
+                                                {
+                                                    iter_obj_mut.properties.insert(
+                                                        "__index".to_string(),
+                                                        Value::Integer((index + 1) as i64),
+                                                    );
                                                 }
                                                 self.stack.push(value);
                                             }
                                         }
                                         ("string", Value::Array(chars_idx)) => {
-                                            if let HeapValue::Array(chars_arr) = &self.heap[*chars_idx] {
+                                            if let HeapValue::Array(chars_arr) =
+                                                &self.heap[*chars_idx]
+                                            {
                                                 if index >= chars_arr.elements.len() {
                                                     self.stack.pop();
                                                     pc = *target as usize;
                                                     continue;
                                                 }
                                                 let value = chars_arr.elements[index].clone();
-                                                if let HeapValue::Object(iter_obj_mut) = &mut self.heap[*iter_idx] {
-                                                    iter_obj_mut.properties.insert("__index".to_string(), Value::Integer((index + 1) as i64));
+                                                if let HeapValue::Object(iter_obj_mut) =
+                                                    &mut self.heap[*iter_idx]
+                                                {
+                                                    iter_obj_mut.properties.insert(
+                                                        "__index".to_string(),
+                                                        Value::Integer((index + 1) as i64),
+                                                    );
                                                 }
                                                 self.stack.push(value);
                                             }
@@ -937,16 +963,14 @@ impl Interpreter {
                             }
                         }
                     }
-                    
+
                     // Generic iterator protocol - call iterator.next()
-                    let next_fn = self.get_property(&iterator, &Value::String("next".to_string()))?;
-                    let next_result = self.call_value(
-                        &next_fn,
-                        &iterator,
-                        &[],
-                    )?;
+                    let next_fn =
+                        self.get_property(&iterator, &Value::String("next".to_string()))?;
+                    let next_result = self.call_value(&next_fn, &iterator, &[])?;
                     // Get done property
-                    let done = self.get_property(&next_result, &Value::String("done".to_string()))?;
+                    let done =
+                        self.get_property(&next_result, &Value::String("done".to_string()))?;
                     match done {
                         Value::Boolean(true) => {
                             // Iterator is done - pop the iterator and jump
@@ -956,7 +980,8 @@ impl Interpreter {
                         }
                         _ => {
                             // Not done - extract value and push it (iterator stays below)
-                            let value = self.get_property(&next_result, &Value::String("value".to_string()))?;
+                            let value = self
+                                .get_property(&next_result, &Value::String("value".to_string()))?;
                             self.stack.push(value);
                         }
                     }
@@ -967,7 +992,9 @@ impl Interpreter {
                         .stack
                         .pop()
                         .ok_or_else(|| Error::RuntimeError("Stack underflow".into()))?;
-                    if let Ok(return_fn) = self.get_property(&iterator, &Value::String("return".to_string())) {
+                    if let Ok(return_fn) =
+                        self.get_property(&iterator, &Value::String("return".to_string()))
+                    {
                         match return_fn {
                             Value::Function(_) | Value::NativeFunction(_) => {
                                 let _ = self.call_value(&return_fn, &iterator, &[]);

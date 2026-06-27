@@ -237,7 +237,7 @@ pub(super) fn native_reflect_get_own_property_descriptor(
                         crate::vm::interpreter::JsObject {
                             properties: descriptor,
                             prototype: None,
-                extensible: true,
+                            extensible: true,
                         },
                     ));
                     return Ok(Value::Object(desc_idx));
@@ -256,7 +256,7 @@ pub(super) fn native_reflect_get_own_property_descriptor(
                         crate::vm::interpreter::JsObject {
                             properties: descriptor,
                             prototype: None,
-                extensible: true,
+                            extensible: true,
                         },
                     ));
                     return Ok(Value::Object(desc_idx));
@@ -272,7 +272,7 @@ pub(super) fn native_reflect_get_own_property_descriptor(
                             crate::vm::interpreter::JsObject {
                                 properties: descriptor,
                                 prototype: None,
-                extensible: true,
+                                extensible: true,
                             },
                         ));
                         return Ok(Value::Object(desc_idx));

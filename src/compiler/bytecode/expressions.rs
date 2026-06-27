@@ -328,7 +328,7 @@ impl CodeGenerator {
                     bytecode_index: 0,
                     param_count: params.len(),
                     closure_var_count: num_captures,
-is_generator: *is_generator,
+                    is_generator: *is_generator,
                 });
 
                 let jump_over = self.instructions.len();
@@ -587,8 +587,12 @@ is_generator: *is_generator,
                             is_static,
                             ..
                         } => {
-                            let func_idx =
-                                self.compile_function(Some(format!("get_{}", mname)), &[], mbody, false)?;
+                            let func_idx = self.compile_function(
+                                Some(format!("get_{}", mname)),
+                                &[],
+                                mbody,
+                                false,
+                            )?;
                             methods.push(ClassMethodInfo {
                                 name: mname.clone(),
                                 func_idx,

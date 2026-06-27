@@ -469,10 +469,15 @@ pub(super) fn native_promise_any(
     if all_rejected && !rejections.is_empty() {
         // Create an AggregateError-like object
         let mut props = std::collections::HashMap::new();
-        props.insert("message".to_string(), Value::String("All promises were rejected".to_string()));
+        props.insert(
+            "message".to_string(),
+            Value::String("All promises were rejected".to_string()),
+        );
         let errors_idx = interp.heap.len();
         interp.heap.push(crate::vm::interpreter::HeapValue::Array(
-            crate::vm::interpreter::JsArray { elements: rejections },
+            crate::vm::interpreter::JsArray {
+                elements: rejections,
+            },
         ));
         props.insert("errors".to_string(), Value::Array(errors_idx));
         let err_obj_idx = interp.heap.len();

@@ -204,13 +204,10 @@ pub(super) fn native_object_freeze(
     args: &[Value],
 ) -> Result<Value> {
     let target = args.first().cloned().unwrap_or(Value::Undefined);
-    match &target {
-        Value::Object(obj_idx) => {
-            if let crate::vm::interpreter::HeapValue::Object(obj) = &mut interp.heap[*obj_idx] {
-                obj.extensible = false;
-            }
+    if let Value::Object(obj_idx) = &target {
+        if let crate::vm::interpreter::HeapValue::Object(obj) = &mut interp.heap[*obj_idx] {
+            obj.extensible = false;
         }
-        _ => {}
     }
     Ok(target)
 }
@@ -258,12 +255,13 @@ fn value_strict_equal(a: &Value, b: &Value) -> bool {
         (Value::BigInt(a), Value::BigInt(b)) => a == b,
         _ => {
             // For heap types, compare by index
-            std::mem::discriminant(a) == std::mem::discriminant(b) && match (a, b) {
-                (Value::Object(a), Value::Object(b)) => a == b,
-                (Value::Array(a), Value::Array(b)) => a == b,
-                (Value::Function(a), Value::Function(b)) => a == b,
-                _ => false,
-            }
+            std::mem::discriminant(a) == std::mem::discriminant(b)
+                && match (a, b) {
+                    (Value::Object(a), Value::Object(b)) => a == b,
+                    (Value::Array(a), Value::Array(b)) => a == b,
+                    (Value::Function(a), Value::Function(b)) => a == b,
+                    _ => false,
+                }
         }
     }
 }
@@ -274,13 +272,10 @@ pub(super) fn native_object_prevent_extensions(
     args: &[Value],
 ) -> Result<Value> {
     let target = args.first().cloned().unwrap_or(Value::Undefined);
-    match &target {
-        Value::Object(obj_idx) => {
-            if let crate::vm::interpreter::HeapValue::Object(obj) = &mut interp.heap[*obj_idx] {
-                obj.extensible = false;
-            }
+    if let Value::Object(obj_idx) = &target {
+        if let crate::vm::interpreter::HeapValue::Object(obj) = &mut interp.heap[*obj_idx] {
+            obj.extensible = false;
         }
-        _ => {}
     }
     Ok(target)
 }
@@ -347,13 +342,10 @@ pub(super) fn native_object_seal(
     args: &[Value],
 ) -> Result<Value> {
     let target = args.first().cloned().unwrap_or(Value::Undefined);
-    match &target {
-        Value::Object(obj_idx) => {
-            if let crate::vm::interpreter::HeapValue::Object(obj) = &mut interp.heap[*obj_idx] {
-                obj.extensible = false;
-            }
+    if let Value::Object(obj_idx) = &target {
+        if let crate::vm::interpreter::HeapValue::Object(obj) = &mut interp.heap[*obj_idx] {
+            obj.extensible = false;
         }
-        _ => {}
     }
     Ok(target)
 }

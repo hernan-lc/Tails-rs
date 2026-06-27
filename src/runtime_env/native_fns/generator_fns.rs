@@ -15,11 +15,12 @@ pub(super) fn native_generator_next(
     let value = args.first().cloned().unwrap_or(Value::Undefined);
 
     // First, get the generator info without mutating
-    let (func_heap_idx, resume_pc) = if let crate::vm::interpreter::HeapValue::Generator(gen) = &interp.heap[idx] {
-        (gen.func_heap_idx, gen.resume_pc)
-    } else {
-        return Err(Error::TypeError("Not a Generator".into()));
-    };
+    let (func_heap_idx, resume_pc) =
+        if let crate::vm::interpreter::HeapValue::Generator(gen) = &interp.heap[idx] {
+            (gen.func_heap_idx, gen.resume_pc)
+        } else {
+            return Err(Error::TypeError("Not a Generator".into()));
+        };
 
     // Now mutate to push the value and save stack
     if let crate::vm::interpreter::HeapValue::Generator(gen) = &mut interp.heap[idx] {
@@ -28,7 +29,7 @@ pub(super) fn native_generator_next(
 
         // Restore the saved stack
         if !gen.saved_stack.is_empty() {
-            interp.stack.extend(gen.saved_stack.drain(..));
+            interp.stack.append(&mut gen.saved_stack);
         }
 
         // Execute from the resume PC using execute_from
@@ -50,7 +51,7 @@ pub(super) fn native_generator_next(
 
             // Execute from the resume PC using the module's execute_from
             let result = interp.execute_from(&module, resume_pc);
-            
+
             // Save the current stack state back to generator
             if let Some(frame) = interp.call_stack.last() {
                 if let crate::vm::interpreter::HeapValue::Generator(gen2) = &mut interp.heap[idx] {
@@ -58,7 +59,7 @@ pub(super) fn native_generator_next(
                     gen2.resume_pc = frame.return_address;
                 }
             }
-            
+
             return result;
         }
 

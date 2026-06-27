@@ -246,12 +246,22 @@ impl Interpreter {
                         match key_str.as_str() {
                             "for" => return Ok(Value::NativeFunction(152)),
                             "keyFor" => return Ok(Value::NativeFunction(153)),
-                            "iterator" => return Ok(Value::Symbol(crate::objects::SYMBOL_ITERATOR)),
-                            "toStringTag" => return Ok(Value::Symbol(crate::objects::SYMBOL_TO_STRING_TAG)),
-                            "hasInstance" => return Ok(Value::Symbol(crate::objects::SYMBOL_HAS_INSTANCE)),
-                            "toPrimitive" => return Ok(Value::Symbol(crate::objects::SYMBOL_TO_PRIMITIVE)),
+                            "iterator" => {
+                                return Ok(Value::Symbol(crate::objects::SYMBOL_ITERATOR))
+                            }
+                            "toStringTag" => {
+                                return Ok(Value::Symbol(crate::objects::SYMBOL_TO_STRING_TAG))
+                            }
+                            "hasInstance" => {
+                                return Ok(Value::Symbol(crate::objects::SYMBOL_HAS_INSTANCE))
+                            }
+                            "toPrimitive" => {
+                                return Ok(Value::Symbol(crate::objects::SYMBOL_TO_PRIMITIVE))
+                            }
                             "species" => return Ok(Value::Symbol(crate::objects::SYMBOL_SPECIES)),
-                            "unscopables" => return Ok(Value::Symbol(crate::objects::SYMBOL_UNSCOPABLES)),
+                            "unscopables" => {
+                                return Ok(Value::Symbol(crate::objects::SYMBOL_UNSCOPABLES))
+                            }
                             _ => {}
                         }
                     }

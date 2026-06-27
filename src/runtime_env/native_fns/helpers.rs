@@ -151,7 +151,7 @@ pub(super) fn from_json_value(interp: &mut Interpreter, val: serde_json::Value) 
                 crate::vm::interpreter::JsObject {
                     properties: props,
                     prototype: None,
-                extensible: true,
+                    extensible: true,
                 },
             ));
             Value::Object(heap_idx)

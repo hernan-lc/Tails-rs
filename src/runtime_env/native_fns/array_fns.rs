@@ -448,17 +448,19 @@ pub(super) fn native_array_copy_within(
             let target = normalize_index(args.first().map(|v| to_f64(v) as i64).unwrap_or(0), len);
             let start = normalize_index(args.get(1).map(|v| to_f64(v) as i64).unwrap_or(0), len);
             let end = normalize_index(args.get(2).map(|v| to_f64(v) as i64).unwrap_or(len), len);
-            
+
             if target < start {
                 for i in start..end {
-                    if i >= 0 && i < len && target + (i - start) >= 0 && target + (i - start) < len {
+                    if i >= 0 && i < len && target + (i - start) >= 0 && target + (i - start) < len
+                    {
                         let val = arr.elements[i as usize].clone();
                         arr.elements[(target + (i - start)) as usize] = val;
                     }
                 }
             } else {
                 for i in (start..end).rev() {
-                    if i >= 0 && i < len && target + (i - start) >= 0 && target + (i - start) < len {
+                    if i >= 0 && i < len && target + (i - start) >= 0 && target + (i - start) < len
+                    {
                         let val = arr.elements[i as usize].clone();
                         arr.elements[(target + (i - start)) as usize] = val;
                     }
@@ -498,7 +500,11 @@ pub(super) fn native_array_find_last(
     let callback = args.first().cloned().unwrap_or(Value::Undefined);
     let elements = get_array_elements(interp, this)?;
     for (i, elem) in elements.iter().enumerate().rev() {
-        let result = interp.call_value(&callback, &Value::Undefined, &[elem.clone(), Value::Integer(i as i64), this.clone()])?;
+        let result = interp.call_value(
+            &callback,
+            &Value::Undefined,
+            &[elem.clone(), Value::Integer(i as i64), this.clone()],
+        )?;
         if super::helpers::is_truthy(&result) {
             return Ok(elem.clone());
         }
@@ -514,7 +520,11 @@ pub(super) fn native_array_find_last_index(
     let callback = args.first().cloned().unwrap_or(Value::Undefined);
     let elements = get_array_elements(interp, this)?;
     for (i, elem) in elements.iter().enumerate().rev() {
-        let result = interp.call_value(&callback, &Value::Undefined, &[elem.clone(), Value::Integer(i as i64), this.clone()])?;
+        let result = interp.call_value(
+            &callback,
+            &Value::Undefined,
+            &[elem.clone(), Value::Integer(i as i64), this.clone()],
+        )?;
         if super::helpers::is_truthy(&result) {
             return Ok(Value::Integer(i as i64));
         }
@@ -531,7 +541,11 @@ pub(super) fn native_array_flat_map(
     let elements = get_array_elements(interp, this)?;
     let mut result = Vec::new();
     for (i, elem) in elements.iter().enumerate() {
-        let mapped = interp.call_value(&callback, &Value::Undefined, &[elem.clone(), Value::Integer(i as i64), this.clone()])?;
+        let mapped = interp.call_value(
+            &callback,
+            &Value::Undefined,
+            &[elem.clone(), Value::Integer(i as i64), this.clone()],
+        )?;
         if let Value::Array(arr_idx) = &mapped {
             if let crate::vm::interpreter::HeapValue::Array(arr) = &interp.heap[*arr_idx] {
                 result.extend(arr.elements.iter().cloned());
@@ -554,7 +568,10 @@ pub(super) fn native_array_last_index_of(
 ) -> Result<Value> {
     let search = args.first().cloned().unwrap_or(Value::Undefined);
     let elements = get_array_elements(interp, this)?;
-    let from_index = args.get(1).map(|v| to_f64(v) as i64).unwrap_or(elements.len() as i64 - 1);
+    let from_index = args
+        .get(1)
+        .map(|v| to_f64(v) as i64)
+        .unwrap_or(elements.len() as i64 - 1);
     let len = elements.len() as i64;
     let start = if from_index < 0 {
         len + from_index
@@ -562,11 +579,10 @@ pub(super) fn native_array_last_index_of(
         from_index.min(len - 1)
     };
     for i in (0..=start).rev() {
-        if i >= 0 && (i as usize) < elements.len() {
-            if elements[i as usize] == search {
+        if i >= 0 && (i as usize) < elements.len()
+            && elements[i as usize] == search {
                 return Ok(Value::Integer(i));
             }
-        }
     }
     Ok(Value::Float(-1.0))
 }
@@ -576,7 +592,10 @@ pub(super) fn native_array_is_array(
     _this: &Value,
     args: &[Value],
 ) -> Result<Value> {
-    Ok(Value::Boolean(matches!(args.first(), Some(Value::Array(_)))))
+    Ok(Value::Boolean(matches!(
+        args.first(),
+        Some(Value::Array(_))
+    )))
 }
 
 pub(super) fn native_array_from(
@@ -587,17 +606,22 @@ pub(super) fn native_array_from(
     let source = args.first().cloned().unwrap_or(Value::Undefined);
     let map_fn = args.get(1).cloned();
     let mut elements = Vec::new();
-    
+
     match &source {
         Value::Array(arr_idx) => {
-            let source_elements = if let crate::vm::interpreter::HeapValue::Array(arr) = &interp.heap[*arr_idx] {
-                arr.elements.clone()
-            } else {
-                Vec::new()
-            };
+            let source_elements =
+                if let crate::vm::interpreter::HeapValue::Array(arr) = &interp.heap[*arr_idx] {
+                    arr.elements.clone()
+                } else {
+                    Vec::new()
+                };
             for (i, elem) in source_elements.iter().enumerate() {
                 if let Some(ref callback) = map_fn {
-                    let mapped = interp.call_value(callback, &Value::Undefined, &[elem.clone(), Value::Integer(i as i64)])?;
+                    let mapped = interp.call_value(
+                        callback,
+                        &Value::Undefined,
+                        &[elem.clone(), Value::Integer(i as i64)],
+                    )?;
                     elements.push(mapped);
                 } else {
                     elements.push(elem.clone());
@@ -608,7 +632,11 @@ pub(super) fn native_array_from(
             for (i, c) in s.chars().enumerate() {
                 let val = Value::String(c.to_string());
                 if let Some(ref callback) = map_fn {
-                    let mapped = interp.call_value(callback, &Value::Undefined, &[val, Value::Integer(i as i64)])?;
+                    let mapped = interp.call_value(
+                        callback,
+                        &Value::Undefined,
+                        &[val, Value::Integer(i as i64)],
+                    )?;
                     elements.push(mapped);
                 } else {
                     elements.push(val);
@@ -619,7 +647,7 @@ pub(super) fn native_array_from(
             // Other types not supported directly - return empty array
         }
     }
-    
+
     let heap_idx = interp.heap.len();
     interp.heap.push(crate::vm::interpreter::HeapValue::Array(
         crate::vm::interpreter::JsArray { elements },
