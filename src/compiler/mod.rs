@@ -1,5 +1,7 @@
+use crate::compiler::type_checker::Type;
 use crate::errors::Result;
 use crate::objects::Value;
+use std::collections::HashMap;
 
 pub mod bytecode;
 pub mod lexer;
@@ -8,11 +10,30 @@ pub mod type_checker;
 
 pub struct Compiler {
     type_checking: bool,
+    known_globals: HashMap<String, Type>,
 }
 
 impl Compiler {
     pub fn new(type_checking: bool) -> Self {
-        Self { type_checking }
+        Self {
+            type_checking,
+            known_globals: HashMap::new(),
+        }
+    }
+
+    pub fn with_globals(type_checking: bool, known_globals: HashMap<String, Type>) -> Self {
+        Self {
+            type_checking,
+            known_globals,
+        }
+    }
+
+    pub fn add_global(&mut self, name: String, ty: Type) {
+        self.known_globals.insert(name, ty);
+    }
+
+    pub fn set_known_globals(&mut self, globals: HashMap<String, Type>) {
+        self.known_globals = globals;
     }
 
     pub fn compile(&self, source: &str) -> Result<CompiledModule> {
@@ -20,7 +41,7 @@ impl Compiler {
         let ast = parser::parse(&tokens)?;
 
         if self.type_checking {
-            type_checker::TypeChecker::check(&ast)?;
+            type_checker::TypeChecker::check_with_globals(&ast, self.known_globals.clone())?;
         }
 
         bytecode::generate(&ast)

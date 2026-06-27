@@ -1,7 +1,9 @@
 use crate::compiler::Compiler;
+use crate::compiler::type_checker::Type;
 use crate::errors::Result;
 use crate::objects::Value;
 use crate::vm::Interpreter;
+use std::collections::HashMap;
 use std::path::Path;
 
 #[derive(Default)]
@@ -25,7 +27,17 @@ impl TailsRuntime {
     }
 
     pub fn eval(&mut self, source: &str) -> Result<Value> {
-        let compiler = Compiler::new(self.config.enable_type_checking);
+        let mut compiler = Compiler::new(self.config.enable_type_checking);
+        // Pass known globals to the compiler for type checking
+        if self.config.enable_type_checking {
+            let globals: HashMap<String, Type> = self
+                .interpreter
+                .globals
+                .keys()
+                .map(|k| (k.clone(), Type::Any))
+                .collect();
+            compiler.set_known_globals(globals);
+        }
         let compiled = compiler.compile(source)?;
         self.interpreter.execute(&compiled)
     }

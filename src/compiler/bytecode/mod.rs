@@ -764,14 +764,16 @@ impl CodeGenerator {
             Statement::BlockStatement(stmts) => {
                 self.scope_depth += 1;
                 let prev_locals_count = self.locals.len();
-                for stmt in stmts {
-                    self.generate_statement(stmt, false)?;
+                self.instructions.push(Instruction::BlockEnter);
+                for (i, stmt) in stmts.iter().enumerate() {
+                    let is_last = i == stmts.len() - 1;
+                    self.generate_statement(stmt, is_last)?;
                 }
                 let locals_added = self.locals.len() - prev_locals_count;
                 for _ in 0..locals_added {
                     self.locals.pop();
-                    self.instructions.push(Instruction::Pop);
                 }
+                self.instructions.push(Instruction::BlockExit);
                 self.scope_depth -= 1;
                 Ok(())
             }
@@ -854,6 +856,7 @@ impl CodeGenerator {
             Statement::BlockStatement(stmts) => {
                 self.scope_depth += 1;
                 let prev_locals_count = self.locals.len();
+                self.instructions.push(Instruction::BlockEnter);
                 for (i, stmt) in stmts.iter().enumerate() {
                     let is_last = i == stmts.len() - 1;
                     self.generate_statement(stmt, is_last)?;
@@ -861,8 +864,8 @@ impl CodeGenerator {
                 let locals_added = self.locals.len() - prev_locals_count;
                 for _ in 0..locals_added {
                     self.locals.pop();
-                    self.instructions.push(Instruction::Pop);
                 }
+                self.instructions.push(Instruction::BlockExit);
                 self.scope_depth -= 1;
                 Ok(())
             }

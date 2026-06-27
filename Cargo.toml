@@ -34,6 +34,9 @@ env_logger = "0.10"
 # File watching
 notify = "8"
 
+# Testing/Tooling
+object_store = "0.14.0"
+
 # FFI Support
 libc = "0.2"
 

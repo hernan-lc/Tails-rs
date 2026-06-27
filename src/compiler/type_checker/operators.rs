@@ -8,6 +8,10 @@ impl TypeChecker {
         left: &Type,
         right: &Type,
     ) -> Result<Type> {
+        // If either type is Any, allow the operation and return Any
+        if matches!(left, Type::Any) || matches!(right, Type::Any) {
+            return Ok(Type::Any);
+        }
         match op {
             BinaryOperator::Add
             | BinaryOperator::Sub

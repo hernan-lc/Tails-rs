@@ -70,21 +70,32 @@ pub struct TypeChecker {
     type_aliases: HashMap<String, TypeAliasDecl>,
     enums: HashMap<String, EnumDecl>,
     narrowed_types: HashMap<String, Type>,
+    known_globals: HashMap<String, Type>,
 }
 
 impl TypeChecker {
     pub fn new() -> Self {
+        Self::with_globals(HashMap::new())
+    }
+
+    pub fn with_globals(known_globals: HashMap<String, Type>) -> Self {
         Self {
             scopes: vec![HashMap::new()],
             interfaces: HashMap::new(),
             type_aliases: HashMap::new(),
             enums: HashMap::new(),
             narrowed_types: HashMap::new(),
+            known_globals,
         }
     }
 
     pub fn check(ast: &AstNode) -> Result<()> {
         let mut checker = Self::new();
+        checker.check_node(ast)
+    }
+
+    pub fn check_with_globals(ast: &AstNode, known_globals: HashMap<String, Type>) -> Result<()> {
+        let mut checker = Self::with_globals(known_globals);
         checker.check_node(ast)
     }
 
@@ -151,7 +162,7 @@ impl TypeChecker {
                 return Some(ty.clone());
             }
         }
-        None
+        self.known_globals.get(name).cloned()
     }
 
     pub(crate) fn resolve_annotation(
