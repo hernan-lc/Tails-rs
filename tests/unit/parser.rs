@@ -1,5 +1,5 @@
 use tails::compiler::lexer::tokenize;
-use tails::compiler::parser::{parse, AstNode, Statement, Expression};
+use tails::compiler::parser::{parse, AstNode, Statement, Expression, BindingPattern};
 
 #[test]
 fn test_number_literal() {
@@ -69,7 +69,10 @@ fn test_variable_declaration() {
             match &stmts[0] {
                 Statement::VariableDeclaration { declarations, .. } => {
                     assert_eq!(declarations.len(), 1);
-                    assert_eq!(declarations[0].id, "x");
+                    match &declarations[0].id {
+                        BindingPattern::Identifier(name) => assert_eq!(name, "x"),
+                        _ => panic!("Expected identifier pattern"),
+                    }
                     assert!(declarations[0].init.is_some());
                 }
                 _ => panic!("Expected variable declaration"),

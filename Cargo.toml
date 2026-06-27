@@ -43,3 +43,15 @@ criterion = { version = "0.5", features = ["html_reports"] }
 [[bench]]
 name = "runtime"
 harness = false
+
+[[test]]
+name = "unit_parser"
+path = "tests/unit/parser.rs"
+
+[[test]]
+name = "unit_lexer"
+path = "tests/unit/lexer.rs"
+
+[[test]]
+name = "unit_vm"
+path = "tests/unit/vm.rs"

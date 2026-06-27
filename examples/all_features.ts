@@ -1,19 +1,14 @@
 // ============================================================
-// Tails-rs — All Features Example (with TypeScript Types)
+// Tails-rs — All Features Example
 // Run:  cargo run --bin tails -- examples/all_features.ts
-// Watch: cargo run --bin tails -- --watch examples/all_features.ts
 // ============================================================
 
 // --- Variables & Operators ---
 console.log("--- Variables & Operators ---");
-
 let x: number = 42;
 const pi: number = 3.14;
 var label: string = "hello";
 let isActive: boolean = true;
-let isNull: null = null;
-let notDefined: undefined = undefined;
-
 console.log(x, pi, label);
 
 // Arithmetic
@@ -27,11 +22,7 @@ console.log("arith:", sum, diff, prod, div, mod, pow);
 
 // Compound assignment
 let a: number = 10;
-a += 5;
-a -= 3;
-a *= 2;
-a /= 4;
-a %= 3;
+a += 5; a -= 3; a *= 2; a /= 4; a %= 3;
 console.log("compound:", a);
 
 // Comparison
@@ -42,19 +33,15 @@ console.log("logic:", true && false, true || false, !true);
 
 // Increment / Decrement
 let counter: number = 0;
-counter++;
-counter++;
-counter++;
+counter++; counter++; counter++;
 console.log("counter:", counter);
 
-// Power
 console.log("pow:", 2 ** 8);
 console.log("bitwise NOT:", ~0);
 
 // --- Control Flow ---
 console.log("\n--- Control Flow ---");
 
-// if / else
 let score: number = 85;
 if (score >= 90) {
     console.log("grade: A");
@@ -64,14 +51,12 @@ if (score >= 90) {
     console.log("grade: C");
 }
 
-// for loop
 let sumFor: number = 0;
 for (let i: number = 1; i <= 5; i++) {
     sumFor += i;
 }
 console.log("for sum 1..5:", sumFor);
 
-// while loop
 let w: number = 0;
 let sumWhile: number = 0;
 while (w < 5) {
@@ -80,7 +65,6 @@ while (w < 5) {
 }
 console.log("while sum 0..4:", sumWhile);
 
-// do-while
 let dw: number = 0;
 let sumDW: number = 0;
 do {
@@ -89,7 +73,6 @@ do {
 } while (dw < 5);
 console.log("do-while sum 0..4:", sumDW);
 
-// switch
 let day: number = 3;
 let dayName: string = "";
 switch (day) {
@@ -102,12 +85,10 @@ switch (day) {
 }
 console.log("day:", dayName);
 
-// ternary
 let age: number = 20;
 let status: string = age >= 18 ? "adult" : "minor";
 console.log("ternary:", status);
 
-// break and continue
 let breakSum: number = 0;
 for (let i: number = 0; i < 10; i++) {
     if (i === 5) break;
@@ -137,7 +118,6 @@ interface Point {
     x: number;
     y: number;
 }
-
 let origin: Point = { x: 0, y: 0 };
 console.log("interface:", origin.x, origin.y);
 
@@ -145,7 +125,6 @@ interface OptionalUser {
     name: string;
     age?: number;
 }
-
 let user1: OptionalUser = { name: "Alice" };
 let user2: OptionalUser = { name: "Bob", age: 30 };
 console.log("optional:", user1.name, user2.name, user2.age);
@@ -153,25 +132,20 @@ console.log("optional:", user1.name, user2.name, user2.age);
 // --- Functions & Closures ---
 console.log("\n--- Functions & Closures ---");
 
-// Function declaration
 function add(a: number, b: number): number {
     return a + b;
 }
 console.log("add(3,7):", add(3, 7));
 
-// Function expression
 const multiply = function(a: number, b: number): number {
     return a * b;
 };
 console.log("multiply(4,5):", multiply(4, 5));
 
-// Arrow functions (untyped params due to current parser limitation, typed by context)
 const double = function(x: number): number { return x * 2; };
 const square = function(x: number): number { return x * x; };
-const addArrow = function(a: number, b: number): number { return a + b; };
-console.log("arrow:", double(7), square(5), addArrow(10, 20));
+console.log("function expr:", double(7), square(5));
 
-// Closures
 function makeCounter(): any {
     let count: number = 0;
     return function(): any {
@@ -182,7 +156,6 @@ function makeCounter(): any {
 const ctr: any = makeCounter();
 console.log("closure:", ctr(), ctr(), ctr());
 
-// Higher-order functions
 function applyTwice(fn: any, val: number): any {
     return fn(fn(val));
 }
@@ -194,7 +167,7 @@ let id1: ID = "abc";
 let id2: ID = 42;
 console.log("type alias:", id1, id2);
 
-// --- Classes (OOP) ---
+// --- Classes ---
 console.log("\n--- Classes ---");
 
 class Calculator {
@@ -202,21 +175,17 @@ class Calculator {
         this.a = a;
         this.b = b;
     }
-
     add() {
         return this.a + this.b;
     }
-
     mul() {
         return this.a * this.b;
     }
-
-    static create(a, b): any {
+    static create(a: number, b: number): any {
         return new Calculator(a, b);
     }
 }
-
-let calc: Calculator = Calculator.create(3, 4);
+let calc: any = Calculator.create(3, 4);
 console.log("class:", calc.add(), calc.mul());
 
 // Inheritance
@@ -228,7 +197,6 @@ class Animal {
         return this.name + " makes a sound";
     }
 }
-
 class Dog extends Animal {
     constructor(name) {
         super(name);
@@ -240,7 +208,6 @@ class Dog extends Animal {
         return this.name + " fetches the ball";
     }
 }
-
 let rex: Dog = new Dog("Rex");
 console.log("inheritance:", rex.speak(), rex.fetch());
 console.log("instanceof:", rex instanceof Dog, rex instanceof Animal);
@@ -260,7 +227,6 @@ class Person {
         this._last = parts[1];
     }
 }
-
 let p: Person = new Person("John", "Doe");
 console.log("getter:", p.fullName);
 p.fullName = "Jane Smith";
@@ -275,7 +241,7 @@ var AnonClass = class {
         return this.msg;
     }
 };
-let anonInst: { msg: string, greet(): string } = new AnonClass();
+let anonInst: any = new AnonClass();
 console.log("class expr:", anonInst.greet());
 
 // Multiple instances
@@ -294,40 +260,44 @@ ca.inc(); ca.inc(); ca.inc();
 cb.inc();
 console.log("multi instance:", ca.count, cb.count);
 
-// --- Promises & Async ---
-console.log("\n--- Promises & Async ---");
+// Constructor with access modifiers
+class Greeter {
+    constructor(public greeting: string) {}
+    greet(): string {
+        return this.greeting;
+    }
+}
+const greeter: Greeter = new Greeter("Hello!");
+console.log("constructor modifiers:", greeter.greet());
 
-// Promise.resolve
+// --- Promises ---
+console.log("\n--- Promises ---");
+
 var pResult: number = 0;
 Promise.resolve(99).then(function(v: number): void { pResult = v; });
 console.log("Promise.resolve:", pResult);
 
-// Promise.reject + catch
 var pErr: string = "";
 Promise.reject("err").catch(function(v: string): void { pErr = v; });
 console.log("Promise.catch:", pErr);
 
-// Promise chaining
 var chainResult: number = 0;
 Promise.resolve(10)
     .then(function(v: number): number { return v + 5; })
     .then(function(v: number): void { chainResult = v; });
 console.log("chain:", chainResult);
 
-// Promise.all
 var allResult: number = 0;
 Promise.all([Promise.resolve(1), Promise.resolve(2), Promise.resolve(3)])
-    .then(function(arr: number[]): void { allResult = arr.length; });
+    .then(function(arr: any[]): void { allResult = arr.length; });
 console.log("Promise.all:", allResult);
 
-// Promise.finally
 var finallyResult: number = 0;
 Promise.resolve(1)
     .then(function(v: number): void { finallyResult += v; })
     .finally(function(): void { finallyResult += 10; });
 console.log("finally:", finallyResult);
 
-// Promise constructor
 var ctorResult: number = 0;
 var ctorPromise: any = new Promise(function(resolve: any): void { resolve(42); });
 ctorPromise.then(function(v: any): void { ctorResult = v; });
@@ -355,30 +325,27 @@ console.log("\n--- JSON ---");
 let jsonStr: string = JSON.stringify({ name: "Alice", age: 30 });
 console.log("stringify:", jsonStr);
 
-let parsed: { x: number, y: string } = JSON.parse('{"x": 10, "y": "hello"}');
+let parsed: any = JSON.parse('{"x": 10, "y": "hello"}');
 console.log("parse:", parsed.x, parsed.y);
 
-let roundTrip: { a: number, b: number } = JSON.parse(JSON.stringify({ a: 1, b: 2 }));
+let roundTrip: any = JSON.parse(JSON.stringify({ a: 1, b: 2 }));
 console.log("roundtrip:", roundTrip.a, roundTrip.b);
 
 // --- Object Methods ---
 console.log("\n--- Object Methods ---");
 
-let obj: { a: number, b: number, c: number } = { a: 1, b: 2, c: 3 };
+let obj: any = { a: 1, b: 2, c: 3 };
 console.log("keys:", Object.keys(obj).length);
 console.log("values:", Object.values(obj).length);
 console.log("entries:", Object.entries(obj).length);
 
-let target: { a: number, b: number, c: number } = { a: 1 };
+let target: any = { a: 1 };
 Object.assign(target, { b: 2 }, { c: 3 });
 console.log("assign:", target.a, target.b, target.c);
 
 // --- Array Methods ---
 console.log("\n--- Array Methods ---");
 
-let arr: number[] = [1, 2, 3];
-
-// push / pop / shift / unshift
 let pushArr: number[] = [1, 2];
 pushArr.push(3);
 console.log("push:", pushArr.length);
@@ -395,47 +362,37 @@ let unshiftArr: number[] = [2, 3];
 unshiftArr.unshift(1);
 console.log("unshift:", unshiftArr.length);
 
-// map
 let mapped: number[] = [1, 2, 3].map(function(x: number): number { return x * 2; });
 console.log("map:", mapped[0], mapped[1], mapped[2]);
 
-// filter
 let evens: number[] = [1, 2, 3, 4, 5, 6].filter(function(x: number): boolean { return x % 2 === 0; });
 console.log("filter:", evens.length);
 
-// reduce
 let total: number = [1, 2, 3, 4].reduce(function(acc: number, x: number): number { return acc + x; }, 0);
 console.log("reduce:", total);
 
-// find / findIndex
-let found: number = [10, 20, 30].find(function(x: number): boolean { return x > 15; });
+let found: any = [10, 20, 30].find(function(x: number): boolean { return x > 15; });
 let foundIdx: number = [10, 20, 30].findIndex(function(x: number): boolean { return x > 15; });
 console.log("find:", found, foundIdx);
 
-// some / every
 let hasBig: boolean = [1, 2, 3].some(function(x: number): boolean { return x > 2; });
 let allPos: boolean = [1, 2, 3].every(function(x: number): boolean { return x > 0; });
 console.log("some/every:", hasBig, allPos);
 
-// indexOf / includes
 let idx: number = [10, 20, 30].indexOf(20);
 let inc: boolean = [1, 2, 3].includes(2);
 console.log("indexOf/includes:", idx, inc);
 
-// join
 let joined: string = ["a", "b", "c"].join("-");
 console.log("join:", joined);
 
-// reverse / sort
 let reversed: number[] = [1, 2, 3].reverse();
 let sorted: number[] = [3, 1, 4, 1, 5].sort();
 console.log("reverse:", reversed[0], "sort:", sorted[0]);
 
-// concat
 let concat: number[] = [1, 2].concat([3, 4]);
 console.log("concat:", concat.length);
 
-// slice / splice
 let sliced: number[] = [1, 2, 3, 4, 5].slice(1, 3);
 console.log("slice:", sliced.length);
 
@@ -443,11 +400,9 @@ let spliced: number[] = [1, 2, 3, 4];
 let removed: number[] = spliced.splice(1, 2);
 console.log("splice:", removed.length, spliced.length);
 
-// flat
 let flat: number[] = [[1, 2], [3, 4]].flat();
 console.log("flat:", flat.length);
 
-// forEach
 let feSum: number = 0;
 [1, 2, 3].forEach(function(x: number): void { feSum += x; });
 console.log("forEach:", feSum);
@@ -461,7 +416,7 @@ console.log("slice:", "hello".slice(1, 3));
 console.log("substring:", "hello".substring(1, 4));
 console.log("indexOf:", "hello world".indexOf("world"));
 console.log("includes:", "hello".includes("ell"));
-console.log("replace:", "hello world".replace("world", "JS"));
+console.log("replace:", "hello world".replace("world", "TS"));
 console.log("split:", "a,b,c".split(",").length);
 console.log("trim:", "  hello  ".trim());
 console.log("toLowerCase:", "HELLO".toLowerCase());

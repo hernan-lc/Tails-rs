@@ -556,7 +556,7 @@ impl CodeGenerator {
                             params,
                             body: mbody,
                             is_static,
-                            is_async: _,
+                            ..
                         } => {
                             let func_idx =
                                 self.compile_function(Some(mname.clone()), params, mbody)?;
@@ -571,6 +571,7 @@ impl CodeGenerator {
                             name: mname,
                             body: mbody,
                             is_static,
+                            ..
                         } => {
                             let func_idx =
                                 self.compile_function(Some(format!("get_{}", mname)), &[], mbody)?;
@@ -586,6 +587,7 @@ impl CodeGenerator {
                             param,
                             body: mbody,
                             is_static,
+                            ..
                         } => {
                             let func_idx = self.compile_function(
                                 Some(format!("set_{}", mname)),

@@ -183,10 +183,27 @@ pub struct CatchClause {
 }
 
 #[derive(Debug, Clone)]
+pub enum AccessModifier {
+    Public,
+    Private,
+    Protected,
+    Readonly,
+}
+
+#[derive(Debug, Clone)]
+pub struct ConstructorParam {
+    pub name: String,
+    pub type_annotation: Option<TypeAnnotation>,
+    pub access_modifiers: Vec<AccessModifier>,
+}
+
+#[derive(Debug, Clone)]
 pub enum ClassMember {
     Method {
         name: String,
         params: Vec<String>,
+        param_types: Option<Vec<Option<TypeAnnotation>>>,
+        return_type: Option<TypeAnnotation>,
         body: Vec<Statement>,
         is_static: bool,
         is_async: bool,
@@ -196,17 +213,19 @@ pub enum ClassMember {
         is_static: bool,
     },
     Constructor {
-        params: Vec<String>,
+        params: Vec<ConstructorParam>,
         body: Vec<Statement>,
     },
     Getter {
         name: String,
+        return_type: Option<TypeAnnotation>,
         body: Vec<Statement>,
         is_static: bool,
     },
     Setter {
         name: String,
         param: String,
+        param_type: Option<TypeAnnotation>,
         body: Vec<Statement>,
         is_static: bool,
     },
@@ -529,30 +548,6 @@ impl<'a> Parser<'a> {
         Ok(Statement::Expression(expr))
     }
 
-    pub(crate) fn parse_params(&mut self) -> Result<Vec<String>> {
-        let mut params = Vec::new();
-        if self.peek() != &Token::RightParen {
-            loop {
-                let param = match self.advance() {
-                    Token::Identifier(name) => name,
-                    token => {
-                        return Err(Error::ParseError(format!(
-                            "Expected parameter name, got {:?}",
-                            token
-                        )))
-                    }
-                };
-                params.push(param);
-                if self.peek() == &Token::Comma {
-                    self.advance();
-                } else {
-                    break;
-                }
-            }
-        }
-        Ok(params)
-    }
-
     pub(crate) fn parse_typed_params(
         &mut self,
     ) -> Result<(Vec<String>, Vec<Option<TypeAnnotation>>)> {
@@ -585,6 +580,62 @@ impl<'a> Parser<'a> {
             }
         }
         Ok((params, param_types))
+    }
+
+    pub(crate) fn parse_constructor_params(&mut self) -> Result<Vec<ConstructorParam>> {
+        let mut params = Vec::new();
+        if self.peek() != &Token::RightParen {
+            loop {
+                let mut access_modifiers = Vec::new();
+                loop {
+                    match self.peek() {
+                        Token::Public => {
+                            self.advance();
+                            access_modifiers.push(AccessModifier::Public);
+                        }
+                        Token::Private => {
+                            self.advance();
+                            access_modifiers.push(AccessModifier::Private);
+                        }
+                        Token::Protected => {
+                            self.advance();
+                            access_modifiers.push(AccessModifier::Protected);
+                        }
+                        Token::Readonly => {
+                            self.advance();
+                            access_modifiers.push(AccessModifier::Readonly);
+                        }
+                        _ => break,
+                    }
+                }
+                let param = match self.advance() {
+                    Token::Identifier(name) => name,
+                    token => {
+                        return Err(Error::ParseError(format!(
+                            "Expected parameter name, got {:?}",
+                            token
+                        )))
+                    }
+                };
+                let type_annotation = if self.peek() == &Token::Colon {
+                    self.advance();
+                    Some(self.parse_type_annotation()?)
+                } else {
+                    None
+                };
+                params.push(ConstructorParam {
+                    name: param,
+                    type_annotation,
+                    access_modifiers,
+                });
+                if self.peek() == &Token::Comma {
+                    self.advance();
+                } else {
+                    break;
+                }
+            }
+        }
+        Ok(params)
     }
 
     pub(crate) fn token_to_key_string(&mut self) -> Result<String> {
@@ -622,6 +673,10 @@ impl<'a> Parser<'a> {
             Token::Super => Ok("super".to_string()),
             Token::Extends => Ok("extends".to_string()),
             Token::Static => Ok("static".to_string()),
+            Token::Public => Ok("public".to_string()),
+            Token::Private => Ok("private".to_string()),
+            Token::Protected => Ok("protected".to_string()),
+            Token::Readonly => Ok("readonly".to_string()),
             Token::Import => Ok("import".to_string()),
             Token::Export => Ok("export".to_string()),
             Token::Default => Ok("default".to_string()),
@@ -672,6 +727,10 @@ impl<'a> Parser<'a> {
             Token::Super => Ok(Expression::Identifier("super".to_string())),
             Token::Extends => Ok(Expression::Identifier("extends".to_string())),
             Token::Static => Ok(Expression::Identifier("static".to_string())),
+            Token::Public => Ok(Expression::Identifier("public".to_string())),
+            Token::Private => Ok(Expression::Identifier("private".to_string())),
+            Token::Protected => Ok(Expression::Identifier("protected".to_string())),
+            Token::Readonly => Ok(Expression::Identifier("readonly".to_string())),
             Token::Import => Ok(Expression::Identifier("import".to_string())),
             Token::Export => Ok(Expression::Identifier("export".to_string())),
             Token::Default => Ok(Expression::Identifier("default".to_string())),

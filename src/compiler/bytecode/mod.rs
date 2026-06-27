@@ -595,7 +595,7 @@ impl CodeGenerator {
                             params,
                             body: mbody,
                             is_static,
-                            is_async: _,
+                            ..
                         } => {
                             let func_idx =
                                 self.compile_function(Some(mname.clone()), params, mbody)?;
@@ -610,6 +610,7 @@ impl CodeGenerator {
                             name: mname,
                             body: mbody,
                             is_static,
+                            ..
                         } => {
                             let func_idx =
                                 self.compile_function(Some(format!("get_{}", mname)), &[], mbody)?;
@@ -625,6 +626,7 @@ impl CodeGenerator {
                             param,
                             body: mbody,
                             is_static,
+                            ..
                         } => {
                             let func_idx = self.compile_function(
                                 Some(format!("set_{}", mname)),
@@ -922,9 +924,10 @@ impl CodeGenerator {
     ) -> Result<Option<u32>> {
         for member in body {
             if let ClassMember::Constructor { params, body } = member {
+                let param_names: Vec<String> = params.iter().map(|p| p.name.clone()).collect();
                 return Ok(Some(self.compile_function(
                     Some("constructor".to_string()),
-                    params,
+                    &param_names,
                     body,
                 )?));
             }

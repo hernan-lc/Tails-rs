@@ -232,7 +232,7 @@ impl TypeChecker {
                         crate::compiler::parser::ClassMember::Constructor { params, body } => {
                             self.enter_scope();
                             for param in params {
-                                self.define_variable(param, Type::Any);
+                                self.define_variable(&param.name, Type::Any);
                             }
                             for stmt in body {
                                 self.check_statement(stmt)?;

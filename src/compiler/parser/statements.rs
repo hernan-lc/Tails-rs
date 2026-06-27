@@ -511,6 +511,10 @@ impl<'a> Parser<'a> {
                     )))
                 }
             };
+            if self.peek() == &Token::Colon {
+                self.advance();
+                self.parse_type_annotation()?;
+            }
             self.expect(&Token::RightParen)?;
             self.expect(&Token::LeftBrace)?;
             let body = self.parse_block_body()?;
@@ -561,6 +565,15 @@ impl<'a> Parser<'a> {
         } else {
             None
         };
+        if matches!(self.peek(), Token::Identifier(s) if s == "implements") {
+            self.advance();
+            while self.peek() != &Token::LeftBrace && self.peek() != &Token::Eof {
+                self.advance();
+                if self.peek() == &Token::Comma {
+                    self.advance();
+                }
+            }
+        }
         self.expect(&Token::LeftBrace)?;
         let body = self.parse_class_body()?;
         self.expect(&Token::RightBrace)?;
@@ -586,11 +599,18 @@ impl<'a> Parser<'a> {
             } else {
                 false
             };
+            // Consume access modifiers (public, private, protected, readonly) in class bodies
+            while matches!(
+                self.peek(),
+                Token::Public | Token::Private | Token::Protected | Token::Readonly
+            ) {
+                self.advance();
+            }
 
             if self.peek() == &Token::Constructor {
                 self.advance();
                 self.expect(&Token::LeftParen)?;
-                let params = self.parse_params()?;
+                let params = self.parse_constructor_params()?;
                 self.expect(&Token::RightParen)?;
                 // Parse optional return type annotation
                 if self.peek() == &Token::Colon {
@@ -614,16 +634,18 @@ impl<'a> Parser<'a> {
                 };
                 self.expect(&Token::LeftParen)?;
                 self.expect(&Token::RightParen)?;
-                // Parse optional return type annotation
-                if self.peek() == &Token::Colon {
+                let return_type = if self.peek() == &Token::Colon {
                     self.advance();
-                    self.parse_type_annotation()?;
-                }
+                    Some(self.parse_type_annotation()?)
+                } else {
+                    None
+                };
                 self.expect(&Token::LeftBrace)?;
                 let body = self.parse_block_body()?;
                 self.expect(&Token::RightBrace)?;
                 members.push(ClassMember::Getter {
                     name,
+                    return_type,
                     body,
                     is_static,
                 });
@@ -638,25 +660,26 @@ impl<'a> Parser<'a> {
                         )))
                     }
                 };
-                self.expect(&Token::LeftParen)?;
-                let param = match self.advance() {
-                    Token::Identifier(name) => {
-                        // Parse optional parameter type annotation
-                        if self.peek() == &Token::Colon {
-                            self.advance();
-                            self.parse_type_annotation()?;
+                let (param, param_type) = {
+                    self.expect(&Token::LeftParen)?;
+                    let pname = match self.advance() {
+                        Token::Identifier(n) => n,
+                        t => {
+                            return Err(Error::ParseError(format!(
+                                "Expected parameter name, got {:?}",
+                                t
+                            )))
                         }
-                        name
-                    }
-                    t => {
-                        return Err(Error::ParseError(format!(
-                            "Expected parameter name, got {:?}",
-                            t
-                        )))
-                    }
+                    };
+                    let ptype = if self.peek() == &Token::Colon {
+                        self.advance();
+                        Some(self.parse_type_annotation()?)
+                    } else {
+                        None
+                    };
+                    (pname, ptype)
                 };
                 self.expect(&Token::RightParen)?;
-                // Parse optional return type annotation
                 if self.peek() == &Token::Colon {
                     self.advance();
                     self.parse_type_annotation()?;
@@ -667,6 +690,7 @@ impl<'a> Parser<'a> {
                 members.push(ClassMember::Setter {
                     name,
                     param,
+                    param_type,
                     body,
                     is_static,
                 });
@@ -682,24 +706,39 @@ impl<'a> Parser<'a> {
                 };
                 if self.peek() == &Token::LeftParen {
                     self.advance();
-                    let params = self.parse_params()?;
+                    let (params, param_types) = self.parse_typed_params()?;
                     self.expect(&Token::RightParen)?;
-                    // Parse optional return type annotation
+                    let return_type = if self.peek() == &Token::Colon {
+                        self.advance();
+                        Some(self.parse_type_annotation()?)
+                    } else {
+                        None
+                    };
+                    if self.peek() == &Token::Semicolon {
+                        self.advance();
+                    } else {
+                        self.expect(&Token::LeftBrace)?;
+                        let body = self.parse_block_body()?;
+                        self.expect(&Token::RightBrace)?;
+                        members.push(ClassMember::Method {
+                            name,
+                            params,
+                            param_types: Some(param_types),
+                            return_type,
+                            body,
+                            is_static,
+                            is_async,
+                        });
+                    }
+                } else {
                     if self.peek() == &Token::Colon {
                         self.advance();
                         self.parse_type_annotation()?;
                     }
-                    self.expect(&Token::LeftBrace)?;
-                    let body = self.parse_block_body()?;
-                    self.expect(&Token::RightBrace)?;
-                    members.push(ClassMember::Method {
-                        name,
-                        params,
-                        body,
-                        is_static,
-                        is_async,
-                    });
-                } else {
+                    if self.peek() == &Token::Assign {
+                        self.advance();
+                        self.parse_expression()?;
+                    }
                     members.push(ClassMember::Property { name, is_static });
                     if self.peek() == &Token::Semicolon {
                         self.advance();

@@ -589,43 +589,26 @@ impl<'a> Parser<'a> {
                 }
                 if let Token::Identifier(_) = self.peek().clone() {
                     let saved = self.pos;
-                    let first = match self.advance() {
-                        Token::Identifier(n) => n,
-                        _ => unreachable!(),
-                    };
-                    if self.peek() == &Token::Arrow {
+                    let (params, param_types) = self.parse_typed_params()?;
+                    if self.peek() == &Token::RightParen {
                         self.advance();
-                        return self.parse_arrow_body(vec![first], None, None, false);
-                    }
-                    if self.peek() == &Token::Comma {
-                        let mut params = vec![first];
-                        loop {
-                            if self.peek() != &Token::Comma {
-                                break;
-                            }
+                        let return_type = if self.peek() == &Token::Colon {
                             self.advance();
-                            if self.peek() == &Token::RightParen {
-                                break;
-                            }
-                            match self.advance() {
-                                Token::Identifier(n) => params.push(n),
-                                t => {
-                                    return Err(Error::ParseError(format!(
-                                        "Expected parameter, got {:?}",
-                                        t
-                                    )))
-                                }
-                            }
-                        }
-                        self.expect(&Token::RightParen)?;
+                            Some(self.parse_type_annotation()?)
+                        } else {
+                            None
+                        };
                         if self.peek() == &Token::Arrow {
                             self.advance();
-                            return self.parse_arrow_body(params, None, None, false);
+                            return self.parse_arrow_body(
+                                params,
+                                Some(param_types),
+                                return_type,
+                                false,
+                            );
                         }
-                        self.pos = saved;
-                    } else {
-                        self.pos = saved;
                     }
+                    self.pos = saved;
                 }
                 let expr = self.parse_expression()?;
                 self.expect(&Token::RightParen)?;

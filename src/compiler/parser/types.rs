@@ -106,15 +106,55 @@ impl<'a> Parser<'a> {
                                 )))
                             }
                         };
-                        let optional = if self.peek() == &Token::Question {
+                        if self.peek() == &Token::LeftParen {
                             self.advance();
-                            true
+                            let mut param_types = Vec::new();
+                            if self.peek() != &Token::RightParen {
+                                loop {
+                                    if matches!(self.peek(), Token::Identifier(_)) {
+                                        self.advance();
+                                        if self.peek() == &Token::Colon {
+                                            self.advance();
+                                            param_types.push(self.parse_type_annotation()?);
+                                        } else {
+                                            param_types.push(TypeAnnotation::Any);
+                                        }
+                                    } else {
+                                        param_types.push(self.parse_type_annotation()?);
+                                    }
+                                    if self.peek() == &Token::Comma {
+                                        self.advance();
+                                    } else {
+                                        break;
+                                    }
+                                }
+                            }
+                            self.expect(&Token::RightParen)?;
+                            let return_type = if self.peek() == &Token::Colon {
+                                self.advance();
+                                self.parse_type_annotation()?
+                            } else {
+                                TypeAnnotation::Any
+                            };
+                            properties.push((
+                                name,
+                                TypeAnnotation::Function {
+                                    params: param_types,
+                                    return_type: Box::new(return_type),
+                                },
+                                false,
+                            ));
                         } else {
-                            false
-                        };
-                        self.expect(&Token::Colon)?;
-                        let ty = self.parse_type_annotation()?;
-                        properties.push((name, ty, optional));
+                            let optional = if self.peek() == &Token::Question {
+                                self.advance();
+                                true
+                            } else {
+                                false
+                            };
+                            self.expect(&Token::Colon)?;
+                            let ty = self.parse_type_annotation()?;
+                            properties.push((name, ty, optional));
+                        }
                         if self.peek() == &Token::Comma {
                             self.advance();
                         } else {
