@@ -3,8 +3,8 @@ mod expressions;
 
 use crate::compiler::parser::{
     ArrayBindingElement, ArrowFunctionBody, AstNode, BinaryOperator, BindingPattern, ClassMember,
-    CompoundAssignmentOp, ExportDeclarationKind, Expression, ForInLeft, ForInit,
-    Statement, UnaryOperator, UpdateOperator,
+    CompoundAssignmentOp, ExportDeclarationKind, Expression, ForInLeft, ForInit, Statement,
+    UnaryOperator, UpdateOperator,
 };
 use crate::compiler::{
     ClassInfo, ClassMethodInfo, ClassMethodKind, CompiledFunction, CompiledModule, Instruction,
@@ -779,7 +779,7 @@ impl CodeGenerator {
                         self.instructions.push(Instruction::ExportDefault);
                     }
                     _ => {
-                        self.generate_statement(declaration, false)?;
+                        self.generate_statement(declaration, true)?;
                         self.instructions.push(Instruction::ExportDefault);
                     }
                 }

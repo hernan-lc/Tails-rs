@@ -51,9 +51,15 @@ impl TailsRuntime {
         let result = self.interpreter.execute_module(&compiled);
         // Register module exports
         let exports = std::mem::take(&mut self.interpreter.module_exports);
+        // If module result is Undefined but there's a default export, return that instead
+        let final_result = if matches!(result, Ok(Value::Undefined)) {
+            exports.get("default").cloned().unwrap_or(Value::Undefined)
+        } else {
+            result?
+        };
         self.interpreter.module_registry.insert(module_key, exports);
         self.interpreter.current_module_path = prev;
-        result
+        Ok(final_result)
     }
 
     pub fn import(&mut self, module_path: &Path) -> Result<Value> {
@@ -108,6 +114,13 @@ impl TailsRuntime {
 
     pub fn call_function(&mut self, func: &Value, this: &Value, args: &[Value]) -> Result<Value> {
         self.interpreter.call_value(func, this, args)
+    }
+
+    pub fn call_global(&mut self, name: &str, args: &[Value]) -> Result<Value> {
+        let func = self.get_global(name).ok_or_else(|| {
+            crate::errors::Error::RuntimeError(format!("Function '{}' not found in globals", name))
+        })?;
+        self.call_function(&func, &Value::Undefined, args)
     }
 }
 
