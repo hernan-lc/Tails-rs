@@ -1,6 +1,6 @@
 import fs from "./fs.native";
 import path from "./path.native";
-import type { PluginInput } from "./types.ts";
+import { PluginInput } from "./types.ts";
 import { validatePlugin } from "./validation.ts";
 
 export async function loadPluginFromFile(

@@ -768,6 +768,10 @@ impl<'a> Parser<'a> {
 
     pub(crate) fn parse_import_declaration(&mut self) -> Result<SpannedNode<Statement>> {
         self.expect(&Token::Import)?;
+        // Skip 'type' keyword for type-only imports: import type { ... } from "..."
+        if self.peek().token == Token::Type {
+            self.advance();
+        }
         let mut specifiers = Vec::new();
 
         if matches!(self.peek().token, Token::String(_)) {
@@ -921,7 +925,19 @@ impl<'a> Parser<'a> {
 
         if self.peek().token == Token::Default {
             self.advance();
-            let decl = self.parse_statement()?;
+            // export default can be followed by a declaration or an expression
+            let decl = match self.peek().token {
+                Token::Function | Token::Class | Token::Const | Token::Let | Token::Var => {
+                    self.parse_statement()?
+                }
+                _ => {
+                    let expr = self.parse_expression()?;
+                    if self.peek().token == Token::Semicolon {
+                        self.advance();
+                    }
+                    self.spanned(Statement::Expression(expr.inner))
+                }
+            };
             return Ok(self.spanned(Statement::ExportDefaultDeclaration {
                 declaration: Box::new(decl),
             }));
@@ -1037,6 +1053,13 @@ impl<'a> Parser<'a> {
             if self.peek().token == Token::Comma {
                 self.advance();
                 continue;
+            }
+            // Skip optional modifiers like 'readonly', 'public', 'private', 'protected', 'static'
+            while matches!(
+                self.peek().token,
+                Token::Readonly | Token::Public | Token::Private | Token::Protected | Token::Static
+            ) {
+                self.advance();
             }
             let name = match self.advance().token {
                 Token::Identifier(n) => n,

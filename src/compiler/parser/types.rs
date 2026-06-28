@@ -100,6 +100,10 @@ impl<'a> Parser<'a> {
                 let mut properties = Vec::new();
                 if self.peek().token != Token::RightBrace {
                     loop {
+                        // Skip optional modifiers like 'readonly'
+                        while matches!(self.peek().token, Token::Readonly) {
+                            self.advance();
+                        }
                         let name = match self.advance().token {
                             Token::Identifier(n) => n,
                             t => {
@@ -161,7 +165,10 @@ impl<'a> Parser<'a> {
                             let ty = self.parse_type_annotation()?;
                             properties.push((name, ty, optional));
                         }
-                        if self.peek().token == Token::Comma {
+                        // Handle both ',' and ';' as property separators
+                        if self.peek().token == Token::Comma
+                            || self.peek().token == Token::Semicolon
+                        {
                             self.advance();
                             if self.peek().token == Token::RightBrace {
                                 break;

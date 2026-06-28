@@ -4,21 +4,21 @@ export interface PluginMetadata {
 }
 
 export interface IPlugin {
-  readonly metadata: PluginMetadata;
-  setup?(): void | Promise<void>;
-  onLoad?(): void | Promise<void>;
-  onEnable?(): void | Promise<void>;
-  onDisable?(): void | Promise<void>;
-  onUnload?(): void | Promise<void>;
+  metadata: PluginMetadata;
+  setup: () => void;
+  onLoad: () => void;
+  onEnable: () => void;
+  onDisable: () => void;
+  onUnload: () => void;
 }
 
 export type PluginConst = {
   metadata: PluginMetadata;
-  setup?: () => void | Promise<void>;
-  onLoad?: () => void | Promise<void>;
-  onEnable?: () => void | Promise<void>;
-  onDisable?: () => void | Promise<void>;
-  onUnload?: () => void | Promise<void>;
+  setup?: () => void;
+  onLoad?: () => void;
+  onEnable?: () => void;
+  onDisable?: () => void;
+  onUnload?: () => void;
 };
 
 export type PluginInput = IPlugin | PluginConst | (new () => IPlugin);

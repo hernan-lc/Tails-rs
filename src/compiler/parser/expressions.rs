@@ -870,7 +870,38 @@ impl<'a> Parser<'a> {
                             });
                         } else {
                             let key = self.token_to_key_string()?;
-                            if self.peek().token == Token::Colon {
+                            if self.peek().token == Token::LeftParen {
+                                // Method syntax: key() { ... }
+                                self.advance();
+                                let (params, param_types) = self.parse_typed_params()?;
+                                self.expect(&Token::RightParen)?;
+                                let return_type = if self.peek().token == Token::Colon {
+                                    self.advance();
+                                    Some(self.parse_type_annotation()?)
+                                } else {
+                                    None
+                                };
+                                self.expect(&Token::LeftBrace)?;
+                                let body = self.parse_block_body()?;
+                                self.expect(&Token::RightBrace)?;
+                                let mut full_body = vec![];
+                                full_body.extend(body);
+                                properties.push(ObjectProperty {
+                                    key: key.clone(),
+                                    value: Expression::FunctionExpression {
+                                        name: Some(key.clone()),
+                                        params,
+                                        param_types: Some(param_types),
+                                        return_type,
+                                        body: full_body,
+                                        is_async: false,
+                                        is_generator: false,
+                                    },
+                                    shorthand: false,
+                                    computed: false,
+                                    computed_key: None,
+                                });
+                            } else if self.peek().token == Token::Colon {
                                 self.expect(&Token::Colon)?;
                                 let value = self.parse_expression()?.inner;
                                 properties.push(ObjectProperty {

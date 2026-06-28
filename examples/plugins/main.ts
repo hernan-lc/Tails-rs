@@ -1,6 +1,6 @@
 import { PluginManager } from "./plugin_manager.ts";
 import { loadPluginFromFile, loadPluginsFromDir } from "./loader.ts";
-import type { PluginInput } from "./types.ts";
+import { PluginInput } from "./types.ts";
 
 // --- Example: Register a plugin from a plain object ---
 const helloPlugin: PluginInput = {
