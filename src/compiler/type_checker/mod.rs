@@ -263,6 +263,7 @@ impl TypeChecker {
                     return_type: Box::new(ret),
                 })
             }
+            TypeAnnotation::TypePredicate { ty, .. } => self.resolve_annotation(ty),
         }
     }
 }

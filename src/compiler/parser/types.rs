@@ -59,6 +59,17 @@ impl<'a> Parser<'a> {
                             }
                             self.expect(&Token::Greater)?;
                             Ok(TypeAnnotation::Generic { name, args })
+                        } else if let Token::Identifier(ref is_name) = self.peek().token {
+                            if is_name == "is" {
+                                self.advance();
+                                let ty = self.parse_type_annotation()?;
+                                Ok(TypeAnnotation::TypePredicate {
+                                    param_name: name,
+                                    ty: Box::new(ty),
+                                })
+                            } else {
+                                Ok(TypeAnnotation::Named(name))
+                            }
                         } else {
                             Ok(TypeAnnotation::Named(name))
                         }
@@ -202,6 +213,9 @@ impl<'a> Parser<'a> {
                             if self.peek().token == Token::RightParen {
                                 break;
                             }
+                            if self.peek().token == Token::Ellipsis {
+                                self.advance();
+                            }
                             if matches!(self.peek().token, Token::Identifier(_)) {
                                 self.advance();
                                 if self.peek().token == Token::Colon {
@@ -245,6 +259,9 @@ impl<'a> Parser<'a> {
                     loop {
                         if self.peek().token == Token::RightParen {
                             break;
+                        }
+                        if self.peek().token == Token::Ellipsis {
+                            self.advance();
                         }
                         if matches!(self.peek().token, Token::Identifier(_)) {
                             self.advance();

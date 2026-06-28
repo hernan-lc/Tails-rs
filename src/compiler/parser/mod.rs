@@ -41,6 +41,10 @@ pub enum TypeAnnotation {
         name: String,
         args: Vec<TypeAnnotation>,
     },
+    TypePredicate {
+        param_name: String,
+        ty: Box<TypeAnnotation>,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq)]
