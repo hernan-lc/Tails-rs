@@ -4,6 +4,13 @@ use crate::objects::Value;
 use std::collections::HashMap;
 
 impl Interpreter {
+    pub(super) fn init_native_modules(&mut self) {
+        self.native_loader
+            .register("fs", || super::native_loader::create_fs_module());
+        self.native_loader
+            .register("path", || super::native_loader::create_path_module());
+    }
+
     pub(super) fn init_builtins(&mut self) {
         // Global constants
         self.globals
@@ -311,65 +318,6 @@ impl Interpreter {
         );
         self.globals
             .insert("Intl".into(), Value::Object(intl_obj_idx));
-
-        // path module
-        let mut path_props = HashMap::new();
-        path_props.insert("join".into(), Value::NativeFunction(265));
-        path_props.insert("resolve".into(), Value::NativeFunction(266));
-        path_props.insert("basename".into(), Value::NativeFunction(267));
-        path_props.insert("dirname".into(), Value::NativeFunction(268));
-        path_props.insert("extname".into(), Value::NativeFunction(269));
-        path_props.insert("relative".into(), Value::NativeFunction(270));
-        path_props.insert("isAbsolute".into(), Value::NativeFunction(271));
-        path_props.insert("normalize".into(), Value::NativeFunction(272));
-        path_props.insert(
-            "sep".into(),
-            Value::String(std::path::MAIN_SEPARATOR.to_string()),
-        );
-        path_props.insert(
-            "delimiter".into(),
-            Value::String(
-                if cfg!(target_os = "windows") {
-                    ";"
-                } else {
-                    ":"
-                }
-                .to_string(),
-            ),
-        );
-        let path_obj_idx = self.gc.allocate(
-            &mut self.heap,
-            HeapValue::Object(JsObject {
-                properties: path_props,
-                prototype: None,
-                extensible: true,
-            }),
-        );
-        self.globals
-            .insert("path".into(), Value::Object(path_obj_idx));
-
-        // fs module
-        let mut fs_props = HashMap::new();
-        fs_props.insert("readFileSync".into(), Value::NativeFunction(286));
-        fs_props.insert("writeFileSync".into(), Value::NativeFunction(287));
-        fs_props.insert("existsSync".into(), Value::NativeFunction(288));
-        fs_props.insert("mkdirSync".into(), Value::NativeFunction(289));
-        fs_props.insert("readdirSync".into(), Value::NativeFunction(290));
-        fs_props.insert("statSync".into(), Value::NativeFunction(291));
-        fs_props.insert("unlinkSync".into(), Value::NativeFunction(292));
-        fs_props.insert("rmSync".into(), Value::NativeFunction(293));
-        fs_props.insert("copyFileSync".into(), Value::NativeFunction(294));
-        fs_props.insert("renameSync".into(), Value::NativeFunction(295));
-        fs_props.insert("appendFileSync".into(), Value::NativeFunction(296));
-        let fs_obj_idx = self.gc.allocate(
-            &mut self.heap,
-            HeapValue::Object(JsObject {
-                properties: fs_props,
-                prototype: None,
-                extensible: true,
-            }),
-        );
-        self.globals.insert("fs".into(), Value::Object(fs_obj_idx));
 
         // Date
         let mut date_proto_props = HashMap::new();

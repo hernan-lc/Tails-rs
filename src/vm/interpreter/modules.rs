@@ -55,6 +55,22 @@ impl Interpreter {
     }
 
     pub(crate) fn load_and_run_module(&mut self, source: &str) -> Result<Option<String>> {
+        if source.ends_with(".native") {
+            let module_name = super::native_loader::extract_module_name(source);
+            if self.native_loader.has_module(module_name) {
+                let exports =
+                    self.native_loader
+                        .load_module(module_name, &mut self.heap, &mut self.gc)?;
+                let mut props = HashMap::new();
+                for (name, val) in &exports {
+                    props.insert(name.clone(), val.clone());
+                }
+                self.module_registry.insert(module_name.to_string(), props);
+                return Ok(Some(module_name.to_string()));
+            }
+            return Ok(None);
+        }
+
         let module_path = match self.resolve_module_path(source) {
             Ok(p) => p,
             Err(_) => return Ok(None),
@@ -84,6 +100,11 @@ impl Interpreter {
         let base = self.current_module_path.as_deref().unwrap_or(".");
         let base_path = std::path::Path::new(base);
         let parent = base_path.parent().unwrap_or(std::path::Path::new("."));
+
+        if source.ends_with(".native") {
+            return Ok(source.to_string());
+        }
+
         let resolved = if source.starts_with("./") || source.starts_with("../") {
             parent.join(source)
         } else {

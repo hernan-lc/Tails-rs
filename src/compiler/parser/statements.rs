@@ -227,22 +227,24 @@ impl<'a> Parser<'a> {
 
     pub(crate) fn parse_return_statement(&mut self) -> Result<SpannedNode<Statement>> {
         self.expect(&Token::Return)?;
-        let value = if self.peek().token != Token::Semicolon && self.peek().token != Token::RightBrace {
-            Some(self.parse_expression()?.inner)
-        } else {
-            None
-        };
+        let value =
+            if self.peek().token != Token::Semicolon && self.peek().token != Token::RightBrace {
+                Some(self.parse_expression()?.inner)
+            } else {
+                None
+            };
         self.expect(&Token::Semicolon)?;
         Ok(self.spanned(Statement::ReturnStatement(value)))
     }
 
     pub(crate) fn parse_yield_statement(&mut self) -> Result<SpannedNode<Statement>> {
         self.expect(&Token::Yield)?;
-        let value = if self.peek().token != Token::Semicolon && self.peek().token != Token::RightBrace {
-            Some(self.parse_expression()?.inner)
-        } else {
-            None
-        };
+        let value =
+            if self.peek().token != Token::Semicolon && self.peek().token != Token::RightBrace {
+                Some(self.parse_expression()?.inner)
+            } else {
+                None
+            };
         self.expect(&Token::Semicolon)?;
         Ok(self.spanned(Statement::YieldStatement(value)))
     }
@@ -317,7 +319,9 @@ impl<'a> Parser<'a> {
             }));
         }
 
-        if self.peek().token == Token::Let || self.peek().token == Token::Const || self.peek().token == Token::Var
+        if self.peek().token == Token::Let
+            || self.peek().token == Token::Const
+            || self.peek().token == Token::Var
         {
             let kind = match self.peek().token {
                 Token::Var => VarKind::Var,
@@ -972,9 +976,9 @@ impl<'a> Parser<'a> {
                 self.advance();
             }
             return Ok(self.spanned(Statement::ExportDeclaration {
-                kind: ExportDeclarationKind::Local(Box::new(self.spanned(Statement::Expression(
-                    Expression::UndefinedLiteral,
-                )))),
+                kind: ExportDeclarationKind::Local(Box::new(
+                    self.spanned(Statement::Expression(Expression::UndefinedLiteral)),
+                )),
             }));
         }
 

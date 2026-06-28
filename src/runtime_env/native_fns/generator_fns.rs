@@ -35,7 +35,8 @@ pub(super) fn native_generator_next(
 
             // Restore the generator's block scope state
             let saved_block_scope = gen.saved_block_scope_stack.clone();
-            let outer_block_scope = std::mem::replace(&mut interp.block_scope_stack, saved_block_scope);
+            let outer_block_scope =
+                std::mem::replace(&mut interp.block_scope_stack, saved_block_scope);
 
             let closure_count = 0;
             let call_frame_len_before = interp.call_stack.len();

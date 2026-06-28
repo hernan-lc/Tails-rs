@@ -1,3 +1,6 @@
+[workspace]
+members = [".", "modules/abi", "modules/fs", "modules/path"]
+
 [package]
 name = "tails-rs"
 version = "0.1.0"
@@ -40,6 +43,9 @@ object_store = "0.14.0"
 
 # FFI Support
 libc = "0.2"
+
+# Dynamic loading
+libloading = "0.8"
 
 # HTTP
 reqwest = { version = "0.12", features = ["blocking", "json"] }

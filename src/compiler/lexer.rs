@@ -208,12 +208,13 @@ pub fn tokenize(source: &str) -> Result<Vec<SpannedToken>> {
     let mut line: usize = 1;
     let mut col: usize = 1;
 
-    let push = |tokens: &mut Vec<SpannedToken>, token: Token, line: usize, col: usize, offset: usize| {
-        tokens.push(SpannedToken {
-            token,
-            span: Span::new(line, col, offset),
-        });
-    };
+    let push =
+        |tokens: &mut Vec<SpannedToken>, token: Token, line: usize, col: usize, offset: usize| {
+            tokens.push(SpannedToken {
+                token,
+                span: Span::new(line, col, offset),
+            });
+        };
 
     while let Some(&(pos, ch)) = chars.peek() {
         match ch {
@@ -303,12 +304,24 @@ pub fn tokenize(source: &str) -> Result<Vec<SpannedToken>> {
                             break;
                         }
                     }
-                    push(&mut tokens, Token::Regex(format!("{}/{}", pattern, flags)), tok_line, tok_col, tok_offset);
+                    push(
+                        &mut tokens,
+                        Token::Regex(format!("{}/{}", pattern, flags)),
+                        tok_line,
+                        tok_col,
+                        tok_offset,
+                    );
                     expects_regex = false;
                 } else if let Some(&(_, '=')) = chars.peek() {
                     chars.next();
                     col += 1;
-                    push(&mut tokens, Token::SlashAssign, tok_line, tok_col, tok_offset);
+                    push(
+                        &mut tokens,
+                        Token::SlashAssign,
+                        tok_line,
+                        tok_col,
+                        tok_offset,
+                    );
                     expects_regex = false;
                 } else {
                     push(&mut tokens, Token::Slash, tok_line, tok_col, tok_offset);
@@ -333,9 +346,21 @@ pub fn tokenize(source: &str) -> Result<Vec<SpannedToken>> {
                 if let Some(&(_, 'n')) = chars.peek() {
                     chars.next();
                     col += 1;
-                    push(&mut tokens, Token::BigInt(num), tok_line, tok_col, tok_offset);
+                    push(
+                        &mut tokens,
+                        Token::BigInt(num),
+                        tok_line,
+                        tok_col,
+                        tok_offset,
+                    );
                 } else {
-                    push(&mut tokens, Token::Number(num.parse().unwrap_or(0.0)), tok_line, tok_col, tok_offset);
+                    push(
+                        &mut tokens,
+                        Token::Number(num.parse().unwrap_or(0.0)),
+                        tok_line,
+                        tok_col,
+                        tok_offset,
+                    );
                 }
             }
             'a'..='z' | 'A'..='Z' | '_' | '$' => {
@@ -416,7 +441,13 @@ pub fn tokenize(source: &str) -> Result<Vec<SpannedToken>> {
                 chars.next();
                 col += 1;
                 let parts = tokenize_template_literal(&mut chars)?;
-                push(&mut tokens, Token::TemplateLiteral(parts), tok_line, tok_col, tok_offset);
+                push(
+                    &mut tokens,
+                    Token::TemplateLiteral(parts),
+                    tok_line,
+                    tok_col,
+                    tok_offset,
+                );
             }
             '"' | '\'' => {
                 let quote = ch;
@@ -463,7 +494,13 @@ pub fn tokenize(source: &str) -> Result<Vec<SpannedToken>> {
                         None => return Err(Error::ParseError("Unterminated string".into())),
                     }
                 }
-                push(&mut tokens, Token::String(str), tok_line, tok_col, tok_offset);
+                push(
+                    &mut tokens,
+                    Token::String(str),
+                    tok_line,
+                    tok_col,
+                    tok_offset,
+                );
             }
             '+' => {
                 let tok_line = line;
@@ -478,7 +515,13 @@ pub fn tokenize(source: &str) -> Result<Vec<SpannedToken>> {
                 } else if let Some(&(_, '=')) = chars.peek() {
                     chars.next();
                     col += 1;
-                    push(&mut tokens, Token::PlusAssign, tok_line, tok_col, tok_offset);
+                    push(
+                        &mut tokens,
+                        Token::PlusAssign,
+                        tok_line,
+                        tok_col,
+                        tok_offset,
+                    );
                 } else {
                     push(&mut tokens, Token::Plus, tok_line, tok_col, tok_offset);
                 }
@@ -496,7 +539,13 @@ pub fn tokenize(source: &str) -> Result<Vec<SpannedToken>> {
                 } else if let Some(&(_, '=')) = chars.peek() {
                     chars.next();
                     col += 1;
-                    push(&mut tokens, Token::MinusAssign, tok_line, tok_col, tok_offset);
+                    push(
+                        &mut tokens,
+                        Token::MinusAssign,
+                        tok_line,
+                        tok_col,
+                        tok_offset,
+                    );
                 } else {
                     push(&mut tokens, Token::Minus, tok_line, tok_col, tok_offset);
                 }
@@ -510,14 +559,26 @@ pub fn tokenize(source: &str) -> Result<Vec<SpannedToken>> {
                 if let Some(&(_, '=')) = chars.peek() {
                     chars.next();
                     col += 1;
-                    push(&mut tokens, Token::StarAssign, tok_line, tok_col, tok_offset);
+                    push(
+                        &mut tokens,
+                        Token::StarAssign,
+                        tok_line,
+                        tok_col,
+                        tok_offset,
+                    );
                 } else if let Some(&(_, '*')) = chars.peek() {
                     chars.next();
                     col += 1;
                     if let Some(&(_, '=')) = chars.peek() {
                         chars.next();
                         col += 1;
-                        push(&mut tokens, Token::PowerAssign, tok_line, tok_col, tok_offset);
+                        push(
+                            &mut tokens,
+                            Token::PowerAssign,
+                            tok_line,
+                            tok_col,
+                            tok_offset,
+                        );
                     } else {
                         push(&mut tokens, Token::Power, tok_line, tok_col, tok_offset);
                     }
@@ -534,7 +595,13 @@ pub fn tokenize(source: &str) -> Result<Vec<SpannedToken>> {
                 if let Some(&(_, '=')) = chars.peek() {
                     chars.next();
                     col += 1;
-                    push(&mut tokens, Token::PercentAssign, tok_line, tok_col, tok_offset);
+                    push(
+                        &mut tokens,
+                        Token::PercentAssign,
+                        tok_line,
+                        tok_col,
+                        tok_offset,
+                    );
                 } else {
                     push(&mut tokens, Token::Percent, tok_line, tok_col, tok_offset);
                 }
@@ -553,7 +620,13 @@ pub fn tokenize(source: &str) -> Result<Vec<SpannedToken>> {
                 let tok_offset = pos;
                 chars.next();
                 col += 1;
-                push(&mut tokens, Token::RightParen, tok_line, tok_col, tok_offset);
+                push(
+                    &mut tokens,
+                    Token::RightParen,
+                    tok_line,
+                    tok_col,
+                    tok_offset,
+                );
             }
             '{' => {
                 let tok_line = line;
@@ -569,7 +642,13 @@ pub fn tokenize(source: &str) -> Result<Vec<SpannedToken>> {
                 let tok_offset = pos;
                 chars.next();
                 col += 1;
-                push(&mut tokens, Token::RightBrace, tok_line, tok_col, tok_offset);
+                push(
+                    &mut tokens,
+                    Token::RightBrace,
+                    tok_line,
+                    tok_col,
+                    tok_offset,
+                );
             }
             '[' => {
                 let tok_line = line;
@@ -577,7 +656,13 @@ pub fn tokenize(source: &str) -> Result<Vec<SpannedToken>> {
                 let tok_offset = pos;
                 chars.next();
                 col += 1;
-                push(&mut tokens, Token::LeftBracket, tok_line, tok_col, tok_offset);
+                push(
+                    &mut tokens,
+                    Token::LeftBracket,
+                    tok_line,
+                    tok_col,
+                    tok_offset,
+                );
             }
             ']' => {
                 let tok_line = line;
@@ -585,7 +670,13 @@ pub fn tokenize(source: &str) -> Result<Vec<SpannedToken>> {
                 let tok_offset = pos;
                 chars.next();
                 col += 1;
-                push(&mut tokens, Token::RightBracket, tok_line, tok_col, tok_offset);
+                push(
+                    &mut tokens,
+                    Token::RightBracket,
+                    tok_line,
+                    tok_col,
+                    tok_offset,
+                );
             }
             ';' => {
                 let tok_line = line;
@@ -641,11 +732,23 @@ pub fn tokenize(source: &str) -> Result<Vec<SpannedToken>> {
                 if let Some(&(_, '.')) = chars.peek() {
                     chars.next();
                     col += 1;
-                    push(&mut tokens, Token::QuestionDot, tok_line, tok_col, tok_offset);
+                    push(
+                        &mut tokens,
+                        Token::QuestionDot,
+                        tok_line,
+                        tok_col,
+                        tok_offset,
+                    );
                 } else if let Some(&(_, '?')) = chars.peek() {
                     chars.next();
                     col += 1;
-                    push(&mut tokens, Token::NullishCoalescing, tok_line, tok_col, tok_offset);
+                    push(
+                        &mut tokens,
+                        Token::NullishCoalescing,
+                        tok_line,
+                        tok_col,
+                        tok_offset,
+                    );
                 } else {
                     push(&mut tokens, Token::Question, tok_line, tok_col, tok_offset);
                 }
@@ -662,7 +765,13 @@ pub fn tokenize(source: &str) -> Result<Vec<SpannedToken>> {
                     if let Some(&(_, '=')) = chars.peek() {
                         chars.next();
                         col += 1;
-                        push(&mut tokens, Token::StrictEqual, tok_line, tok_col, tok_offset);
+                        push(
+                            &mut tokens,
+                            Token::StrictEqual,
+                            tok_line,
+                            tok_col,
+                            tok_offset,
+                        );
                     } else {
                         push(&mut tokens, Token::Equal, tok_line, tok_col, tok_offset);
                     }
@@ -686,7 +795,13 @@ pub fn tokenize(source: &str) -> Result<Vec<SpannedToken>> {
                     if let Some(&(_, '=')) = chars.peek() {
                         chars.next();
                         col += 1;
-                        push(&mut tokens, Token::StrictNotEqual, tok_line, tok_col, tok_offset);
+                        push(
+                            &mut tokens,
+                            Token::StrictNotEqual,
+                            tok_line,
+                            tok_col,
+                            tok_offset,
+                        );
                     } else {
                         push(&mut tokens, Token::NotEqual, tok_line, tok_col, tok_offset);
                     }
@@ -721,11 +836,23 @@ pub fn tokenize(source: &str) -> Result<Vec<SpannedToken>> {
                 if let Some(&(_, '>')) = chars.peek() {
                     chars.next();
                     col += 1;
-                    push(&mut tokens, Token::ShiftRight, tok_line, tok_col, tok_offset);
+                    push(
+                        &mut tokens,
+                        Token::ShiftRight,
+                        tok_line,
+                        tok_col,
+                        tok_offset,
+                    );
                 } else if let Some(&(_, '=')) = chars.peek() {
                     chars.next();
                     col += 1;
-                    push(&mut tokens, Token::GreaterEqual, tok_line, tok_col, tok_offset);
+                    push(
+                        &mut tokens,
+                        Token::GreaterEqual,
+                        tok_line,
+                        tok_col,
+                        tok_offset,
+                    );
                 } else {
                     push(&mut tokens, Token::Greater, tok_line, tok_col, tok_offset);
                 }

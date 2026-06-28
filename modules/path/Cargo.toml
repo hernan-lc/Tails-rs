@@ -1,0 +1,8 @@
+[package]
+name = "tails-path"
+version = "0.1.0"
+edition = "2021"
+description = "Tails native path module"
+
+[lib]
+crate-type = ["cdylib"]

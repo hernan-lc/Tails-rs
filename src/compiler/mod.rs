@@ -165,6 +165,7 @@ pub enum Instruction {
     ImportNamed(String, String, String),
     ImportDefault(String, String),
     ImportAll(String, String),
+    NativeImport(String, String),
     ExportNamed(Vec<String>),
     ExportDefault,
     StoreModuleExport(String),

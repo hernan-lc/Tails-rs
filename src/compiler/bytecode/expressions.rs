@@ -399,9 +399,13 @@ impl CodeGenerator {
                 let func_idx = self.functions.len() as u32;
 
                 let (body_stmts, is_expr) = match body.as_ref() {
-                    ArrowFunctionBody::Expression(expr) => {
-                        (vec![SpannedNode { inner: Statement::ReturnStatement(Some(expr.clone())), span: None }], true)
-                    }
+                    ArrowFunctionBody::Expression(expr) => (
+                        vec![SpannedNode {
+                            inner: Statement::ReturnStatement(Some(expr.clone())),
+                            span: None,
+                        }],
+                        true,
+                    ),
                     ArrowFunctionBody::Block(stmts) => (stmts.clone(), false),
                 };
 
@@ -793,9 +797,7 @@ impl CodeGenerator {
             BinaryOperator::Or => self.emit(Instruction::Or),
             BinaryOperator::Instanceof => self.emit(Instruction::InstanceOf),
             BinaryOperator::In => self.emit(Instruction::In),
-            BinaryOperator::NullishCoalescing => {
-                self.emit(Instruction::NullishCoalescing)
-            }
+            BinaryOperator::NullishCoalescing => self.emit(Instruction::NullishCoalescing),
             _ => {}
         }
         Ok(())

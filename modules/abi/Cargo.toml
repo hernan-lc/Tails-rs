@@ -1,0 +1,8 @@
+[package]
+name = "tails-abi"
+version = "0.1.0"
+edition = "2021"
+description = "C ABI interface for Tails native modules"
+
+[lib]
+crate-type = ["rlib", "cdylib"]

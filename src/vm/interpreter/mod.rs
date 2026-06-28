@@ -3,7 +3,8 @@ mod call_frame;
 mod calls;
 mod heap_types;
 mod instructions;
-mod modules;
+pub(crate) mod modules;
+mod native_loader;
 mod promise_runtime;
 mod property_access;
 mod value_ops;
@@ -44,6 +45,7 @@ pub struct Interpreter {
     pub(crate) regexp_proto_idx: Option<usize>,
     pub(crate) buffer_proto_idx: Option<usize>,
     pub(crate) generator_proto_idx: Option<usize>,
+    pub(crate) native_loader: native_loader::NativeModuleRegistry,
 }
 
 impl Interpreter {
@@ -71,7 +73,10 @@ impl Interpreter {
             regexp_proto_idx: None,
             buffer_proto_idx: None,
             generator_proto_idx: None,
+            native_loader: native_loader::NativeModuleRegistry::new(),
         };
+        interp.init_native_modules();
+        interp.init_builtins();
         interp.init_builtins();
         Ok(interp)
     }
@@ -100,9 +105,9 @@ impl Interpreter {
     }
 
     pub(crate) fn current_source_line(&self, pc: usize) -> Option<usize> {
-        self.current_module.as_ref().and_then(|m| {
-            m.source_lines.get(pc).copied().flatten()
-        })
+        self.current_module
+            .as_ref()
+            .and_then(|m| m.source_lines.get(pc).copied().flatten())
     }
 
     pub(crate) fn execute_from(
@@ -344,8 +349,8 @@ impl Interpreter {
                                             this_value: None,
                                             is_construct: false,
                                             source_name: self.current_module_path.clone(),
-                                        generator_heap_idx: None,
-                                        source_line: self.current_source_line(pc),
+                                            generator_heap_idx: None,
+                                            source_line: self.current_source_line(pc),
                                         });
                                         for closure_var in &f.closure {
                                             self.stack.push(closure_var.clone());
@@ -439,8 +444,8 @@ impl Interpreter {
                                         is_construct: false,
                                         source_name: self.current_module_path.clone(),
                                         generator_heap_idx: None,
-                                    source_line: self.current_source_line(pc),
-                                        });
+                                        source_line: self.current_source_line(pc),
+                                    });
                                     for closure_var in &f_clone.closure {
                                         self.stack.push(closure_var.clone());
                                     }
@@ -519,8 +524,8 @@ impl Interpreter {
                                                             .current_module_path
                                                             .clone(),
                                                         generator_heap_idx: None,
-                                                    source_line: self.current_source_line(pc),
-                                        });
+                                                        source_line: self.current_source_line(pc),
+                                                    });
                                                     for arg in args {
                                                         self.stack.push(arg);
                                                     }
@@ -577,8 +582,8 @@ impl Interpreter {
                                             this_value: Some(this_val.clone()),
                                             is_construct: true,
                                             source_name: self.current_module_path.clone(),
-                                        generator_heap_idx: None,
-                                        source_line: self.current_source_line(pc),
+                                            generator_heap_idx: None,
+                                            source_line: self.current_source_line(pc),
                                         });
                                         for closure_var in &f_clone.closure {
                                             self.stack.push(closure_var.clone());
@@ -729,9 +734,9 @@ impl Interpreter {
                                     this_value: Some(this_val.clone()),
                                     is_construct: true,
                                     source_name: self.current_module_path.clone(),
-                                        generator_heap_idx: None,
-                                source_line: self.current_source_line(pc),
-                                        });
+                                    generator_heap_idx: None,
+                                    source_line: self.current_source_line(pc),
+                                });
                                 for closure_var in &f_clone.closure {
                                     self.stack.push(closure_var.clone());
                                 }
@@ -870,6 +875,34 @@ impl Interpreter {
                             self.heap.push(HeapValue::Object(JsObject::new()));
                             self.globals
                                 .insert(local_name.clone(), Value::Object(heap_idx));
+                        }
+                    }
+                }
+                Instruction::NativeImport(source, local_name) => {
+                    match self.load_and_run_module(source)? {
+                        Some(module_path) => {
+                            let exports = self
+                                .module_registry
+                                .get(&module_path)
+                                .cloned()
+                                .unwrap_or_default();
+                            let val = exports.get("default").cloned().unwrap_or_else(|| {
+                                let heap_idx = self.heap.len();
+                                let mut props = HashMap::new();
+                                for (k, v) in &exports {
+                                    props.insert(k.clone(), v.clone());
+                                }
+                                self.heap.push(HeapValue::Object(JsObject {
+                                    properties: props,
+                                    prototype: None,
+                                    extensible: true,
+                                }));
+                                Value::Object(heap_idx)
+                            });
+                            self.globals.insert(local_name.clone(), val);
+                        }
+                        None => {
+                            self.globals.insert(local_name.clone(), Value::Undefined);
                         }
                     }
                 }

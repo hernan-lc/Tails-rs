@@ -58,9 +58,7 @@ impl CodeGenerator {
     }
 
     fn record_line_from_span(&mut self, span: &Option<crate::errors::Span>) {
-        self.current_source_line = span.and_then(|s| {
-            if s.line > 0 { Some(s.line) } else { None }
-        });
+        self.current_source_line = span.and_then(|s| if s.line > 0 { Some(s.line) } else { None });
     }
 
     fn generate(&mut self, ast: &AstNode) -> Result<CompiledModule> {
@@ -724,7 +722,23 @@ impl CodeGenerator {
                 Ok(())
             }
             Statement::ImportDeclaration { specifiers, source } => {
-                if specifiers.is_empty() {
+                let is_native = source.ends_with(".native");
+                if is_native {
+                    if specifiers.len() == 1 {
+                        let local_name = specifiers[0].local.clone();
+                        self.emit(Instruction::NativeImport(source.clone(), local_name));
+                    } else if specifiers.is_empty() {
+                        self.emit(Instruction::NativeImport(
+                            source.clone(),
+                            "__module".to_string(),
+                        ));
+                    } else {
+                        for spec in specifiers {
+                            let local_name = spec.local.clone();
+                            self.emit(Instruction::NativeImport(source.clone(), local_name));
+                        }
+                    }
+                } else if specifiers.is_empty() {
                     self.emit(Instruction::ImportModule(source.clone()));
                 } else if specifiers.len() == 1 && specifiers[0].imported.as_deref() == Some("*") {
                     self.emit(Instruction::ImportAll(
