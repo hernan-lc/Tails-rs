@@ -630,6 +630,9 @@ impl<'a> Parser<'a> {
                 param_types.push(ty);
                 if self.peek().token == Token::Comma {
                     self.advance();
+                    if self.peek().token == Token::RightParen {
+                        break;
+                    }
                 } else {
                     break;
                 }
@@ -686,6 +689,9 @@ impl<'a> Parser<'a> {
                 });
                 if self.peek().token == Token::Comma {
                     self.advance();
+                    if self.peek().token == Token::RightParen {
+                        break;
+                    }
                 } else {
                     break;
                 }

@@ -57,6 +57,10 @@ impl Interpreter {
     pub(crate) fn load_and_run_module(&mut self, source: &str) -> Result<Option<String>> {
         if source.ends_with(".native") {
             let module_name = super::native_loader::extract_module_name(source);
+            if !self.native_loader.has_module(module_name) {
+                // Discover and register the module lazily
+                super::native_loader::discover_module(module_name, &mut self.native_loader);
+            }
             if self.native_loader.has_module(module_name) {
                 let exports =
                     self.native_loader

@@ -75,7 +75,6 @@ impl Interpreter {
             generator_proto_idx: None,
             native_loader: native_loader::NativeModuleRegistry::new(),
         };
-        interp.init_native_modules();
         interp.init_builtins();
         interp.init_builtins();
         Ok(interp)

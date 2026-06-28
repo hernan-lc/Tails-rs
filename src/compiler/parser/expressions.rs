@@ -537,6 +537,9 @@ impl<'a> Parser<'a> {
                 args.push(self.parse_assignment()?.inner);
                 if self.peek().token == Token::Comma {
                     self.advance();
+                    if self.peek().token == Token::RightParen {
+                        break;
+                    }
                 } else {
                     break;
                 }

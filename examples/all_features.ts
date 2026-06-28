@@ -175,27 +175,27 @@ console.log("push:", arr.push(6));
 console.log("pop:", arr.pop());
 console.log(
   "map:",
-  arr.map((x: number) => x * 2),
+  arr.map((x: number) => x * 2)
 );
 console.log(
   "filter:",
-  arr.filter((x: number) => x > 3),
+  arr.filter((x: number) => x > 3)
 );
 console.log(
   "reduce:",
-  arr.reduce((a: number, b: number) => a + b, 0),
+  arr.reduce((a: number, b: number) => a + b, 0)
 );
 console.log(
   "find:",
-  arr.find((x: number) => x > 3),
+  arr.find((x: number) => x > 3)
 );
 console.log(
   "some:",
-  arr.some((x: number) => x > 4),
+  arr.some((x: number) => x > 4)
 );
 console.log(
   "every:",
-  arr.every((x: number) => x > 0),
+  arr.every((x: number) => x > 0)
 );
 console.log("includes:", arr.includes(3));
 console.log("join:", arr.join("-"));
@@ -204,8 +204,8 @@ console.log(
   "flat:",
   [
     [1, 2],
-    [3, 4],
-  ].flat(),
+    [3, 4]
+  ].flat()
 );
 
 // --- Typed Arrays ---

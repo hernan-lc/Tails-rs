@@ -52,6 +52,20 @@ pub fn extract_module_name(source: &str) -> &str {
     }
 }
 
+pub fn discover_module(name: &str, registry: &mut NativeModuleRegistry) {
+    match name {
+        "fs" => registry.register("fs", |heap, gc| create_fs_module(heap, gc)),
+        "path" => registry.register("path", |heap, gc| create_path_module(heap, gc)),
+        "process" => registry.register("process", |heap, gc| create_process_module(heap, gc)),
+        "buffer" => registry.register("buffer", |heap, gc| create_buffer_module(heap, gc)),
+        "intl" => registry.register("intl", |heap, gc| create_intl_module(heap, gc)),
+        "events" => registry.register("events", |heap, gc| create_events_module(heap, gc)),
+        "os" => registry.register("os", |heap, gc| create_os_module(heap, gc)),
+        "crypto" => registry.register("crypto", |heap, gc| create_crypto_module(heap, gc)),
+        _ => {}
+    }
+}
+
 pub fn create_fs_module(_heap: &mut Vec<HeapValue>, _gc: &mut GarbageCollector) -> HashMap<String, Value> {
     let mut props = HashMap::new();
     props.insert("readFileSync".into(), Value::NativeFunction(286));

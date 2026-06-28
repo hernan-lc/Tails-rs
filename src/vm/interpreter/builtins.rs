@@ -4,25 +4,6 @@ use crate::objects::Value;
 use std::collections::HashMap;
 
 impl Interpreter {
-    pub(super) fn init_native_modules(&mut self) {
-        self.native_loader
-            .register("fs", |heap, gc| super::native_loader::create_fs_module(heap, gc));
-        self.native_loader
-            .register("path", |heap, gc| super::native_loader::create_path_module(heap, gc));
-        self.native_loader
-            .register("process", |heap, gc| super::native_loader::create_process_module(heap, gc));
-        self.native_loader
-            .register("buffer", |heap, gc| super::native_loader::create_buffer_module(heap, gc));
-        self.native_loader
-            .register("intl", |heap, gc| super::native_loader::create_intl_module(heap, gc));
-        self.native_loader
-            .register("events", |heap, gc| super::native_loader::create_events_module(heap, gc));
-        self.native_loader
-            .register("os", |heap, gc| super::native_loader::create_os_module(heap, gc));
-        self.native_loader
-            .register("crypto", |heap, gc| super::native_loader::create_crypto_module(heap, gc));
-    }
-
     pub(super) fn init_builtins(&mut self) {
         // Global constants
         self.globals
