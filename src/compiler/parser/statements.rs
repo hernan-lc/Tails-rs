@@ -84,6 +84,9 @@ impl<'a> Parser<'a> {
                 elements.push(ArrayBindingElement::Pattern(pattern, default));
                 if self.peek().token == Token::Comma {
                     self.advance();
+                    if self.peek().token == Token::RightBracket {
+                        break;
+                    }
                 } else {
                     break;
                 }
@@ -159,6 +162,9 @@ impl<'a> Parser<'a> {
                 }
                 if self.peek().token == Token::Comma {
                     self.advance();
+                    if self.peek().token == Token::RightBrace {
+                        break;
+                    }
                 } else {
                     break;
                 }
@@ -830,6 +836,9 @@ impl<'a> Parser<'a> {
                     });
                     if self.peek().token == Token::Comma {
                         self.advance();
+                        if self.peek().token == Token::RightBrace {
+                            break;
+                        }
                     }
                 }
                 self.expect(&Token::RightBrace)?;
@@ -866,6 +875,9 @@ impl<'a> Parser<'a> {
                 });
                 if self.peek().token == Token::Comma {
                     self.advance();
+                    if self.peek().token == Token::RightBrace {
+                        break;
+                    }
                 }
             }
             self.expect(&Token::RightBrace)?;

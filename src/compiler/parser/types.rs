@@ -52,6 +52,9 @@ impl<'a> Parser<'a> {
                             let mut args = vec![self.parse_type_annotation()?];
                             while self.peek().token == Token::Comma {
                                 self.advance();
+                                if self.peek().token == Token::Greater {
+                                    break;
+                                }
                                 args.push(self.parse_type_annotation()?);
                             }
                             self.expect(&Token::Greater)?;
@@ -124,6 +127,9 @@ impl<'a> Parser<'a> {
                                     }
                                     if self.peek().token == Token::Comma {
                                         self.advance();
+                                        if self.peek().token == Token::RightParen {
+                                            break;
+                                        }
                                     } else {
                                         break;
                                     }
@@ -157,6 +163,9 @@ impl<'a> Parser<'a> {
                         }
                         if self.peek().token == Token::Comma {
                             self.advance();
+                            if self.peek().token == Token::RightBrace {
+                                break;
+                            }
                         } else {
                             break;
                         }
@@ -186,6 +195,9 @@ impl<'a> Parser<'a> {
                         }
                         if self.peek().token == Token::Comma {
                             self.advance();
+                            if self.peek().token == Token::RightParen {
+                                break;
+                            }
                         } else {
                             break;
                         }
