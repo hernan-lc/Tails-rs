@@ -353,12 +353,7 @@ fn days_since_epoch(year: i64, month: i32, day: i64) -> i64 {
 
     // Adjust for JS month (0-based) if month is 0-based
     // Our components use 0-based months from JS
-    if m < 0 {
-        m = 0;
-    }
-    if m > 11 {
-        m = 11;
-    }
+    m = m.clamp(0, 11);
 
     let mut total_days = 0i64;
 
@@ -456,13 +451,13 @@ fn parse_iso8601(s: &str) -> Option<f64> {
     let mut tz_offset = 0i64; // minutes from UTC
 
     let rest = &s[19..];
-    if rest.starts_with('.') {
-        // Parse fractional seconds
-        let frac_end = rest[1..]
+    if let Some(frac_str) = rest.strip_prefix('.') {
+        let frac_end = frac_str
             .find(|c: char| !c.is_ascii_digit())
-            .unwrap_or(rest.len() - 1);
-        let frac_str = &rest[1..1 + frac_end];
-        let frac_val: f64 = format!("0.{}", frac_str).parse().unwrap_or(0.0);
+            .unwrap_or(frac_str.len());
+        let frac_val: f64 = format!("0.{}", &frac_str[..frac_end])
+            .parse()
+            .unwrap_or(0.0);
         ms = frac_val * 1000.0;
         let rest = &rest[1 + frac_end..];
         if rest == "Z" || rest.is_empty() {

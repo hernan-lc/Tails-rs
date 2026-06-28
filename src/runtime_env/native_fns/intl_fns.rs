@@ -295,7 +295,7 @@ fn format_datetime(
                             } else {
                                 hours
                             };
-                            parts.push(format!("{}:{}", h12, format!("{:02}", minutes)));
+                            parts.push(format!("{}:{:02}", h12, minutes));
                             parts.push(ampm.to_string());
                         }
                         _ => {}
@@ -564,9 +564,8 @@ fn format_number(n: f64, min_frac: usize, max_frac: usize) -> String {
 }
 
 fn add_thousand_separators(s: &str) -> String {
-    if s.starts_with('-') {
-        let rest = add_thousand_separators(&s[1..]);
-        return format!("-{}", rest);
+    if let Some(rest) = s.strip_prefix('-') {
+        return format!("-{}", add_thousand_separators(rest));
     }
 
     let parts: Vec<&str> = s.split('.').collect();

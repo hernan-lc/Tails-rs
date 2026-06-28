@@ -97,14 +97,12 @@ pub(super) fn native_buffer_concat(
     args: &[Value],
 ) -> Result<Value> {
     let mut result = Vec::new();
-    if let Some(first) = args.first() {
-        if let Value::Array(arr_idx) = first {
-            if let HeapValue::Array(arr) = &interp.heap[*arr_idx] {
-                for elem in &arr.elements {
-                    if let Value::Buffer(buf_idx) = elem {
-                        if let HeapValue::Buffer(buf) = &interp.heap[*buf_idx] {
-                            result.extend_from_slice(buf);
-                        }
+    if let Some(Value::Array(arr_idx)) = args.first() {
+        if let HeapValue::Array(arr) = &interp.heap[*arr_idx] {
+            for elem in &arr.elements {
+                if let Value::Buffer(buf_idx) = elem {
+                    if let HeapValue::Buffer(buf) = &interp.heap[*buf_idx] {
+                        result.extend_from_slice(buf);
                     }
                 }
             }

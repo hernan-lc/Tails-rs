@@ -357,7 +357,7 @@ fn advance_iterator(interp: &mut Interpreter, iterator: &Value) -> Result<Option
                                 let result = interp.call_value(
                                     &callback,
                                     &Value::Undefined,
-                                    &[value.clone()],
+                                    std::slice::from_ref(&value),
                                 )?;
                                 if interp.is_truthy(&result) {
                                     return Ok(Some(value));
