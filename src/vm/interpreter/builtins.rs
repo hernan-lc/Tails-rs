@@ -283,6 +283,14 @@ impl Interpreter {
             .insert("Buffer".into(), Value::Object(buffer_ctor_idx));
         self.buffer_proto_idx = Some(buffer_proto_idx);
 
+        // URL (factory function, not constructor)
+        self.globals
+            .insert("URL".into(), Value::NativeFunction(273));
+
+        // fetch
+        self.globals
+            .insert("fetch".into(), Value::NativeFunction(297));
+
         // Intl
         let mut intl_props = HashMap::new();
         intl_props.insert("DateTimeFormat".into(), Value::NativeFunction(260));
@@ -336,17 +344,17 @@ impl Interpreter {
 
         // fs module
         let mut fs_props = HashMap::new();
-        fs_props.insert("readFileSync".into(), Value::NativeFunction(273));
-        fs_props.insert("writeFileSync".into(), Value::NativeFunction(274));
-        fs_props.insert("existsSync".into(), Value::NativeFunction(275));
-        fs_props.insert("mkdirSync".into(), Value::NativeFunction(276));
-        fs_props.insert("readdirSync".into(), Value::NativeFunction(277));
-        fs_props.insert("statSync".into(), Value::NativeFunction(278));
-        fs_props.insert("unlinkSync".into(), Value::NativeFunction(279));
-        fs_props.insert("rmSync".into(), Value::NativeFunction(280));
-        fs_props.insert("copyFileSync".into(), Value::NativeFunction(281));
-        fs_props.insert("renameSync".into(), Value::NativeFunction(282));
-        fs_props.insert("appendFileSync".into(), Value::NativeFunction(283));
+        fs_props.insert("readFileSync".into(), Value::NativeFunction(286));
+        fs_props.insert("writeFileSync".into(), Value::NativeFunction(287));
+        fs_props.insert("existsSync".into(), Value::NativeFunction(288));
+        fs_props.insert("mkdirSync".into(), Value::NativeFunction(289));
+        fs_props.insert("readdirSync".into(), Value::NativeFunction(290));
+        fs_props.insert("statSync".into(), Value::NativeFunction(291));
+        fs_props.insert("unlinkSync".into(), Value::NativeFunction(292));
+        fs_props.insert("rmSync".into(), Value::NativeFunction(293));
+        fs_props.insert("copyFileSync".into(), Value::NativeFunction(294));
+        fs_props.insert("renameSync".into(), Value::NativeFunction(295));
+        fs_props.insert("appendFileSync".into(), Value::NativeFunction(296));
         let fs_obj_idx = self.gc.allocate(
             &mut self.heap,
             HeapValue::Object(JsObject {

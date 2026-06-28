@@ -5,6 +5,7 @@ mod console;
 mod date_fns;
 mod encoding_fns;
 mod error_fns;
+mod fetch_fns;
 mod fs_fns;
 mod function_fns;
 mod generator_fns;
@@ -25,6 +26,7 @@ mod regexp_fns;
 mod string_fns;
 mod symbol_fns;
 mod typed_array_fns;
+mod url_fns;
 
 use crate::errors::Result;
 use crate::objects::Value;
@@ -328,7 +330,21 @@ pub static NATIVE_TABLE: &[NativeFn] = &[
     path_fns::native_path_relative,
     path_fns::native_path_is_absolute,
     path_fns::native_path_normalize,
-    // Fs (273-284)
+    // URL (284-295)
+    url_fns::native_url_constructor,
+    url_fns::native_url_to_string,
+    url_fns::native_search_params_get,
+    url_fns::native_search_params_get_all,
+    url_fns::native_search_params_has,
+    url_fns::native_search_params_set,
+    url_fns::native_search_params_append,
+    url_fns::native_search_params_delete,
+    url_fns::native_search_params_to_string,
+    url_fns::native_search_params_entries,
+    url_fns::native_search_params_keys,
+    url_fns::native_search_params_values,
+    url_fns::native_search_params_for_each,
+    // Fs (296-306)
     fs_fns::native_fs_read_file_sync,
     fs_fns::native_fs_write_file_sync,
     fs_fns::native_fs_exists_sync,
@@ -340,4 +356,9 @@ pub static NATIVE_TABLE: &[NativeFn] = &[
     fs_fns::native_fs_copy_file_sync,
     fs_fns::native_fs_rename_sync,
     fs_fns::native_fs_append_file_sync,
+    // Fetch (307-310)
+    fetch_fns::native_fetch,
+    fetch_fns::native_response_text,
+    fetch_fns::native_response_json,
+    fetch_fns::native_response_array_buffer,
 ];
