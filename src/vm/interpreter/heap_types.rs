@@ -109,7 +109,7 @@ pub struct JsRegExp {
 
 #[derive(Debug, Clone)]
 pub struct JsCompiledRegex {
-    pub pattern: regex::Regex,
+    pub pattern: fancy_regex::Regex,
 }
 
 impl JsRegExp {
@@ -133,7 +133,7 @@ impl JsRegExp {
         }
         regex_flags.push_str(pattern);
 
-        let compiled = regex::Regex::new(&regex_flags).map_err(|e| e.to_string())?;
+        let compiled = fancy_regex::Regex::new(&regex_flags).map_err(|e| e.to_string())?;
 
         Ok(JsRegExp {
             source: pattern.to_string(),
@@ -151,7 +151,7 @@ impl JsRegExp {
 
     pub fn test(&self, input: &str) -> bool {
         if let Some(ref compiled) = self.compiled {
-            compiled.pattern.is_match(input)
+            compiled.pattern.is_match(input).unwrap_or(false)
         } else {
             false
         }
@@ -159,7 +159,7 @@ impl JsRegExp {
 
     pub fn exec(&self, input: &str) -> Option<Vec<String>> {
         if let Some(ref compiled) = self.compiled {
-            let caps = compiled.pattern.captures(input)?;
+            let caps = compiled.pattern.captures(input).ok()??;
             let mut results = Vec::new();
             for i in 0..caps.len() {
                 results.push(
@@ -179,6 +179,7 @@ impl JsRegExp {
             compiled
                 .pattern
                 .find_iter(input)
+                .filter_map(|m| m.ok())
                 .map(|m| m.as_str().to_string())
                 .collect()
         } else {
@@ -199,6 +200,8 @@ impl JsRegExp {
             compiled
                 .pattern
                 .find(input)
+                .ok()
+                .flatten()
                 .map(|m| m.start() as i64)
                 .unwrap_or(-1)
         } else {
@@ -211,6 +214,7 @@ impl JsRegExp {
             compiled
                 .pattern
                 .split(input)
+                .filter_map(|s| s.ok())
                 .map(|s| s.to_string())
                 .collect()
         } else {

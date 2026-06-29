@@ -766,12 +766,9 @@ impl<'a> Parser<'a> {
             }
             Token::Regex(s) => {
                 self.advance();
-                let parts: Vec<&str> = s.splitn(2, '/').collect();
-                let pattern = parts[0].to_string();
-                let flags = if parts.len() > 1 {
-                    parts[1].to_string()
-                } else {
-                    String::new()
+                let (pattern, flags) = match s.rfind('/') {
+                    Some(pos) => (s[..pos].to_string(), s[pos + 1..].to_string()),
+                    None => (s.clone(), String::new()),
                 };
                 Ok(self.spanned(Expression::RegexLiteral { pattern, flags }))
             }
