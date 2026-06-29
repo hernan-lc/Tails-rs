@@ -48,6 +48,9 @@ impl Interpreter {
                 || key == "Headers"
                 || key == "Request"
                 || key == "Response"
+                || key == "globalThis"
+                || key == "globalThis"
+                || key == "globalThis"
                 || key == "fetch"
                 || key == "WebSocket"
             {

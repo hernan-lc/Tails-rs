@@ -144,6 +144,9 @@ impl CodeGenerator {
                         CompoundAssignmentOp::ModAssign => self.emit(Instruction::Mod),
                         CompoundAssignmentOp::AndAssign => self.emit(Instruction::And),
                         CompoundAssignmentOp::OrAssign => self.emit(Instruction::Or),
+                        CompoundAssignmentOp::XorAssign => self.emit(Instruction::BitXor),
+                        CompoundAssignmentOp::BitAndAssign => self.emit(Instruction::BitAnd),
+                        CompoundAssignmentOp::BitOrAssign => self.emit(Instruction::BitOr),
                     }
                     if let Expression::Identifier(name) = target.as_ref() {
                         if let Some(local_idx) = self.resolve_local(name) {

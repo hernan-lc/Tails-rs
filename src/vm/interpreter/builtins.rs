@@ -8,6 +8,14 @@ impl Interpreter {
         // Global constants
         self.globals
             .insert("Infinity".into(), Value::Float(f64::INFINITY));
+
+        // globalThis — an object that represents the global scope
+        let global_this_idx = self.gc.allocate(
+            &mut self.heap,
+            HeapValue::Object(JsObject::new()),
+        );
+        self.globals
+            .insert("globalThis".into(), Value::Object(global_this_idx));
         self.globals
             .insert("-Infinity".into(), Value::Float(f64::NEG_INFINITY));
 

@@ -450,6 +450,9 @@ pub enum CompoundAssignmentOp {
     ModAssign,
     AndAssign,
     OrAssign,
+    XorAssign,
+    BitAndAssign,
+    BitOrAssign,
 }
 
 #[derive(Debug, Clone)]
@@ -634,7 +637,6 @@ impl<'a> Parser<'a> {
             Token::Import => self.parse_import_declaration(),
             Token::Export => self.parse_export_declaration(),
             Token::Interface => self.parse_interface_declaration(),
-            Token::Type => self.parse_type_alias_declaration(),
             Token::Enum => self.parse_enum_declaration(),
             _ => self.parse_expression_statement(),
         }

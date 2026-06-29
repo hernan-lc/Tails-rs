@@ -95,6 +95,33 @@ impl<'a> Parser<'a> {
                     op: Some(CompoundAssignmentOp::OrAssign),
                 }))
             }
+            Token::XorAssign => {
+                self.advance();
+                let value = self.parse_assignment()?;
+                Ok(self.spanned(Expression::Assignment {
+                    target: Box::new(left.inner),
+                    value: Box::new(value.inner),
+                    op: Some(CompoundAssignmentOp::XorAssign),
+                }))
+            }
+            Token::BitAndAssign => {
+                self.advance();
+                let value = self.parse_assignment()?;
+                Ok(self.spanned(Expression::Assignment {
+                    target: Box::new(left.inner),
+                    value: Box::new(value.inner),
+                    op: Some(CompoundAssignmentOp::BitAndAssign),
+                }))
+            }
+            Token::BitOrAssign => {
+                self.advance();
+                let value = self.parse_assignment()?;
+                Ok(self.spanned(Expression::Assignment {
+                    target: Box::new(left.inner),
+                    value: Box::new(value.inner),
+                    op: Some(CompoundAssignmentOp::BitOrAssign),
+                }))
+            }
             _ => Ok(left),
         }
     }
@@ -702,7 +729,13 @@ impl<'a> Parser<'a> {
         let mut args = Vec::new();
         if self.peek().token != Token::RightParen {
             loop {
-                args.push(self.parse_assignment()?.inner);
+                if self.peek().token == Token::Ellipsis {
+                    self.advance();
+                    let argument = Box::new(self.parse_assignment()?.inner);
+                    args.push(Expression::SpreadElement { argument });
+                } else {
+                    args.push(self.parse_assignment()?.inner);
+                }
                 if self.peek().token == Token::Comma {
                     self.advance();
                     if self.peek().token == Token::RightParen {
@@ -774,7 +807,7 @@ impl<'a> Parser<'a> {
                     }
                     return Err(Error::ParseError("Unexpected )".into()));
                 }
-                if let Token::Identifier(_) = self.peek().token.clone() {
+                if matches!(self.peek().token, Token::Identifier(_) | Token::Ellipsis) {
                     let saved = self.pos;
                     let (params, param_types, defaults, rest_param) = self.parse_typed_params()?;
                     if self.peek().token == Token::RightParen {
@@ -1104,7 +1137,10 @@ impl<'a> Parser<'a> {
                 self.expect(&Token::RightBrace)?;
                 Ok(self.spanned(Expression::ObjectLiteral { properties }))
             }
-            token => Err(Error::ParseError(format!("Unexpected token {:?}", token))),
+            token => {
+                eprintln!("[DEBUG] parse_primary: unexpected {:?} at pos {}, context: {:?}", token, self.pos, self.tokens.get(self.pos.saturating_sub(3)..=self.pos).map(|t| t.iter().map(|s| &s.token).collect::<Vec<_>>()));
+                Err(Error::ParseError(format!("Unexpected token {:?}", token)))
+            },
         }
     }
 

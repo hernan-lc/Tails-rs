@@ -826,7 +826,7 @@ impl<'a> Parser<'a> {
     pub(crate) fn parse_import_declaration(&mut self) -> Result<SpannedNode<Statement>> {
         self.expect(&Token::Import)?;
         // Skip 'type' keyword for type-only imports: import type { ... } from "..."
-        if self.peek().token == Token::Type {
+        if self.peek().token == Token::Identifier("type".to_string()) {
             self.advance();
         }
         let mut specifiers = Vec::new();
@@ -981,7 +981,7 @@ impl<'a> Parser<'a> {
         self.expect(&Token::Export)?;
 
         // Handle 'export type': parse as type alias export
-        if self.peek().token == Token::Type {
+        if self.peek().token == Token::Identifier("type".to_string()) {
             let type_alias = self.parse_type_alias_declaration()?;
             return Ok(self.spanned(Statement::ExportDeclaration {
                 kind: ExportDeclarationKind::Local(Box::new(type_alias)),
@@ -1263,7 +1263,11 @@ impl<'a> Parser<'a> {
     }
 
     pub(crate) fn parse_type_alias_declaration(&mut self) -> Result<SpannedNode<Statement>> {
-        self.expect(&Token::Type)?;
+        // Consume the "type" identifier
+        match &self.peek().token {
+            Token::Identifier(s) if s == "type" => { self.advance(); }
+            _ => return Err(Error::ParseError("Expected 'type' keyword".into())),
+        }
         let name = match self.advance().token {
             Token::Identifier(name) => name,
             t => {

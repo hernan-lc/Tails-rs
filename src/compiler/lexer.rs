@@ -78,6 +78,9 @@ pub enum Token {
     PowerAssign,
     AndAssign,
     OrAssign,
+    XorAssign,
+    BitAndAssign,
+    BitOrAssign,
     Equal,
     StrictEqual,
     NotEqual,
@@ -408,7 +411,7 @@ pub fn tokenize(source: &str) -> Result<Vec<SpannedToken>> {
                     "default" => Token::Default,
                     "from" => Token::From,
                     "as" => Token::As,
-                    "type" => Token::Type,
+                    "type" => Token::Identifier("type".to_string()),
                     "interface" => Token::Interface,
                     "enum" => Token::Enum,
                     "async" => Token::Async,
@@ -873,6 +876,10 @@ pub fn tokenize(source: &str) -> Result<Vec<SpannedToken>> {
                     } else {
                         push(&mut tokens, Token::And, tok_line, tok_col, tok_offset);
                     }
+                } else if let Some(&(_, '=')) = chars.peek() {
+                    chars.next();
+                    col += 1;
+                    push(&mut tokens, Token::BitAndAssign, tok_line, tok_col, tok_offset);
                 } else {
                     push(&mut tokens, Token::BitAnd, tok_line, tok_col, tok_offset);
                 }
@@ -893,6 +900,10 @@ pub fn tokenize(source: &str) -> Result<Vec<SpannedToken>> {
                     } else {
                         push(&mut tokens, Token::Or, tok_line, tok_col, tok_offset);
                     }
+                } else if let Some(&(_, '=')) = chars.peek() {
+                    chars.next();
+                    col += 1;
+                    push(&mut tokens, Token::BitOrAssign, tok_line, tok_col, tok_offset);
                 } else {
                     push(&mut tokens, Token::BitOr, tok_line, tok_col, tok_offset);
                 }
@@ -903,7 +914,13 @@ pub fn tokenize(source: &str) -> Result<Vec<SpannedToken>> {
                 let tok_offset = pos;
                 chars.next();
                 col += 1;
-                push(&mut tokens, Token::BitXor, tok_line, tok_col, tok_offset);
+                if let Some(&(_, '=')) = chars.peek() {
+                    chars.next();
+                    col += 1;
+                    push(&mut tokens, Token::XorAssign, tok_line, tok_col, tok_offset);
+                } else {
+                    push(&mut tokens, Token::BitXor, tok_line, tok_col, tok_offset);
+                }
             }
             '~' => {
                 let tok_line = line;
