@@ -3,7 +3,7 @@ import { loadPluginsFromDir } from "./loader";
 const manager = new PluginManager();
 
 // Load all plugins from ./plugins directory
-const plugins = await loadPluginsFromDir("./plugins");
+const plugins = await loadPluginsFromDir("./examples/plugins/plugins");
 //console.log("plugins", plugins);
 for (const plugin of plugins) {
   manager.register(plugin);

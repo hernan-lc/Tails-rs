@@ -26,7 +26,7 @@ pub(super) fn native_assert(
 }
 
 pub(super) fn native_assert_strict_equal(
-    interp: &mut Interpreter,
+    _interp: &mut Interpreter,
     _this: &Value,
     args: &[Value],
 ) -> Result<Value> {

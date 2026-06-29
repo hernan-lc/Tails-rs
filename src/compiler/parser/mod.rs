@@ -57,8 +57,8 @@ pub enum TypeLiteral {
 #[derive(Debug, Clone)]
 pub enum AstNode {
     Program(Vec<SpannedNode<Statement>>),
-    Statement(SpannedNode<Statement>),
-    Expression(SpannedNode<Expression>),
+    Statement(Box<SpannedNode<Statement>>),
+    Expression(Box<SpannedNode<Expression>>),
 }
 
 #[derive(Debug, Clone)]
@@ -176,7 +176,7 @@ pub struct EnumMember {
 
 #[derive(Debug, Clone)]
 pub enum ForInit {
-    Variable(SpannedNode<Statement>),
+    Variable(Box<SpannedNode<Statement>>),
     Expression(Expression),
 }
 
@@ -286,7 +286,7 @@ pub enum BindingPattern {
 
 #[derive(Debug, Clone)]
 pub enum ArrayBindingElement {
-    Pattern(BindingPattern, Option<Expression>),
+    Pattern(BindingPattern, Box<Option<Expression>>),
     Rest(Box<BindingPattern>),
     Skip,
 }
@@ -498,6 +498,13 @@ pub enum UnaryOperator {
     UnaryPlus,
 }
 
+pub type TypedParams = (
+    Vec<String>,
+    Vec<Option<TypeAnnotation>>,
+    Vec<Option<Expression>>,
+    Option<String>,
+);
+
 pub fn parse(tokens: &[SpannedToken]) -> Result<AstNode> {
     let mut parser = Parser::new(tokens);
     parser.parse_program()
@@ -649,14 +656,7 @@ impl<'a> Parser<'a> {
         Ok(self.spanned(Statement::Expression(expr.inner)))
     }
 
-    pub(crate) fn parse_typed_params(
-        &mut self,
-    ) -> Result<(
-        Vec<String>,
-        Vec<Option<TypeAnnotation>>,
-        Vec<Option<Expression>>,
-        Option<String>,
-    )> {
+    pub(crate) fn parse_typed_params(&mut self) -> Result<TypedParams> {
         let mut params = Vec::new();
         let mut param_types = Vec::new();
         let mut defaults = Vec::new();

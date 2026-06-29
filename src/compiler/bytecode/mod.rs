@@ -1069,7 +1069,7 @@ impl CodeGenerator {
                             let idx = self.add_constant(Value::Integer(i as i64));
                             self.emit(Instruction::LoadConst(idx));
                             self.emit(Instruction::GetProperty);
-                            if let Some(default_expr) = default {
+                            if let Some(default_expr) = default.as_ref() {
                                 let skip_default = self.instructions.len();
                                 self.emit(Instruction::JumpIfNotUndefined(0));
                                 self.emit(Instruction::Pop);

@@ -81,7 +81,7 @@ impl<'a> Parser<'a> {
                 } else {
                     None
                 };
-                elements.push(ArrayBindingElement::Pattern(pattern, default));
+                elements.push(ArrayBindingElement::Pattern(pattern, Box::new(default)));
                 if self.peek().token == Token::Comma {
                     self.advance();
                     if self.peek().token == Token::RightBracket {
@@ -382,9 +382,9 @@ impl<'a> Parser<'a> {
                 type_annotation: None,
                 init: init_val,
             });
-            let init = Some(Box::new(ForInit::Variable(
+            let init = Some(Box::new(ForInit::Variable(Box::new(
                 self.spanned(Statement::VariableDeclaration { kind, declarations }),
-            )));
+            ))));
             self.expect(&Token::Semicolon)?;
             let condition = if self.peek().token != Token::Semicolon {
                 Some(self.parse_expression()?.inner)

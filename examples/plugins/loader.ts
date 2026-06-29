@@ -1,4 +1,4 @@
-import fs from "fs";
+import fs from "fs/promises";
 import path from "path";
 import { PluginInput } from "./types.ts";
 import { validatePlugin } from "./validation.ts";
@@ -14,7 +14,7 @@ export async function loadPluginFromFile(
 
 export async function loadPluginsFromDir(dir: string): Promise<PluginInput[]> {
   const dirPath: string = path.resolve(dir);
-  const entries: string[] = await fs.readdir(dirPath);
+  const entries: string[] = await fs.readdir(dirPath); // Now this works perfectly with await!
   //console.log("dirPath", dirPath, entries);
   const plugins: PluginInput[] = [];
   for (let i = 0; i < entries.length; i++) {
