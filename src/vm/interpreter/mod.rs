@@ -794,8 +794,10 @@ impl Interpreter {
                 | Instruction::SuperGet => {
                     let mut pc_mut = pc;
                     self.exec_class_ops(&instruction, &mut pc_mut, module)?;
-                    pc = pc_mut;
-                    continue;
+                    if pc_mut != pc {
+                        pc = pc_mut;
+                        continue;
+                    }
                 }
                 Instruction::ImportModule(source) => match self.load_and_run_module(source)? {
                     Some(module_path) => {

@@ -132,7 +132,7 @@ impl CodeGenerator {
                                     self.emit(Instruction::StoreGlobal(id.clone()));
                                 } else {
                                     self.locals.push(id.clone());
-                                    let slot = (self.locals.len() - 1) as u16;
+                                    let slot = (self.locals.len() - 1 - self.local_start_idx) as u16;
                                     self.emit(Instruction::StoreLocal(slot));
                                 }
                             }
@@ -658,7 +658,7 @@ impl CodeGenerator {
 
                 if let Some(catch_clause) = handler {
                     self.locals.push(catch_clause.param.clone());
-                    let slot = (self.locals.len() - 1) as u16;
+                    let slot = (self.locals.len() - 1 - self.local_start_idx) as u16;
                     self.emit(Instruction::LoadException);
                     self.emit(Instruction::StoreLocal(slot));
                     let last_idx = catch_clause.body.len().saturating_sub(1);
@@ -801,7 +801,7 @@ impl CodeGenerator {
                     self.emit(Instruction::StoreGlobal(class_name));
                 } else {
                     self.locals.push(class_name);
-                    let slot = (self.locals.len() - 1) as u16;
+                    let slot = (self.locals.len() - 1 - self.local_start_idx) as u16;
                     self.emit(Instruction::StoreLocal(slot));
                 }
                 Ok(())
@@ -1037,7 +1037,7 @@ impl CodeGenerator {
                     self.emit(Instruction::StoreGlobal(name.clone()));
                 } else {
                     self.locals.push(name.clone());
-                    let slot = (self.locals.len() - 1) as u16;
+                    let slot = (self.locals.len() - 1 - self.local_start_idx) as u16;
                     self.emit(Instruction::StoreLocal(slot));
                 }
                 Ok(())
@@ -1078,7 +1078,7 @@ impl CodeGenerator {
                     self.emit(Instruction::StoreGlobal(id.clone()));
                 } else {
                     self.locals.push(id.clone());
-                    let slot = (self.locals.len() - 1) as u16;
+                    let slot = (self.locals.len() - 1 - self.local_start_idx) as u16;
                     self.emit(Instruction::StoreLocal(slot));
                 }
             }
