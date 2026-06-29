@@ -45,6 +45,7 @@ pub enum TypeAnnotation {
         param_name: String,
         ty: Box<TypeAnnotation>,
     },
+    Typeof(Box<TypeAnnotation>),
 }
 
 #[derive(Debug, Clone, PartialEq)]

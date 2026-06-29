@@ -718,6 +718,9 @@ impl<'a> Parser<'a> {
                     property: Box::new(property),
                     computed: true,
                 });
+            } else if self.peek().token == Token::Not {
+                // TypeScript non-null assertion: expr!
+                self.advance();
             } else {
                 break;
             }
@@ -1299,7 +1302,7 @@ impl<'a> Parser<'a> {
                     Ok(expr)
                 } else {
                     Err(Error::ParseError(
-                        "Expected '(' after type parameters in generic arrow function".into(),
+                        format!("Expected '(' after type parameters in generic arrow function at {}:{}", self.current_span.line, self.current_span.col),
                     ))
                 }
             }
@@ -1357,7 +1360,7 @@ impl<'a> Parser<'a> {
                     self.advance();
                     Ok(self.spanned(Expression::Identifier(name.to_string())))
                 } else {
-                    Err(Error::ParseError(format!("Unexpected token {:?}", token)))
+                    Err(Error::ParseError(format!("Unexpected token {:?} at {}:{}", token, self.current_span.line, self.current_span.col)))
                 }
             }
         }

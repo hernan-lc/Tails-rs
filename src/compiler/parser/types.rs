@@ -102,6 +102,11 @@ impl<'a> Parser<'a> {
                 self.advance();
                 Ok(TypeAnnotation::Literal(TypeLiteral::String(s)))
             }
+            Token::Typeof => {
+                self.advance();
+                let inner = self.parse_primary_type()?;
+                Ok(TypeAnnotation::Typeof(Box::new(inner)))
+            }
             Token::LeftBracket => {
                 self.advance();
                 if self.peek().token == Token::RightBracket {
