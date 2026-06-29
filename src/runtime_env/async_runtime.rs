@@ -87,6 +87,10 @@ impl AsyncRuntime {
         }
         tasks
     }
+
+    pub fn is_idle(&self) -> bool {
+        self.microtask_queue.is_empty() && self.macrotask_queue.is_empty()
+    }
 }
 
 impl Default for AsyncRuntime {

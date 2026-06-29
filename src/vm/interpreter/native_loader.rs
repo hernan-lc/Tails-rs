@@ -82,14 +82,14 @@ pub fn create_fs_module(
     props.insert("renameSync".into(), Value::NativeFunction(295));
     props.insert("appendFileSync".into(), Value::NativeFunction(296));
     // Async wrappers returning Promises
-    props.insert("readdir".into(), Value::NativeFunction(343));
-    props.insert("readFile".into(), Value::NativeFunction(344));
-    props.insert("writeFile".into(), Value::NativeFunction(345));
-    props.insert("stat".into(), Value::NativeFunction(346));
-    props.insert("mkdir".into(), Value::NativeFunction(347));
-    props.insert("unlink".into(), Value::NativeFunction(348));
-    props.insert("copyFile".into(), Value::NativeFunction(349));
-    props.insert("rename".into(), Value::NativeFunction(350));
+    props.insert("readdir".into(), Value::NativeFunction(333));
+    props.insert("readFile".into(), Value::NativeFunction(334));
+    props.insert("writeFile".into(), Value::NativeFunction(335));
+    props.insert("stat".into(), Value::NativeFunction(336));
+    props.insert("mkdir".into(), Value::NativeFunction(337));
+    props.insert("unlink".into(), Value::NativeFunction(338));
+    props.insert("copyFile".into(), Value::NativeFunction(339));
+    props.insert("rename".into(), Value::NativeFunction(340));
     props
 }
 
@@ -299,14 +299,14 @@ pub fn create_events_module(
     let mut props = HashMap::new();
 
     // EventEmitter constructor
-    props.insert("EventEmitter".into(), Value::NativeFunction(322));
+    props.insert("EventEmitter".into(), Value::NativeFunction(312));
 
     // Prototype methods
     let mut proto_props = HashMap::new();
-    proto_props.insert("on".into(), Value::NativeFunction(323));
-    proto_props.insert("emit".into(), Value::NativeFunction(324));
-    proto_props.insert("off".into(), Value::NativeFunction(325));
-    proto_props.insert("listenerCount".into(), Value::NativeFunction(326));
+    proto_props.insert("on".into(), Value::NativeFunction(313));
+    proto_props.insert("emit".into(), Value::NativeFunction(314));
+    proto_props.insert("off".into(), Value::NativeFunction(315));
+    proto_props.insert("listenerCount".into(), Value::NativeFunction(316));
 
     let proto_idx = gc.allocate(
         heap,
@@ -326,17 +326,17 @@ pub fn create_os_module(
     _gc: &mut GarbageCollector,
 ) -> HashMap<String, Value> {
     let mut props = HashMap::new();
-    props.insert("platform".into(), Value::NativeFunction(329));
-    props.insert("arch".into(), Value::NativeFunction(330));
-    props.insert("cpus".into(), Value::NativeFunction(331));
-    props.insert("totalmem".into(), Value::NativeFunction(332));
-    props.insert("freemem".into(), Value::NativeFunction(333));
-    props.insert("uptime".into(), Value::NativeFunction(334));
-    props.insert("hostname".into(), Value::NativeFunction(335));
-    props.insert("type".into(), Value::NativeFunction(336));
-    props.insert("release".into(), Value::NativeFunction(337));
-    props.insert("homedir".into(), Value::NativeFunction(338));
-    props.insert("tmpdir".into(), Value::NativeFunction(339));
+    props.insert("platform".into(), Value::NativeFunction(319));
+    props.insert("arch".into(), Value::NativeFunction(320));
+    props.insert("cpus".into(), Value::NativeFunction(321));
+    props.insert("totalmem".into(), Value::NativeFunction(322));
+    props.insert("freemem".into(), Value::NativeFunction(323));
+    props.insert("uptime".into(), Value::NativeFunction(324));
+    props.insert("hostname".into(), Value::NativeFunction(325));
+    props.insert("type".into(), Value::NativeFunction(326));
+    props.insert("release".into(), Value::NativeFunction(327));
+    props.insert("homedir".into(), Value::NativeFunction(328));
+    props.insert("tmpdir".into(), Value::NativeFunction(329));
     props
 }
 
@@ -345,8 +345,8 @@ pub fn create_crypto_module(
     _gc: &mut GarbageCollector,
 ) -> HashMap<String, Value> {
     let mut props = HashMap::new();
-    props.insert("randomBytes".into(), Value::NativeFunction(340));
-    props.insert("randomUUID".into(), Value::NativeFunction(341));
-    props.insert("createHash".into(), Value::NativeFunction(342));
+    props.insert("randomBytes".into(), Value::NativeFunction(330));
+    props.insert("randomUUID".into(), Value::NativeFunction(331));
+    props.insert("createHash".into(), Value::NativeFunction(332));
     props
 }

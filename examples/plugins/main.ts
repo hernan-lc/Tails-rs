@@ -4,6 +4,7 @@ const manager = new PluginManager();
 
 // Load all plugins from ./plugins directory
 const plugins = await loadPluginsFromDir("./plugins");
+console.log("plugins", plugins);
 for (const plugin of plugins) {
   manager.register(plugin);
 }

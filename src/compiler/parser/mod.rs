@@ -594,7 +594,7 @@ impl<'a> Parser<'a> {
     pub(crate) fn parse_statement(&mut self) -> Result<SpannedNode<Statement>> {
         match self.peek().token.clone() {
             Token::Const | Token::Let | Token::Var => self.parse_variable_declaration(),
-            Token::Function => self.parse_function_declaration(),
+            Token::Function | Token::Async => self.parse_function_declaration(),
             Token::Return => self.parse_return_statement(),
             Token::Yield => self.parse_yield_statement(),
             Token::If => self.parse_if_statement(),

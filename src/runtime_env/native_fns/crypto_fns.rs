@@ -71,8 +71,8 @@ pub(super) fn native_crypto_create_hash(
     let mut props = std::collections::HashMap::new();
     props.insert("_algorithm".into(), Value::String(algorithm));
     props.insert("_data".into(), Value::Object(data_buf_idx));
-    props.insert("update".into(), Value::NativeFunction(327));
-    props.insert("digest".into(), Value::NativeFunction(328));
+    props.insert("update".into(), Value::NativeFunction(317));
+    props.insert("digest".into(), Value::NativeFunction(318));
 
     let hash_obj_idx = interp.heap.len();
     interp.heap.push(HeapValue::Object(JsObject {

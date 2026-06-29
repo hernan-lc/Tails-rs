@@ -19,8 +19,20 @@ use crate::errors::{Error, Result};
 use crate::objects::js_promise::PromiseState;
 use crate::objects::Value;
 use crate::runtime_env::async_runtime::AsyncRuntime;
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use std::rc::Rc;
+
+#[derive(Clone)]
+pub(crate) struct SuspendedFrame {
+    pub(crate) promise_idx: usize,
+    pub(crate) resume_pc: usize,
+    pub(crate) stack_snapshot: Vec<Value>,
+    pub(crate) call_stack_snapshot: Vec<CallFrame>,
+    pub(crate) module: Option<Rc<CompiledModule>>,
+    pub(crate) module_path: Option<String>,
+    pub(crate) exception_handlers_snapshot: Vec<ExceptionHandler>,
+    pub(crate) block_scope_stack_snapshot: Vec<usize>,
+}
 
 pub struct Interpreter {
     pub(crate) globals: HashMap<String, Value>,
@@ -47,6 +59,7 @@ pub struct Interpreter {
     pub(crate) generator_proto_idx: Option<usize>,
     pub(crate) native_loader: native_loader::NativeModuleRegistry,
     pub(crate) current_pc: usize,
+    pub(crate) suspended_frames: VecDeque<SuspendedFrame>,
 }
 
 impl Interpreter {
@@ -76,6 +89,7 @@ impl Interpreter {
             generator_proto_idx: None,
             native_loader: native_loader::NativeModuleRegistry::new(),
             current_pc: 0,
+            suspended_frames: VecDeque::new(),
         };
         interp.init_builtins();
         interp.init_builtins();
@@ -84,12 +98,67 @@ impl Interpreter {
 
     pub fn execute(&mut self, module: &CompiledModule) -> Result<Value> {
         self.current_module = Some(Rc::new(module.clone()));
-        let result = self.execute_from(module, 0);
-        self.drain_microtasks();
-        let macrotasks: Vec<_> = self.async_runtime.run_macrotasks();
-        for task in macrotasks {
-            let _ = self.call_value(&task.callback, &Value::Undefined, &[]);
+        let mut result = self.execute_from(module, 0);
+
+        loop {
+            self.drain_microtasks();
+
+            let mut any_resumed = false;
+            let mut i = 0;
+            while i < self.suspended_frames.len() {
+                let promise_idx = self.suspended_frames[i].promise_idx;
+                let should_resume = if let HeapValue::Promise(p) = &self.heap[promise_idx] {
+                    matches!(
+                        p.state,
+                        PromiseState::Fulfilled(_) | PromiseState::Rejected(_)
+                    )
+                } else {
+                    false
+                };
+
+                if should_resume {
+                    let frame = self.suspended_frames.remove(i).unwrap();
+                    let resolved_value =
+                        if let HeapValue::Promise(p) = &self.heap[frame.promise_idx] {
+                            match &p.state {
+                                PromiseState::Fulfilled(v) => v.clone(),
+                                PromiseState::Rejected(reason) => {
+                                    return Err(self.err_at_location(Error::RuntimeError(
+                                        format!("Unhandled promise rejection: {:?}", reason),
+                                    )));
+                                }
+                                _ => unreachable!(),
+                            }
+                        } else {
+                            Value::Undefined
+                        };
+
+                    self.stack = frame.stack_snapshot;
+                    self.stack.push(resolved_value);
+                    self.call_stack = frame.call_stack_snapshot;
+                    self.current_module = frame.module;
+                    self.current_module_path = frame.module_path;
+                    self.exception_handlers = frame.exception_handlers_snapshot;
+                    self.block_scope_stack = frame.block_scope_stack_snapshot;
+
+                    let module_ref = self.current_module.clone().unwrap();
+                    result = self.execute_from(&module_ref, frame.resume_pc);
+                    any_resumed = true;
+                } else {
+                    i += 1;
+                }
+            }
+
+            let macrotasks: Vec<_> = self.async_runtime.run_macrotasks();
+            for task in macrotasks {
+                let _ = self.call_value(&task.callback, &Value::Undefined, &[]);
+            }
+
+            if !any_resumed && self.suspended_frames.is_empty() && self.async_runtime.is_idle() {
+                break;
+            }
         }
+
         result
     }
 
@@ -860,7 +929,31 @@ impl Interpreter {
                                 .get(&module_path)
                                 .cloned()
                                 .unwrap_or_default();
-                            let val = exports.get("default").cloned().unwrap_or(Value::Undefined);
+                            let val = if let Some(v) = exports.get("default") {
+                                v.clone()
+                            } else if !exports.is_empty() {
+                                // Create a default export object from named exports
+                                let obj_idx = self.heap.len();
+                                let mut obj_props = std::collections::HashMap::new();
+                                for (name, val) in &exports {
+                                    obj_props.insert(name.clone(), val.clone());
+                                }
+                                self.heap.push(HeapValue::Object(JsObject {
+                                    properties: obj_props,
+                                    prototype: None,
+                                    extensible: true,
+                                }));
+                                // Cache it in the registry
+                                if let Some(registry_exports) =
+                                    self.module_registry.get_mut(&module_path)
+                                {
+                                    registry_exports
+                                        .insert("default".to_string(), Value::Object(obj_idx));
+                                }
+                                Value::Object(obj_idx)
+                            } else {
+                                Value::Undefined
+                            };
                             self.globals.insert(local_name.clone(), val);
                         }
                         None => {
@@ -955,11 +1048,26 @@ impl Interpreter {
                                 PromiseState::Fulfilled(v) => {
                                     self.stack.push(v.clone());
                                 }
-                                PromiseState::Rejected(_r) => {
-                                    self.stack.push(Value::Undefined);
+                                PromiseState::Rejected(reason) => {
+                                    return Err(self.err_at_location(Error::RuntimeError(
+                                        format!("Unhandled promise rejection: {:?}", reason),
+                                    )));
                                 }
                                 PromiseState::Pending => {
-                                    self.stack.push(value);
+                                    let frame = SuspendedFrame {
+                                        promise_idx: *promise_idx,
+                                        resume_pc: pc + 1,
+                                        stack_snapshot: self.stack.clone(),
+                                        call_stack_snapshot: self.call_stack.clone(),
+                                        module: self.current_module.clone(),
+                                        module_path: self.current_module_path.clone(),
+                                        exception_handlers_snapshot: self
+                                            .exception_handlers
+                                            .clone(),
+                                        block_scope_stack_snapshot: self.block_scope_stack.clone(),
+                                    };
+                                    self.suspended_frames.push_back(frame);
+                                    return Ok(Value::Undefined);
                                 }
                             }
                         } else {

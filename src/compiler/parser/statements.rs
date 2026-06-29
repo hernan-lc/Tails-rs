@@ -1061,9 +1061,10 @@ impl<'a> Parser<'a> {
                 self.advance();
             }
             return Ok(self.spanned(Statement::ExportDeclaration {
-                kind: ExportDeclarationKind::Local(Box::new(
-                    self.spanned(Statement::Expression(Expression::UndefinedLiteral)),
-                )),
+                kind: ExportDeclarationKind::ReExport {
+                    specifiers,
+                    source: String::new(),
+                },
             }));
         }
 

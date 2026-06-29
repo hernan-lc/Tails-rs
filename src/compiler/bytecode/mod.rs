@@ -863,19 +863,26 @@ impl CodeGenerator {
                         Ok(())
                     }
                     ExportDeclarationKind::ReExport { specifiers, source } => {
-                        // Re-export: export { a as b } from "./module";
-                        // Load the module first
-                        self.emit(Instruction::ImportModule(source.clone()));
-                        // Import and re-export each specifier
-                        for spec in specifiers {
-                            let imported_name = spec.exported.as_ref().unwrap_or(&spec.local);
-                            let local_name = &spec.local;
-                            self.emit(Instruction::ImportNamed(
-                                source.clone(),
-                                imported_name.clone(),
-                                local_name.clone(),
-                            ));
-                            self.emit(Instruction::StoreModuleExport(local_name.clone()));
+                        if source.is_empty() {
+                            // export { a, b } — re-export local names
+                            for spec in specifiers {
+                                let _exported_name = spec.exported.as_ref().unwrap_or(&spec.local);
+                                let local_name = &spec.local;
+                                self.emit(Instruction::StoreModuleExport(local_name.clone()));
+                            }
+                        } else {
+                            // Re-export: export { a as b } from "./module";
+                            self.emit(Instruction::ImportModule(source.clone()));
+                            for spec in specifiers {
+                                let imported_name = spec.exported.as_ref().unwrap_or(&spec.local);
+                                let local_name = &spec.local;
+                                self.emit(Instruction::ImportNamed(
+                                    source.clone(),
+                                    imported_name.clone(),
+                                    local_name.clone(),
+                                ));
+                                self.emit(Instruction::StoreModuleExport(local_name.clone()));
+                            }
                         }
                         Ok(())
                     }
