@@ -892,7 +892,13 @@ pub fn tokenize(source: &str) -> Result<Vec<SpannedToken>> {
                 } else if let Some(&(_, '=')) = chars.peek() {
                     chars.next();
                     col += 1;
-                    push(&mut tokens, Token::BitAndAssign, tok_line, tok_col, tok_offset);
+                    push(
+                        &mut tokens,
+                        Token::BitAndAssign,
+                        tok_line,
+                        tok_col,
+                        tok_offset,
+                    );
                 } else {
                     push(&mut tokens, Token::BitAnd, tok_line, tok_col, tok_offset);
                 }
@@ -916,7 +922,13 @@ pub fn tokenize(source: &str) -> Result<Vec<SpannedToken>> {
                 } else if let Some(&(_, '=')) = chars.peek() {
                     chars.next();
                     col += 1;
-                    push(&mut tokens, Token::BitOrAssign, tok_line, tok_col, tok_offset);
+                    push(
+                        &mut tokens,
+                        Token::BitOrAssign,
+                        tok_line,
+                        tok_col,
+                        tok_offset,
+                    );
                 } else {
                     push(&mut tokens, Token::BitOr, tok_line, tok_col, tok_offset);
                 }

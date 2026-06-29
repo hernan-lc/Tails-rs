@@ -191,6 +191,19 @@ impl<'a> Parser<'a> {
         };
         let name = match self.advance().token {
             Token::Identifier(name) => name,
+            Token::Get => "get".to_string(),
+            Token::Set => "set".to_string(),
+            Token::Delete => "delete".to_string(),
+            Token::Typeof => "typeof".to_string(),
+            Token::Void => "void".to_string(),
+            Token::Of => "of".to_string(),
+            Token::As => "as".to_string(),
+            Token::From => "from".to_string(),
+            Token::Enum => "enum".to_string(),
+            Token::Interface => "interface".to_string(),
+            Token::Yield => "yield".to_string(),
+            Token::Await => "await".to_string(),
+            Token::Static => "static".to_string(),
             token => {
                 return Err(Error::ParseError(format!(
                     "Expected function name, got {:?}",
@@ -690,7 +703,7 @@ impl<'a> Parser<'a> {
                     let name = "get".to_string();
                     self.advance(); // consume 'get'
                     self.advance(); // consume '('
-                    let (params, param_types, defaults, rest_param) =
+                    let (params, param_types, _defaults, _rest_param) =
                         self.parse_typed_params()?;
                     self.expect(&Token::RightParen)?;
                     let return_type = if self.peek().token == Token::Colon {
@@ -716,78 +729,113 @@ impl<'a> Parser<'a> {
                         });
                     }
                 } else {
-                self.advance();
-                let name = match self.advance().token {
-                    Token::Identifier(name) => name,
-                    t => {
-                        return Err(Error::ParseError(format!(
-                            "Expected property name after 'get', got {:?}",
-                            t
-                        )))
-                    }
-                };
-                self.expect(&Token::LeftParen)?;
-                self.expect(&Token::RightParen)?;
-                let return_type = if self.peek().token == Token::Colon {
                     self.advance();
-                    Some(self.parse_type_annotation()?)
-                } else {
-                    None
-                };
-                self.expect(&Token::LeftBrace)?;
-                let body = self.parse_block_body()?;
-                self.expect(&Token::RightBrace)?;
-                members.push(ClassMember::Getter {
-                    name,
-                    return_type,
-                    body,
-                    is_static,
-                });
-            } else if self.peek().token == Token::Set && !is_async {
-                self.advance();
-                let name = match self.advance().token {
-                    Token::Identifier(name) => name,
-                    t => {
-                        return Err(Error::ParseError(format!(
-                            "Expected property name after 'set', got {:?}",
-                            t
-                        )))
-                    }
-                };
-                let (param, param_type) = {
-                    self.expect(&Token::LeftParen)?;
-                    let pname = match self.advance().token {
-                        Token::Identifier(n) => n,
+                    let name = match self.advance().token {
+                        Token::Identifier(name) => name,
                         t => {
                             return Err(Error::ParseError(format!(
-                                "Expected parameter name, got {:?}",
+                                "Expected property name after 'get', got {:?}",
                                 t
                             )))
                         }
                     };
-                    let ptype = if self.peek().token == Token::Colon {
+                    self.expect(&Token::LeftParen)?;
+                    self.expect(&Token::RightParen)?;
+                    let return_type = if self.peek().token == Token::Colon {
                         self.advance();
                         Some(self.parse_type_annotation()?)
                     } else {
                         None
                     };
-                    (pname, ptype)
-                };
-                self.expect(&Token::RightParen)?;
-                if self.peek().token == Token::Colon {
-                    self.advance();
-                    self.parse_type_annotation()?;
+                    self.expect(&Token::LeftBrace)?;
+                    let body = self.parse_block_body()?;
+                    self.expect(&Token::RightBrace)?;
+                    members.push(ClassMember::Getter {
+                        name,
+                        return_type,
+                        body,
+                        is_static,
+                    });
                 }
-                self.expect(&Token::LeftBrace)?;
-                let body = self.parse_block_body()?;
-                self.expect(&Token::RightBrace)?;
-                members.push(ClassMember::Setter {
-                    name,
-                    param,
-                    param_type,
-                    body,
-                    is_static,
-                });
+            } else if self.peek().token == Token::Set && !is_async {
+                // Lookahead: if next token after 'set' is '(', it's a method named "set"
+                let is_method = self.pos + 1 < self.tokens.len()
+                    && self.tokens[self.pos + 1].token == Token::LeftParen;
+                if is_method {
+                    let name = "set".to_string();
+                    self.advance(); // consume 'set'
+                    self.advance(); // consume '('
+                    let (params, param_types, _defaults, _rest_param) =
+                        self.parse_typed_params()?;
+                    self.expect(&Token::RightParen)?;
+                    let return_type = if self.peek().token == Token::Colon {
+                        self.advance();
+                        Some(self.parse_type_annotation()?)
+                    } else {
+                        None
+                    };
+                    if self.peek().token == Token::Semicolon {
+                        self.advance();
+                    } else {
+                        self.expect(&Token::LeftBrace)?;
+                        let body = self.parse_block_body()?;
+                        self.expect(&Token::RightBrace)?;
+                        members.push(ClassMember::Method {
+                            name,
+                            params,
+                            param_types: Some(param_types),
+                            return_type,
+                            body,
+                            is_static,
+                            is_async,
+                        });
+                    }
+                } else {
+                    self.advance();
+                    let name = match self.advance().token {
+                        Token::Identifier(name) => name,
+                        t => {
+                            return Err(Error::ParseError(format!(
+                                "Expected property name after 'set', got {:?}",
+                                t
+                            )))
+                        }
+                    };
+                    let (param, param_type) = {
+                        self.expect(&Token::LeftParen)?;
+                        let pname = match self.advance().token {
+                            Token::Identifier(n) => n,
+                            t => {
+                                return Err(Error::ParseError(format!(
+                                    "Expected parameter name, got {:?}",
+                                    t
+                                )))
+                            }
+                        };
+                        let ptype = if self.peek().token == Token::Colon {
+                            self.advance();
+                            Some(self.parse_type_annotation()?)
+                        } else {
+                            None
+                        };
+                        (pname, ptype)
+                    };
+                    self.expect(&Token::RightParen)?;
+                    if self.peek().token == Token::Colon {
+                        self.advance();
+                        self.parse_type_annotation()?;
+                    }
+                    self.expect(&Token::LeftBrace)?;
+                    let body = self.parse_block_body()?;
+                    self.expect(&Token::RightBrace)?;
+                    members.push(ClassMember::Setter {
+                        name,
+                        param,
+                        param_type,
+                        body,
+                        is_static,
+                    });
+                }
             } else {
                 let name = match self.advance().token {
                     Token::Identifier(name) => name,
@@ -1055,20 +1103,20 @@ impl<'a> Parser<'a> {
             self.advance();
             if self.peek().token == Token::As {
                 self.advance();
-                let alias = match self.advance().token {
-                    Token::Identifier(name) => name,
-                    t => return Err(Error::ParseError(format!(
-                        "Expected identifier after 'export * as', got {:?}", t
-                    ))),
-                };
+                let alias = self.advance_as_ident();
                 self.expect(&Token::From)?;
                 let source = match self.advance().token {
                     Token::String(s) => s,
-                    t => return Err(Error::ParseError(format!(
-                        "Expected string literal after 'from', got {:?}", t
-                    ))),
+                    t => {
+                        return Err(Error::ParseError(format!(
+                            "Expected string literal after 'from', got {:?}",
+                            t
+                        )))
+                    }
                 };
-                if self.peek().token == Token::Semicolon { self.advance(); }
+                if self.peek().token == Token::Semicolon {
+                    self.advance();
+                }
                 return Ok(self.spanned(Statement::ExportDeclaration {
                     kind: ExportDeclarationKind::ReExport {
                         specifiers: vec![ExportSpecifier {
@@ -1082,11 +1130,16 @@ impl<'a> Parser<'a> {
                 self.expect(&Token::From)?;
                 let source = match self.advance().token {
                     Token::String(s) => s,
-                    t => return Err(Error::ParseError(format!(
-                        "Expected string literal after 'from', got {:?}", t
-                    ))),
+                    t => {
+                        return Err(Error::ParseError(format!(
+                            "Expected string literal after 'from', got {:?}",
+                            t
+                        )))
+                    }
                 };
-                if self.peek().token == Token::Semicolon { self.advance(); }
+                if self.peek().token == Token::Semicolon {
+                    self.advance();
+                }
                 return Ok(self.spanned(Statement::ExportDeclaration {
                     kind: ExportDeclarationKind::ReExport {
                         specifiers: vec![ExportSpecifier {
@@ -1107,26 +1160,10 @@ impl<'a> Parser<'a> {
                     self.advance();
                     continue;
                 }
-                let local = match self.advance().token {
-                    Token::Identifier(name) => name,
-                    t => {
-                        return Err(Error::ParseError(format!(
-                            "Expected identifier, got {:?}",
-                            t
-                        )))
-                    }
-                };
+                let local = self.advance_as_ident();
                 let exported = if self.peek().token == Token::As {
                     self.advance();
-                    match self.advance().token {
-                        Token::Identifier(name) => Some(name),
-                        t => {
-                            return Err(Error::ParseError(format!(
-                                "Expected identifier after 'as', got {:?}",
-                                t
-                            )))
-                        }
-                    }
+                    Some(self.advance_as_ident())
                 } else {
                     None
                 };
@@ -1312,7 +1349,9 @@ impl<'a> Parser<'a> {
     pub(crate) fn parse_type_alias_declaration(&mut self) -> Result<SpannedNode<Statement>> {
         // Consume the "type" identifier
         match &self.peek().token {
-            Token::Identifier(s) if s == "type" => { self.advance(); }
+            Token::Identifier(s) if s == "type" => {
+                self.advance();
+            }
             _ => return Err(Error::ParseError("Expected 'type' keyword".into())),
         }
         let name = match self.advance().token {

@@ -679,8 +679,16 @@ impl<'a> Parser<'a> {
                     rest_param = Some(param);
                     break;
                 }
-                let param = match self.advance().token {
-                    Token::Identifier(name) => name,
+                let param = match self.peek().token.clone() {
+                    Token::Identifier(_) => match self.advance().token {
+                        Token::Identifier(name) => name,
+                        _ => unreachable!(),
+                    },
+                    Token::LeftBracket | Token::LeftBrace => {
+                        // Destructured parameter: consume the binding pattern
+                        let _pattern = self.parse_binding_pattern()?;
+                        format!("__destr_{}", params.len())
+                    }
                     token => {
                         return Err(Error::ParseError(format!(
                             "Expected parameter name, got {:?}",
@@ -841,6 +849,10 @@ impl<'a> Parser<'a> {
             Token::Try => Ok("try".to_string()),
             Token::Constructor => Ok("constructor".to_string()),
             Token::Of => Ok("of".to_string()),
+            Token::Enum => Ok("enum".to_string()),
+            Token::Interface => Ok("interface".to_string()),
+            Token::Yield => Ok("yield".to_string()),
+            Token::Type => Ok("type".to_string()),
             t => Err(Error::ParseError(format!(
                 "Expected property key, got {:?}",
                 t
@@ -895,10 +907,78 @@ impl<'a> Parser<'a> {
             Token::Try => Ok(Expression::Identifier("try".to_string())),
             Token::Constructor => Ok(Expression::Identifier("constructor".to_string())),
             Token::Of => Ok(Expression::Identifier("of".to_string())),
+            Token::Enum => Ok(Expression::Identifier("enum".to_string())),
+            Token::Interface => Ok(Expression::Identifier("interface".to_string())),
+            Token::Yield => Ok(Expression::Identifier("yield".to_string())),
+            Token::Type => Ok(Expression::Identifier("type".to_string())),
             t => Err(Error::ParseError(format!(
                 "Expected property name, got {:?}",
                 t
             ))),
+        }
+    }
+
+    /// Convert any token to an identifier string. Used where JS allows
+    /// keywords as identifiers (export names, import names, etc.)
+    pub(crate) fn advance_as_ident(&mut self) -> String {
+        let st = self.advance();
+        match st.token {
+            Token::Identifier(n) => n,
+            Token::String(s) => s,
+            other => {
+                // Use token_to_key_string logic for keyword tokens
+                let key = match other {
+                    Token::Get => "get",
+                    Token::Set => "set",
+                    Token::Delete => "delete",
+                    Token::Typeof => "typeof",
+                    Token::Void => "void",
+                    Token::New => "new",
+                    Token::Return => "return",
+                    Token::If => "if",
+                    Token::Else => "else",
+                    Token::While => "while",
+                    Token::For => "for",
+                    Token::Do => "do",
+                    Token::Switch => "switch",
+                    Token::Case => "case",
+                    Token::Break => "break",
+                    Token::Continue => "continue",
+                    Token::Try => "try",
+                    Token::Catch => "catch",
+                    Token::Finally => "finally",
+                    Token::Throw => "throw",
+                    Token::Const => "const",
+                    Token::Let => "let",
+                    Token::Var => "var",
+                    Token::In => "in",
+                    Token::Of => "of",
+                    Token::Instanceof => "instanceof",
+                    Token::Extends => "extends",
+                    Token::Static => "static",
+                    Token::Public => "public",
+                    Token::Private => "private",
+                    Token::Protected => "protected",
+                    Token::Readonly => "readonly",
+                    Token::Enum => "enum",
+                    Token::Interface => "interface",
+                    Token::Yield => "yield",
+                    Token::Await => "await",
+                    Token::Constructor => "constructor",
+                    Token::From => "from",
+                    Token::As => "as",
+                    Token::Default => "default",
+                    Token::Import => "import",
+                    Token::Export => "export",
+                    Token::Function => "function",
+                    Token::Class => "class",
+                    Token::Super => "super",
+                    Token::This => "this",
+                    Token::Async => "async",
+                    _ => return format!("{:?}", other),
+                };
+                key.to_string()
+            }
         }
     }
 }

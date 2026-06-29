@@ -21,17 +21,16 @@ impl CodeGenerator {
                 Ok(())
             }
             Expression::RegexLiteral { pattern, flags } => {
-                // For now, create a RegExp object using the regex constructor
-                // Load the RegExp constructor
+                // Create a RegExp object: new RegExp(pattern, flags)
+                // Push constructor first (below args on stack)
+                self.emit(Instruction::LoadGlobal("RegExp".to_string()));
                 let reg_idx = self.add_constant(Value::String(pattern.clone()));
                 self.emit(Instruction::LoadConst(reg_idx));
                 if !flags.is_empty() {
                     let flags_idx = self.add_constant(Value::String(flags.clone()));
                     self.emit(Instruction::LoadConst(flags_idx));
-                    self.emit(Instruction::LoadGlobal("RegExp".to_string()));
                     self.emit(Instruction::Construct(2));
                 } else {
-                    self.emit(Instruction::LoadGlobal("RegExp".to_string()));
                     self.emit(Instruction::Construct(1));
                 }
                 Ok(())

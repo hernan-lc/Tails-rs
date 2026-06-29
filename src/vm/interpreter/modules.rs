@@ -249,11 +249,7 @@ impl Interpreter {
     }
 
     /// Resolve a package's entry point from its package.json
-    fn resolve_package_entry(
-        &self,
-        pkg_dir: &std::path::Path,
-        subpath: &str,
-    ) -> Option<String> {
+    fn resolve_package_entry(&self, pkg_dir: &std::path::Path, subpath: &str) -> Option<String> {
         // If there's a subpath, resolve that directly
         if !subpath.is_empty() {
             let sub = pkg_dir.join(subpath);
@@ -363,7 +359,8 @@ impl Interpreter {
         // Try extensions
         for ext in &[".ts", ".js", ".mjs"] {
             let with_ext = path.with_extension("");
-            let candidate = std::path::PathBuf::from(format!("{}{}", with_ext.to_string_lossy(), ext));
+            let candidate =
+                std::path::PathBuf::from(format!("{}{}", with_ext.to_string_lossy(), ext));
             if candidate.exists() {
                 return Some(candidate.to_string_lossy().to_string());
             }

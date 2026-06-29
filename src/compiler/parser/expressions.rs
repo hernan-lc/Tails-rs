@@ -837,6 +837,20 @@ impl<'a> Parser<'a> {
                 if self.peek().token == Token::Arrow {
                     let params = match &expr.inner {
                         Expression::Identifier(name) => vec![name.clone()],
+                        Expression::ArrayLiteral { elements } => {
+                            // Destructured array params: ([a, b]) => ...
+                            elements
+                                .iter()
+                                .map(|e| match e {
+                                    Expression::Identifier(n) => n.clone(),
+                                    _ => format!("__destr_{}", 0),
+                                })
+                                .collect()
+                        }
+                        Expression::ObjectLiteral { properties } => {
+                            // Destructured object params: ({a, b}) => ...
+                            properties.iter().map(|p| p.key.clone()).collect()
+                        }
                         _ => {
                             return Err(Error::ParseError(
                                 "Invalid arrow function parameter".into(),
@@ -1115,6 +1129,74 @@ impl<'a> Parser<'a> {
                                         computed: false,
                                         computed_key: None,
                                     });
+                                } else if (key == "get" || key == "set")
+                                    && matches!(
+                                        self.peek().token,
+                                        Token::Identifier(_) | Token::String(_)
+                                    )
+                                {
+                                    // Getter or setter: get "prop"() / set "prop"(val)
+                                    let prop_name = match self.advance().token {
+                                        Token::Identifier(n) => n,
+                                        Token::String(s) => s,
+                                        _ => unreachable!(),
+                                    };
+                                    self.expect(&Token::LeftParen)?;
+                                    let is_getter = key == "get";
+                                    if !is_getter {
+                                        // Setter has a parameter
+                                        match self.advance().token {
+                                            Token::Identifier(_) => {}
+                                            t => {
+                                                return Err(Error::ParseError(format!(
+                                                    "Expected setter parameter, got {:?}",
+                                                    t
+                                                )))
+                                            }
+                                        }
+                                    }
+                                    self.expect(&Token::RightParen)?;
+                                    let return_type = if self.peek().token == Token::Colon {
+                                        self.advance();
+                                        Some(self.parse_type_annotation()?)
+                                    } else {
+                                        None
+                                    };
+                                    self.expect(&Token::LeftBrace)?;
+                                    let body = self.parse_block_body()?;
+                                    self.expect(&Token::RightBrace)?;
+                                    let accessor_fn = if is_getter {
+                                        Expression::FunctionExpression {
+                                            name: Some(prop_name.clone()),
+                                            params: vec![],
+                                            param_types: Some(vec![]),
+                                            defaults: vec![],
+                                            rest_param: None,
+                                            return_type,
+                                            body,
+                                            is_async: false,
+                                            is_generator: false,
+                                        }
+                                    } else {
+                                        Expression::FunctionExpression {
+                                            name: Some(prop_name.clone()),
+                                            params: vec!["__set_val".to_string()],
+                                            param_types: Some(vec![None]),
+                                            defaults: vec![],
+                                            rest_param: None,
+                                            return_type,
+                                            body,
+                                            is_async: false,
+                                            is_generator: false,
+                                        }
+                                    };
+                                    properties.push(ObjectProperty {
+                                        key: prop_name,
+                                        value: accessor_fn,
+                                        shorthand: false,
+                                        computed: false,
+                                        computed_key: None,
+                                    });
                                 } else if self.peek().token == Token::Colon {
                                     self.expect(&Token::Colon)?;
                                     let value = self.parse_expression()?.inner;
@@ -1170,7 +1252,63 @@ impl<'a> Parser<'a> {
                 self.expect(&Token::RightBrace)?;
                 Ok(self.spanned(Expression::ObjectLiteral { properties }))
             }
-            token => Err(Error::ParseError(format!("Unexpected token {:?}", token))),
+            // Fallback: treat any keyword token as an identifier in expression position
+            // JavaScript allows keywords to be used as values, property names, etc.
+            token => {
+                let name = match &token {
+                    Token::Set => Some("set"),
+                    Token::Get => Some("get"),
+                    Token::Delete => Some("delete"),
+                    Token::Typeof => Some("typeof"),
+                    Token::Void => Some("void"),
+                    Token::New => Some("new"),
+                    Token::Return => Some("return"),
+                    Token::If => Some("if"),
+                    Token::Else => Some("else"),
+                    Token::While => Some("while"),
+                    Token::For => Some("for"),
+                    Token::Do => Some("do"),
+                    Token::Switch => Some("switch"),
+                    Token::Case => Some("case"),
+                    Token::Break => Some("break"),
+                    Token::Continue => Some("continue"),
+                    Token::Try => Some("try"),
+                    Token::Catch => Some("catch"),
+                    Token::Finally => Some("finally"),
+                    Token::Throw => Some("throw"),
+                    Token::Const => Some("const"),
+                    Token::Let => Some("let"),
+                    Token::Var => Some("var"),
+                    Token::In => Some("in"),
+                    Token::Of => Some("of"),
+                    Token::Instanceof => Some("instanceof"),
+                    Token::Extends => Some("extends"),
+                    Token::Static => Some("static"),
+                    Token::Public => Some("public"),
+                    Token::Private => Some("private"),
+                    Token::Protected => Some("protected"),
+                    Token::Enum => Some("enum"),
+                    Token::Interface => Some("interface"),
+                    Token::Yield => Some("yield"),
+                    Token::Await => Some("await"),
+                    Token::Constructor => Some("constructor"),
+                    Token::From => Some("from"),
+                    Token::As => Some("as"),
+                    Token::Default => Some("default"),
+                    Token::Import => Some("import"),
+                    Token::Export => Some("export"),
+                    Token::Function => Some("function"),
+                    Token::Class => Some("class"),
+                    Token::Super => Some("super"),
+                    _ => None,
+                };
+                if let Some(name) = name {
+                    self.advance();
+                    Ok(self.spanned(Expression::Identifier(name.to_string())))
+                } else {
+                    Err(Error::ParseError(format!("Unexpected token {:?}", token)))
+                }
+            }
         }
     }
 
