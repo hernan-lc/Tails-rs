@@ -1,6 +1,9 @@
 mod builtins;
 mod call_frame;
 mod calls;
+mod class_ops;
+mod control_flow;
+mod error_format;
 mod exception_handling;
 mod function_ops;
 mod heap_types;
@@ -20,6 +23,7 @@ pub use heap_types::{
 use crate::compiler::{CompiledModule, Instruction};
 use crate::errors::{Error, Result};
 use crate::objects::js_promise::PromiseState;
+use crate::vm::interpreter::control_flow::ControlFlowOutcome;
 use crate::objects::Value;
 use crate::runtime_env::async_runtime::AsyncRuntime;
 use std::collections::{HashMap, VecDeque};
@@ -277,101 +281,21 @@ impl Interpreter {
             }
 
             match &instruction {
-                Instruction::Jump(target) => {
-                    pc = *target as usize;
-                    continue;
-                }
-                Instruction::JumpIf(target) => {
-                    let value = self
-                        .stack
-                        .pop()
-                        .ok_or_else(|| Error::RuntimeError("Stack underflow".into()))?;
-                    if self.is_truthy(&value) {
-                        pc = *target as usize;
-                        continue;
-                    }
-                }
-                Instruction::JumpIfNot(target) => {
-                    let value = self
-                        .stack
-                        .pop()
-                        .ok_or_else(|| Error::RuntimeError("Stack underflow".into()))?;
-                    if !self.is_truthy(&value) {
-                        pc = *target as usize;
-                        continue;
-                    }
-                }
-                Instruction::JumpIfUndefined(target) => {
-                    let value = self
-                        .stack
-                        .pop()
-                        .ok_or_else(|| Error::RuntimeError("Stack underflow".into()))?;
-                    if matches!(value, Value::Undefined | Value::Null) {
-                        pc = *target as usize;
-                        continue;
-                    }
-                }
-                Instruction::JumpIfNotUndefined(target) => {
-                    let value = self
-                        .stack
-                        .last()
-                        .ok_or_else(|| Error::RuntimeError("Stack underflow".into()))?;
-                    if !matches!(value, Value::Undefined | Value::Null) {
-                        pc = *target as usize;
-                        continue;
-                    }
-                }
-                Instruction::Return => {
-                    let return_value = self.stack.pop().unwrap_or(Value::Undefined);
-                    if let Some(frame) = self.call_stack.pop() {
-                        if frame.closure_var_count > 0 {
-                            if let Some(heap_idx) = frame.func_heap_idx {
-                                if let HeapValue::Function(f) = &mut self.heap[heap_idx] {
-                                    f.closure.clear();
-                                    for i in 0..frame.closure_var_count {
-                                        let val = self
-                                            .stack
-                                            .get(frame.base_pointer + i)
-                                            .cloned()
-                                            .unwrap_or(Value::Undefined);
-                                        f.closure.push(val);
-                                    }
-                                }
-                            }
+                Instruction::Jump(_)
+                | Instruction::JumpIf(_)
+                | Instruction::JumpIfNot(_)
+                | Instruction::JumpIfUndefined(_)
+                | Instruction::JumpIfNotUndefined(_)
+                | Instruction::Return
+                | Instruction::Yield => {
+                    let mut pc_mut = pc;
+                    match self.exec_control_flow(&instruction, module, &mut pc_mut)? {
+                        ControlFlowOutcome::Continue => {
+                            pc = pc_mut;
+                            continue;
                         }
-                        let final_value = if frame.is_construct {
-                            match &return_value {
-                                Value::Object(_) | Value::Array(_) | Value::Function(_) => {
-                                    return_value
-                                }
-                                _ => frame.this_value.clone().unwrap_or(return_value),
-                            }
-                        } else {
-                            return_value
-                        };
-                        self.stack.truncate(frame.base_pointer);
-                        self.stack.push(final_value);
-                        pc = frame.return_address;
-                        continue;
-                    } else {
-                        return Ok(return_value);
-                    }
-                }
-                Instruction::Yield => {
-                    let yield_value = self.stack.pop().unwrap_or(Value::Undefined);
-                    if let Some(frame) = self.call_stack.last() {
-                        let saved_pc = pc + 1;
-                        let saved_stack: Vec<Value> = self.stack[frame.base_pointer..].to_vec();
-                        if let Some(gen_heap_idx) = frame.generator_heap_idx {
-                            if let HeapValue::Generator(gen) = &mut self.heap[gen_heap_idx] {
-                                gen.yield_value = yield_value.clone();
-                                gen.resume_pc = saved_pc;
-                                gen.saved_stack = saved_stack;
-                                gen.saved_block_scope_stack = self.block_scope_stack.clone();
-                                gen.func_heap_idx = frame.func_heap_idx;
-                            }
-                        }
-                        return Ok(yield_value);
+                        ControlFlowOutcome::Return(v) => return Ok(v),
+                        ControlFlowOutcome::Next => {}
                     }
                 }
                 Instruction::Call(argc) => {
@@ -865,128 +789,13 @@ impl Interpreter {
                         }
                     }
                 }
-                Instruction::MakeClass(class_info_idx) => {
-                    self.handle_make_class(class_info_idx, module)?;
-                }
-                Instruction::SuperConstruct(argc) => {
-                    self.handle_super_construct(*argc, pc, module)?;
-                    // Note: handle_super_construct may modify pc, but since we can't
-                    // easily propagate that here, we handle it inline
-                    let mut args = Vec::new();
-                    for _ in 0..*argc {
-                        args.push(
-                            self.stack
-                                .pop()
-                                .ok_or_else(|| Error::RuntimeError("Stack underflow".into()))?,
-                        );
-                    }
-                    args.reverse();
-                    let this_val = self
-                        .stack
-                        .pop()
-                        .ok_or_else(|| Error::RuntimeError("Stack underflow".into()))?;
-                    let super_class = {
-                        let mut found = Value::Undefined;
-                        for frame in self.call_stack.iter().rev() {
-                            if let Some(func_idx) = frame.func_heap_idx {
-                                if let HeapValue::Function(f) = &self.heap[func_idx] {
-                                    if let Some(ref sc) = f.super_class {
-                                        found = sc.clone();
-                                        break;
-                                    }
-                                }
-                            }
-                        }
-                        found
-                    };
-                    match super_class {
-                        Value::Function(func_idx) => {
-                            if let HeapValue::Function(f) = &self.heap[func_idx] {
-                                let f_clone = f.clone();
-                                let proto_val = self.get_property(
-                                    &super_class,
-                                    &Value::String("prototype".to_string()),
-                                )?;
-                                let proto_idx = if let Value::Object(pi) = proto_val {
-                                    Some(pi)
-                                } else {
-                                    None
-                                };
-                                let new_obj_heap_idx = self.gc.allocate(
-                                    &mut self.heap,
-                                    HeapValue::Object(JsObject::with_prototype(proto_idx)),
-                                );
-                                let _constructed = Value::Object(new_obj_heap_idx);
-                                let return_address = pc + 1;
-                                let base_pointer = self.stack.len();
-                                let closure_count = f_clone.closure.len();
-                                self.call_stack.push(CallFrame {
-                                    return_address,
-                                    base_pointer,
-                                    closure_var_count: closure_count,
-                                    func_heap_idx: Some(func_idx),
-                                    this_value: Some(this_val.clone()),
-                                    is_construct: true,
-                                    source_name: self.current_module_path.clone(),
-                                    generator_heap_idx: None,
-                                    source_line: self.current_source_line(pc),
-                                    source_col: self.current_source_col(pc),
-                                });
-                                for closure_var in &f_clone.closure {
-                                    self.stack.push(closure_var.clone());
-                                }
-                                for arg in args {
-                                    self.stack.push(arg);
-                                }
-                                pc = f_clone.bytecode_index;
-                                continue;
-                            }
-                        }
-                        Value::NativeFunction(native_idx) => {
-                            let result = self.call_native(native_idx, &this_val, &args)?;
-                            self.stack.push(result);
-                        }
-                        _ => {
-                            return Err(self.err_at_location(Error::TypeError(
-                                "Superclass is not a constructor".into(),
-                            )));
-                        }
-                    }
-                }
-                Instruction::SuperGet => {
-                    let key = self
-                        .stack
-                        .pop()
-                        .ok_or_else(|| Error::RuntimeError("Stack underflow".into()))?;
-                    let _this = self
-                        .stack
-                        .pop()
-                        .ok_or_else(|| Error::RuntimeError("Stack underflow".into()))?;
-                    let super_class = {
-                        let mut found = Value::Undefined;
-                        for frame in self.call_stack.iter().rev() {
-                            if let Some(func_idx) = frame.func_heap_idx {
-                                if let HeapValue::Function(f) = &self.heap[func_idx] {
-                                    if let Some(ref sc) = f.super_class {
-                                        found = sc.clone();
-                                        break;
-                                    }
-                                }
-                            }
-                        }
-                        found
-                    };
-                    if let Value::Function(func_idx) = &super_class {
-                        if let HeapValue::Function(f) = &self.heap[*func_idx] {
-                            if let Some(proto_idx) = f.prototype {
-                                let proto_val = Value::Object(proto_idx);
-                                let result = self.get_property(&proto_val, &key)?;
-                                self.stack.push(result);
-                                continue;
-                            }
-                        }
-                    }
-                    self.stack.push(Value::Undefined);
+                Instruction::MakeClass(_)
+                | Instruction::SuperConstruct(_)
+                | Instruction::SuperGet => {
+                    let mut pc_mut = pc;
+                    self.exec_class_ops(&instruction, &mut pc_mut, module)?;
+                    pc = pc_mut;
+                    continue;
                 }
                 Instruction::ImportModule(source) => match self.load_and_run_module(source)? {
                     Some(module_path) => {
@@ -1799,6 +1608,7 @@ impl Interpreter {
                     } else if self.exec_comparison(&instruction)? {
                     } else if self.exec_property_ops(&instruction)? {
                     } else if self.exec_make_function(&instruction, module, pc)? {
+                    } else if self.exec_class_ops(&instruction, &mut pc, module)? {
                     } else {
                         let saved_pc = pc;
                         if self.exec_exception(&instruction, &mut pc)? {
@@ -1827,283 +1637,6 @@ impl Interpreter {
 
     pub fn set_global(&mut self, name: &str, value: Value) {
         self.globals.insert(name.to_string(), value);
-    }
-
-    fn handle_make_class(&mut self, class_info_idx: &u32, module: &CompiledModule) -> Result<()> {
-        let class_info = module.class_infos[*class_info_idx as usize].clone();
-        let super_val = if class_info.superclass.is_some() {
-            self.stack
-                .pop()
-                .ok_or_else(|| Error::RuntimeError("Stack underflow".into()))?
-        } else {
-            Value::Undefined
-        };
-        let proto_obj_idx = self
-            .gc
-            .allocate(&mut self.heap, HeapValue::Object(JsObject::new()));
-        let super_proto = match &super_val {
-            Value::Object(super_obj_idx) => {
-                if let HeapValue::Object(super_obj) = &self.heap[*super_obj_idx] {
-                    super_obj.properties.get("prototype").cloned()
-                } else {
-                    None
-                }
-            }
-            Value::Function(func_idx) => {
-                if let HeapValue::Function(f) = &self.heap[*func_idx] {
-                    f.prototype.map(Value::Object)
-                } else {
-                    None
-                }
-            }
-            _ => None,
-        };
-        if let Some(Value::Object(sp_idx)) = super_proto {
-            self.heap[proto_obj_idx] = HeapValue::Object(JsObject::with_prototype(Some(sp_idx)));
-        }
-        let ctor_heap_idx = if let Some(ctor_func_idx) = class_info.constructor_func_idx {
-            let func_info = module.functions[ctor_func_idx as usize].clone();
-            let owner = self.current_module.clone();
-            let src_file = self.current_module_path.clone();
-            let src_line = self.current_source_line(self.current_pc);
-            self.gc.allocate(
-                &mut self.heap,
-                HeapValue::Function(JsFunction {
-                    name: Some(class_info.name.clone()),
-                    params: func_info.params,
-                    rest_param: func_info.rest_param,
-                    bytecode_index: func_info.bytecode_index,
-                    closure: Vec::new(),
-                    prototype: Some(proto_obj_idx),
-                    super_class: Some(super_val.clone()),
-                    properties: HashMap::new(),
-                    owner_module: owner,
-                    module_scope: None,
-                    is_generator: false,
-                    source_file: src_file,
-                    source_line: src_line,
-                    is_arrow: false,
-                    captured_this: None,
-                }),
-            )
-        } else {
-            let src_file = self.current_module_path.clone();
-            let src_line = self.current_source_line(self.current_pc);
-            self.gc.allocate(
-                &mut self.heap,
-                HeapValue::Function(JsFunction {
-                    name: Some(class_info.name.clone()),
-                    params: Vec::new(),
-                    rest_param: None,
-                    bytecode_index: usize::MAX,
-                    closure: Vec::new(),
-                    prototype: Some(proto_obj_idx),
-                    super_class: Some(super_val.clone()),
-                    properties: HashMap::new(),
-                    owner_module: None,
-                    module_scope: None,
-                    is_generator: false,
-                    source_file: src_file,
-                    source_line: src_line,
-                    is_arrow: false,
-                    captured_this: None,
-                }),
-            )
-        };
-        if let HeapValue::Object(proto_obj) = &mut self.heap[proto_obj_idx] {
-            proto_obj
-                .properties
-                .insert("constructor".to_string(), Value::Function(ctor_heap_idx));
-        }
-        for method_info in &class_info.methods {
-            let method_func_info = module.functions[method_info.func_idx as usize].clone();
-            let method_proto_idx = self
-                .gc
-                .allocate(&mut self.heap, HeapValue::Object(JsObject::new()));
-            let owner = self.current_module.clone();
-            let src_file = self.current_module_path.clone();
-            let src_line = self.current_source_line(self.current_pc);
-            let method_heap_idx = self.gc.allocate(
-                &mut self.heap,
-                HeapValue::Function(JsFunction {
-                    name: Some(method_info.name.clone()),
-                    params: method_func_info.params,
-                    rest_param: method_func_info.rest_param,
-                    bytecode_index: method_func_info.bytecode_index,
-                    closure: Vec::new(),
-                    prototype: Some(method_proto_idx),
-                    super_class: None,
-                    properties: HashMap::new(),
-                    owner_module: owner,
-                    module_scope: None,
-                    is_generator: false,
-                    source_file: src_file,
-                    source_line: src_line,
-                    is_arrow: false,
-                    captured_this: None,
-                }),
-            );
-            let method_val = Value::Function(method_heap_idx);
-            if method_info.is_static {
-                if let HeapValue::Function(ctor_func) = &mut self.heap[ctor_heap_idx] {
-                    ctor_func
-                        .properties
-                        .insert(method_info.name.clone(), method_val);
-                }
-            } else {
-                match &method_info.kind {
-                    crate::compiler::ClassMethodKind::Getter => {
-                        if let HeapValue::Object(proto_obj) = &mut self.heap[proto_obj_idx] {
-                            proto_obj
-                                .properties
-                                .insert(format!("__getter_{}", method_info.name), method_val);
-                        }
-                    }
-                    crate::compiler::ClassMethodKind::Setter => {
-                        if let HeapValue::Object(proto_obj) = &mut self.heap[proto_obj_idx] {
-                            proto_obj
-                                .properties
-                                .insert(format!("__setter_{}", method_info.name), method_val);
-                        }
-                    }
-                    crate::compiler::ClassMethodKind::Method => {
-                        if let HeapValue::Object(proto_obj) = &mut self.heap[proto_obj_idx] {
-                            proto_obj
-                                .properties
-                                .insert(method_info.name.clone(), method_val);
-                        }
-                    }
-                }
-            }
-        }
-        self.stack.push(Value::Function(ctor_heap_idx));
-        Ok(())
-    }
-
-    fn handle_super_construct(
-        &mut self,
-        _argc: u16,
-        _pc: usize,
-        _module: &CompiledModule,
-    ) -> Result<()> {
-        // This is handled inline in execute_from() due to pc control flow
-        Ok(())
-    }
-
-    pub(crate) fn build_stack_trace(&self, error_name: &str, message: &str) -> String {
-        let mut trace = format!(
-            "{}{}",
-            error_name,
-            if message.is_empty() {
-                String::new()
-            } else {
-                format!(": {}", message)
-            }
-        );
-
-        for frame in self.call_stack.iter().rev() {
-            let func_name = frame
-                .func_heap_idx
-                .and_then(|idx| {
-                    if let HeapValue::Function(f) = &self.heap[idx] {
-                        f.name.clone()
-                    } else {
-                        None
-                    }
-                })
-                .unwrap_or_else(|| "<anonymous>".to_string());
-
-            let location = match (&frame.source_name, frame.source_line, frame.source_col) {
-                (Some(name), Some(line), Some(col)) => format!(" ({}:{}:{})", name, line, col),
-                (Some(name), Some(line), None) => format!(" ({}:{})", name, line),
-                (Some(name), None, _) => format!(" ({})", name),
-                (None, Some(line), Some(col)) => format!(" (line {}:{})", line, col),
-                (None, Some(line), None) => format!(" (line {})", line),
-                (None, None, _) => String::new(),
-            };
-
-            trace.push_str(&format!("\n    at {}{}", func_name, location));
-        }
-
-        trace
-    }
-
-    pub(crate) fn format_rejection_reason(&self, reason: &Value) -> String {
-        if let Value::Object(obj_idx) = reason {
-            if let HeapValue::Object(obj) = &self.heap[*obj_idx] {
-                let name = obj
-                    .properties
-                    .get("name")
-                    .and_then(|v| {
-                        if let Value::String(s) = v {
-                            Some(s.as_str())
-                        } else {
-                            None
-                        }
-                    })
-                    .unwrap_or("Error");
-                let message = obj
-                    .properties
-                    .get("message")
-                    .and_then(|v| {
-                        if let Value::String(s) = v {
-                            Some(s.as_str())
-                        } else {
-                            None
-                        }
-                    })
-                    .unwrap_or("");
-                let stack = obj.properties.get("stack").and_then(|v| {
-                    if let Value::String(s) = v {
-                        Some(s.as_str())
-                    } else {
-                        None
-                    }
-                });
-                if let Some(stack) = stack {
-                    return stack.to_string();
-                }
-                if message.is_empty() {
-                    return name.to_string();
-                }
-                return format!("{}: {}", name, message);
-            }
-        }
-        self.value_to_string(reason)
-    }
-
-    pub(crate) fn call_stack_backtrace(&self) -> String {
-        let mut frames: Vec<String> = Vec::new();
-
-        for frame in self.call_stack.iter().rev() {
-            let func_name = frame
-                .func_heap_idx
-                .and_then(|idx| {
-                    if let HeapValue::Function(f) = &self.heap[idx] {
-                        f.name.clone()
-                    } else {
-                        None
-                    }
-                })
-                .unwrap_or_else(|| "<anonymous>".to_string());
-
-            let location = match (&frame.source_name, frame.source_line, frame.source_col) {
-                (Some(name), Some(line), Some(col)) => format!("{}:{}:{}", name, line, col),
-                (Some(name), Some(line), None) => format!("{}:{}", name, line),
-                (Some(name), None, _) => name.clone(),
-                (None, Some(line), Some(col)) => format!("line {}:{}", line, col),
-                (None, Some(line), None) => format!("line {}", line),
-                (None, None, _) => "<script>".to_string(),
-            };
-
-            frames.push(format!("    at {} ({})", func_name, location));
-        }
-
-        if frames.is_empty() {
-            String::new()
-        } else {
-            format!("Call stack:\n{}", frames.join("\n"))
-        }
     }
 }
 

@@ -1268,6 +1268,41 @@ impl<'a> Parser<'a> {
                 self.expect(&Token::RightBrace)?;
                 Ok(self.spanned(Expression::ObjectLiteral { properties }))
             }
+            Token::Less => {
+                // TypeScript generic arrow function: <T extends Foo>(...) => ...
+                // or type assertion <Type>expr
+                self.skip_type_parameters();
+                // After skipping type params, parse the parenthesized params + arrow body
+                if self.peek().token == Token::LeftParen {
+                    self.advance();
+                    let (params, param_types, defaults, rest_param) = self.parse_typed_params()?;
+                    self.expect(&Token::RightParen)?;
+                    let return_type = if self.peek().token == Token::Colon {
+                        self.advance();
+                        Some(self.parse_type_annotation()?)
+                    } else {
+                        None
+                    };
+                    if self.peek().token == Token::Arrow {
+                        self.advance();
+                        return self.parse_arrow_body(
+                            params,
+                            Some(param_types),
+                            defaults,
+                            rest_param,
+                            return_type,
+                            false,
+                        );
+                    }
+                    // If no arrow, it was a type assertion, parse as expression
+                    let expr = self.parse_assignment()?;
+                    Ok(expr)
+                } else {
+                    Err(Error::ParseError(
+                        "Expected '(' after type parameters in generic arrow function".into(),
+                    ))
+                }
+            }
             // Fallback: treat any keyword token as an identifier in expression position
             // JavaScript allows keywords to be used as values, property names, etc.
             token => {
