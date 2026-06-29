@@ -200,9 +200,180 @@ impl Interpreter {
                 }
             }
         }
+
+        // node_modules resolution for bare specifiers (no ./ or ../)
+        if !source.starts_with('.') && !source.starts_with('/') {
+            if let Some(resolved) = self.resolve_from_node_modules(source, parent) {
+                return Ok(resolved);
+            }
+        }
+
         Err(crate::errors::Error::RuntimeError(format!(
             "Module '{}' not found",
             source
         )))
+    }
+
+    /// Walk up the directory tree looking for node_modules/<pkg> and resolve its entry point
+    fn resolve_from_node_modules(
+        &self,
+        specifier: &str,
+        start_dir: &std::path::Path,
+    ) -> Option<String> {
+        // Parse scoped package names: @scope/pkg/subpath -> (@scope/pkg, subpath)
+        let (pkg_name, subpath) = if specifier.starts_with('@') {
+            let mut parts = specifier.splitn(3, '/');
+            let scope = parts.next()?;
+            let name = parts.next()?;
+            let sub = parts.next().unwrap_or("");
+            (format!("{}/{}", scope, name), sub)
+        } else {
+            let mut parts = specifier.splitn(2, '/');
+            let name = parts.next()?;
+            let sub = parts.next().unwrap_or("");
+            (name.to_string(), sub)
+        };
+
+        let mut current = Some(start_dir);
+        while let Some(dir) = current {
+            let pkg_dir = dir.join("node_modules").join(&pkg_name);
+            if pkg_dir.is_dir() {
+                return self.resolve_package_entry(&pkg_dir, subpath);
+            }
+            current = dir.parent();
+        }
+        None
+    }
+
+    /// Resolve a package's entry point from its package.json
+    fn resolve_package_entry(
+        &self,
+        pkg_dir: &std::path::Path,
+        subpath: &str,
+    ) -> Option<String> {
+        // If there's a subpath, resolve that directly
+        if !subpath.is_empty() {
+            let sub = pkg_dir.join(subpath);
+            return self.resolve_with_fallbacks(&sub);
+        }
+
+        // Read package.json
+        let pkg_json_path = pkg_dir.join("package.json");
+        let pkg_json = std::fs::read_to_string(&pkg_json_path).ok()?;
+        let pkg: serde_json::Value = serde_json::from_str(&pkg_json).ok()?;
+
+        // Priority: exports > module > main > index.js
+        // Try exports["."]["import"] > exports["."]["default"] > exports["."]
+        if let Some(exports) = pkg.get("exports") {
+            if let Some(resolved) = self.resolve_exports_field(exports, pkg_dir) {
+                return Some(resolved);
+            }
+        }
+
+        // Try "module" field (ESM)
+        if let Some(module) = pkg.get("module").and_then(|v| v.as_str()) {
+            let path = pkg_dir.join(module);
+            if let Some(r) = self.resolve_with_fallbacks(&path) {
+                return Some(r);
+            }
+        }
+
+        // Try "main" field
+        if let Some(main) = pkg.get("main").and_then(|v| v.as_str()) {
+            let path = pkg_dir.join(main);
+            if let Some(r) = self.resolve_with_fallbacks(&path) {
+                return Some(r);
+            }
+        }
+
+        // Fallback: index.js
+        self.resolve_with_fallbacks(&pkg_dir.join("index.js"))
+    }
+
+    /// Try the "exports" field with condition resolution
+    fn resolve_exports_field(
+        &self,
+        exports: &serde_json::Value,
+        pkg_dir: &std::path::Path,
+    ) -> Option<String> {
+        match exports {
+            // "exports": "./index.js"
+            serde_json::Value::String(s) => {
+                let path = pkg_dir.join(s);
+                return self.resolve_with_fallbacks(&path);
+            }
+            // "exports": { ".": "...", "./sub": "..." }
+            serde_json::Value::Object(map) => {
+                // Look for "." entry (the main entry)
+                if let Some(dot_entry) = map.get(".") {
+                    return self.resolve_condition(dot_entry, pkg_dir);
+                }
+                // If no "." key, maybe it's a condition map directly (e.g. {"import":"...", "default":"..."})
+                // Try "import" then "default"
+                if let Some(import_val) = map.get("import") {
+                    if let Some(r) = self.resolve_condition(import_val, pkg_dir) {
+                        return Some(r);
+                    }
+                }
+                if let Some(default_val) = map.get("default") {
+                    if let Some(r) = self.resolve_condition(default_val, pkg_dir) {
+                        return Some(r);
+                    }
+                }
+            }
+            _ => {}
+        }
+        None
+    }
+
+    /// Resolve a single condition value (string or nested condition map)
+    fn resolve_condition(
+        &self,
+        value: &serde_json::Value,
+        pkg_dir: &std::path::Path,
+    ) -> Option<String> {
+        match value {
+            serde_json::Value::String(s) => {
+                let path = pkg_dir.join(s);
+                self.resolve_with_fallbacks(&path)
+            }
+            serde_json::Value::Object(map) => {
+                // Nested conditions: try "import" > "default" > "require" > "node"
+                for condition in &["import", "default", "require", "node"] {
+                    if let Some(val) = map.get(*condition) {
+                        if let Some(r) = self.resolve_condition(val, pkg_dir) {
+                            return Some(r);
+                        }
+                    }
+                }
+                None
+            }
+            _ => None,
+        }
+    }
+
+    /// Try resolving a path with .ts, .js, /index.ts, /index.js fallbacks
+    fn resolve_with_fallbacks(&self, path: &std::path::Path) -> Option<String> {
+        if path.exists() && path.is_file() {
+            return Some(path.to_string_lossy().to_string());
+        }
+        // Try extensions
+        for ext in &[".ts", ".js", ".mjs"] {
+            let with_ext = path.with_extension("");
+            let candidate = std::path::PathBuf::from(format!("{}{}", with_ext.to_string_lossy(), ext));
+            if candidate.exists() {
+                return Some(candidate.to_string_lossy().to_string());
+            }
+        }
+        // Try directory index
+        if path.is_dir() {
+            for name in &["index.ts", "index.js", "index.mjs"] {
+                let idx = path.join(name);
+                if idx.exists() {
+                    return Some(idx.to_string_lossy().to_string());
+                }
+            }
+        }
+        None
     }
 }

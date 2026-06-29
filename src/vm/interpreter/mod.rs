@@ -1094,6 +1094,24 @@ impl Interpreter {
                         self.module_exports.insert(name.clone(), val.clone());
                     }
                 }
+                Instruction::ReExportAll(source) => {
+                    match self.load_and_run_module(source)? {
+                        Some(module_path) => {
+                            let exports = self
+                                .module_registry
+                                .get(&module_path)
+                                .cloned()
+                                .unwrap_or_default();
+                            for (k, v) in &exports {
+                                // Don't re-export "default" — only named exports
+                                if k != "default" {
+                                    self.module_exports.insert(k.clone(), v.clone());
+                                }
+                            }
+                        }
+                        None => {}
+                    }
+                }
                 Instruction::PopModuleExports => {
                     self.module_exports.clear();
                 }

@@ -1008,6 +1008,55 @@ impl<'a> Parser<'a> {
             }));
         }
 
+        // Handle 'export * from "..."' and 'export * as name from "..."'
+        if self.peek().token == Token::Star {
+            self.advance();
+            if self.peek().token == Token::As {
+                self.advance();
+                let alias = match self.advance().token {
+                    Token::Identifier(name) => name,
+                    t => return Err(Error::ParseError(format!(
+                        "Expected identifier after 'export * as', got {:?}", t
+                    ))),
+                };
+                self.expect(&Token::From)?;
+                let source = match self.advance().token {
+                    Token::String(s) => s,
+                    t => return Err(Error::ParseError(format!(
+                        "Expected string literal after 'from', got {:?}", t
+                    ))),
+                };
+                if self.peek().token == Token::Semicolon { self.advance(); }
+                return Ok(self.spanned(Statement::ExportDeclaration {
+                    kind: ExportDeclarationKind::ReExport {
+                        specifiers: vec![ExportSpecifier {
+                            local: "*".to_string(),
+                            exported: Some(alias),
+                        }],
+                        source,
+                    },
+                }));
+            } else {
+                self.expect(&Token::From)?;
+                let source = match self.advance().token {
+                    Token::String(s) => s,
+                    t => return Err(Error::ParseError(format!(
+                        "Expected string literal after 'from', got {:?}", t
+                    ))),
+                };
+                if self.peek().token == Token::Semicolon { self.advance(); }
+                return Ok(self.spanned(Statement::ExportDeclaration {
+                    kind: ExportDeclarationKind::ReExport {
+                        specifiers: vec![ExportSpecifier {
+                            local: "*".to_string(),
+                            exported: Some("*".to_string()),
+                        }],
+                        source,
+                    },
+                }));
+            }
+        }
+
         if self.peek().token == Token::LeftBrace {
             self.advance();
             let mut specifiers = Vec::new();

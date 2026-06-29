@@ -887,6 +887,14 @@ impl CodeGenerator {
                                 let local_name = &spec.local;
                                 self.emit(Instruction::StoreModuleExport(local_name.clone()));
                             }
+                        } else if specifiers.len() == 1 && specifiers[0].local == "*" && specifiers[0].exported.as_deref() == Some("*") {
+                            // export * from "source" — re-export all
+                            self.emit(Instruction::ReExportAll(source.clone()));
+                        } else if specifiers.len() == 1 && specifiers[0].local == "*" {
+                            // export * as name from "source"
+                            let alias = specifiers[0].exported.as_ref().unwrap();
+                            self.emit(Instruction::ImportAll(source.clone(), alias.clone()));
+                            self.emit(Instruction::StoreModuleExport(alias.clone()));
                         } else {
                             // Re-export: export { a as b } from "./module";
                             self.emit(Instruction::ImportModule(source.clone()));

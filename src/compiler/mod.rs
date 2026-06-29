@@ -190,4 +190,5 @@ pub enum Instruction {
     IteratorNext(u32),
     AsyncIteratorNext(u32),
     IteratorClose,
+    ReExportAll(String),
 }
