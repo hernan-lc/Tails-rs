@@ -55,6 +55,8 @@ pub struct JsFunction {
     pub owner_module: Option<Rc<CompiledModule>>,
     pub module_scope: Option<Rc<HashMap<String, Value>>>,
     pub is_generator: bool,
+    pub source_file: Option<String>,
+    pub source_line: Option<usize>,
 }
 
 #[derive(Debug, Clone)]

@@ -27,6 +27,8 @@ impl Interpreter {
                 owner_module: None,
                 module_scope: None,
                 is_generator: false,
+                source_file: None,
+                source_line: None,
             }),
         );
         Value::Function(heap_idx)
@@ -49,6 +51,8 @@ impl Interpreter {
                 owner_module: None,
                 module_scope: None,
                 is_generator: false,
+                source_file: None,
+                source_line: None,
             }),
         );
         Value::Function(heap_idx)

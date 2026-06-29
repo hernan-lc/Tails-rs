@@ -98,6 +98,19 @@ impl Interpreter {
 
     pub fn execute(&mut self, module: &CompiledModule) -> Result<Value> {
         self.current_module = Some(Rc::new(module.clone()));
+        let saved_call_stack_len = self.call_stack.len();
+        self.call_stack.push(CallFrame {
+            return_address: module.instructions.len(),
+            base_pointer: 0,
+            closure_var_count: 0,
+            func_heap_idx: None,
+            this_value: None,
+            is_construct: false,
+            source_name: self.current_module_path.clone(),
+            generator_heap_idx: None,
+            source_line: None,
+            source_col: None,
+        });
         let mut result = self.execute_from(module, 0);
 
         loop {
@@ -190,6 +203,9 @@ impl Interpreter {
             }
         }
 
+        if result.is_ok() {
+            self.call_stack.truncate(saved_call_stack_len);
+        }
         result
     }
 
@@ -1719,7 +1735,7 @@ impl Interpreter {
                         // handled
                     } else if self.exec_property_ops(&instruction)? {
                         // handled
-                    } else if self.exec_make_function(&instruction, module)? {
+                    } else if self.exec_make_function(&instruction, module, pc)? {
                         // handled
                     } else {
                         let saved_pc = pc;
@@ -1786,6 +1802,8 @@ impl Interpreter {
         let ctor_heap_idx = if let Some(ctor_func_idx) = class_info.constructor_func_idx {
             let func_info = module.functions[ctor_func_idx as usize].clone();
             let owner = self.current_module.clone();
+            let src_file = self.current_module_path.clone();
+            let src_line = self.current_source_line(self.current_pc);
             self.gc.allocate(
                 &mut self.heap,
                 HeapValue::Function(JsFunction {
@@ -1799,9 +1817,13 @@ impl Interpreter {
                     owner_module: owner,
                     module_scope: None,
                     is_generator: false,
+                    source_file: src_file,
+                    source_line: src_line,
                 }),
             )
         } else {
+            let src_file = self.current_module_path.clone();
+            let src_line = self.current_source_line(self.current_pc);
             self.gc.allocate(
                 &mut self.heap,
                 HeapValue::Function(JsFunction {
@@ -1815,6 +1837,8 @@ impl Interpreter {
                     owner_module: None,
                     module_scope: None,
                     is_generator: false,
+                    source_file: src_file,
+                    source_line: src_line,
                 }),
             )
         };
@@ -1829,6 +1853,8 @@ impl Interpreter {
                 .gc
                 .allocate(&mut self.heap, HeapValue::Object(JsObject::new()));
             let owner = self.current_module.clone();
+            let src_file = self.current_module_path.clone();
+            let src_line = self.current_source_line(self.current_pc);
             let method_heap_idx = self.gc.allocate(
                 &mut self.heap,
                 HeapValue::Function(JsFunction {
@@ -1842,6 +1868,8 @@ impl Interpreter {
                     owner_module: owner,
                     module_scope: None,
                     is_generator: false,
+                    source_file: src_file,
+                    source_line: src_line,
                 }),
             );
             let method_val = Value::Function(method_heap_idx);
@@ -1974,7 +2002,8 @@ impl Interpreter {
     }
 
     pub(crate) fn call_stack_backtrace(&self) -> String {
-        let mut frames = Vec::new();
+        let mut frames: Vec<String> = Vec::new();
+
         for frame in self.call_stack.iter().rev() {
             let func_name = frame
                 .func_heap_idx
@@ -2002,7 +2031,7 @@ impl Interpreter {
         if frames.is_empty() {
             String::new()
         } else {
-            format!("\nCall stack:\n{}", frames.join("\n"))
+            format!("Call stack:\n{}", frames.join("\n"))
         }
     }
 }

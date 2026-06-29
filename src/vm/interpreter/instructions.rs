@@ -848,6 +848,7 @@ impl Interpreter {
         &mut self,
         instruction: &Instruction,
         module: &CompiledModule,
+        pc: usize,
     ) -> Result<bool> {
         match instruction {
             Instruction::MakeFunction(func_idx) => {
@@ -857,6 +858,8 @@ impl Interpreter {
                     .allocate(&mut self.heap, HeapValue::Object(JsObject::new()));
                 let owner = self.current_module.clone();
                 let scope = std::rc::Rc::new(self.globals.clone());
+                let src_file = self.current_module_path.clone();
+                let src_line = self.current_source_line(pc);
                 let heap_idx = self.gc.allocate(
                     &mut self.heap,
                     HeapValue::Function(JsFunction {
@@ -870,6 +873,8 @@ impl Interpreter {
                         owner_module: owner,
                         module_scope: Some(scope),
                         is_generator: func_info.is_generator,
+                        source_file: src_file,
+                        source_line: src_line,
                     }),
                 );
                 self.stack.push(Value::Function(heap_idx));
@@ -892,6 +897,8 @@ impl Interpreter {
                     .allocate(&mut self.heap, HeapValue::Object(JsObject::new()));
                 let owner = self.current_module.clone();
                 let scope = std::rc::Rc::new(self.globals.clone());
+                let src_file = self.current_module_path.clone();
+                let src_line = self.current_source_line(pc);
                 let heap_idx = self.gc.allocate(
                     &mut self.heap,
                     HeapValue::Function(JsFunction {
@@ -905,6 +912,8 @@ impl Interpreter {
                         owner_module: owner,
                         module_scope: Some(scope),
                         is_generator: func_info.is_generator,
+                        source_file: src_file,
+                        source_line: src_line,
                     }),
                 );
                 self.stack.push(Value::Function(heap_idx));

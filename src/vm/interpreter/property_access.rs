@@ -120,11 +120,11 @@ impl Interpreter {
     ) -> Result<Value> {
         match object {
             Value::Null | Value::Undefined => {
-                return Err(Error::TypeError(format!(
+                return Err(self.err_at_location(Error::TypeError(format!(
                     "Cannot read properties of {} (reading '{}')",
                     self.value_to_string(object),
                     self.value_to_string(key)
-                )));
+                ))));
             }
             Value::Object(obj_idx) => {
                 if let HeapValue::Object(obj) = &self.heap[*obj_idx] {
@@ -710,10 +710,10 @@ impl Interpreter {
     ) -> Result<Value> {
         let trap = self.get_property(handler, &Value::String(trap_name.to_string()))?;
         if matches!(trap, Value::Undefined) {
-            return Err(Error::RuntimeError(format!(
+            return Err(self.err_at_location(Error::RuntimeError(format!(
                 "Proxy has no '{}' trap",
                 trap_name
-            )));
+            ))));
         }
         self.call_value(&trap, handler, args)
     }

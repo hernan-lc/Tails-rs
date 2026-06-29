@@ -1,6 +1,7 @@
 mod array_fns;
 mod assert_fns;
 mod buffer_fns;
+mod child_process_fns;
 mod collection_fns;
 pub mod console;
 mod crypto_fns;
@@ -564,4 +565,32 @@ pub static NATIVE_TABLE: &[NativeFn] = &[
     // Assert (364-365)
     assert_fns::native_assert,
     assert_fns::native_assert_strict_equal,
+    // URL additional (366-369)
+    url_fns::native_url_search_params_constructor,
+    url_fns::native_url_can_parse,
+    url_fns::native_url_parse,
+    url_fns::native_url_to_json,
+    // Headers (370-379)
+    fetch_fns::native_headers_constructor,
+    fetch_fns::native_headers_append,
+    fetch_fns::native_headers_get,
+    fetch_fns::native_headers_set,
+    fetch_fns::native_headers_has,
+    fetch_fns::native_headers_delete,
+    fetch_fns::native_headers_for_each,
+    fetch_fns::native_headers_keys,
+    fetch_fns::native_headers_values,
+    fetch_fns::native_headers_entries,
+    // Request (380)
+    fetch_fns::native_request_constructor,
+    // Response (381-385)
+    fetch_fns::native_response_constructor,
+    fetch_fns::native_response_json_static,
+    fetch_fns::native_response_error,
+    fetch_fns::native_response_redirect,
+    fetch_fns::native_response_clone,
+    // child_process (386-388)
+    child_process_fns::native_child_process_exec_sync,
+    child_process_fns::native_child_process_exec,
+    child_process_fns::native_child_process_spawn,
 ];

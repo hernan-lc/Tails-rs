@@ -39,6 +39,10 @@ impl Interpreter {
                         self.module_globals = Some((**scope).clone());
                     }
 
+                    let caller_pc = self.current_pc;
+                    let call_site_line = self.current_source_line(caller_pc);
+                    let call_site_col = self.current_source_col(caller_pc);
+
                     self.call_stack.push(CallFrame {
                         return_address,
                         base_pointer,
@@ -48,8 +52,8 @@ impl Interpreter {
                         is_construct: false,
                         source_name: self.current_module_path.clone(),
                         generator_heap_idx: None,
-                        source_line: self.current_source_line(0),
-                        source_col: self.current_source_col(0),
+                        source_line: call_site_line,
+                        source_col: call_site_col,
                     });
 
                     for closure_var in &f_clone.closure {

@@ -85,6 +85,8 @@ pub(super) fn native_function_bind(
                 owner_module: None,
                 module_scope: None,
                 is_generator: false,
+                source_file: None,
+                source_line: None,
             },
         ));
 

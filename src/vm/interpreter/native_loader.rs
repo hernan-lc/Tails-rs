@@ -68,6 +68,7 @@ pub fn discover_module(name: &str, registry: &mut NativeModuleRegistry) {
         "os" => registry.register("os", create_os_module),
         "crypto" => registry.register("crypto", create_crypto_module),
         "assert" => registry.register("assert", create_assert_module),
+        "child_process" => registry.register("child_process", create_child_process_module),
         _ => {}
     }
 }
@@ -396,5 +397,16 @@ pub fn create_assert_module(
     props.insert("ok".into(), Value::NativeFunction(364));
     props.insert("equal".into(), Value::NativeFunction(365));
     props.insert("deepEqual".into(), Value::NativeFunction(365));
+    props
+}
+
+pub fn create_child_process_module(
+    _heap: &mut Vec<HeapValue>,
+    _gc: &mut GarbageCollector,
+) -> HashMap<String, Value> {
+    let mut props = HashMap::new();
+    props.insert("execSync".into(), Value::NativeFunction(386));
+    props.insert("exec".into(), Value::NativeFunction(387));
+    props.insert("spawn".into(), Value::NativeFunction(388));
     props
 }

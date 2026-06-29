@@ -420,3 +420,142 @@ where
         }
     }
 }
+
+// --- URLSearchParams standalone constructor (index 366) ---
+
+pub(super) fn native_url_search_params_constructor(
+    interp: &mut Interpreter,
+    _this: &Value,
+    args: &[Value],
+) -> Result<Value> {
+    let init = args.first().cloned().unwrap_or(Value::Undefined);
+    let query_str = match &init {
+        Value::String(s) => s.clone(),
+        Value::Object(obj_idx) => {
+            if let HeapValue::Object(obj) = &interp.heap[*obj_idx] {
+                // If it has __entries, it's already a URLSearchParams
+                if let Some(Value::String(entries)) = obj.properties.get("__entries") {
+                    entries.clone()
+                } else {
+                    // Object: key=value pairs
+                    let pairs: Vec<String> = obj
+                        .properties
+                        .iter()
+                        .filter(|(k, _)| !k.starts_with('_'))
+                        .map(|(k, v)| {
+                            let val = super::helpers::to_string_value(interp, v);
+                            format!("{}={}", k, urlencoding::encode(&val))
+                        })
+                        .collect();
+                    pairs.join("&")
+                }
+            } else {
+                String::new()
+            }
+        }
+        Value::Array(arr_idx) => {
+            if let HeapValue::Array(arr) = &interp.heap[*arr_idx] {
+                // Array of [key, value] pairs
+                let pairs: Vec<String> = arr
+                    .elements
+                    .iter()
+                    .filter_map(|elem| {
+                        if let Value::Array(pair_idx) = elem {
+                            if let HeapValue::Array(pair) = &interp.heap[*pair_idx] {
+                                if pair.elements.len() >= 2 {
+                                    let k = super::helpers::to_string_value(interp, &pair.elements[0]);
+                                    let v = super::helpers::to_string_value(interp, &pair.elements[1]);
+                                    return Some(format!("{}={}", k, urlencoding::encode(&v)));
+                                }
+                            }
+                        }
+                        None
+                    })
+                    .collect();
+                pairs.join("&")
+            } else {
+                String::new()
+            }
+        }
+        Value::Null | Value::Undefined => String::new(),
+        _ => String::new(),
+    };
+
+    let idx = create_search_params(interp, &query_str);
+    Ok(Value::Object(idx))
+}
+
+// --- URL.canParse (index 367) ---
+
+pub(super) fn native_url_can_parse(
+    interp: &mut Interpreter,
+    _this: &Value,
+    args: &[Value],
+) -> Result<Value> {
+    let url_str = args
+        .first()
+        .map(|v| super::helpers::to_string_value(interp, v))
+        .unwrap_or_default();
+
+    let base = args
+        .get(1)
+        .map(|v| super::helpers::to_string_value(interp, v));
+
+    let result = if let Some(base_str) = base {
+        url::Url::parse(&base_str)
+            .ok()
+            .and_then(|base_url| base_url.join(&url_str).ok())
+            .is_some()
+    } else {
+        url::Url::parse(&url_str).is_ok()
+    };
+
+    Ok(Value::Boolean(result))
+}
+
+// --- URL.parse (index 368) ---
+
+pub(super) fn native_url_parse(
+    interp: &mut Interpreter,
+    _this: &Value,
+    args: &[Value],
+) -> Result<Value> {
+    let url_str = args
+        .first()
+        .map(|v| super::helpers::to_string_value(interp, v))
+        .unwrap_or_default();
+
+    let base = args
+        .get(1)
+        .map(|v| super::helpers::to_string_value(interp, v));
+
+    let parsed = if let Some(base_str) = base {
+        url::Url::parse(&base_str)
+            .ok()
+            .and_then(|base_url| base_url.join(&url_str).ok())
+    } else {
+        url::Url::parse(&url_str).ok()
+    };
+
+    match parsed {
+        Some(url) => {
+            // Reuse native_url_constructor logic
+            native_url_constructor(
+                interp,
+                &Value::Undefined,
+                &[Value::String(url.to_string())],
+            )
+        }
+        None => Ok(Value::Null),
+    }
+}
+
+// --- URL.toJSON (index 369) ---
+
+pub(super) fn native_url_to_json(
+    interp: &mut Interpreter,
+    _this: &Value,
+    _args: &[Value],
+) -> Result<Value> {
+    native_url_to_string(interp, _this, &[])
+}

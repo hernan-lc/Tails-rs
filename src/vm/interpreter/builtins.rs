@@ -172,9 +172,26 @@ impl Interpreter {
         self.globals
             .insert("URL".into(), Value::NativeFunction(273));
 
+        // URLSearchParams constructor
+        self.globals
+            .insert("URLSearchParams".into(), Value::NativeFunction(366));
+
+        // Headers constructor
+        self.globals
+            .insert("Headers".into(), Value::NativeFunction(370));
+
+        // Request constructor
+        self.globals
+            .insert("Request".into(), Value::NativeFunction(380));
+
+        // Response constructor - the native function handles construction
+        // Static methods are available via the native function dispatch
+        self.globals
+            .insert("Response".into(), Value::NativeFunction(381));
+
         // fetch
         self.globals
-            .insert("fetch".into(), Value::NativeFunction(297));
+            .insert("fetch".into(), Value::NativeFunction(307));
 
         // Date
         let mut date_proto_props = HashMap::new();
@@ -658,7 +675,7 @@ impl Interpreter {
 
         // WebSocket constructor
         self.globals
-            .insert("WebSocket".into(), Value::NativeFunction(383));
+            .insert("WebSocket".into(), Value::NativeFunction(359));
     }
 }
 

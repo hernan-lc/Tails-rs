@@ -44,7 +44,12 @@ impl Interpreter {
                 || key == "Date"
                 || key == "RegExp"
                 || key == "URL"
+                || key == "URLSearchParams"
+                || key == "Headers"
+                || key == "Request"
+                || key == "Response"
                 || key == "fetch"
+                || key == "WebSocket"
             {
                 self.globals.insert(key.clone(), saved_globals[key].clone());
             }
@@ -176,19 +181,20 @@ impl Interpreter {
         } else {
             std::path::PathBuf::from(source)
         };
-        if resolved.exists() && resolved.is_file() {
-            return Ok(resolved.to_string_lossy().to_string());
+        let normalized: std::path::PathBuf = resolved.components().collect();
+        if normalized.exists() && normalized.is_file() {
+            return Ok(normalized.to_string_lossy().to_string());
         }
         for ext in &[".ts", ".js"] {
-            let stem = resolved.with_extension("");
+            let stem = normalized.with_extension("");
             let candidate = std::path::PathBuf::from(format!("{}{}", stem.to_string_lossy(), ext));
             if candidate.exists() {
                 return Ok(candidate.to_string_lossy().to_string());
             }
         }
-        if resolved.is_dir() {
+        if normalized.is_dir() {
             for name in &["index.ts", "index.js"] {
-                let idx = resolved.join(name);
+                let idx = normalized.join(name);
                 if idx.exists() {
                     return Ok(idx.to_string_lossy().to_string());
                 }

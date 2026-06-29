@@ -139,7 +139,29 @@ impl Error {
             if span.line > 0 {
                 if let Some(source) = source {
                     let lines: Vec<&str> = source.lines().collect();
-                    if span.line > 0 && span.line <= lines.len() {}
+                    if span.line > 0 && span.line <= lines.len() {
+                        let line_content = lines[span.line - 1];
+                        out.push_str(&format!(
+                            "\x1B[90m{}:{}:{}\x1B[0m\n",
+                            self.file.as_deref().unwrap_or("<script>"),
+                            span.line,
+                            span.col
+                        ));
+                        out.push_str(&format!("{}\n", line_content));
+                        let padding: String = " ".repeat(span.col.saturating_sub(1));
+                        let caret_len = if line_content.len() > span.col.saturating_sub(1) {
+                            let remaining = &line_content[span.col.saturating_sub(1)..];
+                            let len = remaining.find(char::is_whitespace).unwrap_or(remaining.len());
+                            if len == 0 { 1 } else { len }
+                        } else {
+                            1
+                        };
+                        out.push_str(&format!(
+                            "{}\x1B[31m{}\x1B[0m\n",
+                            padding,
+                            "^".repeat(caret_len)
+                        ));
+                    }
                 }
             }
         }
