@@ -310,9 +310,24 @@ impl<'a> Parser<'a> {
             _ => Ok(TypeAnnotation::Any),
         }?;
         if self.peek().token == Token::LeftBracket {
-            self.advance();
-            self.expect(&Token::RightBracket)?;
-            Ok(TypeAnnotation::Array(Box::new(base)))
+            // Check if this is T[] (array type) or T["key"] (indexed access type)
+            if self.pos + 1 < self.tokens.len()
+                && self.tokens[self.pos + 1].token == Token::RightBracket
+            {
+                self.advance();
+                self.expect(&Token::RightBracket)?;
+                Ok(TypeAnnotation::Array(Box::new(base)))
+            } else {
+                // Indexed access type like T["_input"] - skip the brackets and content
+                self.advance();
+                while self.peek().token != Token::RightBracket && self.peek().token != Token::Eof {
+                    self.advance();
+                }
+                if self.peek().token == Token::RightBracket {
+                    self.advance();
+                }
+                Ok(base)
+            }
         } else {
             Ok(base)
         }

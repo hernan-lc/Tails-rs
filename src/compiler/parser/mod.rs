@@ -973,6 +973,15 @@ impl<'a> Parser<'a> {
                         depth += 2;
                         self.advance();
                     }
+                    Token::ShiftRight => {
+                        depth = depth.saturating_sub(2);
+                        if depth == 0 {
+                            self.advance();
+                            break;
+                        } else {
+                            self.advance();
+                        }
+                    }
                     _ => {
                         self.advance();
                     }

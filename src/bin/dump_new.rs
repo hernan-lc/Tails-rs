@@ -10,8 +10,8 @@ fn main() {
         let f = new Foo(42);
         f.x;
     "#;
-    let tokens = tokenize(source).unwrap();
-    let ast = parse(&tokens).unwrap();
+    let mut tokens = tokenize(source).unwrap();
+    let ast = parse(&mut tokens).unwrap();
     let module = generate(&ast).unwrap();
     for (idx, instr) in module.instructions.iter().enumerate() {
         println!("{:4}: {:?}", idx, instr);

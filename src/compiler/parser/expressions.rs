@@ -1341,7 +1341,8 @@ impl<'a> Parser<'a> {
                 TemplatePart::Expression(expr_tokens) => {
                     quasis.push(text_buf.clone());
                     text_buf.clear();
-                    let mut sub_parser = Parser::new(&expr_tokens);
+                    let mut owned_tokens = expr_tokens.clone();
+                    let mut sub_parser = Parser::new(&mut owned_tokens);
                     let expr = sub_parser.parse_expression()?;
                     expressions.push(expr.inner);
                 }

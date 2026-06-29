@@ -1235,6 +1235,7 @@ impl<'a> Parser<'a> {
                         )))
                     }
                 }
+                self.skip_type_parameters();
                 if self.peek().token == Token::Comma {
                     self.advance();
                 } else {
@@ -1261,16 +1262,7 @@ impl<'a> Parser<'a> {
                     _ => break,
                 }
             }
-            let name = match self.advance().token {
-                Token::Identifier(n) => n,
-                Token::String(s) => s,
-                t => {
-                    return Err(Error::ParseError(format!(
-                        "Expected property name, got {:?}",
-                        t
-                    )))
-                }
-            };
+            let name = self.token_to_key_string()?;
             // Skip optional marker for methods: setup?(): void
             if self.peek().token == Token::Question {
                 self.advance();

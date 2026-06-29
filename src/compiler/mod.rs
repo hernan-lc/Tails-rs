@@ -37,8 +37,8 @@ impl Compiler {
     }
 
     pub fn compile(&self, source: &str) -> Result<CompiledModule> {
-        let tokens = lexer::tokenize(source)?;
-        let ast = parser::parse(&tokens)?;
+        let mut tokens = lexer::tokenize(source)?;
+        let ast = parser::parse(&mut tokens)?;
 
         if self.type_checking {
             type_checker::TypeChecker::check_with_globals(&ast, self.known_globals.clone())?;
