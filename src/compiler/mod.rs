@@ -55,6 +55,7 @@ pub struct CompiledModule {
     pub functions: Vec<CompiledFunction>,
     pub class_infos: Vec<ClassInfo>,
     pub source_lines: Vec<Option<usize>>,
+    pub source_cols: Vec<Option<usize>>,
 }
 
 #[derive(Debug, Clone)]

@@ -11,6 +11,7 @@ pub(crate) struct CallFrame {
     pub(crate) source_name: Option<String>,
     pub(crate) generator_heap_idx: Option<usize>,
     pub(crate) source_line: Option<usize>,
+    pub(crate) source_col: Option<usize>,
 }
 
 #[derive(Debug, Clone)]

@@ -30,7 +30,9 @@ pub(crate) struct CodeGenerator {
     continue_patches: Vec<usize>,
     class_infos: Vec<ClassInfo>,
     source_lines: Vec<Option<usize>>,
+    source_cols: Vec<Option<usize>>,
     current_source_line: Option<usize>,
+    current_source_col: Option<usize>,
 }
 
 impl CodeGenerator {
@@ -48,17 +50,31 @@ impl CodeGenerator {
             continue_patches: Vec::new(),
             class_infos: Vec::new(),
             source_lines: Vec::new(),
+            source_cols: Vec::new(),
             current_source_line: None,
+            current_source_col: None,
         }
     }
 
     fn emit(&mut self, instr: Instruction) {
         self.instructions.push(instr);
         self.source_lines.push(self.current_source_line);
+        self.source_cols.push(self.current_source_col);
     }
 
     fn record_line_from_span(&mut self, span: &Option<crate::errors::Span>) {
-        self.current_source_line = span.and_then(|s| if s.line > 0 { Some(s.line) } else { None });
+        if let Some(s) = span {
+            if s.line > 0 {
+                self.current_source_line = Some(s.line);
+                self.current_source_col = if s.col > 0 { Some(s.col) } else { None };
+            } else {
+                self.current_source_line = None;
+                self.current_source_col = None;
+            }
+        } else {
+            self.current_source_line = None;
+            self.current_source_col = None;
+        }
     }
 
     fn generate(&mut self, ast: &AstNode) -> Result<CompiledModule> {
@@ -86,6 +102,7 @@ impl CodeGenerator {
             functions: self.functions.clone(),
             class_infos: self.class_infos.clone(),
             source_lines: self.source_lines.clone(),
+            source_cols: self.source_cols.clone(),
         })
     }
 

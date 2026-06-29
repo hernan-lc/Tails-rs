@@ -135,24 +135,11 @@ impl Error {
 
         out.push_str(&format!("\x1B[31m{}: {}\x1B[0m\n", kind_name, msg));
 
-        let file_str = self.file.as_deref().unwrap_or("<input>");
         if let Some(span) = &self.span {
             if span.line > 0 {
-                out.push_str(&format!("  --> {}:{}:{}\n", file_str, span.line, span.col));
-
                 if let Some(source) = source {
                     let lines: Vec<&str> = source.lines().collect();
-                    if span.line > 0 && span.line <= lines.len() {
-                        let line_idx = span.line - 1;
-                        let line_content = lines[line_idx];
-                        let line_num_str = format!("{}", span.line);
-                        let padding = " ".repeat(line_num_str.len());
-                        out.push_str(&format!("   {} |\n", padding));
-                        out.push_str(&format!("{} | {}\n", line_num_str, line_content));
-                        let col_marker =
-                            " ".repeat((span.col.saturating_sub(1)).min(line_content.len()));
-                        out.push_str(&format!("   {} | {}^\n", padding, col_marker));
-                    }
+                    if span.line > 0 && span.line <= lines.len() {}
                 }
             }
         }

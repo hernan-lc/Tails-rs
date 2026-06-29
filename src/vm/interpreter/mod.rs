@@ -211,13 +211,21 @@ impl Interpreter {
             .and_then(|m| m.source_lines.get(pc).copied().flatten())
     }
 
+    pub(crate) fn current_source_col(&self, pc: usize) -> Option<usize> {
+        self.current_module
+            .as_ref()
+            .and_then(|m| m.source_cols.get(pc).copied().flatten())
+    }
+
     pub(crate) fn err_at_location(&self, mut err: crate::errors::Error) -> crate::errors::Error {
         if err.span.is_some() {
             return err;
         }
-        if let Some(line) = self.current_source_line(self.current_pc) {
+        let line = self.current_source_line(self.current_pc);
+        let col = self.current_source_col(self.current_pc);
+        if let Some(line) = line {
             let file = self.current_module_path.clone();
-            err.span = Some(crate::errors::Span::new(line, 1, 0));
+            err.span = Some(crate::errors::Span::new(line, col.unwrap_or(1), 0));
             if err.file.is_none() {
                 err.file = file;
             }
@@ -468,6 +476,7 @@ impl Interpreter {
                                             source_name: self.current_module_path.clone(),
                                             generator_heap_idx: None,
                                             source_line: self.current_source_line(pc),
+                                            source_col: self.current_source_col(pc),
                                         });
                                         for closure_var in &f.closure {
                                             self.stack.push(closure_var.clone());
@@ -562,6 +571,7 @@ impl Interpreter {
                                         source_name: self.current_module_path.clone(),
                                         generator_heap_idx: None,
                                         source_line: self.current_source_line(pc),
+                                        source_col: self.current_source_col(pc),
                                     });
                                     for closure_var in &f_clone.closure {
                                         self.stack.push(closure_var.clone());
@@ -642,6 +652,7 @@ impl Interpreter {
                                                             .clone(),
                                                         generator_heap_idx: None,
                                                         source_line: self.current_source_line(pc),
+                                                        source_col: self.current_source_col(pc),
                                                     });
                                                     for arg in args {
                                                         self.stack.push(arg);
@@ -701,6 +712,7 @@ impl Interpreter {
                                             source_name: self.current_module_path.clone(),
                                             generator_heap_idx: None,
                                             source_line: self.current_source_line(pc),
+                                            source_col: self.current_source_col(pc),
                                         });
                                         for closure_var in &f_clone.closure {
                                             self.stack.push(closure_var.clone());
@@ -853,6 +865,7 @@ impl Interpreter {
                                     source_name: self.current_module_path.clone(),
                                     generator_heap_idx: None,
                                     source_line: self.current_source_line(pc),
+                                    source_col: self.current_source_col(pc),
                                 });
                                 for closure_var in &f_clone.closure {
                                     self.stack.push(closure_var.clone());
@@ -1901,11 +1914,13 @@ impl Interpreter {
                 })
                 .unwrap_or_else(|| "<anonymous>".to_string());
 
-            let location = match (&frame.source_name, frame.source_line) {
-                (Some(name), Some(line)) => format!(" ({}:{})", name, line),
-                (Some(name), None) => format!(" ({})", name),
-                (None, Some(line)) => format!(" (line {})", line),
-                (None, None) => String::new(),
+            let location = match (&frame.source_name, frame.source_line, frame.source_col) {
+                (Some(name), Some(line), Some(col)) => format!(" ({}:{}:{})", name, line, col),
+                (Some(name), Some(line), None) => format!(" ({}:{})", name, line),
+                (Some(name), None, _) => format!(" ({})", name),
+                (None, Some(line), Some(col)) => format!(" (line {}:{})", line, col),
+                (None, Some(line), None) => format!(" (line {})", line),
+                (None, None, _) => String::new(),
             };
 
             trace.push_str(&format!("\n    at {}{}", func_name, location));
@@ -1972,11 +1987,13 @@ impl Interpreter {
                 })
                 .unwrap_or_else(|| "<anonymous>".to_string());
 
-            let location = match (&frame.source_name, frame.source_line) {
-                (Some(name), Some(line)) => format!("{}:{}", name, line),
-                (Some(name), None) => name.clone(),
-                (None, Some(line)) => format!("line {}", line),
-                (None, None) => "<script>".to_string(),
+            let location = match (&frame.source_name, frame.source_line, frame.source_col) {
+                (Some(name), Some(line), Some(col)) => format!("{}:{}:{}", name, line, col),
+                (Some(name), Some(line), None) => format!("{}:{}", name, line),
+                (Some(name), None, _) => name.clone(),
+                (None, Some(line), Some(col)) => format!("line {}:{}", line, col),
+                (None, Some(line), None) => format!("line {}", line),
+                (None, None, _) => "<script>".to_string(),
             };
 
             frames.push(format!("    at {} ({})", func_name, location));
