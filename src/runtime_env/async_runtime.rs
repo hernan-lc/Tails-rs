@@ -1,5 +1,6 @@
 use crate::objects::Value;
 use std::collections::VecDeque;
+use std::time::Instant;
 
 pub struct Microtask {
     pub callback: Value,
@@ -9,6 +10,7 @@ pub struct Microtask {
 pub struct Macrotask {
     pub id: u32,
     pub callback: Value,
+    pub fire_at: Instant,
     pub interval_ms: Option<f64>,
 }
 
@@ -42,12 +44,14 @@ impl AsyncRuntime {
         self.microtask_queue.pop_front()
     }
 
-    pub fn enqueue_macrotask(&mut self, callback: Value) -> u32 {
+    pub fn enqueue_macrotask(&mut self, callback: Value, delay_ms: f64) -> u32 {
         let id = self.next_timer_id;
         self.next_timer_id += 1;
+        let fire_at = Instant::now() + std::time::Duration::from_millis(delay_ms as u64);
         self.macrotask_queue.push_back(Macrotask {
             id,
             callback,
+            fire_at,
             interval_ms: None,
         });
         id
@@ -56,9 +60,11 @@ impl AsyncRuntime {
     pub fn enqueue_interval(&mut self, callback: Value, interval_ms: f64) -> u32 {
         let id = self.next_timer_id;
         self.next_timer_id += 1;
+        let fire_at = Instant::now() + std::time::Duration::from_millis(interval_ms as u64);
         self.macrotask_queue.push_back(Macrotask {
             id,
             callback,
+            fire_at,
             interval_ms: Some(interval_ms),
         });
         id
@@ -81,11 +87,45 @@ impl AsyncRuntime {
     }
 
     pub fn run_macrotasks(&mut self) -> Vec<Macrotask> {
-        let mut tasks = Vec::new();
+        let now = Instant::now();
+        let mut ready = Vec::new();
+        let mut remaining = VecDeque::new();
         while let Some(task) = self.macrotask_queue.pop_front() {
-            tasks.push(task);
+            if now >= task.fire_at {
+                if let Some(interval_ms) = task.interval_ms {
+                    let new_fire_at = now + std::time::Duration::from_millis(interval_ms as u64);
+                    remaining.push_back(Macrotask {
+                        id: task.id,
+                        callback: task.callback.clone(),
+                        fire_at: new_fire_at,
+                        interval_ms: task.interval_ms,
+                    });
+                }
+                ready.push(task);
+            } else {
+                remaining.push_back(task);
+            }
         }
-        tasks
+        self.macrotask_queue = remaining;
+        ready
+    }
+
+    pub fn has_pending_timers(&self) -> bool {
+        !self.macrotask_queue.is_empty()
+    }
+
+    pub fn next_timer_delay_ms(&self) -> Option<u64> {
+        self.macrotask_queue
+            .iter()
+            .map(|t| {
+                let now = Instant::now();
+                if t.fire_at > now {
+                    (t.fire_at - now).as_millis() as u64
+                } else {
+                    0
+                }
+            })
+            .min()
     }
 
     pub fn is_idle(&self) -> bool {

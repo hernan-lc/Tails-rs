@@ -165,9 +165,10 @@ impl Interpreter {
                             }
                             if !handled {
                                 let exc = self.pending_exception.take().unwrap();
+                                let formatted = self.format_rejection_reason(&exc);
                                 return Err(self.err_at_location(Error::RuntimeError(format!(
-                                    "Unhandled promise rejection: {}",
-                                    self.value_to_string(&exc)
+                                    "Unhandled promise rejection:\n{}",
+                                    formatted
                                 ))));
                             }
                             any_resumed = true;
@@ -1080,6 +1081,7 @@ impl Interpreter {
                                 }
                                 PromiseState::Rejected(reason) => {
                                     self.pending_exception = Some(reason.clone());
+                                    let mut handled = false;
                                     while let Some(handler) =
                                         self.exception_handlers.last().cloned()
                                     {
@@ -1087,23 +1089,26 @@ impl Interpreter {
                                             self.exception_handlers.pop();
                                             self.stack.truncate(handler.stack_depth);
                                             pc = handler.catch_pc as usize;
+                                            handled = true;
                                             break;
                                         } else if handler.finally_pc != 0 {
                                             self.exception_handlers.pop();
                                             self.stack.truncate(handler.stack_depth);
                                             pc = handler.finally_pc as usize;
+                                            handled = true;
                                             break;
                                         } else {
                                             self.exception_handlers.pop();
                                         }
                                     }
+                                    if handled {
+                                        continue;
+                                    }
                                     if self.pending_exception.is_some() {
                                         let exc = self.pending_exception.take().unwrap();
+                                        let formatted = self.format_rejection_reason(&exc);
                                         return Err(self.err_at_location(Error::RuntimeError(
-                                            format!(
-                                                "Unhandled promise rejection: {}",
-                                                self.value_to_string(&exc)
-                                            ),
+                                            format!("Unhandled promise rejection:\n{}", formatted),
                                         )));
                                     }
                                 }
@@ -1907,6 +1912,50 @@ impl Interpreter {
         }
 
         trace
+    }
+
+    pub(crate) fn format_rejection_reason(&self, reason: &Value) -> String {
+        if let Value::Object(obj_idx) = reason {
+            if let HeapValue::Object(obj) = &self.heap[*obj_idx] {
+                let name = obj
+                    .properties
+                    .get("name")
+                    .and_then(|v| {
+                        if let Value::String(s) = v {
+                            Some(s.as_str())
+                        } else {
+                            None
+                        }
+                    })
+                    .unwrap_or("Error");
+                let message = obj
+                    .properties
+                    .get("message")
+                    .and_then(|v| {
+                        if let Value::String(s) = v {
+                            Some(s.as_str())
+                        } else {
+                            None
+                        }
+                    })
+                    .unwrap_or("");
+                let stack = obj.properties.get("stack").and_then(|v| {
+                    if let Value::String(s) = v {
+                        Some(s.as_str())
+                    } else {
+                        None
+                    }
+                });
+                if let Some(stack) = stack {
+                    return stack.to_string();
+                }
+                if message.is_empty() {
+                    return name.to_string();
+                }
+                return format!("{}: {}", name, message);
+            }
+        }
+        self.value_to_string(reason)
     }
 
     pub(crate) fn call_stack_backtrace(&self) -> String {

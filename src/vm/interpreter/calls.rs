@@ -10,6 +10,19 @@ impl Interpreter {
             Value::Function(func_idx) => {
                 if let HeapValue::Function(f) = &self.heap[*func_idx] {
                     let f_clone = f.clone();
+
+                    if f_clone.bytecode_index == usize::MAX {
+                        if let Some(Value::Promise(promise_idx)) = f_clone.closure.first() {
+                            let value = args.first().cloned().unwrap_or(Value::Undefined);
+                            if f_clone.name.as_deref() == Some("resolve") {
+                                self.resolve_promise(*promise_idx, value);
+                            } else if f_clone.name.as_deref() == Some("reject") {
+                                self.reject_promise(*promise_idx, value);
+                            }
+                            return Ok(Value::Undefined);
+                        }
+                    }
+
                     let func_module: Option<Rc<CompiledModule>> = f_clone
                         .owner_module
                         .clone()

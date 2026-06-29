@@ -123,8 +123,8 @@ pub(super) fn native_set_timeout(
     args: &[Value],
 ) -> Result<Value> {
     let callback = args.first().cloned().unwrap_or(Value::Undefined);
-    let _delay = args.get(1).map(to_f64).unwrap_or(0.0);
-    let id = interp.async_runtime.enqueue_macrotask(callback);
+    let delay = args.get(1).map(to_f64).unwrap_or(0.0);
+    let id = interp.async_runtime.enqueue_macrotask(callback, delay);
     Ok(Value::Float(id as f64))
 }
 
