@@ -69,6 +69,8 @@ pub(super) fn native_url_constructor(
         }),
     );
     props.insert("searchParams".to_string(), Value::Object(search_params_idx));
+    props.insert("toString".to_string(), Value::NativeFunction(274));
+    props.insert("toJSON".to_string(), Value::NativeFunction(360));
 
     // Always create a new object
     let obj_idx = interp.heap.len();
@@ -463,8 +465,10 @@ pub(super) fn native_url_search_params_constructor(
                         if let Value::Array(pair_idx) = elem {
                             if let HeapValue::Array(pair) = &interp.heap[*pair_idx] {
                                 if pair.elements.len() >= 2 {
-                                    let k = super::helpers::to_string_value(interp, &pair.elements[0]);
-                                    let v = super::helpers::to_string_value(interp, &pair.elements[1]);
+                                    let k =
+                                        super::helpers::to_string_value(interp, &pair.elements[0]);
+                                    let v =
+                                        super::helpers::to_string_value(interp, &pair.elements[1]);
                                     return Some(format!("{}={}", k, urlencoding::encode(&v)));
                                 }
                             }
@@ -540,11 +544,7 @@ pub(super) fn native_url_parse(
     match parsed {
         Some(url) => {
             // Reuse native_url_constructor logic
-            native_url_constructor(
-                interp,
-                &Value::Undefined,
-                &[Value::String(url.to_string())],
-            )
+            native_url_constructor(interp, &Value::Undefined, &[Value::String(url.to_string())])
         }
         None => Ok(Value::Null),
     }

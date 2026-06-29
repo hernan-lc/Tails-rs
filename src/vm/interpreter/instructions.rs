@@ -848,7 +848,7 @@ impl Interpreter {
         &mut self,
         instruction: &Instruction,
         module: &CompiledModule,
-        pc: usize,
+        _pc: usize,
     ) -> Result<bool> {
         match instruction {
             Instruction::MakeFunction(func_idx) => {
@@ -859,7 +859,7 @@ impl Interpreter {
                 let owner = self.current_module.clone();
                 let scope = std::rc::Rc::new(self.globals.clone());
                 let src_file = self.current_module_path.clone();
-                let src_line = self.current_source_line(pc);
+                let src_line = func_info.source_line;
                 let heap_idx = self.gc.allocate(
                     &mut self.heap,
                     HeapValue::Function(JsFunction {
@@ -898,7 +898,7 @@ impl Interpreter {
                 let owner = self.current_module.clone();
                 let scope = std::rc::Rc::new(self.globals.clone());
                 let src_file = self.current_module_path.clone();
-                let src_line = self.current_source_line(pc);
+                let src_line = func_info.source_line;
                 let heap_idx = self.gc.allocate(
                     &mut self.heap,
                     HeapValue::Function(JsFunction {

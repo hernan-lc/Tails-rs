@@ -168,30 +168,42 @@ impl Interpreter {
         self.globals
             .insert("btoa".into(), Value::NativeFunction(238));
 
-        // URL (factory function, not constructor)
+        // URL object with static methods
+        let mut url_props = HashMap::new();
+        url_props.insert("canParse".into(), Value::NativeFunction(358));
+        url_props.insert("parse".into(), Value::NativeFunction(359));
+        let _url_obj_idx = self.gc.allocate(
+            &mut self.heap,
+            HeapValue::Object(JsObject {
+                properties: url_props,
+                prototype: None,
+                extensible: true,
+            }),
+        );
+        // URL is a factory function (NativeFunction(273)) used as `new URL(...)`
+        // Static methods are accessed via the native function's own properties
         self.globals
             .insert("URL".into(), Value::NativeFunction(273));
 
         // URLSearchParams constructor
         self.globals
-            .insert("URLSearchParams".into(), Value::NativeFunction(366));
+            .insert("URLSearchParams".into(), Value::NativeFunction(357));
 
         // Headers constructor
         self.globals
-            .insert("Headers".into(), Value::NativeFunction(370));
+            .insert("Headers".into(), Value::NativeFunction(361));
 
         // Request constructor
         self.globals
-            .insert("Request".into(), Value::NativeFunction(380));
+            .insert("Request".into(), Value::NativeFunction(371));
 
-        // Response constructor - the native function handles construction
-        // Static methods are available via the native function dispatch
+        // Response constructor
         self.globals
-            .insert("Response".into(), Value::NativeFunction(381));
+            .insert("Response".into(), Value::NativeFunction(372));
 
         // fetch
         self.globals
-            .insert("fetch".into(), Value::NativeFunction(307));
+            .insert("fetch".into(), Value::NativeFunction(297));
 
         // Date
         let mut date_proto_props = HashMap::new();
@@ -675,7 +687,7 @@ impl Interpreter {
 
         // WebSocket constructor
         self.globals
-            .insert("WebSocket".into(), Value::NativeFunction(359));
+            .insert("WebSocket".into(), Value::NativeFunction(350));
     }
 }
 

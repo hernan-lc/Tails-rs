@@ -39,9 +39,14 @@ impl Interpreter {
                         self.module_globals = Some((**scope).clone());
                     }
 
-                    let caller_pc = self.current_pc;
-                    let call_site_line = self.current_source_line(caller_pc);
-                    let call_site_col = self.current_source_col(caller_pc);
+                    let saved_module = self.current_module.clone();
+                    let saved_path = self.current_module_path.clone();
+                    if let Some(ref mod_ref) = func_module {
+                        self.current_module = Some(mod_ref.clone());
+                    }
+                    if f_clone.source_file.is_some() {
+                        self.current_module_path = f_clone.source_file.clone();
+                    }
 
                     self.call_stack.push(CallFrame {
                         return_address,
@@ -50,10 +55,13 @@ impl Interpreter {
                         func_heap_idx: Some(*func_idx),
                         this_value: Some(this.clone()),
                         is_construct: false,
-                        source_name: self.current_module_path.clone(),
+                        source_name: f_clone
+                            .source_file
+                            .clone()
+                            .or_else(|| self.current_module_path.clone()),
                         generator_heap_idx: None,
-                        source_line: call_site_line,
-                        source_col: call_site_col,
+                        source_line: f_clone.source_line,
+                        source_col: None,
                     });
 
                     for closure_var in &f_clone.closure {
@@ -69,6 +77,8 @@ impl Interpreter {
                         Ok(Value::Undefined)
                     };
 
+                    self.current_module = saved_module;
+                    self.current_module_path = saved_path;
                     self.module_globals = saved_mg;
                     result
                 } else {

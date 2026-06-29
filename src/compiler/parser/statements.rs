@@ -181,6 +181,7 @@ impl<'a> Parser<'a> {
         } else {
             false
         };
+        let func_keyword_span = self.current_span;
         self.expect(&Token::Function)?;
         let is_generator = if self.peek().token == Token::Star {
             self.advance();
@@ -220,7 +221,9 @@ impl<'a> Parser<'a> {
         self.expect(&Token::LeftBrace)?;
         let body = self.parse_block_body()?;
         self.expect(&Token::RightBrace)?;
-        Ok(self.spanned(Statement::FunctionDeclaration {
+        let saved_span = self.current_span;
+        self.current_span = func_keyword_span;
+        let result = self.spanned(Statement::FunctionDeclaration {
             name,
             params,
             param_types: Some(param_types),
@@ -230,7 +233,9 @@ impl<'a> Parser<'a> {
             body,
             is_async,
             is_generator,
-        }))
+        });
+        self.current_span = saved_span;
+        Ok(result)
     }
 
     pub(crate) fn parse_return_statement(&mut self) -> Result<SpannedNode<Statement>> {

@@ -292,6 +292,23 @@ impl Interpreter {
                             _ => {}
                         }
                     }
+                    // URL static methods
+                    if *idx == 273 {
+                        match key_str.as_str() {
+                            "canParse" => return Ok(Value::NativeFunction(358)),
+                            "parse" => return Ok(Value::NativeFunction(359)),
+                            _ => {}
+                        }
+                    }
+                    // Response static methods
+                    if *idx == 372 {
+                        match key_str.as_str() {
+                            "json" => return Ok(Value::NativeFunction(373)),
+                            "error" => return Ok(Value::NativeFunction(374)),
+                            "redirect" => return Ok(Value::NativeFunction(375)),
+                            _ => {}
+                        }
+                    }
                 }
             }
             Value::Proxy(proxy_idx) => {

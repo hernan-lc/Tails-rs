@@ -35,10 +35,7 @@ pub(super) fn native_headers_constructor(
                                 header_strs.push(format!("{}\0{}", k.to_lowercase(), val));
                             }
                         }
-                        props.insert(
-                            "__headers".into(),
-                            Value::String(header_strs.join("\n")),
-                        );
+                        props.insert("__headers".into(), Value::String(header_strs.join("\n")));
                     }
                 }
             }
@@ -49,32 +46,30 @@ pub(super) fn native_headers_constructor(
                         if let Value::Array(pair_idx) = elem {
                             if let HeapValue::Array(pair) = &interp.heap[*pair_idx] {
                                 if pair.elements.len() >= 2 {
-                                    let k = to_string_value(interp, &pair.elements[0]).to_lowercase();
+                                    let k =
+                                        to_string_value(interp, &pair.elements[0]).to_lowercase();
                                     let v = to_string_value(interp, &pair.elements[1]);
                                     header_strs.push(format!("{}\0{}", k, v));
                                 }
                             }
                         }
                     }
-                    props.insert(
-                        "__headers".into(),
-                        Value::String(header_strs.join("\n")),
-                    );
+                    props.insert("__headers".into(), Value::String(header_strs.join("\n")));
                 }
             }
             _ => {}
         }
     }
 
-    props.insert("append".into(), Value::NativeFunction(371));
-    props.insert("get".into(), Value::NativeFunction(372));
-    props.insert("set".into(), Value::NativeFunction(373));
-    props.insert("has".into(), Value::NativeFunction(374));
-    props.insert("delete".into(), Value::NativeFunction(375));
-    props.insert("forEach".into(), Value::NativeFunction(376));
-    props.insert("keys".into(), Value::NativeFunction(377));
-    props.insert("values".into(), Value::NativeFunction(378));
-    props.insert("entries".into(), Value::NativeFunction(379));
+    props.insert("append".into(), Value::NativeFunction(362));
+    props.insert("get".into(), Value::NativeFunction(363));
+    props.insert("set".into(), Value::NativeFunction(364));
+    props.insert("has".into(), Value::NativeFunction(365));
+    props.insert("delete".into(), Value::NativeFunction(366));
+    props.insert("forEach".into(), Value::NativeFunction(367));
+    props.insert("keys".into(), Value::NativeFunction(368));
+    props.insert("values".into(), Value::NativeFunction(369));
+    props.insert("entries".into(), Value::NativeFunction(370));
 
     let idx = interp.heap.len();
     interp.heap.push(HeapValue::Object(JsObject {
@@ -131,10 +126,8 @@ where
                 .iter()
                 .map(|(k, v)| format!("{}\0{}", k, v))
                 .collect();
-            obj.properties.insert(
-                "__headers".into(),
-                Value::String(new_raw.join("\n")),
-            );
+            obj.properties
+                .insert("__headers".into(), Value::String(new_raw.join("\n")));
         }
     }
 }
@@ -259,12 +252,11 @@ pub(super) fn native_headers_keys(
 ) -> Result<Value> {
     let raw = get_headers_string(interp, _this);
     let entries = parse_headers(&raw);
-    let keys: Vec<Value> = entries
-        .into_iter()
-        .map(|(k, _)| Value::String(k))
-        .collect();
+    let keys: Vec<Value> = entries.into_iter().map(|(k, _)| Value::String(k)).collect();
     let arr_idx = interp.heap.len();
-    interp.heap.push(HeapValue::Array(JsArray { elements: keys }));
+    interp
+        .heap
+        .push(HeapValue::Array(JsArray { elements: keys }));
     Ok(Value::Array(arr_idx))
 }
 
@@ -275,12 +267,11 @@ pub(super) fn native_headers_values(
 ) -> Result<Value> {
     let raw = get_headers_string(interp, _this);
     let entries = parse_headers(&raw);
-    let vals: Vec<Value> = entries
-        .into_iter()
-        .map(|(_, v)| Value::String(v))
-        .collect();
+    let vals: Vec<Value> = entries.into_iter().map(|(_, v)| Value::String(v)).collect();
     let arr_idx = interp.heap.len();
-    interp.heap.push(HeapValue::Array(JsArray { elements: vals }));
+    interp
+        .heap
+        .push(HeapValue::Array(JsArray { elements: vals }));
     Ok(Value::Array(arr_idx))
 }
 
@@ -300,9 +291,9 @@ pub(super) fn native_headers_entries(
         result.push(Value::Array(pair_idx));
     }
     let arr_idx = interp.heap.len();
-    interp.heap.push(HeapValue::Array(JsArray {
-        elements: result,
-    }));
+    interp
+        .heap
+        .push(HeapValue::Array(JsArray { elements: result }));
     Ok(Value::Array(arr_idx))
 }
 
@@ -377,9 +368,7 @@ pub(super) fn native_request_constructor(
                 props.insert("__headers".into(), Value::String(headers_raw.clone()));
                 props.insert(
                     "__body".into(),
-                    body.clone()
-                        .map(Value::String)
-                        .unwrap_or(Value::Null),
+                    body.clone().map(Value::String).unwrap_or(Value::Null),
                 );
                 props.insert("bodyUsed".into(), Value::Boolean(false));
                 props.insert("__is_request".into(), Value::Boolean(true));
@@ -389,15 +378,15 @@ pub(super) fn native_request_constructor(
                 let h_idx = interp.heap.len();
                 let mut h_props = std::collections::HashMap::new();
                 h_props.insert("__headers".into(), Value::String(headers_raw));
-                h_props.insert("append".into(), Value::NativeFunction(371));
-                h_props.insert("get".into(), Value::NativeFunction(372));
-                h_props.insert("set".into(), Value::NativeFunction(373));
-                h_props.insert("has".into(), Value::NativeFunction(374));
-                h_props.insert("delete".into(), Value::NativeFunction(375));
-                h_props.insert("forEach".into(), Value::NativeFunction(376));
-                h_props.insert("keys".into(), Value::NativeFunction(377));
-                h_props.insert("values".into(), Value::NativeFunction(378));
-                h_props.insert("entries".into(), Value::NativeFunction(379));
+                h_props.insert("append".into(), Value::NativeFunction(362));
+                h_props.insert("get".into(), Value::NativeFunction(363));
+                h_props.insert("set".into(), Value::NativeFunction(364));
+                h_props.insert("has".into(), Value::NativeFunction(365));
+                h_props.insert("delete".into(), Value::NativeFunction(366));
+                h_props.insert("forEach".into(), Value::NativeFunction(367));
+                h_props.insert("keys".into(), Value::NativeFunction(368));
+                h_props.insert("values".into(), Value::NativeFunction(369));
+                h_props.insert("entries".into(), Value::NativeFunction(370));
                 interp.heap.push(HeapValue::Object(JsObject {
                     properties: h_props,
                     prototype: None,
@@ -431,8 +420,7 @@ pub(super) fn native_request_constructor(
                         for (k, v) in &hdr_obj.properties {
                             if !k.starts_with('_') {
                                 let val = to_string_value(interp, v);
-                                header_strs
-                                    .push(format!("{}\0{}", k.to_lowercase(), val));
+                                header_strs.push(format!("{}\0{}", k.to_lowercase(), val));
                             }
                         }
                         headers_raw = header_strs.join("\n");
@@ -460,15 +448,15 @@ pub(super) fn native_request_constructor(
     let h_idx = interp.heap.len();
     let mut h_props = std::collections::HashMap::new();
     h_props.insert("__headers".into(), Value::String(headers_raw));
-    h_props.insert("append".into(), Value::NativeFunction(371));
-    h_props.insert("get".into(), Value::NativeFunction(372));
-    h_props.insert("set".into(), Value::NativeFunction(373));
-    h_props.insert("has".into(), Value::NativeFunction(374));
-    h_props.insert("delete".into(), Value::NativeFunction(375));
-    h_props.insert("forEach".into(), Value::NativeFunction(376));
-    h_props.insert("keys".into(), Value::NativeFunction(377));
-    h_props.insert("values".into(), Value::NativeFunction(378));
-    h_props.insert("entries".into(), Value::NativeFunction(379));
+    h_props.insert("append".into(), Value::NativeFunction(362));
+    h_props.insert("get".into(), Value::NativeFunction(363));
+    h_props.insert("set".into(), Value::NativeFunction(364));
+    h_props.insert("has".into(), Value::NativeFunction(365));
+    h_props.insert("delete".into(), Value::NativeFunction(366));
+    h_props.insert("forEach".into(), Value::NativeFunction(367));
+    h_props.insert("keys".into(), Value::NativeFunction(368));
+    h_props.insert("values".into(), Value::NativeFunction(369));
+    h_props.insert("entries".into(), Value::NativeFunction(370));
     interp.heap.push(HeapValue::Object(JsObject {
         properties: h_props,
         prototype: None,
@@ -560,27 +548,24 @@ fn build_response(
     props.insert("__headers".into(), Value::String(headers_raw.to_string()));
 
     // Instance methods
-    props.insert("text".into(), Value::NativeFunction(308));
-    props.insert("json".into(), Value::NativeFunction(309));
-    props.insert("arrayBuffer".into(), Value::NativeFunction(310));
-    props.insert("clone".into(), Value::NativeFunction(385));
+    props.insert("text".into(), Value::NativeFunction(298));
+    props.insert("json".into(), Value::NativeFunction(299));
+    props.insert("arrayBuffer".into(), Value::NativeFunction(300));
+    props.insert("clone".into(), Value::NativeFunction(376));
 
     // Create headers object
     let h_idx = interp.heap.len();
     let mut h_props = std::collections::HashMap::new();
-    h_props.insert(
-        "__headers".into(),
-        Value::String(headers_raw.to_string()),
-    );
-    h_props.insert("append".into(), Value::NativeFunction(371));
-    h_props.insert("get".into(), Value::NativeFunction(372));
-    h_props.insert("set".into(), Value::NativeFunction(373));
-    h_props.insert("has".into(), Value::NativeFunction(374));
-    h_props.insert("delete".into(), Value::NativeFunction(375));
-    h_props.insert("forEach".into(), Value::NativeFunction(376));
-    h_props.insert("keys".into(), Value::NativeFunction(377));
-    h_props.insert("values".into(), Value::NativeFunction(378));
-    h_props.insert("entries".into(), Value::NativeFunction(379));
+    h_props.insert("__headers".into(), Value::String(headers_raw.to_string()));
+    h_props.insert("append".into(), Value::NativeFunction(362));
+    h_props.insert("get".into(), Value::NativeFunction(363));
+    h_props.insert("set".into(), Value::NativeFunction(364));
+    h_props.insert("has".into(), Value::NativeFunction(365));
+    h_props.insert("delete".into(), Value::NativeFunction(366));
+    h_props.insert("forEach".into(), Value::NativeFunction(367));
+    h_props.insert("keys".into(), Value::NativeFunction(368));
+    h_props.insert("values".into(), Value::NativeFunction(369));
+    h_props.insert("entries".into(), Value::NativeFunction(370));
     interp.heap.push(HeapValue::Object(JsObject {
         properties: h_props,
         prototype: None,
@@ -857,7 +842,11 @@ pub(super) fn native_fetch(
 fn parse_fetch_args(
     interp: &mut Interpreter,
     args: &[Value],
-) -> (String, std::collections::HashMap<String, String>, Option<String>) {
+) -> (
+    String,
+    std::collections::HashMap<String, String>,
+    Option<String>,
+) {
     let method = "GET".to_string();
     let headers_map = std::collections::HashMap::new();
     let mut body = None;
@@ -902,7 +891,11 @@ fn parse_fetch_args(
 fn parse_fetch_options(
     interp: &mut Interpreter,
     args: &[Value],
-) -> (String, std::collections::HashMap<String, String>, Option<String>) {
+) -> (
+    String,
+    std::collections::HashMap<String, String>,
+    Option<String>,
+) {
     let method = "GET".to_string();
     let headers_map = std::collections::HashMap::new();
     let body = None;
@@ -988,11 +981,7 @@ fn execute_fetch(
     let mut resp_headers = Vec::new();
     for (key, value) in response.headers() {
         if let Ok(val) = value.to_str() {
-            resp_headers.push(format!(
-                "{}\0{}",
-                key.as_str().to_lowercase(),
-                val
-            ));
+            resp_headers.push(format!("{}\0{}", key.as_str().to_lowercase(), val));
         }
     }
     let headers_raw = resp_headers.join("\n");

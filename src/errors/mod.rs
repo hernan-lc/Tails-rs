@@ -97,7 +97,9 @@ impl Error {
     }
 
     pub fn with_file(mut self, file: impl Into<String>) -> Self {
-        self.file = Some(file.into());
+        if self.file.is_none() {
+            self.file = Some(file.into());
+        }
         self
     }
 
@@ -137,30 +139,53 @@ impl Error {
 
         if let Some(span) = &self.span {
             if span.line > 0 {
-                if let Some(source) = source {
-                    let lines: Vec<&str> = source.lines().collect();
+                let source_code = self
+                    .file
+                    .as_ref()
+                    .and_then(|f| std::fs::read_to_string(f).ok())
+                    .or_else(|| source.map(|s| s.to_string()));
+                if let Some(source_code) = source_code {
+                    let lines: Vec<&str> = source_code.lines().collect();
                     if span.line > 0 && span.line <= lines.len() {
-                        let line_content = lines[span.line - 1];
-                        out.push_str(&format!(
-                            "\x1B[90m{}:{}:{}\x1B[0m\n",
-                            self.file.as_deref().unwrap_or("<script>"),
-                            span.line,
-                            span.col
-                        ));
-                        out.push_str(&format!("{}\n", line_content));
-                        let padding: String = " ".repeat(span.col.saturating_sub(1));
-                        let caret_len = if line_content.len() > span.col.saturating_sub(1) {
-                            let remaining = &line_content[span.col.saturating_sub(1)..];
-                            let len = remaining.find(char::is_whitespace).unwrap_or(remaining.len());
-                            if len == 0 { 1 } else { len }
-                        } else {
-                            1
-                        };
-                        out.push_str(&format!(
-                            "{}\x1B[31m{}\x1B[0m\n",
-                            padding,
-                            "^".repeat(caret_len)
-                        ));
+                        let file = self.file.as_deref().unwrap_or("<script>");
+                        let context_start = span.line.saturating_sub(2).max(1);
+                        let context_end = (span.line + 1).min(lines.len());
+                        let gutter_width = format!("{}", context_end).len();
+
+                        for i in context_start..=context_end {
+                            let line_num = i;
+                            let line_content = lines[line_num - 1];
+                            out.push_str(&format!(
+                                "\x1B[90m{:>width$} | {}\x1B[0m\n",
+                                line_num,
+                                line_content,
+                                width = gutter_width
+                            ));
+                            if line_num == span.line {
+                                let padding: String =
+                                    " ".repeat(gutter_width + 3 + span.col.saturating_sub(1));
+                                let line_content = lines[line_num - 1];
+                                let caret_len = if line_content.len() > span.col.saturating_sub(1) {
+                                    let remaining = &line_content[span.col.saturating_sub(1)..];
+                                    let len = remaining
+                                        .find(char::is_whitespace)
+                                        .unwrap_or(remaining.len());
+                                    if len == 0 {
+                                        1
+                                    } else {
+                                        len
+                                    }
+                                } else {
+                                    1
+                                };
+                                out.push_str(&format!(
+                                    "{}\x1B[31m{}\x1B[0m\n",
+                                    padding,
+                                    "^".repeat(caret_len)
+                                ));
+                            }
+                        }
+                        out.push_str(&format!("\x1B[90m{}\x1B[0m\n", file));
                     }
                 }
             }

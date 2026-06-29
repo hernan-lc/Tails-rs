@@ -405,8 +405,8 @@ pub fn create_child_process_module(
     _gc: &mut GarbageCollector,
 ) -> HashMap<String, Value> {
     let mut props = HashMap::new();
-    props.insert("execSync".into(), Value::NativeFunction(386));
-    props.insert("exec".into(), Value::NativeFunction(387));
-    props.insert("spawn".into(), Value::NativeFunction(388));
+    props.insert("execSync".into(), Value::NativeFunction(368));
+    props.insert("exec".into(), Value::NativeFunction(369));
+    props.insert("spawn".into(), Value::NativeFunction(370));
     props
 }
