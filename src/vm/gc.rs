@@ -70,7 +70,7 @@ impl GarbageCollector {
         }
 
         self.free_list = new_free_list;
-        self.allocation_count = heap.len() - self.free_list.len();
+        self.allocation_count = 0;
         self.bytes_freed += freed;
         self.collections_performed += 1;
         freed
