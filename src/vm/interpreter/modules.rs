@@ -356,7 +356,6 @@ impl Interpreter {
         if path.exists() && path.is_file() {
             return Some(path.to_string_lossy().to_string());
         }
-        // Try extensions
         for ext in &[".ts", ".js", ".mjs"] {
             let with_ext = path.with_extension("");
             let candidate =
@@ -365,7 +364,6 @@ impl Interpreter {
                 return Some(candidate.to_string_lossy().to_string());
             }
         }
-        // Try directory index
         if path.is_dir() {
             for name in &["index.ts", "index.js", "index.mjs"] {
                 let idx = path.join(name);
@@ -375,5 +373,196 @@ impl Interpreter {
             }
         }
         None
+    }
+
+    fn build_module_object_from_exports(&mut self, exports: &HashMap<String, Value>) -> Value {
+        let heap_idx = self.heap.len();
+        let mut props = HashMap::new();
+        for (k, v) in exports {
+            props.insert(k.clone(), v.clone());
+        }
+        self.heap.push(HeapValue::Object(JsObject {
+            properties: props,
+            prototype: None,
+            extensible: true,
+        }));
+        Value::Object(heap_idx)
+    }
+
+    pub(crate) fn build_error_promise(&mut self, message: String) -> Value {
+        let reason_idx = self.heap.len();
+        let mut props = HashMap::new();
+        props.insert("message".into(), Value::String(message));
+        self.heap.push(HeapValue::Object(JsObject {
+            properties: props,
+            prototype: None,
+            extensible: true,
+        }));
+        let promise_idx = self.heap.len();
+        self.heap.push(HeapValue::Promise(
+            crate::objects::js_promise::JsPromise::rejected(Value::Object(reason_idx)),
+        ));
+        Value::Promise(promise_idx)
+    }
+
+    pub(crate) fn build_module_promise(&mut self, exports: HashMap<String, Value>) -> Value {
+        let module_obj = self.build_module_object_from_exports(&exports);
+        let promise_idx = self.heap.len();
+        self.heap.push(HeapValue::Promise(
+            crate::objects::js_promise::JsPromise::fulfilled(module_obj),
+        ));
+        Value::Promise(promise_idx)
+    }
+
+    pub(crate) fn exec_import_module(&mut self, source: &str) -> Result<Option<Value>> {
+        match self.load_and_run_module(source)? {
+            Some(module_path) => {
+                let exports = self
+                    .module_registry
+                    .get(&module_path)
+                    .cloned()
+                    .unwrap_or_default();
+                Ok(Some(self.build_module_object_from_exports(&exports)))
+            }
+            None => Ok(Some(Value::Undefined)),
+        }
+    }
+
+    pub(crate) fn exec_import_named(
+        &mut self,
+        source: &str,
+        imported_name: &str,
+        local_name: &str,
+    ) -> Result<Value> {
+        match self.load_and_run_module(source)? {
+            Some(module_path) => {
+                let exports = self
+                    .module_registry
+                    .get(&module_path)
+                    .cloned()
+                    .unwrap_or_default();
+                let val = exports
+                    .get(imported_name)
+                    .cloned()
+                    .unwrap_or(Value::Undefined);
+                self.globals.insert(local_name.to_string(), val);
+                Ok(Value::Undefined)
+            }
+            None => {
+                self.globals
+                    .insert(local_name.to_string(), Value::Undefined);
+                Ok(Value::Undefined)
+            }
+        }
+    }
+
+    pub(crate) fn exec_import_default(&mut self, source: &str, local_name: &str) -> Result<Value> {
+        match self.load_and_run_module(source)? {
+            Some(module_path) => {
+                let exports = self
+                    .module_registry
+                    .get(&module_path)
+                    .cloned()
+                    .unwrap_or_default();
+                let val = if let Some(v) = exports.get("default") {
+                    v.clone()
+                } else if !exports.is_empty() {
+                    self.build_module_object_from_exports(&exports)
+                } else {
+                    Value::Undefined
+                };
+                self.globals.insert(local_name.to_string(), val);
+            }
+            None => {
+                self.globals
+                    .insert(local_name.to_string(), Value::Undefined);
+            }
+        }
+        Ok(Value::Undefined)
+    }
+
+    pub(crate) fn exec_import_all(&mut self, source: &str, local_name: &str) -> Result<Value> {
+        match self.load_and_run_module(source)? {
+            Some(module_path) => {
+                let exports = self
+                    .module_registry
+                    .get(&module_path)
+                    .cloned()
+                    .unwrap_or_default();
+                let module_obj = self.build_module_object_from_exports(&exports);
+                self.globals.insert(local_name.to_string(), module_obj);
+            }
+            None => {
+                let heap_idx = self.heap.len();
+                self.heap.push(HeapValue::Object(JsObject::new()));
+                self.globals
+                    .insert(local_name.to_string(), Value::Object(heap_idx));
+            }
+        }
+        Ok(Value::Undefined)
+    }
+
+    pub(crate) fn exec_native_import(&mut self, source: &str, local_name: &str) -> Result<Value> {
+        match self.load_and_run_module(source)? {
+            Some(_module_path) => {
+                let exports = self
+                    .module_registry
+                    .values()
+                    .last()
+                    .cloned()
+                    .unwrap_or_default();
+                let val = exports
+                    .get("default")
+                    .cloned()
+                    .unwrap_or_else(|| self.build_module_object_from_exports(&exports));
+                self.globals.insert(local_name.to_string(), val);
+            }
+            None => {
+                self.globals
+                    .insert(local_name.to_string(), Value::Undefined);
+            }
+        }
+        Ok(Value::Undefined)
+    }
+
+    pub(crate) fn exec_export_named(&mut self, names: &[String]) -> Result<()> {
+        for name in names {
+            if let Some(val) = self.globals.get(name) {
+                self.module_exports.insert(name.clone(), val.clone());
+            }
+        }
+        Ok(())
+    }
+
+    pub(crate) fn exec_export_default(&mut self) -> Result<()> {
+        let val = self.stack.last().cloned().unwrap_or(Value::Undefined);
+        self.module_exports.insert("default".to_string(), val);
+        Ok(())
+    }
+
+    pub(crate) fn exec_store_module_export(&mut self, name: &str) -> Result<()> {
+        if let Some(val) = self.globals.get(name) {
+            self.module_exports.insert(name.to_string(), val.clone());
+        }
+        Ok(())
+    }
+
+    pub(crate) fn exec_reexport_all(&mut self, source: &str) -> Result<()> {
+        match self.load_and_run_module(source)? {
+            Some(module_path) => {
+                let exports = self
+                    .module_registry
+                    .get(&module_path)
+                    .cloned()
+                    .unwrap_or_default();
+                for (k, v) in &exports {
+                    if k != "default" {
+                        self.module_exports.insert(k.clone(), v.clone());
+                    }
+                }
+            }
+            None => {}
+        }
+        Ok(())
     }
 }

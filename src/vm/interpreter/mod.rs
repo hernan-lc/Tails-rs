@@ -8,6 +8,7 @@ mod exception_handling;
 mod function_ops;
 mod heap_types;
 mod instructions;
+mod iterators;
 mod modules;
 mod native_loader;
 mod ops;
@@ -98,7 +99,6 @@ impl Interpreter {
             current_pc: 0,
             suspended_frames: VecDeque::new(),
         };
-        interp.init_builtins();
         interp.init_builtins();
         Ok(interp)
     }
@@ -296,6 +296,10 @@ impl Interpreter {
                         }
                         ControlFlowOutcome::Return(v) => return Ok(v),
                         ControlFlowOutcome::Next => {}
+                        ControlFlowOutcome::Jump(target) => {
+                            pc = target;
+                            continue;
+                        }
                     }
                 }
                 Instruction::Call(argc) => {
@@ -799,178 +803,33 @@ impl Interpreter {
                         continue;
                     }
                 }
-                Instruction::ImportModule(source) => match self.load_and_run_module(source)? {
-                    Some(module_path) => {
-                        let exports = self
-                            .module_registry
-                            .get(&module_path)
-                            .cloned()
-                            .unwrap_or_default();
-                        let heap_idx = self.heap.len();
-                        let mut props = HashMap::new();
-                        for (k, v) in &exports {
-                            props.insert(k.clone(), v.clone());
-                        }
-                        self.heap.push(HeapValue::Object(JsObject {
-                            properties: props,
-                            prototype: None,
-                            extensible: true,
-                        }));
-                        self.stack.push(Value::Object(heap_idx));
-                    }
-                    None => {
-                        self.stack.push(Value::Undefined);
-                    }
-                },
+                Instruction::ImportModule(source) => {
+                    let module_obj = self.exec_import_module(source)?.unwrap_or(Value::Undefined);
+                    self.stack.push(module_obj);
+                }
                 Instruction::ImportNamed(source, imported_name, local_name) => {
-                    match self.load_and_run_module(source)? {
-                        Some(module_path) => {
-                            let exports = self
-                                .module_registry
-                                .get(&module_path)
-                                .cloned()
-                                .unwrap_or_default();
-                            let val = exports
-                                .get(imported_name)
-                                .cloned()
-                                .unwrap_or(Value::Undefined);
-                            self.globals.insert(local_name.clone(), val);
-                        }
-                        None => {
-                            self.globals.insert(local_name.clone(), Value::Undefined);
-                        }
-                    }
+                    let _ = self.exec_import_named(source, imported_name, local_name)?;
                 }
                 Instruction::ImportDefault(source, local_name) => {
-                    match self.load_and_run_module(source)? {
-                        Some(module_path) => {
-                            let exports = self
-                                .module_registry
-                                .get(&module_path)
-                                .cloned()
-                                .unwrap_or_default();
-                            let val = if let Some(v) = exports.get("default") {
-                                v.clone()
-                            } else if !exports.is_empty() {
-                                // Create a default export object from named exports
-                                let obj_idx = self.heap.len();
-                                let mut obj_props = std::collections::HashMap::new();
-                                for (name, val) in &exports {
-                                    obj_props.insert(name.clone(), val.clone());
-                                }
-                                self.heap.push(HeapValue::Object(JsObject {
-                                    properties: obj_props,
-                                    prototype: None,
-                                    extensible: true,
-                                }));
-                                // Cache it in the registry
-                                if let Some(registry_exports) =
-                                    self.module_registry.get_mut(&module_path)
-                                {
-                                    registry_exports
-                                        .insert("default".to_string(), Value::Object(obj_idx));
-                                }
-                                Value::Object(obj_idx)
-                            } else {
-                                Value::Undefined
-                            };
-                            self.globals.insert(local_name.clone(), val);
-                        }
-                        None => {
-                            self.globals.insert(local_name.clone(), Value::Undefined);
-                        }
-                    }
+                    let _ = self.exec_import_default(source, local_name)?;
                 }
                 Instruction::ImportAll(source, local_name) => {
-                    match self.load_and_run_module(source)? {
-                        Some(module_path) => {
-                            let exports = self
-                                .module_registry
-                                .get(&module_path)
-                                .cloned()
-                                .unwrap_or_default();
-                            let heap_idx = self.heap.len();
-                            let mut props = HashMap::new();
-                            for (k, v) in &exports {
-                                props.insert(k.clone(), v.clone());
-                            }
-                            self.heap.push(HeapValue::Object(JsObject {
-                                properties: props,
-                                prototype: None,
-                                extensible: true,
-                            }));
-                            self.globals
-                                .insert(local_name.clone(), Value::Object(heap_idx));
-                        }
-                        None => {
-                            let heap_idx = self.heap.len();
-                            self.heap.push(HeapValue::Object(JsObject::new()));
-                            self.globals
-                                .insert(local_name.clone(), Value::Object(heap_idx));
-                        }
-                    }
+                    let _ = self.exec_import_all(source, local_name)?;
                 }
                 Instruction::NativeImport(source, local_name) => {
-                    match self.load_and_run_module(source)? {
-                        Some(module_path) => {
-                            let exports = self
-                                .module_registry
-                                .get(&module_path)
-                                .cloned()
-                                .unwrap_or_default();
-                            let val = exports.get("default").cloned().unwrap_or_else(|| {
-                                let heap_idx = self.heap.len();
-                                let mut props = HashMap::new();
-                                for (k, v) in &exports {
-                                    props.insert(k.clone(), v.clone());
-                                }
-                                self.heap.push(HeapValue::Object(JsObject {
-                                    properties: props,
-                                    prototype: None,
-                                    extensible: true,
-                                }));
-                                Value::Object(heap_idx)
-                            });
-                            self.globals.insert(local_name.clone(), val);
-                        }
-                        None => {
-                            self.globals.insert(local_name.clone(), Value::Undefined);
-                        }
-                    }
+                    let _ = self.exec_native_import(source, local_name)?;
                 }
                 Instruction::ExportNamed(names) => {
-                    for name in names {
-                        if let Some(val) = self.globals.get(name) {
-                            self.module_exports.insert(name.clone(), val.clone());
-                        }
-                    }
+                    let _ = self.exec_export_named(names)?;
                 }
                 Instruction::ExportDefault => {
-                    let val = self.stack.last().cloned().unwrap_or(Value::Undefined);
-                    self.module_exports.insert("default".to_string(), val);
+                    let _ = self.exec_export_default()?;
                 }
                 Instruction::StoreModuleExport(name) => {
-                    if let Some(val) = self.globals.get(name) {
-                        self.module_exports.insert(name.clone(), val.clone());
-                    }
+                    let _ = self.exec_store_module_export(name)?;
                 }
                 Instruction::ReExportAll(source) => {
-                    match self.load_and_run_module(source)? {
-                        Some(module_path) => {
-                            let exports = self
-                                .module_registry
-                                .get(&module_path)
-                                .cloned()
-                                .unwrap_or_default();
-                            for (k, v) in &exports {
-                                // Don't re-export "default" — only named exports
-                                if k != "default" {
-                                    self.module_exports.insert(k.clone(), v.clone());
-                                }
-                            }
-                        }
-                        None => {}
-                    }
+                    let _ = self.exec_reexport_all(source)?;
                 }
                 Instruction::PopModuleExports => {
                     self.module_exports.clear();
@@ -988,35 +847,8 @@ impl Interpreter {
                                 }
                                 PromiseState::Rejected(reason) => {
                                     self.pending_exception = Some(reason.clone());
-                                    let mut handled = false;
-                                    while let Some(handler) =
-                                        self.exception_handlers.last().cloned()
-                                    {
-                                        if handler.catch_pc != 0 {
-                                            self.exception_handlers.pop();
-                                            self.stack.truncate(handler.stack_depth);
-                                            pc = handler.catch_pc as usize;
-                                            handled = true;
-                                            break;
-                                        } else if handler.finally_pc != 0 {
-                                            self.exception_handlers.pop();
-                                            self.stack.truncate(handler.stack_depth);
-                                            pc = handler.finally_pc as usize;
-                                            handled = true;
-                                            break;
-                                        } else {
-                                            self.exception_handlers.pop();
-                                        }
-                                    }
-                                    if handled {
+                                    if self.handle_pending_exception(&mut pc)? {
                                         continue;
-                                    }
-                                    if self.pending_exception.is_some() {
-                                        let exc = self.pending_exception.take().unwrap();
-                                        let formatted = self.format_rejection_reason(&exc);
-                                        return Err(self.err_at_location(Error::RuntimeError(
-                                            format!("Unhandled promise rejection:\n{}", formatted),
-                                        )));
                                     }
                                 }
                                 PromiseState::Pending => {
@@ -1068,62 +900,20 @@ impl Interpreter {
                                 .get(&module_path)
                                 .cloned()
                                 .unwrap_or_default();
-                            let heap_idx = self.heap.len();
-                            let mut props = HashMap::new();
-                            for (k, v) in &exports {
-                                props.insert(k.clone(), v.clone());
-                            }
-                            self.heap.push(HeapValue::Object(JsObject {
-                                properties: props,
-                                prototype: None,
-                                extensible: true,
-                            }));
-                            let module_obj = Value::Object(heap_idx);
-                            let promise_idx = self.heap.len();
-                            self.heap.push(HeapValue::Promise(
-                                crate::objects::js_promise::JsPromise::fulfilled(module_obj),
-                            ));
-                            self.stack.push(Value::Promise(promise_idx));
+                            let promise = self.build_module_promise(exports);
+                            self.stack.push(promise);
                         }
                         Ok(None) => {
-                            let reason_idx = self.heap.len();
-                            let mut props = HashMap::new();
-                            props.insert(
-                                "message".into(),
-                                Value::String(format!("Module '{}' not found", source_str)),
+                            let promise = self.build_error_promise(
+                                format!("Module '{}' not found", source_str),
                             );
-                            self.heap.push(HeapValue::Object(JsObject {
-                                properties: props,
-                                prototype: None,
-                                extensible: true,
-                            }));
-                            let promise_idx = self.heap.len();
-                            self.heap.push(HeapValue::Promise(
-                                crate::objects::js_promise::JsPromise::rejected(Value::Object(
-                                    reason_idx,
-                                )),
-                            ));
-                            self.stack.push(Value::Promise(promise_idx));
+                            self.stack.push(promise);
                         }
                         Err(e) => {
-                            let reason_idx = self.heap.len();
-                            let mut props = HashMap::new();
-                            props.insert(
-                                "message".into(),
-                                Value::String(format!("Module '{}' error: {}", source_str, e)),
+                            let promise = self.build_error_promise(
+                                format!("Module '{}' error: {}", source_str, e),
                             );
-                            self.heap.push(HeapValue::Object(JsObject {
-                                properties: props,
-                                prototype: None,
-                                extensible: true,
-                            }));
-                            let promise_idx = self.heap.len();
-                            self.heap.push(HeapValue::Promise(
-                                crate::objects::js_promise::JsPromise::rejected(Value::Object(
-                                    reason_idx,
-                                )),
-                            ));
-                            self.stack.push(Value::Promise(promise_idx));
+                            self.stack.push(promise);
                         }
                     }
                 }
@@ -1132,478 +922,57 @@ impl Interpreter {
                         .stack
                         .pop()
                         .ok_or_else(|| Error::RuntimeError("Stack underflow".into()))?;
-
-                    // Check for built-in iterables (arrays, strings)
-                    match &iterable {
-                        Value::Array(arr_idx) => {
-                            // Create an array iterator object
-                            let arr_clone = if let HeapValue::Array(arr) = &self.heap[*arr_idx] {
-                                arr.elements.clone()
-                            } else {
-                                Vec::new()
-                            };
-                            let data_idx = self.gc.allocate(
-                                &mut self.heap,
-                                HeapValue::Array(JsArray {
-                                    elements: arr_clone,
-                                }),
-                            );
-                            let mut props = HashMap::new();
-                            props.insert("__type".to_string(), Value::String("array".to_string()));
-                            props.insert("__index".to_string(), Value::Integer(0));
-                            props.insert("__data".to_string(), Value::Array(data_idx));
-                            // Iterator helper methods
-                            props.insert("map".to_string(), Value::NativeFunction(230));
-                            props.insert("filter".to_string(), Value::NativeFunction(231));
-                            props.insert("take".to_string(), Value::NativeFunction(232));
-                            props.insert("drop".to_string(), Value::NativeFunction(233));
-                            props.insert("forEach".to_string(), Value::NativeFunction(234));
-                            props.insert("toArray".to_string(), Value::NativeFunction(235));
-                            let iter_idx = self.gc.allocate(
-                                &mut self.heap,
-                                HeapValue::Object(JsObject {
-                                    properties: props,
-                                    prototype: None,
-                                    extensible: true,
-                                }),
-                            );
-                            self.stack.push(Value::Object(iter_idx));
-                        }
-                        Value::String(s) => {
-                            // Create a string iterator object
-                            let chars: Vec<Value> =
-                                s.chars().map(|c| Value::String(c.to_string())).collect();
-                            let data_idx = self.gc.allocate(
-                                &mut self.heap,
-                                HeapValue::Array(JsArray { elements: chars }),
-                            );
-                            let mut props = HashMap::new();
-                            props.insert("__type".to_string(), Value::String("string".to_string()));
-                            props.insert("__index".to_string(), Value::Integer(0));
-                            props.insert("__data".to_string(), Value::Array(data_idx));
-                            // Iterator helper methods
-                            props.insert("map".to_string(), Value::NativeFunction(230));
-                            props.insert("filter".to_string(), Value::NativeFunction(231));
-                            props.insert("take".to_string(), Value::NativeFunction(232));
-                            props.insert("drop".to_string(), Value::NativeFunction(233));
-                            props.insert("forEach".to_string(), Value::NativeFunction(234));
-                            props.insert("toArray".to_string(), Value::NativeFunction(235));
-                            let iter_idx = self.gc.allocate(
-                                &mut self.heap,
-                                HeapValue::Object(JsObject {
-                                    properties: props,
-                                    prototype: None,
-                                    extensible: true,
-                                }),
-                            );
-                            self.stack.push(Value::Object(iter_idx));
-                        }
-                        Value::Map(map_idx) => {
-                            let entries = if let HeapValue::Map(m) = &self.heap[*map_idx] {
-                                m.entries.clone()
-                            } else {
-                                Vec::new()
-                            };
-                            let mut elements = Vec::new();
-                            for (k, v) in &entries {
-                                let pair_idx = self.heap.len();
-                                self.heap.push(HeapValue::Array(JsArray {
-                                    elements: vec![k.clone(), v.clone()],
-                                }));
-                                elements.push(Value::Array(pair_idx));
-                            }
-                            let data_idx = self
-                                .gc
-                                .allocate(&mut self.heap, HeapValue::Array(JsArray { elements }));
-                            let mut props = HashMap::new();
-                            props.insert("__type".to_string(), Value::String("array".to_string()));
-                            props.insert("__index".to_string(), Value::Integer(0));
-                            props.insert("__data".to_string(), Value::Array(data_idx));
-                            props.insert("map".to_string(), Value::NativeFunction(230));
-                            props.insert("filter".to_string(), Value::NativeFunction(231));
-                            props.insert("take".to_string(), Value::NativeFunction(232));
-                            props.insert("drop".to_string(), Value::NativeFunction(233));
-                            props.insert("forEach".to_string(), Value::NativeFunction(234));
-                            props.insert("toArray".to_string(), Value::NativeFunction(235));
-                            let iter_idx = self.gc.allocate(
-                                &mut self.heap,
-                                HeapValue::Object(JsObject {
-                                    properties: props,
-                                    prototype: None,
-                                    extensible: true,
-                                }),
-                            );
-                            self.stack.push(Value::Object(iter_idx));
-                        }
-                        Value::Set(set_idx) => {
-                            let values = if let HeapValue::Set(s) = &self.heap[*set_idx] {
-                                s.values.clone()
-                            } else {
-                                Vec::new()
-                            };
-                            let data_idx = self.gc.allocate(
-                                &mut self.heap,
-                                HeapValue::Array(JsArray { elements: values }),
-                            );
-                            let mut props = HashMap::new();
-                            props.insert("__type".to_string(), Value::String("array".to_string()));
-                            props.insert("__index".to_string(), Value::Integer(0));
-                            props.insert("__data".to_string(), Value::Array(data_idx));
-                            props.insert("map".to_string(), Value::NativeFunction(230));
-                            props.insert("filter".to_string(), Value::NativeFunction(231));
-                            props.insert("take".to_string(), Value::NativeFunction(232));
-                            props.insert("drop".to_string(), Value::NativeFunction(233));
-                            props.insert("forEach".to_string(), Value::NativeFunction(234));
-                            props.insert("toArray".to_string(), Value::NativeFunction(235));
-                            let iter_idx = self.gc.allocate(
-                                &mut self.heap,
-                                HeapValue::Object(JsObject {
-                                    properties: props,
-                                    prototype: None,
-                                    extensible: true,
-                                }),
-                            );
-                            self.stack.push(Value::Object(iter_idx));
-                        }
-                        _ => {
-                            // Look up Symbol.iterator on the iterable
-                            let iterator_symbol = Value::Symbol(crate::objects::SYMBOL_ITERATOR);
-                            let iterator_fn = self.get_property(&iterable, &iterator_symbol)?;
-                            match iterator_fn {
-                                Value::Function(_) | Value::NativeFunction(_) => {
-                                    let iterator = self.call_value(&iterator_fn, &iterable, &[])?;
-                                    self.stack.push(iterator);
-                                }
-                                _ => {
-                                    return Err(Error::TypeError(
-                                        "Value is not iterable (no Symbol.iterator method)".into(),
-                                    ));
-                                }
-                            }
-                        }
-                    }
+                    let iter = self.exec_get_iterator(iterable)?;
+                    self.stack.push(iter);
                 }
                 Instruction::GetAsyncIterator => {
                     let iterable = self
                         .stack
                         .pop()
                         .ok_or_else(|| Error::RuntimeError("Stack underflow".into()))?;
-
-                    // For async iteration, check Symbol.asyncIterator first, then Symbol.iterator
-                    // Built-in arrays and strings use the regular iterator
-                    match &iterable {
-                        Value::Array(arr_idx) => {
-                            // Create an array iterator (same as GetIterator)
-                            let arr_clone = if let HeapValue::Array(arr) = &self.heap[*arr_idx] {
-                                arr.elements.clone()
-                            } else {
-                                Vec::new()
-                            };
-                            let data_idx = self.gc.allocate(
-                                &mut self.heap,
-                                HeapValue::Array(JsArray {
-                                    elements: arr_clone,
-                                }),
-                            );
-                            let mut props = HashMap::new();
-                            props.insert("__type".to_string(), Value::String("array".to_string()));
-                            props.insert("__index".to_string(), Value::Integer(0));
-                            props.insert("__data".to_string(), Value::Array(data_idx));
-                            props.insert("map".to_string(), Value::NativeFunction(230));
-                            props.insert("filter".to_string(), Value::NativeFunction(231));
-                            props.insert("take".to_string(), Value::NativeFunction(232));
-                            props.insert("drop".to_string(), Value::NativeFunction(233));
-                            props.insert("forEach".to_string(), Value::NativeFunction(234));
-                            props.insert("toArray".to_string(), Value::NativeFunction(235));
-                            let iter_idx = self.gc.allocate(
-                                &mut self.heap,
-                                HeapValue::Object(JsObject {
-                                    properties: props,
-                                    prototype: None,
-                                    extensible: true,
-                                }),
-                            );
-                            self.stack.push(Value::Object(iter_idx));
-                        }
-                        Value::String(s) => {
-                            let chars: Vec<Value> =
-                                s.chars().map(|c| Value::String(c.to_string())).collect();
-                            let data_idx = self.gc.allocate(
-                                &mut self.heap,
-                                HeapValue::Array(JsArray { elements: chars }),
-                            );
-                            let mut props = HashMap::new();
-                            props.insert("__type".to_string(), Value::String("string".to_string()));
-                            props.insert("__index".to_string(), Value::Integer(0));
-                            props.insert("__data".to_string(), Value::Array(data_idx));
-                            props.insert("map".to_string(), Value::NativeFunction(230));
-                            props.insert("filter".to_string(), Value::NativeFunction(231));
-                            props.insert("take".to_string(), Value::NativeFunction(232));
-                            props.insert("drop".to_string(), Value::NativeFunction(233));
-                            props.insert("forEach".to_string(), Value::NativeFunction(234));
-                            props.insert("toArray".to_string(), Value::NativeFunction(235));
-                            let iter_idx = self.gc.allocate(
-                                &mut self.heap,
-                                HeapValue::Object(JsObject {
-                                    properties: props,
-                                    prototype: None,
-                                    extensible: true,
-                                }),
-                            );
-                            self.stack.push(Value::Object(iter_idx));
-                        }
-                        _ => {
-                            // Try Symbol.asyncIterator first, then Symbol.iterator
-                            let async_iter_symbol =
-                                Value::Symbol(crate::objects::SYMBOL_ASYNC_ITERATOR);
-                            let async_iter_fn = self.get_property(&iterable, &async_iter_symbol)?;
-                            let iterator_fn = if matches!(
-                                async_iter_fn,
-                                Value::Function(_) | Value::NativeFunction(_)
-                            ) {
-                                async_iter_fn
-                            } else {
-                                let iterator_symbol =
-                                    Value::Symbol(crate::objects::SYMBOL_ITERATOR);
-                                self.get_property(&iterable, &iterator_symbol)?
-                            };
-                            match iterator_fn {
-                                Value::Function(_) | Value::NativeFunction(_) => {
-                                    let iterator = self.call_value(&iterator_fn, &iterable, &[])?;
-                                    self.stack.push(iterator);
-                                }
-                                _ => {
-                                    return Err(Error::TypeError(
-                                        "Value is not async iterable".into(),
-                                    ));
-                                }
-                            }
-                        }
-                    }
+                    let iter = self.exec_get_async_iterator(iterable)?;
+                    self.stack.push(iter);
                 }
                 Instruction::IteratorNext(target) => {
-                    // Stack: [..., iterator]
                     let iterator = self
                         .stack
                         .last()
                         .cloned()
                         .ok_or_else(|| Error::RuntimeError("Stack underflow".into()))?;
-
-                    // Check if this is a built-in iterator (has __type property)
-                    if let Value::Object(iter_idx) = &iterator {
-                        if let HeapValue::Object(iter_obj) = &self.heap[*iter_idx] {
-                            if let Some(Value::String(iter_type)) =
-                                iter_obj.properties.get("__type")
-                            {
-                                let index = match iter_obj.properties.get("__index") {
-                                    Some(Value::Integer(i)) => *i as usize,
-                                    _ => 0,
-                                };
-                                if let Some(data_val) = iter_obj.properties.get("__data") {
-                                    match (iter_type.as_str(), data_val) {
-                                        ("array", Value::Array(arr_idx)) => {
-                                            if let HeapValue::Array(arr) = &self.heap[*arr_idx] {
-                                                if index >= arr.elements.len() {
-                                                    // Done - pop iterator and jump
-                                                    self.stack.pop();
-                                                    pc = *target as usize;
-                                                    continue;
-                                                }
-                                                let value = arr.elements[index].clone();
-                                                // Update index
-                                                if let HeapValue::Object(iter_obj_mut) =
-                                                    &mut self.heap[*iter_idx]
-                                                {
-                                                    iter_obj_mut.properties.insert(
-                                                        "__index".to_string(),
-                                                        Value::Integer((index + 1) as i64),
-                                                    );
-                                                }
-                                                self.stack.push(value);
-                                            }
-                                        }
-                                        ("string", Value::Array(chars_idx)) => {
-                                            if let HeapValue::Array(chars_arr) =
-                                                &self.heap[*chars_idx]
-                                            {
-                                                if index >= chars_arr.elements.len() {
-                                                    self.stack.pop();
-                                                    pc = *target as usize;
-                                                    continue;
-                                                }
-                                                let value = chars_arr.elements[index].clone();
-                                                if let HeapValue::Object(iter_obj_mut) =
-                                                    &mut self.heap[*iter_idx]
-                                                {
-                                                    iter_obj_mut.properties.insert(
-                                                        "__index".to_string(),
-                                                        Value::Integer((index + 1) as i64),
-                                                    );
-                                                }
-                                                self.stack.push(value);
-                                            }
-                                        }
-                                        _ => {
-                                            // Unknown iterator type, fall through to generic handling
-                                        }
-                                    }
-                                }
-                                pc += 1;
-                                continue;
-                            }
-                        }
-                    }
-
-                    // Generic iterator protocol - call iterator.next()
-                    let next_fn =
-                        self.get_property(&iterator, &Value::String("next".to_string()))?;
-                    let next_result = self.call_value(&next_fn, &iterator, &[])?;
-                    // Get done property
-                    let done =
-                        self.get_property(&next_result, &Value::String("done".to_string()))?;
-                    match done {
-                        Value::Boolean(true) => {
-                            // Iterator is done - pop the iterator and jump
+                    match self.exec_iterator_next(iterator, *target as usize)? {
+                        ControlFlowOutcome::Jump(jump_target) => {
                             self.stack.pop();
-                            pc = *target as usize;
+                            pc = jump_target;
                             continue;
                         }
-                        _ => {
-                            // Not done - extract value and push it (iterator stays below)
-                            let value = self
-                                .get_property(&next_result, &Value::String("value".to_string()))?;
-                            self.stack.push(value);
-                        }
+                        ControlFlowOutcome::Next => {}
+                        _ => {}
                     }
                 }
                 Instruction::IteratorClose => {
-                    // Pop the iterator and call .return() if it exists
                     let iterator = self
                         .stack
                         .pop()
                         .ok_or_else(|| Error::RuntimeError("Stack underflow".into()))?;
-                    if let Ok(return_fn) =
-                        self.get_property(&iterator, &Value::String("return".to_string()))
-                    {
-                        match return_fn {
-                            Value::Function(_) | Value::NativeFunction(_) => {
-                                let _ = self.call_value(&return_fn, &iterator, &[]);
-                            }
-                            _ => {}
-                        }
-                    }
+                    let _ = self.exec_iterator_close(iterator)?;
                 }
                 Instruction::AsyncIteratorNext(target) => {
-                    // Similar to IteratorNext but also awaits the value if it's a promise
                     let iterator = self
                         .stack
                         .last()
                         .cloned()
                         .ok_or_else(|| Error::RuntimeError("Stack underflow".into()))?;
-
-                    // First, check for built-in iterators (same as IteratorNext)
-                    if let Value::Object(iter_idx) = &iterator {
-                        let iter_idx = *iter_idx;
-                        if let HeapValue::Object(ref iter_obj) = self.heap[iter_idx] {
-                            if let Some(Value::String(_iter_type)) =
-                                iter_obj.properties.get("__type")
-                            {
-                                let index = match iter_obj.properties.get("__index") {
-                                    Some(Value::Integer(i)) => *i as usize,
-                                    _ => 0,
-                                };
-                                if let Some(data_val) = iter_obj.properties.get("__data").cloned() {
-                                    let done = match &data_val {
-                                        Value::Array(arr_idx) => {
-                                            if let HeapValue::Array(arr) = &self.heap[*arr_idx] {
-                                                index >= arr.elements.len()
-                                            } else {
-                                                true
-                                            }
-                                        }
-                                        _ => true,
-                                    };
-                                    if done {
-                                        self.stack.pop();
-                                        pc = *target as usize;
-                                        continue;
-                                    }
-                                    let value = match &data_val {
-                                        Value::Array(arr_idx) => {
-                                            if let HeapValue::Array(arr) = &self.heap[*arr_idx] {
-                                                arr.elements[index].clone()
-                                            } else {
-                                                Value::Undefined
-                                            }
-                                        }
-                                        _ => Value::Undefined,
-                                    };
-                                    // Update index
-                                    if let HeapValue::Object(ref mut obj) = self.heap[iter_idx] {
-                                        obj.properties.insert(
-                                            "__index".to_string(),
-                                            Value::Integer((index + 1) as i64),
-                                        );
-                                    }
-                                    // Await the value if it's a promise
-                                    let awaited_value = if let Value::Promise(promise_idx) = &value
-                                    {
-                                        if let HeapValue::Promise(p) = &self.heap[*promise_idx] {
-                                            match &p.state {
-                                                PromiseState::Fulfilled(v) => v.clone(),
-                                                PromiseState::Rejected(_) => Value::Undefined,
-                                                PromiseState::Pending => value.clone(),
-                                            }
-                                        } else {
-                                            value.clone()
-                                        }
-                                    } else {
-                                        value.clone()
-                                    };
-                                    self.stack.push(awaited_value);
-                                    pc += 1;
-                                    continue;
-                                }
-                            }
-                        }
-                    }
-
-                    // Generic iterator - call iterator.next()
-                    let next_fn =
-                        self.get_property(&iterator, &Value::String("next".to_string()))?;
-                    let next_result = self.call_value(&next_fn, &iterator, &[])?;
-                    // Check done property
-                    let done =
-                        self.get_property(&next_result, &Value::String("done".to_string()))?;
-                    match done {
-                        Value::Boolean(true) => {
+                    match self.exec_async_iterator_next(iterator, *target as usize)? {
+                        ControlFlowOutcome::Jump(jump_target) => {
                             self.stack.pop();
-                            pc = *target as usize;
+                            pc = jump_target;
                             continue;
                         }
-                        _ => {
-                            let value = self
-                                .get_property(&next_result, &Value::String("value".to_string()))?;
-                            // Await the value if it's a promise
-                            let awaited_value = if let Value::Promise(promise_idx) = &value {
-                                if let HeapValue::Promise(p) = &self.heap[*promise_idx] {
-                                    match &p.state {
-                                        PromiseState::Fulfilled(v) => v.clone(),
-                                        PromiseState::Rejected(_) => Value::Undefined,
-                                        PromiseState::Pending => value.clone(),
-                                    }
-                                } else {
-                                    value.clone()
-                                }
-                            } else {
-                                value.clone()
-                            };
-                            self.stack.push(awaited_value);
-                        }
+                        ControlFlowOutcome::Next => {}
+                        _ => {}
                     }
                 }
                 _ => {
-                    // Delegate to instruction handler modules
                     #[allow(clippy::if_same_then_else)]
                     if self.exec_load_store(&instruction, module)? {
                     } else if self.exec_arithmetic(&instruction)? {
@@ -1611,18 +980,13 @@ impl Interpreter {
                     } else if self.exec_property_ops(&instruction)? {
                     } else if self.exec_make_function(&instruction, module, pc)? {
                     } else if self.exec_class_ops(&instruction, &mut pc, module)? {
+                    } else if self.exec_exception(&instruction, &mut pc)? {
+                    } else if self.handle_pending_exception(&mut pc)? {
                     } else {
-                        let saved_pc = pc;
-                        if self.exec_exception(&instruction, &mut pc)? {
-                            if pc != saved_pc {
-                                continue;
-                            }
-                        } else {
-                            return Err(Error::RuntimeError(format!(
-                                "Unhandled instruction: {:?}",
-                                instruction
-                            )));
-                        }
+                        return Err(Error::RuntimeError(format!(
+                            "Unhandled instruction: {:?}",
+                            instruction
+                        )));
                     }
                 }
             }

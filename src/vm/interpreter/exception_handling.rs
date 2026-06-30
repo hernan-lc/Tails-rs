@@ -17,19 +17,18 @@ impl Interpreter {
                     .ok_or_else(|| Error::RuntimeError("Stack underflow".into()))?;
                 self.pending_exception = Some(value.clone());
                 while let Some(handler) = self.exception_handlers.last().cloned() {
-                    if handler.catch_pc != 0 {
-                        self.exception_handlers.pop();
-                        self.stack.truncate(handler.stack_depth);
-                        *pc = handler.catch_pc as usize;
-                        return Ok(true);
-                    } else if handler.finally_pc != 0 {
-                        self.exception_handlers.pop();
-                        self.stack.truncate(handler.stack_depth);
-                        *pc = handler.finally_pc as usize;
-                        return Ok(true);
-                    } else {
-                        self.exception_handlers.pop();
-                    }
+                if handler.catch_pc != 0 {
+                    self.exception_handlers.pop();
+                    self.stack.truncate(handler.stack_depth);
+                    *pc = handler.catch_pc as usize;
+                    return Ok(true);
+                }
+                if handler.finally_pc != 0 {
+                    self.exception_handlers.pop();
+                    self.stack.truncate(handler.stack_depth);
+                    *pc = handler.finally_pc as usize;
+                    return Ok(true);
+                }
                 }
                 return Err(Error::RuntimeError(format!(
                     "Thrown: {}",
@@ -100,5 +99,32 @@ impl Interpreter {
             _ => return Ok(false),
         }
         Ok(true)
+    }
+
+    pub(crate) fn handle_pending_exception(
+        &mut self,
+        pc: &mut usize,
+    ) -> Result<bool> {
+        if self.pending_exception.is_some() {
+            while let Some(handler) = self.exception_handlers.last().cloned() {
+                self.exception_handlers.pop();
+                self.stack.truncate(handler.stack_depth);
+                if handler.catch_pc != 0 {
+                    *pc = handler.catch_pc as usize;
+                    return Ok(true);
+                }
+                if handler.finally_pc != 0 {
+                    *pc = handler.finally_pc as usize;
+                    return Ok(true);
+                }
+            }
+            let exc = self.pending_exception.take().unwrap_or(Value::Undefined);
+            let formatted = self.format_rejection_reason(&exc);
+            return Err(Error::RuntimeError(format!(
+                "Unhandled promise rejection:\n{}",
+                formatted
+            )));
+        }
+        Ok(false)
     }
 }

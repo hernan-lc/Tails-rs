@@ -6,6 +6,7 @@ use crate::objects::Value;
 pub(crate) enum ControlFlowOutcome {
     Continue,
     Next,
+    Jump(usize),
     Return(Value),
 }
 
