@@ -151,7 +151,7 @@ impl Interpreter {
                 while self
                     .call_stack
                     .last()
-                    .map_or(false, |f| f.base_pointer >= handler.stack_depth)
+                    .is_some_and(|f| f.base_pointer >= handler.stack_depth)
                 {
                     self.call_stack.pop();
                 }
@@ -163,7 +163,7 @@ impl Interpreter {
                 while self
                     .call_stack
                     .last()
-                    .map_or(false, |f| f.base_pointer >= handler.stack_depth)
+                    .is_some_and(|f| f.base_pointer >= handler.stack_depth)
                 {
                     self.call_stack.pop();
                 }

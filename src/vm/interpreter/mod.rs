@@ -839,19 +839,19 @@ impl Interpreter {
                     let _ = self.exec_import_all(source, local_name)?;
                 }
                 Instruction::NativeImport(source, local_name) => {
-                    let _ = self.exec_native_import(source, local_name)?;
+                    self.exec_native_import(source, local_name)?;
                 }
                 Instruction::ExportNamed(names) => {
-                    let _ = self.exec_export_named(names)?;
+                    self.exec_export_named(names)?;
                 }
                 Instruction::ExportDefault => {
-                    let _ = self.exec_export_default()?;
+                    self.exec_export_default()?;
                 }
                 Instruction::StoreModuleExport(name) => {
-                    let _ = self.exec_store_module_export(name)?;
+                    self.exec_store_module_export(name)?;
                 }
                 Instruction::ReExportAll(source) => {
-                    let _ = self.exec_reexport_all(source)?;
+                    self.exec_reexport_all(source)?;
                 }
                 Instruction::PopModuleExports => {
                     self.module_exports.clear();
@@ -976,7 +976,7 @@ impl Interpreter {
                         .stack
                         .pop()
                         .ok_or_else(|| Error::RuntimeError("Stack underflow".into()))?;
-                    let _ = self.exec_iterator_close(iterator)?;
+                    self.exec_iterator_close(iterator)?;
                 }
                 Instruction::AsyncIteratorNext(target) => {
                     let iterator = self

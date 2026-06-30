@@ -66,8 +66,7 @@ fn collect_object_properties<'a>(
             if k == "constructor" {
                 continue;
             }
-            if k.starts_with("__getter_") {
-                let prop_name = &k["__getter_".len()..];
+            if let Some(prop_name) = k.strip_prefix("__getter_") {
                 all_props.push((prop_name.to_string(), v));
                 continue;
             }
