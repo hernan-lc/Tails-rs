@@ -1,7 +1,7 @@
 use super::*;
 use crate::errors::{Error, Result};
-use crate::objects::Value;
 use crate::objects::js_promise::PromiseState;
+use crate::objects::Value;
 use std::collections::HashMap;
 
 impl Interpreter {
@@ -18,10 +18,7 @@ impl Interpreter {
         props
     }
 
-    pub(crate) fn exec_get_iterator(
-        &mut self,
-        iterable: Value,
-    ) -> Result<Value> {
+    pub(crate) fn exec_get_iterator(&mut self, iterable: Value) -> Result<Value> {
         match &iterable {
             Value::Array(arr_idx) => {
                 let elements = if let HeapValue::Array(arr) = &self.heap[*arr_idx] {
@@ -29,10 +26,9 @@ impl Interpreter {
                 } else {
                     Vec::new()
                 };
-                let data_idx = self.gc.allocate(
-                    &mut self.heap,
-                    HeapValue::Array(JsArray { elements }),
-                );
+                let data_idx = self
+                    .gc
+                    .allocate(&mut self.heap, HeapValue::Array(JsArray { elements }));
                 let mut props = Self::make_builtin_iter_props();
                 props.insert("__data".to_string(), Value::Array(data_idx));
                 let iter_idx = self.gc.allocate(
@@ -78,10 +74,9 @@ impl Interpreter {
                     }));
                     elements.push(Value::Array(pair_idx));
                 }
-                let data_idx = self.gc.allocate(
-                    &mut self.heap,
-                    HeapValue::Array(JsArray { elements }),
-                );
+                let data_idx = self
+                    .gc
+                    .allocate(&mut self.heap, HeapValue::Array(JsArray { elements }));
                 let mut props = Self::make_builtin_iter_props();
                 props.insert("__data".to_string(), Value::Array(data_idx));
                 let iter_idx = self.gc.allocate(
@@ -132,10 +127,7 @@ impl Interpreter {
         }
     }
 
-    pub(crate) fn exec_get_async_iterator(
-        &mut self,
-        iterable: Value,
-    ) -> Result<Value> {
+    pub(crate) fn exec_get_async_iterator(&mut self, iterable: Value) -> Result<Value> {
         match &iterable {
             Value::Array(arr_idx) => {
                 let elements = if let HeapValue::Array(arr) = &self.heap[*arr_idx] {
@@ -143,10 +135,9 @@ impl Interpreter {
                 } else {
                     Vec::new()
                 };
-                let data_idx = self.gc.allocate(
-                    &mut self.heap,
-                    HeapValue::Array(JsArray { elements }),
-                );
+                let data_idx = self
+                    .gc
+                    .allocate(&mut self.heap, HeapValue::Array(JsArray { elements }));
                 let mut props = Self::make_builtin_iter_props();
                 props.insert("__data".to_string(), Value::Array(data_idx));
                 let iter_idx = self.gc.allocate(
@@ -181,12 +172,13 @@ impl Interpreter {
             _ => {
                 let async_iter_symbol = Value::Symbol(crate::objects::SYMBOL_ASYNC_ITERATOR);
                 let async_iter_fn = self.get_property(&iterable, &async_iter_symbol)?;
-                let iterator_fn = if matches!(async_iter_fn, Value::Function(_) | Value::NativeFunction(_)) {
-                    async_iter_fn
-                } else {
-                    let iterator_symbol = Value::Symbol(crate::objects::SYMBOL_ITERATOR);
-                    self.get_property(&iterable, &iterator_symbol)?
-                };
+                let iterator_fn =
+                    if matches!(async_iter_fn, Value::Function(_) | Value::NativeFunction(_)) {
+                        async_iter_fn
+                    } else {
+                        let iterator_symbol = Value::Symbol(crate::objects::SYMBOL_ITERATOR);
+                        self.get_property(&iterable, &iterator_symbol)?
+                    };
                 match iterator_fn {
                     Value::Function(_) | Value::NativeFunction(_) => {
                         let iterator = self.call_value(&iterator_fn, &iterable, &[])?;
@@ -218,7 +210,9 @@ impl Interpreter {
                                         return Ok(ControlFlowOutcome::Jump(target));
                                     }
                                     let value = arr.elements[index].clone();
-                                    if let HeapValue::Object(iter_obj_mut) = &mut self.heap[*iter_idx] {
+                                    if let HeapValue::Object(iter_obj_mut) =
+                                        &mut self.heap[*iter_idx]
+                                    {
                                         iter_obj_mut.properties.insert(
                                             "__index".to_string(),
                                             Value::Integer((index + 1) as i64),
@@ -233,7 +227,9 @@ impl Interpreter {
                                         return Ok(ControlFlowOutcome::Jump(target));
                                     }
                                     let value = chars_arr.elements[index].clone();
-                                    if let HeapValue::Object(iter_obj_mut) = &mut self.heap[*iter_idx] {
+                                    if let HeapValue::Object(iter_obj_mut) =
+                                        &mut self.heap[*iter_idx]
+                                    {
                                         iter_obj_mut.properties.insert(
                                             "__index".to_string(),
                                             Value::Integer((index + 1) as i64),
@@ -301,10 +297,8 @@ impl Interpreter {
                             _ => Value::Undefined,
                         };
                         if let HeapValue::Object(ref mut obj) = self.heap[iter_idx] {
-                            obj.properties.insert(
-                                "__index".to_string(),
-                                Value::Integer((index + 1) as i64),
-                            );
+                            obj.properties
+                                .insert("__index".to_string(), Value::Integer((index + 1) as i64));
                         }
                         let awaited_value = Self::resolve_value_promise(&self.heap, &value);
                         self.stack.push(awaited_value);

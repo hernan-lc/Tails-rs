@@ -56,6 +56,10 @@ impl Interpreter {
                     } else {
                         this.clone()
                     };
+                    if self.call_stack.len() >= self.max_call_stack_depth {
+                        let msg = "Maximum call stack size exceeded".to_string();
+                        return Err(crate::errors::Error::RuntimeError(msg));
+                    }
                     self.call_stack.push(CallFrame {
                         return_address,
                         base_pointer,

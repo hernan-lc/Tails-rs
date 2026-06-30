@@ -117,13 +117,19 @@ fn pretty_format(interp: &Interpreter, v: &Value, depth: usize, use_colors: bool
             for (key, val) in &props {
                 let getter_key = format!("__getter_{}", key);
                 let setter_key = format!("__setter_{}", key);
-                let is_getter = if let crate::vm::interpreter::HeapValue::Object(obj) = &interp.heap[*obj_idx] {
-                    obj.properties.contains_key(&getter_key) && !obj.properties.contains_key(&setter_key)
+                let is_getter = if let crate::vm::interpreter::HeapValue::Object(obj) =
+                    &interp.heap[*obj_idx]
+                {
+                    obj.properties.contains_key(&getter_key)
+                        && !obj.properties.contains_key(&setter_key)
                 } else {
                     false
                 };
-                let is_setter = if let crate::vm::interpreter::HeapValue::Object(obj) = &interp.heap[*obj_idx] {
-                    !obj.properties.contains_key(&getter_key) && obj.properties.contains_key(&setter_key)
+                let is_setter = if let crate::vm::interpreter::HeapValue::Object(obj) =
+                    &interp.heap[*obj_idx]
+                {
+                    !obj.properties.contains_key(&getter_key)
+                        && obj.properties.contains_key(&setter_key)
                 } else {
                     false
                 };

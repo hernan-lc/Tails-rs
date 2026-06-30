@@ -141,9 +141,22 @@ impl<'a> Parser<'a> {
                             let mut depth = 1u32;
                             while depth > 0 && self.peek().token != Token::Eof {
                                 match self.peek().token {
-                                    Token::LeftBracket => { depth += 1; self.advance(); }
-                                    Token::RightBracket => { depth -= 1; if depth > 0 { self.advance(); } else { self.advance(); break; } }
-                                    _ => { self.advance(); }
+                                    Token::LeftBracket => {
+                                        depth += 1;
+                                        self.advance();
+                                    }
+                                    Token::RightBracket => {
+                                        depth -= 1;
+                                        if depth > 0 {
+                                            self.advance();
+                                        } else {
+                                            self.advance();
+                                            break;
+                                        }
+                                    }
+                                    _ => {
+                                        self.advance();
+                                    }
                                 }
                             }
                             // Expect `: Type`

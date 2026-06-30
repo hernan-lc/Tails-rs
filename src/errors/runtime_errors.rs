@@ -5,11 +5,17 @@ pub fn runtime_error(message: &str) -> Error {
 }
 
 pub fn runtime_error_cannot_read_property(obj: &str, prop: &str) -> Error {
-    Error::RuntimeError(format!("Cannot read properties of {} (reading '{}')", obj, prop))
+    Error::RuntimeError(format!(
+        "Cannot read properties of {} (reading '{}')",
+        obj, prop
+    ))
 }
 
 pub fn runtime_error_cannot_set_property(obj: &str, prop: &str) -> Error {
-    Error::RuntimeError(format!("Cannot set properties of {} (setting '{}')", obj, prop))
+    Error::RuntimeError(format!(
+        "Cannot set properties of {} (setting '{}')",
+        obj, prop
+    ))
 }
 
 pub fn runtime_error_cannot_convert_to(value: &str, target: &str) -> Error {
@@ -81,5 +87,8 @@ pub fn runtime_error_division_by_zero() -> Error {
 }
 
 pub fn runtime_error_index_out_of_bounds(index: usize, length: usize) -> Error {
-    Error::RuntimeError(format!("Index {} out of bounds for length {}", index, length))
+    Error::RuntimeError(format!(
+        "Index {} out of bounds for length {}",
+        index, length
+    ))
 }

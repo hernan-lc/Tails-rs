@@ -5,7 +5,11 @@ use crate::errors::Result;
 use crate::objects::Value;
 
 impl CodeGenerator {
-    pub(super) fn generate_control_flow_statement(&mut self, stmt: &Statement, _is_last: bool) -> Result<bool> {
+    pub(super) fn generate_control_flow_statement(
+        &mut self,
+        stmt: &Statement,
+        _is_last: bool,
+    ) -> Result<bool> {
         match stmt {
             Statement::IfStatement {
                 condition,

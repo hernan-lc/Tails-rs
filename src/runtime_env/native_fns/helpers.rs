@@ -233,7 +233,12 @@ pub(super) fn to_json_value(interp: &Interpreter, v: &Value) -> String {
     to_json_value_inner(interp, v, &mut std::collections::HashSet::new(), 0)
 }
 
-fn to_json_value_inner(interp: &Interpreter, v: &Value, visited: &mut std::collections::HashSet<usize>, depth: usize) -> String {
+fn to_json_value_inner(
+    interp: &Interpreter,
+    v: &Value,
+    visited: &mut std::collections::HashSet<usize>,
+    depth: usize,
+) -> String {
     if depth > 64 {
         return "null".to_string();
     }
@@ -275,8 +280,18 @@ fn to_json_value_inner(interp: &Interpreter, v: &Value, visited: &mut std::colle
                 let parts: Vec<String> = obj
                     .properties
                     .iter()
-                    .filter(|(k, _)| !k.starts_with("__getter_") && !k.starts_with("__setter_") && !k.starts_with("__method_"))
-                    .map(|(k, v)| format!("\"{}\":{}", k, to_json_value_inner(interp, v, visited, depth + 1)))
+                    .filter(|(k, _)| {
+                        !k.starts_with("__getter_")
+                            && !k.starts_with("__setter_")
+                            && !k.starts_with("__method_")
+                    })
+                    .map(|(k, v)| {
+                        format!(
+                            "\"{}\":{}",
+                            k,
+                            to_json_value_inner(interp, v, visited, depth + 1)
+                        )
+                    })
                     .collect();
                 format!("{{{}}}", parts.join(","))
             } else {
@@ -359,7 +374,7 @@ pub(super) fn find_error_ctor_proto(interp: &Interpreter) -> Option<usize> {
     None
 }
 
-pub(super) fn find_error_proto(interp: &Interpreter, type_name: &str) -> Option<usize> {
+pub(crate) fn find_error_proto(interp: &Interpreter, type_name: &str) -> Option<usize> {
     for (i, hv) in interp.heap.iter().enumerate() {
         if let crate::vm::interpreter::HeapValue::Object(obj) = hv {
             if let Some(Value::String(name)) = obj.properties.get("name") {

@@ -6,10 +6,20 @@ use crate::vm::Interpreter;
 use std::collections::HashMap;
 use std::path::Path;
 
-#[derive(Default)]
 pub struct RuntimeConfig {
     pub enable_type_checking: bool,
     pub max_heap_size: usize,
+    pub max_call_stack_depth: usize,
+}
+
+impl Default for RuntimeConfig {
+    fn default() -> Self {
+        Self {
+            enable_type_checking: false,
+            max_heap_size: 0,
+            max_call_stack_depth: 10_000,
+        }
+    }
 }
 
 pub struct TailsRuntime {
@@ -19,7 +29,10 @@ pub struct TailsRuntime {
 
 impl TailsRuntime {
     pub fn new(config: RuntimeConfig) -> Result<Self> {
-        let interpreter = Interpreter::new()?;
+        let mut interpreter = Interpreter::new()?;
+        if config.max_call_stack_depth > 0 {
+            interpreter.max_call_stack_depth = config.max_call_stack_depth;
+        }
         Ok(Self {
             interpreter,
             config,

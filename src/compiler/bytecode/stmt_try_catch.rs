@@ -4,10 +4,7 @@ use crate::compiler::Instruction;
 use crate::errors::Result;
 
 impl CodeGenerator {
-    pub(super) fn generate_try_catch_statement(
-        &mut self,
-        stmt: &Statement,
-    ) -> Result<bool> {
+    pub(super) fn generate_try_catch_statement(&mut self, stmt: &Statement) -> Result<bool> {
         match stmt {
             Statement::TryStatement {
                 block,
@@ -44,7 +41,7 @@ impl CodeGenerator {
                     0
                 };
 
-if let Some(catch_clause) = handler {
+                if let Some(catch_clause) = handler {
                     self.locals.push(catch_clause.param.clone());
                     let slot = self.last_local_slot();
                     self.emit(Instruction::LoadException);

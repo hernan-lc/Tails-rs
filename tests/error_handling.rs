@@ -1,4 +1,4 @@
-use tails::TailsRuntime;
+use tails::{RuntimeConfig, TailsRuntime};
 
 #[test]
 fn test_basic_try_catch() {
@@ -263,4 +263,223 @@ fn test_throw_number() {
     );
     assert!(r.is_ok());
     assert_eq!(r.unwrap(), tails::Value::Float(42.0));
+}
+
+#[test]
+fn test_infinite_recursion_throws_error() {
+    let mut rt = TailsRuntime::default();
+    let r = rt.eval(
+        r#"
+        function recurse() { recurse(); }
+        recurse();
+    "#,
+    );
+    assert!(r.is_err());
+    let err = r.unwrap_err();
+    assert!(err.message().contains("Maximum call stack size exceeded"));
+}
+
+#[test]
+fn test_infinite_recursion_caught_by_try_catch() {
+    let mut rt = TailsRuntime::default();
+    let r = rt.eval(
+        r#"
+        function recurse() { recurse(); }
+        let caught = "";
+        try {
+            recurse();
+        } catch(e) {
+            caught = e.message;
+        }
+        caught;
+    "#,
+    );
+    assert!(r.is_ok(), "eval should succeed when caught: {:?}", r);
+    assert_eq!(
+        r.unwrap(),
+        tails::Value::String("Maximum call stack size exceeded".into())
+    );
+}
+
+#[test]
+fn test_infinite_recursion_caught_check_name() {
+    let mut rt = TailsRuntime::default();
+    let r = rt.eval(
+        r#"
+        function recurse() { recurse(); }
+        let name = "";
+        try {
+            recurse();
+        } catch(e) {
+            name = e.name;
+        }
+        name;
+    "#,
+    );
+    assert!(r.is_ok(), "eval should succeed when caught: {:?}", r);
+    assert_eq!(r.unwrap(), tails::Value::String("RangeError".into()));
+}
+
+#[test]
+fn test_deep_recursion_passes_with_default_limit() {
+    let mut rt = TailsRuntime::default();
+    let r = rt.eval(
+        r#"
+        function factorial(n, acc) {
+            if (acc === undefined) { acc = 1; }
+            if (n <= 1) { return acc; }
+            return factorial(n - 1, n * acc);
+        }
+        factorial(5000);
+    "#,
+    );
+    assert!(r.is_ok(), "deep recursion should pass: {:?}", r);
+}
+
+#[test]
+fn test_mutual_recursion_hits_limit() {
+    let mut rt = TailsRuntime::default();
+    let r = rt.eval(
+        r#"
+        let depth = 0;
+        function a() { depth++; b(); }
+        function b() { depth++; a(); }
+        try { a(); } catch(e) {}
+        depth;
+    "#,
+    );
+    assert!(r.is_ok());
+    let val = r.unwrap();
+    if let tails::Value::Float(n) = val {
+        assert!(n > 100.0, "should recurse deeply before limit: got {}", n);
+    } else {
+        panic!("expected Float, got {:?}", val);
+    }
+}
+
+#[test]
+fn test_custom_shorter_recursion_limit() {
+    let config = RuntimeConfig {
+        max_call_stack_depth: 50,
+        ..RuntimeConfig::default()
+    };
+    let mut rt = TailsRuntime::new(config).unwrap();
+    let r = rt.eval(
+        r#"
+        function recurse() { recurse(); }
+        let msg = "";
+        try {
+            recurse();
+        } catch(e) {
+            msg = e.message;
+        }
+        msg;
+    "#,
+    );
+    assert!(r.is_ok(), "custom limit 50: {:?}", r);
+    assert_eq!(
+        r.unwrap(),
+        tails::Value::String("Maximum call stack size exceeded".into())
+    );
+    drop(rt);
+
+    let config = RuntimeConfig {
+        max_call_stack_depth: 200,
+        ..RuntimeConfig::default()
+    };
+    let mut rt = TailsRuntime::new(config).unwrap();
+    let r = rt.eval(
+        r#"
+        function recurse() { recurse(); }
+        let msg = "";
+        try {
+            recurse();
+        } catch(e) {
+            msg = e.message;
+        }
+        msg;
+    "#,
+    );
+    assert!(r.is_ok(), "custom limit 200: {:?}", r);
+    assert_eq!(
+        r.unwrap(),
+        tails::Value::String("Maximum call stack size exceeded".into())
+    );
+}
+
+#[test]
+fn test_custom_shorter_limit_caught_name() {
+    let config = RuntimeConfig {
+        max_call_stack_depth: 50,
+        ..RuntimeConfig::default()
+    };
+    let mut rt = TailsRuntime::new(config).unwrap();
+    let r = rt.eval(
+        r#"
+        function recurse() { recurse(); }
+        let name = "";
+        try {
+            recurse();
+        } catch(e) {
+            name = e.name;
+        }
+        name;
+    "#,
+    );
+    assert!(r.is_ok(), "caught name: {:?}", r);
+    assert_eq!(r.unwrap(), tails::Value::String("RangeError".into()));
+}
+
+#[test]
+fn test_custom_shorter_limit_caught_stack() {
+    let config = RuntimeConfig {
+        max_call_stack_depth: 10,
+        ..RuntimeConfig::default()
+    };
+    let mut rt = TailsRuntime::new(config).unwrap();
+    let r = rt.eval(
+        r#"
+        function recurse() { recurse(); }
+        let stack = "";
+        try {
+            recurse();
+        } catch(e) {
+            stack = e.stack;
+        }
+        stack;
+    "#,
+    );
+    assert!(r.is_ok(), "caught stack: {:?}", r);
+    let val = r.unwrap();
+    if let tails::Value::String(s) = val {
+        assert!(s.contains("RangeError"), "stack should contain RangeError");
+        assert!(
+            s.contains("Maximum call stack size exceeded"),
+            "stack should contain message"
+        );
+        assert!(s.contains("recurse"), "stack should contain function name");
+    } else {
+        panic!("expected String, got {:?}", val);
+    }
+}
+
+#[test]
+fn test_recursion_limit_zero_disables_check() {
+    let config = RuntimeConfig {
+        max_call_stack_depth: 0,
+        ..RuntimeConfig::default()
+    };
+    let mut rt = TailsRuntime::new(config).unwrap();
+    let r = rt.eval(
+        r#"
+        function factorial(n, acc) {
+            if (acc === undefined) { acc = 1; }
+            if (n <= 1) { return acc; }
+            return factorial(n - 1, n * acc);
+        }
+        factorial(5);
+    "#,
+    );
+    assert!(r.is_ok());
+    assert_eq!(r.unwrap(), tails::Value::Float(120.0));
 }

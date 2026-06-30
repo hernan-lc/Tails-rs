@@ -117,7 +117,10 @@ impl Interpreter {
                 self.module_registry.insert(module_name.to_string(), props);
                 return Ok(Some(module_name.to_string()));
             }
-                return Err(Error::RuntimeError(format!("Cannot find module '{}'", source)));
+            return Err(Error::RuntimeError(format!(
+                "Cannot find module '{}'",
+                source
+            )));
         }
 
         let module_path = match self.resolve_module_path(source) {
@@ -146,15 +149,17 @@ impl Interpreter {
                     self.module_registry.insert(module_name.to_string(), props);
                     return Ok(Some(module_name.to_string()));
                 }
-            return Err(Error::RuntimeError(format!("Cannot find module '{}'", source)));
+                return Err(Error::RuntimeError(format!(
+                    "Cannot find module '{}'",
+                    source
+                )));
             }
         };
         if self.module_registry.contains_key(&module_path) {
             return Ok(Some(module_path));
         }
-        let source_code = std::fs::read_to_string(&module_path).map_err(|e| {
-            Error::RuntimeError(format!("Cannot read module '{}': {}", source, e))
-        })?;
+        let source_code = std::fs::read_to_string(&module_path)
+            .map_err(|e| Error::RuntimeError(format!("Cannot read module '{}': {}", source, e)))?;
         let compiler = crate::compiler::Compiler::new(false);
         let compiled = compiler.compile(&source_code)?;
         let prev_path = self.current_module_path.take();
@@ -193,7 +198,8 @@ impl Interpreter {
             }
             for ext in &[".ts", ".js"] {
                 let stem = normalized.with_extension("");
-                let candidate = std::path::PathBuf::from(format!("{}{}", stem.to_string_lossy(), ext));
+                let candidate =
+                    std::path::PathBuf::from(format!("{}{}", stem.to_string_lossy(), ext));
                 if candidate.exists() {
                     return Ok(candidate.to_string_lossy().to_string());
                 }
@@ -453,7 +459,10 @@ impl Interpreter {
                 self.globals.insert(local_name.to_string(), val);
                 Ok(Value::Undefined)
             }
-            None => Err(Error::RuntimeError(format!("Cannot find module '{}'", source)))
+            None => Err(Error::RuntimeError(format!(
+                "Cannot find module '{}'",
+                source
+            ))),
         }
     }
 
@@ -475,7 +484,10 @@ impl Interpreter {
                 self.globals.insert(local_name.to_string(), val);
                 Ok(Value::Undefined)
             }
-            None => Err(Error::RuntimeError(format!("Cannot find module '{}'", source))),
+            None => Err(Error::RuntimeError(format!(
+                "Cannot find module '{}'",
+                source
+            ))),
         }
     }
 
@@ -491,7 +503,10 @@ impl Interpreter {
                 self.globals.insert(local_name.to_string(), module_obj);
                 Ok(Value::Undefined)
             }
-            None => Err(Error::RuntimeError(format!("Cannot find module '{}'", source))),
+            None => Err(Error::RuntimeError(format!(
+                "Cannot find module '{}'",
+                source
+            ))),
         }
     }
 
@@ -511,7 +526,10 @@ impl Interpreter {
                 self.globals.insert(local_name.to_string(), val);
                 Ok(Value::Undefined)
             }
-            None => Err(Error::RuntimeError(format!("Cannot find module '{}'", source))),
+            None => Err(Error::RuntimeError(format!(
+                "Cannot find module '{}'",
+                source
+            ))),
         }
     }
 
@@ -552,7 +570,10 @@ impl Interpreter {
                 }
                 Ok(())
             }
-            None => Err(Error::RuntimeError(format!("Cannot find module '{}'", source))),
+            None => Err(Error::RuntimeError(format!(
+                "Cannot find module '{}'",
+                source
+            ))),
         }
     }
 }

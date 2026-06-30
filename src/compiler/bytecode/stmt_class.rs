@@ -1,16 +1,11 @@
 use super::{ClassInfo, ClassMethodInfo, ClassMethodKind, Instruction};
-use crate::compiler::parser::{
-    ClassMember, Expression, SpannedNode, Statement,
-};
+use crate::compiler::parser::{ClassMember, Expression, SpannedNode, Statement};
 use crate::errors::Result;
 
 use super::CodeGenerator;
 
 impl CodeGenerator {
-    pub(super) fn generate_class_statement(
-        &mut self,
-        stmt: &Statement,
-    ) -> Result<bool> {
+    pub(super) fn generate_class_statement(&mut self, stmt: &Statement) -> Result<bool> {
         match stmt {
             Statement::ClassDeclaration {
                 name,

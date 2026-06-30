@@ -22,11 +22,12 @@ pub use heap_types::{
 };
 
 use crate::compiler::{CompiledModule, Instruction};
+use crate::errors::runtime_errors::runtime_error_stack_overflow;
 use crate::errors::{Error, Result};
 use crate::objects::js_promise::PromiseState;
-use crate::vm::interpreter::control_flow::ControlFlowOutcome;
 use crate::objects::Value;
 use crate::runtime_env::async_runtime::AsyncRuntime;
+use crate::vm::interpreter::control_flow::ControlFlowOutcome;
 use std::collections::{HashMap, VecDeque};
 use std::rc::Rc;
 
@@ -68,6 +69,7 @@ pub struct Interpreter {
     pub(crate) native_loader: native_loader::NativeModuleRegistry,
     pub(crate) current_pc: usize,
     pub(crate) suspended_frames: VecDeque<SuspendedFrame>,
+    pub(crate) max_call_stack_depth: usize,
 }
 
 impl Interpreter {
@@ -98,6 +100,7 @@ impl Interpreter {
             native_loader: native_loader::NativeModuleRegistry::new(),
             current_pc: 0,
             suspended_frames: VecDeque::new(),
+            max_call_stack_depth: 10_000,
         };
         interp.init_builtins();
         Ok(interp)
@@ -106,6 +109,9 @@ impl Interpreter {
     pub fn execute(&mut self, module: &CompiledModule) -> Result<Value> {
         self.current_module = Some(Rc::new(module.clone()));
         let saved_call_stack_len = self.call_stack.len();
+        if self.call_stack.len() >= self.max_call_stack_depth {
+            return Err(runtime_error_stack_overflow());
+        }
         self.call_stack.push(CallFrame {
             return_address: module.instructions.len(),
             base_pointer: 0,
@@ -414,12 +420,14 @@ impl Interpreter {
                                         let base_pointer = self.stack.len();
                                         let closure_count = f.closure.len();
                                         let this_for_frame = if f.is_arrow {
-                                            f.captured_this
-                                                .clone()
-                                                .unwrap_or(Value::Undefined)
+                                            f.captured_this.clone().unwrap_or(Value::Undefined)
                                         } else {
                                             Value::Undefined
                                         };
+                                        if self.call_stack.len() >= self.max_call_stack_depth {
+                                            self.throw_stack_overflow(&mut pc)?;
+                                            continue;
+                                        }
                                         self.call_stack.push(CallFrame {
                                             return_address,
                                             base_pointer,
@@ -539,6 +547,10 @@ impl Interpreter {
                                     } else {
                                         object.clone()
                                     };
+                                    if self.call_stack.len() >= self.max_call_stack_depth {
+                                        self.throw_stack_overflow(&mut pc)?;
+                                        continue;
+                                    }
                                     self.call_stack.push(CallFrame {
                                         return_address,
                                         base_pointer,
@@ -633,6 +645,12 @@ impl Interpreter {
                                                     let super_f_clone = super_f.clone();
                                                     let return_address = pc + 1;
                                                     let base_pointer = self.stack.len();
+                                                    if self.call_stack.len()
+                                                        >= self.max_call_stack_depth
+                                                    {
+                                                        self.throw_stack_overflow(&mut pc)?;
+                                                        continue;
+                                                    }
                                                     self.call_stack.push(CallFrame {
                                                         return_address,
                                                         base_pointer,
@@ -695,6 +713,10 @@ impl Interpreter {
                                         let return_address = pc + 1;
                                         let base_pointer = self.stack.len();
                                         let closure_count = f_clone.closure.len();
+                                        if self.call_stack.len() >= self.max_call_stack_depth {
+                                            self.throw_stack_overflow(&mut pc)?;
+                                            continue;
+                                        }
                                         self.call_stack.push(CallFrame {
                                             return_address,
                                             base_pointer,
@@ -904,15 +926,15 @@ impl Interpreter {
                             self.stack.push(promise);
                         }
                         Ok(None) => {
-                            let promise = self.build_error_promise(
-                                format!("Module '{}' not found", source_str),
-                            );
+                            let promise = self
+                                .build_error_promise(format!("Module '{}' not found", source_str));
                             self.stack.push(promise);
                         }
                         Err(e) => {
-                            let promise = self.build_error_promise(
-                                format!("Module '{}' error: {}", source_str, e),
-                            );
+                            let promise = self.build_error_promise(format!(
+                                "Module '{}' error: {}",
+                                source_str, e
+                            ));
                             self.stack.push(promise);
                         }
                     }
@@ -972,7 +994,8 @@ impl Interpreter {
                         _ => {}
                     }
                 }
-                _ => {
+                _ =>
+                {
                     #[allow(clippy::if_same_then_else)]
                     if self.exec_load_store(&instruction, module)? {
                     } else if self.exec_arithmetic(&instruction)? {

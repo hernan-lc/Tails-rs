@@ -1,15 +1,14 @@
 mod closures;
 mod expressions;
-mod stmt_control_flow;
-mod stmt_try_catch;
 mod stmt_class;
-mod stmt_module;
+mod stmt_control_flow;
 mod stmt_function;
+mod stmt_module;
+mod stmt_try_catch;
 
 use crate::compiler::parser::{
     ArrayBindingElement, ArrowFunctionBody, AstNode, BinaryOperator, BindingPattern, ClassMember,
-    CompoundAssignmentOp, Expression, SpannedNode, Statement,
-    UnaryOperator, UpdateOperator,
+    CompoundAssignmentOp, Expression, SpannedNode, Statement, UnaryOperator, UpdateOperator,
 };
 use crate::compiler::{
     ClassInfo, ClassMethodInfo, ClassMethodKind, CompiledFunction, CompiledModule, Instruction,

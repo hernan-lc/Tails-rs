@@ -41,6 +41,11 @@ pub(super) fn native_generator_next(
             let closure_count = 0;
             let call_frame_len_before = interp.call_stack.len();
 
+            if interp.call_stack.len() >= interp.max_call_stack_depth {
+                return Err(crate::errors::Error::RuntimeError(
+                    "Maximum call stack size exceeded".into(),
+                ));
+            }
             interp.call_stack.push(crate::vm::interpreter::CallFrame {
                 return_address,
                 base_pointer,

@@ -16,6 +16,7 @@ fn main() -> anyhow::Result<()> {
     let mut rt = TailsRuntime::new(RuntimeConfig {
         enable_type_checking: true,
         max_heap_size: 64 * 1024 * 1024,
+        max_call_stack_depth: 10_000,
     })?;
 
     // 3. Set a custom global from Rust, use it in TS
