@@ -493,7 +493,69 @@ impl<'a> Parser<'a> {
                         source: Box::new(source.inner),
                     }))
                 } else {
-                    Ok(self.spanned(Expression::Identifier("import".to_string())))
+                    let mut expr = self.spanned(Expression::Identifier("import".to_string()));
+                    loop {
+                        match self.peek().token {
+                            Token::Dot => {
+                                self.advance();
+                                let property = self.token_to_property_name()?;
+                                expr = self.spanned(Expression::Member {
+                                    object: Box::new(expr.inner),
+                                    property: Box::new(property),
+                                    computed: false,
+                                });
+                            }
+                            Token::LeftBracket => {
+                                self.advance();
+                                let property = self.parse_expression()?.inner;
+                                self.expect(&Token::RightBracket)?;
+                                expr = self.spanned(Expression::Member {
+                                    object: Box::new(expr.inner),
+                                    property: Box::new(property),
+                                    computed: true,
+                                });
+                            }
+                            Token::LeftParen => {
+                                self.advance();
+                                let args = self.parse_args()?;
+                                self.expect(&Token::RightParen)?;
+                                expr = self.spanned(Expression::Call {
+                                    callee: Box::new(expr.inner),
+                                    args,
+                                });
+                            }
+                            Token::QuestionDot => {
+                                self.advance();
+                                if self.peek().token == Token::LeftParen {
+                                    self.advance();
+                                    let args = self.parse_args()?;
+                                    self.expect(&Token::RightParen)?;
+                                    expr = self.spanned(Expression::OptionalCall {
+                                        callee: Box::new(expr.inner),
+                                        args,
+                                    });
+                                } else if self.peek().token == Token::LeftBracket {
+                                    self.advance();
+                                    let property = self.parse_expression()?.inner;
+                                    self.expect(&Token::RightBracket)?;
+                                    expr = self.spanned(Expression::OptionalMember {
+                                        object: Box::new(expr.inner),
+                                        property: Box::new(property),
+                                        computed: true,
+                                    });
+                                } else {
+                                    let property = self.token_to_property_name()?;
+                                    expr = self.spanned(Expression::OptionalMember {
+                                        object: Box::new(expr.inner),
+                                        property: Box::new(property),
+                                        computed: false,
+                                    });
+                                }
+                            }
+                            _ => break,
+                        }
+                    }
+                    Ok(expr)
                 }
             }
             _ => self.parse_postfix(),

@@ -70,6 +70,41 @@ impl Interpreter {
             self.globals
                 .insert("__dirname".to_string(), Value::String(dir));
 
+            // inject import.meta with url property (file:// URL)
+            let file_url = if path.starts_with('/') {
+                format!("file://{}", path)
+            } else {
+                format!(
+                    "file://{}/{}",
+                    std::env::current_dir()
+                        .map(|d| d.to_string_lossy().to_string())
+                        .unwrap_or_default(),
+                    path
+                )
+            };
+            let mut meta_props = std::collections::HashMap::new();
+            meta_props.insert("url".to_string(), Value::String(file_url));
+            let meta_obj_idx = self.gc.allocate(
+                &mut self.heap,
+                HeapValue::Object(crate::vm::interpreter::JsObject {
+                    properties: meta_props,
+                    prototype: None,
+                    extensible: true,
+                }),
+            );
+            let mut import_props = std::collections::HashMap::new();
+            import_props.insert("meta".to_string(), Value::Object(meta_obj_idx));
+            let import_obj_idx = self.gc.allocate(
+                &mut self.heap,
+                HeapValue::Object(crate::vm::interpreter::JsObject {
+                    properties: import_props,
+                    prototype: None,
+                    extensible: true,
+                }),
+            );
+            self.globals
+                .insert("import".to_string(), Value::Object(import_obj_idx));
+
             // Also inject module and exports for CJS compatibility
             let module_obj = self.new_object();
             let exports_obj = self.new_object();
