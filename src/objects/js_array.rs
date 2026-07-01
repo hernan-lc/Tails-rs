@@ -1,5 +1,4 @@
 use crate::objects::Value;
-use super::safe_typed_array::TypedArrayRef;
 
 #[derive(Debug, Clone)]
 pub enum TypedArrayType {
