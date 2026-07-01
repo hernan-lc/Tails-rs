@@ -297,6 +297,7 @@ impl Interpreter {
             Value::Date(_) => "[Date]".to_string(),
             Value::RegExp(_) => "[RegExp]".to_string(),
             Value::Buffer(_) => "[Buffer]".to_string(),
+            Value::NativeObject(_) => "[NativeObject]".to_string(),
         }
     }
 
@@ -338,6 +339,7 @@ impl Interpreter {
             Value::Date(_) => "[Date]".to_string(),
             Value::RegExp(_) => "[RegExp]".to_string(),
             Value::Buffer(_) => "[Buffer]".to_string(),
+            Value::NativeObject(_) => "[NativeObject]".to_string(),
         }
     }
 }

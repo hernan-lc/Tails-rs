@@ -142,6 +142,7 @@ pub(super) fn to_string_value(interp: &Interpreter, v: &Value) -> String {
         Value::TypedArray(_) => "[TypedArray]".to_string(),
         Value::WeakMap(_) => "[WeakMap]".to_string(),
         Value::WeakSet(_) => "[WeakSet]".to_string(),
+        Value::NativeObject(_) => "[NativeObject]".to_string(),
     }
 }
 

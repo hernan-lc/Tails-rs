@@ -162,7 +162,7 @@ fn test_json_parse_simple() {
     let mut rt = TailsRuntime::default();
     let r = rt.eval(r#"let obj = JSON.parse('{"a": 1}'); obj.a;"#);
     assert!(r.is_ok());
-    assert_eq!(r.unwrap(), tails::Value::Float(1 as f64));
+    assert_eq!(r.unwrap(), tails::Value::Float(1_f64));
 }
 
 #[test]
@@ -170,7 +170,7 @@ fn test_json_parse_array() {
     let mut rt = TailsRuntime::default();
     let r = rt.eval(r#"let arr = JSON.parse('[1, 2, 3]'); arr[1];"#);
     assert!(r.is_ok());
-    assert_eq!(r.unwrap(), tails::Value::Float(2 as f64));
+    assert_eq!(r.unwrap(), tails::Value::Float(2_f64));
 }
 
 #[test]
@@ -198,7 +198,7 @@ fn test_json_roundtrip() {
     "#,
     );
     assert!(r.is_ok());
-    assert_eq!(r.unwrap(), tails::Value::Float(10 as f64));
+    assert_eq!(r.unwrap(), tails::Value::Float(10_f64));
 }
 
 // ---- Object.keys/values/entries/assign ----
@@ -252,7 +252,7 @@ fn test_object_assign() {
     "#,
     );
     assert!(r.is_ok());
-    assert_eq!(r.unwrap(), tails::Value::Float(5 as f64));
+    assert_eq!(r.unwrap(), tails::Value::Float(5_f64));
 }
 
 // ---- Global functions ----
@@ -261,10 +261,11 @@ fn test_parse_int() {
     let mut rt = TailsRuntime::default();
     let r = rt.eval(r#"parseInt("42");"#);
     assert!(r.is_ok());
-    assert_eq!(r.unwrap(), tails::Value::Float(42 as f64));
+    assert_eq!(r.unwrap(), tails::Value::Float(42_f64));
 }
 
 #[test]
+#[allow(clippy::approx_constant)]
 fn test_parse_float() {
     let mut rt = TailsRuntime::default();
     let r = rt.eval(r#"parseFloat("3.14");"#);
@@ -351,7 +352,7 @@ fn test_array_shift() {
     "#,
     );
     assert!(r.is_ok());
-    assert_eq!(r.unwrap(), tails::Value::Float(1 as f64));
+    assert_eq!(r.unwrap(), tails::Value::Float(1_f64));
 }
 
 #[test]
@@ -406,7 +407,7 @@ fn test_array_index_of() {
     "#,
     );
     assert!(r.is_ok());
-    assert_eq!(r.unwrap(), tails::Value::Float(1 as f64));
+    assert_eq!(r.unwrap(), tails::Value::Float(1_f64));
 }
 
 #[test]
@@ -433,7 +434,7 @@ fn test_array_find() {
     "#,
     );
     assert!(r.is_ok());
-    assert_eq!(r.unwrap(), tails::Value::Float(3 as f64));
+    assert_eq!(r.unwrap(), tails::Value::Float(3_f64));
 }
 
 #[test]
@@ -446,7 +447,7 @@ fn test_array_find_index() {
     "#,
     );
     assert!(r.is_ok());
-    assert_eq!(r.unwrap(), tails::Value::Float(2 as f64));
+    assert_eq!(r.unwrap(), tails::Value::Float(2_f64));
 }
 
 #[test]
@@ -488,7 +489,7 @@ fn test_array_reduce() {
     "#,
     );
     assert!(r.is_ok());
-    assert_eq!(r.unwrap(), tails::Value::Float(10 as f64));
+    assert_eq!(r.unwrap(), tails::Value::Float(10_f64));
 }
 
 #[test]
@@ -502,7 +503,7 @@ fn test_array_for_each() {
     "#,
     );
     assert!(r.is_ok());
-    assert_eq!(r.unwrap(), tails::Value::Float(6 as f64));
+    assert_eq!(r.unwrap(), tails::Value::Float(6_f64));
 }
 
 #[test]
@@ -553,7 +554,7 @@ fn test_array_reverse() {
     "#,
     );
     assert!(r.is_ok());
-    assert_eq!(r.unwrap(), tails::Value::Float(3 as f64));
+    assert_eq!(r.unwrap(), tails::Value::Float(3_f64));
 }
 
 #[test]
@@ -567,7 +568,7 @@ fn test_array_sort() {
     "#,
     );
     assert!(r.is_ok());
-    assert_eq!(r.unwrap(), tails::Value::Float(1 as f64));
+    assert_eq!(r.unwrap(), tails::Value::Float(1_f64));
 }
 
 #[test]
@@ -611,7 +612,7 @@ fn test_string_char_code_at() {
     let mut rt = TailsRuntime::default();
     let r = rt.eval(r#""A".charCodeAt(0);"#);
     assert!(r.is_ok());
-    assert_eq!(r.unwrap(), tails::Value::Float(65 as f64));
+    assert_eq!(r.unwrap(), tails::Value::Float(65_f64));
 }
 
 #[test]
@@ -635,7 +636,7 @@ fn test_string_index_of() {
     let mut rt = TailsRuntime::default();
     let r = rt.eval(r#""hello world".indexOf("world");"#);
     assert!(r.is_ok());
-    assert_eq!(r.unwrap(), tails::Value::Float(6 as f64));
+    assert_eq!(r.unwrap(), tails::Value::Float(6_f64));
 }
 
 #[test]
@@ -737,10 +738,11 @@ fn test_number_parse_int() {
     let mut rt = TailsRuntime::default();
     let r = rt.eval(r#"Number.parseInt("42");"#);
     assert!(r.is_ok());
-    assert_eq!(r.unwrap(), tails::Value::Float(42 as f64));
+    assert_eq!(r.unwrap(), tails::Value::Float(42_f64));
 }
 
 #[test]
+#[allow(clippy::approx_constant)]
 fn test_number_parse_float() {
     let mut rt = TailsRuntime::default();
     let r = rt.eval(r#"Number.parseFloat("3.14");"#);
@@ -776,7 +778,7 @@ fn test_array_map_with_arrow() {
     "#,
     );
     assert!(r.is_ok());
-    assert_eq!(r.unwrap(), tails::Value::Float(60 as f64));
+    assert_eq!(r.unwrap(), tails::Value::Float(60_f64));
 }
 
 #[test]
@@ -792,7 +794,7 @@ fn test_array_filter_reduce_combined() {
     "#,
     );
     assert!(r.is_ok());
-    assert_eq!(r.unwrap(), tails::Value::Float(12 as f64));
+    assert_eq!(r.unwrap(), tails::Value::Float(12_f64));
 }
 
 #[test]
@@ -836,5 +838,5 @@ fn test_math_in_array_reduce() {
     "#,
     );
     assert!(r.is_ok());
-    assert_eq!(r.unwrap(), tails::Value::Float(14 as f64));
+    assert_eq!(r.unwrap(), tails::Value::Float(14_f64));
 }

@@ -14,6 +14,7 @@ fn module_dir() -> std::path::PathBuf {
 }
 
 #[test]
+#[allow(clippy::approx_constant)]
 fn test_named_exports() {
     let mut runtime = TailsRuntime::default();
     let source = fixture("math.ts");

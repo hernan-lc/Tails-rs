@@ -8,6 +8,7 @@ fn test_numbers() {
 }
 
 #[test]
+#[allow(clippy::approx_constant)]
 fn test_float_numbers() {
     let tokens = tokenize("3.14").unwrap();
     assert_eq!(tokens.len(), 2);

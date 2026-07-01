@@ -151,10 +151,91 @@ impl Interpreter {
         if idx < NATIVE_TABLE.len() {
             NATIVE_TABLE[idx](self, this, args)
         } else {
-            Err(Error::RuntimeError(format!(
-                "Unknown native function index: {}",
-                idx
-            )))
+            // Check for dynamic native functions (from loaded .so/.dylib modules)
+            let dynamic_idx = idx - NATIVE_TABLE.len();
+            if let Some(&func_ptr) = self.dynamic_native_fns.get(dynamic_idx) {
+                // The func_ptr is a C ABI function pointer stored as usize
+                // We need to call it with the C ABI signature
+                // C ABI: extern "C" fn(interp: *mut c_void, this: NativeValue, args: *const NativeValue, argc: i32) -> NativeValue
+                let c_func: extern "C" fn(
+                    *mut std::ffi::c_void,
+                    tails_abi::NativeValue,
+                    *const tails_abi::NativeValue,
+                    i32,
+                ) -> tails_abi::NativeValue = unsafe { std::mem::transmute(func_ptr) };
+
+                // Convert this value to NativeValue
+                let native_this = match this {
+                    Value::NativeObject(obj_id) => tails_abi::NativeValue {
+                        tag: 5,
+                        data: obj_id.0 as u64,
+                    },
+                    Value::Object(_) => tails_abi::NativeValue { tag: 5, data: 0 },
+                    Value::String(s) => tails_abi::string(s),
+                    Value::Integer(n) => tails_abi::integer(*n),
+                    Value::Float(n) => tails_abi::number(*n),
+                    Value::Boolean(b) => tails_abi::boolean(*b),
+                    Value::Null => tails_abi::null(),
+                    Value::Undefined => tails_abi::undefined(),
+                    _ => tails_abi::undefined(),
+                };
+
+                // Convert args to NativeValue array
+                let native_args: Vec<tails_abi::NativeValue> = args
+                    .iter()
+                    .map(|v| match v {
+                        Value::String(s) => tails_abi::string(s),
+                        Value::Integer(n) => tails_abi::integer(*n),
+                        Value::Float(n) => tails_abi::number(*n),
+                        Value::Boolean(b) => tails_abi::boolean(*b),
+                        Value::Null => tails_abi::null(),
+                        Value::Undefined => tails_abi::undefined(),
+                        _ => tails_abi::undefined(),
+                    })
+                    .collect();
+
+                // Call the C ABI function
+                let result = c_func(
+                    std::ptr::null_mut(),
+                    native_this,
+                    native_args.as_ptr(),
+                    native_args.len() as i32,
+                );
+
+                // Convert NativeValue back to interpreter Value
+                match result.tag {
+                    0 => Ok(Value::Undefined),
+                    1 => Ok(Value::Null),
+                    2 => Ok(Value::Boolean(result.data != 0)),
+                    3 => Ok(Value::Float(f64::from_bits(result.data))),
+                    4 => {
+                        let s = tails_abi::get_string(result);
+                        Ok(Value::String(s))
+                    }
+                    5 => {
+                        // Native object - create NativeObject value with the ID
+                        let obj_id = result.data as u32;
+
+                        // Look up class methods from the registry
+                        // The constructor function name tells us the class name
+                        // We need to find the constructor name from the dynamic_native_fns index
+                        let class_name = self.find_class_name_for_native(idx);
+                        if let Some(class_name) = class_name {
+                            if let Some(methods) = self.native_class_registry.get(&class_name) {
+                                self.native_object_methods.insert(obj_id, methods.clone());
+                            }
+                        }
+
+                        Ok(Value::NativeObject(crate::objects::NativeObjectId(obj_id)))
+                    }
+                    _ => Ok(Value::Undefined),
+                }
+            } else {
+                Err(Error::RuntimeError(format!(
+                    "Unknown native function index: {}",
+                    idx
+                )))
+            }
         }
     }
 
@@ -174,6 +255,23 @@ impl Interpreter {
                 if let Some(Value::String(name)) = obj.properties.get("name") {
                     if name == ctor_name {
                         return Some(i);
+                    }
+                }
+            }
+        }
+        None
+    }
+
+    fn find_class_name_for_native(&self, native_idx: usize) -> Option<String> {
+        for props in self.module_registry.values() {
+            for (func_name, value) in props {
+                if let Value::NativeFunction(idx) = value {
+                    if *idx == native_idx {
+                        for class_name in self.native_class_registry.keys() {
+                            if func_name == class_name {
+                                return Some(class_name.clone());
+                            }
+                        }
                     }
                 }
             }

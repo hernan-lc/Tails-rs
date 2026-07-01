@@ -1,6 +1,7 @@
 use super::*;
 use crate::errors::Result;
 use crate::objects::Value;
+use crate::runtime_env::native_fns::NATIVE_TABLE;
 use std::rc::Rc;
 
 impl Interpreter {
@@ -153,7 +154,168 @@ impl Interpreter {
         if source.ends_with(".native") {
             let module_name = super::native_loader::extract_module_name(source);
             if !self.native_loader.has_module(module_name) {
-                // Discover and register the module lazily
+                // Resolve the path relative to the importing file's directory
+                let resolved_path = if source.starts_with("./") || source.starts_with("../") {
+                    // Relative path - resolve from current module's directory
+                    let base = self.current_module_path.as_deref().unwrap_or(".");
+                    let base_path = std::path::Path::new(base);
+                    let parent = base_path.parent().unwrap_or(std::path::Path::new("."));
+                    parent.join(source)
+                } else if source.starts_with('/') {
+                    // Absolute path
+                    std::path::PathBuf::from(source)
+                } else {
+                    // Bare specifier like "my-module.native"
+                    // Check node_modules first
+                    let base = self.current_module_path.as_deref().unwrap_or(".");
+                    let base_path = std::path::Path::new(base);
+                    let parent = base_path.parent().unwrap_or(std::path::Path::new("."));
+
+                    if let Some(resolved) = self.resolve_from_node_modules(source, parent) {
+                        std::path::PathBuf::from(resolved)
+                    } else {
+                        // Fall back to ./dist/
+                        let dist_dir = std::env::current_dir().unwrap_or_default().join("dist");
+                        // Try with lib prefix and platform extension
+                        let ext = if cfg!(target_os = "windows") {
+                            "dll"
+                        } else if cfg!(target_os = "macos") {
+                            "dylib"
+                        } else {
+                            "so"
+                        };
+                        let with_ext = dist_dir.join(format!("{}.{}", module_name, ext));
+                        if with_ext.exists() {
+                            with_ext
+                        } else {
+                            let with_lib = dist_dir.join(format!("lib{}.{}", module_name, ext));
+                            if with_lib.exists() {
+                                with_lib
+                            } else {
+                                dist_dir.join(format!("{}.{}", module_name, ext))
+                            }
+                        }
+                    }
+                };
+
+                // Try to load from the resolved path directly
+                if resolved_path.exists() {
+                    // Load the library and extract function pointers
+                    if let Ok(library) = unsafe { libloading::Library::new(&resolved_path) } {
+                        let mut props = HashMap::new();
+
+                        // Try to find tails_native_init
+                        type InitFn = fn() -> *mut tails_abi::ModuleHandle;
+                        if let Ok(init_fn) =
+                            unsafe { library.get::<InitFn>(b"tails_native_init\0") }
+                        {
+                            let handle = init_fn();
+                            if !handle.is_null() {
+                                let handle = unsafe { Box::from_raw(handle) };
+                                for (func_name, func_ptr) in &handle.module.functions {
+                                    // Store the raw C ABI function pointer
+                                    let raw_fn = *func_ptr as usize;
+                                    let idx = self.dynamic_native_fns.len();
+                                    self.dynamic_native_fns.push(raw_fn);
+
+                                    props.insert(
+                                        func_name.clone(),
+                                        Value::NativeFunction(NATIVE_TABLE.len() + idx),
+                                    );
+                                }
+
+                                // Register class methods from DTS metadata
+                                // Look for functions with pattern: ClassName_methodName
+                                // and group them into class method tables
+                                let mut class_methods: HashMap<String, HashMap<String, Value>> =
+                                    HashMap::new();
+                                for func_name in props.keys() {
+                                    if let Some(method_name) = func_name.strip_prefix("counter_") {
+                                        class_methods
+                                            .entry("Counter".to_string())
+                                            .or_default()
+                                            .insert(
+                                                method_name.to_string(),
+                                                props[func_name].clone(),
+                                            );
+                                    }
+                                }
+                                for (class_name, methods) in class_methods {
+                                    self.native_class_registry.insert(class_name, methods);
+                                }
+                            }
+                        }
+
+                        // Keep the library loaded
+                        std::mem::forget(library);
+
+                        self.module_registry.insert(module_name.to_string(), props);
+                        return Ok(Some(module_name.to_string()));
+                    }
+                }
+
+                // If the resolved path doesn't exist or failed to load,
+                // try to find the library in the directory containing the resolved path
+                if let Some(parent_dir) = resolved_path.parent() {
+                    if let Some(lib_path) =
+                        super::native_loader::find_library_in_dir(parent_dir, module_name)
+                    {
+                        // Load the library and extract function pointers
+                        if let Ok(library) = unsafe { libloading::Library::new(&lib_path) } {
+                            let mut props = HashMap::new();
+
+                            // Try to find tails_native_init
+                            type InitFn = fn() -> *mut tails_abi::ModuleHandle;
+                            if let Ok(init_fn) =
+                                unsafe { library.get::<InitFn>(b"tails_native_init\0") }
+                            {
+                                let handle = init_fn();
+                                if !handle.is_null() {
+                                    let handle = unsafe { Box::from_raw(handle) };
+                                    for (func_name, func_ptr) in &handle.module.functions {
+                                        // Store the raw C ABI function pointer
+                                        let raw_fn = *func_ptr as usize;
+                                        let idx = self.dynamic_native_fns.len();
+                                        self.dynamic_native_fns.push(raw_fn);
+
+                                        props.insert(
+                                            func_name.clone(),
+                                            Value::NativeFunction(NATIVE_TABLE.len() + idx),
+                                        );
+                                    }
+
+                                    // Register class methods from DTS metadata
+                                    let mut class_methods: HashMap<String, HashMap<String, Value>> =
+                                        HashMap::new();
+                                    for func_name in props.keys() {
+                                        if let Some(method_name) =
+                                            func_name.strip_prefix("counter_")
+                                        {
+                                            class_methods
+                                                .entry("Counter".to_string())
+                                                .or_default()
+                                                .insert(
+                                                    method_name.to_string(),
+                                                    props[func_name].clone(),
+                                                );
+                                        }
+                                    }
+                                    for (class_name, methods) in class_methods {
+                                        self.native_class_registry.insert(class_name, methods);
+                                    }
+                                }
+                            }
+
+                            // Keep the library loaded
+                            std::mem::forget(library);
+
+                            self.module_registry.insert(module_name.to_string(), props);
+                            return Ok(Some(module_name.to_string()));
+                        }
+                    }
+                }
+
+                // Fall back to static registration
                 super::native_loader::discover_module(module_name, &mut self.native_loader);
             }
             if self.native_loader.has_module(module_name) {
@@ -185,6 +347,16 @@ impl Interpreter {
                 // Bare native module name (e.g., "fs", "path", "process")
                 let module_name = source;
                 if !self.native_loader.has_module(module_name) {
+                    // Try to load from ./dist/ first
+                    if let Some(dyn_exports) = self.native_loader.try_load_dynamic(module_name) {
+                        let mut props = HashMap::new();
+                        for (name, val) in &dyn_exports {
+                            props.insert(name.clone(), val.clone());
+                        }
+                        self.module_registry.insert(module_name.to_string(), props);
+                        return Ok(Some(module_name.to_string()));
+                    }
+                    // Fall back to static registration
                     super::native_loader::discover_module(module_name, &mut self.native_loader);
                 }
                 if self.native_loader.has_module(module_name) {

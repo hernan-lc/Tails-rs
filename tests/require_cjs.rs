@@ -16,6 +16,7 @@ fn fixture_file(name: &str) -> std::path::PathBuf {
 }
 
 #[test]
+#[allow(clippy::approx_constant)]
 fn test_require_exports_object() {
     let mut runtime = TailsRuntime::default();
     let source = run_fixture("main_exports.ts");

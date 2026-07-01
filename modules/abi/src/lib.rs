@@ -1,7 +1,15 @@
+pub mod loader;
+pub mod module;
+pub mod traits;
+
 use std::collections::HashMap;
 use std::ffi::{CStr, CString};
 use std::os::raw::c_char;
 use std::sync::Mutex;
+
+pub use loader::{extract_module_name, load_native_module, resolve_native_path, NativeLibrary};
+pub use module::{NativeModuleExport, TailsModule};
+pub use traits::{FromNativeValue, ToNativeValue};
 
 #[repr(C)]
 #[derive(Copy, Clone, Debug)]
@@ -172,6 +180,12 @@ pub trait NativeModuleTrait: Send {
 
 pub struct NativeModuleRegistry {
     modules: HashMap<String, Box<dyn NativeModuleTrait>>,
+}
+
+impl Default for NativeModuleRegistry {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl NativeModuleRegistry {

@@ -1,0 +1,15 @@
+[package]
+name = "tails-native-macros"
+version = "0.1.0"
+edition = "2021"
+description = "Proc macros for Tails native modules"
+
+[lib]
+proc-macro = true
+
+[dependencies]
+syn = { version = "2", features = ["full", "extra-traits"] }
+quote = "1"
+proc-macro2 = "1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"

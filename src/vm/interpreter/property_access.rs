@@ -480,6 +480,15 @@ impl Interpreter {
                     return self.get_property_with_this(&proto_val, key, this);
                 }
             }
+            Value::NativeObject(obj_id) => {
+                if let Value::String(key_str) = key {
+                    if let Some(methods) = self.native_object_methods.get(&obj_id.0) {
+                        if let Some(method) = methods.get(key_str) {
+                            return Ok(method.clone());
+                        }
+                    }
+                }
+            }
             _ => {}
         }
         Ok(Value::Undefined)

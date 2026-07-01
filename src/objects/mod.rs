@@ -41,7 +41,11 @@ pub enum Value {
     Date(usize),
     RegExp(usize),
     Buffer(usize),
+    NativeObject(NativeObjectId),
 }
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct NativeObjectId(pub u32);
 
 impl PartialEq for Value {
     fn eq(&self, other: &Self) -> bool {
@@ -71,6 +75,7 @@ impl PartialEq for Value {
             (Value::Date(a), Value::Date(b)) => a == b,
             (Value::RegExp(a), Value::RegExp(b)) => a == b,
             (Value::Buffer(a), Value::Buffer(b)) => a == b,
+            (Value::NativeObject(a), Value::NativeObject(b)) => a == b,
             _ => false,
         }
     }
@@ -102,6 +107,7 @@ impl fmt::Display for Value {
             Value::Date(_) => write!(f, "[Date]"),
             Value::RegExp(_) => write!(f, "[RegExp]"),
             Value::Buffer(_) => write!(f, "[Buffer]"),
+            Value::NativeObject(id) => write!(f, "[NativeObject({})]", id.0),
         }
     }
 }

@@ -1,0 +1,14 @@
+[package]
+name = "my-tails-module"
+version = "0.1.0"
+edition = "2021"
+description = "Example Tails native module"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+tails-abi = { path = "../abi" }
+
+[build-dependencies]
+tails-abi = { path = "../abi" }

@@ -88,6 +88,7 @@ impl Interpreter {
                     | Value::WeakSet(_)
                     | Value::Buffer(_) => "object",
                     Value::Date(_) | Value::RegExp(_) => "object",
+                    Value::NativeObject(_) => "object",
                 };
                 self.stack.push(Value::String(type_str.to_string()));
             }

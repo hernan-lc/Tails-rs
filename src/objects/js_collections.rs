@@ -252,7 +252,9 @@ impl Hash for Value {
             Value::Set(i) => i.hash(state),
             Value::WeakMap(i) => i.hash(state),
             Value::WeakSet(i) => i.hash(state),
-            Value::Date(_) | Value::RegExp(_) | Value::Buffer(_) => todo!(),
+            Value::Date(_) | Value::RegExp(_) | Value::Buffer(_) | Value::NativeObject(_) => {
+                todo!()
+            }
         }
     }
 }

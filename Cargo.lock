@@ -1021,6 +1021,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "my-tails-module"
+version = "0.1.0"
+dependencies = [
+ "tails-abi",
+]
+
+[[package]]
 name = "native-tls"
 version = "0.2.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1716,10 +1723,26 @@ dependencies = [
 [[package]]
 name = "tails-abi"
 version = "0.1.0"
+dependencies = [
+ "libloading",
+ "serde",
+ "serde_json",
+]
 
 [[package]]
 name = "tails-fs"
 version = "0.1.0"
+
+[[package]]
+name = "tails-native-macros"
+version = "0.1.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "serde",
+ "serde_json",
+ "syn",
+]
 
 [[package]]
 name = "tails-os"
@@ -1757,6 +1780,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2",
+ "tails-abi",
  "tails-fs",
  "tails-os",
  "tails-path",

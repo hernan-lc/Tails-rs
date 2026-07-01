@@ -15,7 +15,7 @@ export function getCount() {
 }
 "#;
     let dir = Path::new(".");
-    runtime.eval_module(&source, dir).unwrap();
+    runtime.eval_module(source, dir).unwrap();
 
     let count_val = runtime.get_global("count");
     let inc_val = runtime.get_global("increment");

@@ -7,12 +7,18 @@ type NativeModuleFactory = fn(&mut Vec<HeapValue>, &mut GarbageCollector) -> Has
 
 pub struct NativeModuleRegistry {
     modules: HashMap<String, Box<NativeModuleFactory>>,
+    dynamic_libraries: Vec<DynamicLibraryEntry>,
+}
+
+struct DynamicLibraryEntry {
+    _library: libloading::Library,
 }
 
 impl NativeModuleRegistry {
     pub fn new() -> Self {
         Self {
             modules: HashMap::new(),
+            dynamic_libraries: Vec::new(),
         }
     }
 
@@ -37,6 +43,46 @@ impl NativeModuleRegistry {
                 "Native module '{}' not found in registry",
                 name
             )))
+        }
+    }
+
+    pub fn try_load_dynamic(&mut self, name: &str) -> Option<HashMap<String, Value>> {
+        let dist_dir = std::env::current_dir().ok()?.join("dist");
+        let lib_path = find_library_in_dir(&dist_dir, name)?;
+
+        self.try_load_from_path(&lib_path)
+    }
+
+    pub fn try_load_from_path(
+        &mut self,
+        lib_path: &std::path::Path,
+    ) -> Option<HashMap<String, Value>> {
+        if !lib_path.exists() {
+            return None;
+        }
+
+        unsafe {
+            let library = libloading::Library::new(lib_path).ok()?;
+
+            let mut exports = HashMap::new();
+
+            // Try to find tails_native_init
+            type InitFn = fn() -> *mut tails_abi::ModuleHandle;
+            if let Ok(init_fn) = library.get::<InitFn>(b"tails_native_init") {
+                let handle = init_fn();
+                if !handle.is_null() {
+                    let handle = Box::from_raw(handle);
+                    for func_name in handle.module.functions.keys() {
+                        let id = self.modules.len() + 2000;
+                        exports.insert(func_name.clone(), Value::NativeFunction(id));
+                    }
+                }
+            }
+
+            self.dynamic_libraries
+                .push(DynamicLibraryEntry { _library: library });
+
+            Some(exports)
         }
     }
 }
@@ -419,4 +465,47 @@ pub fn create_url_module(
     let mut props = HashMap::new();
     props.insert("fileURLToPath".into(), Value::NativeFunction(382));
     props
+}
+
+pub fn find_library_in_dir(dir: &std::path::Path, name: &str) -> Option<std::path::PathBuf> {
+    let extensions = if cfg!(target_os = "windows") {
+        vec!["dll"]
+    } else if cfg!(target_os = "macos") {
+        vec!["dylib"]
+    } else {
+        vec!["so"]
+    };
+
+    // Convert hyphens to underscores for the file name (Rust crate naming convention)
+    let name_underscore = name.replace('-', "_");
+
+    // Try all combinations of name variants and extensions
+    let name_variants = vec![name, &name_underscore];
+
+    for ext in &extensions {
+        for name_variant in &name_variants {
+            // Try direct name with extension
+            let path = dir.join(format!("{}.{}", name_variant, ext));
+            if path.exists() {
+                return Some(path);
+            }
+            // Try with lib prefix on Unix
+            if *ext != "dll" {
+                let path = dir.join(format!("lib{}.{}", name_variant, ext));
+                if path.exists() {
+                    return Some(path);
+                }
+            }
+        }
+    }
+
+    // Also check if the name already has an extension and exists directly
+    for name_variant in &name_variants {
+        let path = dir.join(name_variant);
+        if path.exists() {
+            return Some(path);
+        }
+    }
+
+    None
 }

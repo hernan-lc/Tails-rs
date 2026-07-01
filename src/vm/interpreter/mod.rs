@@ -71,6 +71,9 @@ pub struct Interpreter {
     pub(crate) current_pc: usize,
     pub(crate) suspended_frames: VecDeque<SuspendedFrame>,
     pub(crate) max_call_stack_depth: usize,
+    pub(crate) dynamic_native_fns: Vec<usize>,
+    pub(crate) native_object_methods: HashMap<u32, HashMap<String, Value>>,
+    pub(crate) native_class_registry: HashMap<String, HashMap<String, Value>>,
 }
 
 impl Interpreter {
@@ -103,6 +106,9 @@ impl Interpreter {
             current_pc: 0,
             suspended_frames: VecDeque::new(),
             max_call_stack_depth: 10_000,
+            dynamic_native_fns: Vec::new(),
+            native_object_methods: HashMap::new(),
+            native_class_registry: HashMap::new(),
         };
         interp.init_builtins();
         Ok(interp)
@@ -791,7 +797,8 @@ impl Interpreter {
                                 | Value::Set(_)
                                 | Value::WeakMap(_)
                                 | Value::WeakSet(_)
-                                | Value::TypedArray(_) => {
+                                | Value::TypedArray(_)
+                                | Value::NativeObject(_) => {
                                     self.stack.push(result);
                                 }
                                 _ => {

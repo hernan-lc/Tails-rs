@@ -572,8 +572,7 @@ pub(super) fn native_url_file_url_to_path(
         .map(|v| to_string_value(interp, v))
         .unwrap_or_default();
 
-    if url_str.starts_with("file://") {
-        let path = &url_str[7..];
+    if let Some(path) = url_str.strip_prefix("file://") {
         // On Unix, percent-decode the path
         let decoded = urlencoding::decode(path)
             .unwrap_or(std::borrow::Cow::Borrowed(path))
@@ -584,9 +583,6 @@ pub(super) fn native_url_file_url_to_path(
             .collect::<std::path::PathBuf>();
         Ok(Value::String(normalized.to_string_lossy().into_owned()))
     } else {
-        Err(Error::TypeError(format!(
-            "Invalid file URL: {}",
-            url_str
-        )))
+        Err(Error::TypeError(format!("Invalid file URL: {}", url_str)))
     }
 }
