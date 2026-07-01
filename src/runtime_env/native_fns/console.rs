@@ -326,6 +326,10 @@ fn pretty_format(
     }
 }
 
+fn format_value_no_colors(interp: &Interpreter, v: &Value) -> String {
+    pretty_format(interp, v, 0, false, false)
+}
+
 fn colorize_value(interp: &Interpreter, v: &Value) -> String {
     let use_colors = get_use_colors();
     pretty_format(interp, v, 0, use_colors, false)
@@ -338,7 +342,7 @@ pub(super) fn native_console_log(
 ) -> Result<Value> {
     let indent = get_indent();
     let timestamp = get_timestamp();
-    let parts: Vec<String> = args.iter().map(|a| colorize_value(interp, a)).collect();
+    let parts: Vec<String> = args.iter().map(|a| format_value_no_colors(interp, a)).collect();
     println!("{}{}{}", timestamp, indent, parts.join(" "));
     Ok(Value::Undefined)
 }
@@ -350,8 +354,14 @@ pub(super) fn native_console_warn(
 ) -> Result<Value> {
     let indent = get_indent();
     let timestamp = get_timestamp();
-    let parts: Vec<String> = args.iter().map(|a| colorize_value(interp, a)).collect();
-    eprintln!("{}{}{}", timestamp, indent, parts.join(" "));
+    let use_colors = get_use_colors();
+    let parts: Vec<String> = args.iter().map(|a| format_value_no_colors(interp, a)).collect();
+    let msg = parts.join(" ");
+    if use_colors {
+        eprintln!("{}{}{}", timestamp, indent, msg.yellow());
+    } else {
+        eprintln!("{}{}{}", timestamp, indent, msg);
+    }
     Ok(Value::Undefined)
 }
 
@@ -362,8 +372,14 @@ pub(super) fn native_console_error(
 ) -> Result<Value> {
     let indent = get_indent();
     let timestamp = get_timestamp();
-    let parts: Vec<String> = args.iter().map(|a| colorize_value(interp, a)).collect();
-    eprintln!("{}{}{}", timestamp, indent, parts.join(" "));
+    let use_colors = get_use_colors();
+    let parts: Vec<String> = args.iter().map(|a| format_value_no_colors(interp, a)).collect();
+    let msg = parts.join(" ");
+    if use_colors {
+        eprintln!("{}{}{}", timestamp, indent, msg.red());
+    } else {
+        eprintln!("{}{}{}", timestamp, indent, msg);
+    }
     Ok(Value::Undefined)
 }
 
@@ -374,8 +390,14 @@ pub(super) fn native_console_info(
 ) -> Result<Value> {
     let indent = get_indent();
     let timestamp = get_timestamp();
-    let parts: Vec<String> = args.iter().map(|a| colorize_value(interp, a)).collect();
-    println!("{}{}{}", timestamp, indent, parts.join(" "));
+    let use_colors = get_use_colors();
+    let parts: Vec<String> = args.iter().map(|a| format_value_no_colors(interp, a)).collect();
+    let msg = parts.join(" ");
+    if use_colors {
+        println!("{}{}{}", timestamp, indent, msg.blue());
+    } else {
+        println!("{}{}{}", timestamp, indent, msg);
+    }
     Ok(Value::Undefined)
 }
 
@@ -586,7 +608,7 @@ pub(super) fn native_console_group(
 ) -> Result<Value> {
     let indent = get_indent();
     let timestamp = get_timestamp();
-    let parts: Vec<String> = args.iter().map(|a| colorize_value(interp, a)).collect();
+    let parts: Vec<String> = args.iter().map(|a| format_value_no_colors(interp, a)).collect();
 
     if !parts.is_empty() {
         if get_use_colors() {
@@ -622,7 +644,7 @@ pub(super) fn native_console_group_collapsed(
 ) -> Result<Value> {
     let indent = get_indent();
     let timestamp = get_timestamp();
-    let parts: Vec<String> = args.iter().map(|a| colorize_value(interp, a)).collect();
+    let parts: Vec<String> = args.iter().map(|a| format_value_no_colors(interp, a)).collect();
 
     if !parts.is_empty() {
         if get_use_colors() {
@@ -718,15 +740,21 @@ pub(super) fn native_console_assert(
     if !condition {
         let indent = get_indent();
         let timestamp = get_timestamp();
+        let use_colors = get_use_colors();
         let parts: Vec<String> = if args.len() > 1 {
             args[1..]
                 .iter()
-                .map(|a| colorize_value(interp, a))
+                .map(|a| format_value_no_colors(interp, a))
                 .collect()
         } else {
             vec!["Assertion failed".to_string()]
         };
-        eprintln!("{}{}{}", timestamp, indent, parts.join(" "));
+        let msg = parts.join(" ");
+        if use_colors {
+            eprintln!("{}{}{}", timestamp, indent, msg.red());
+        } else {
+            eprintln!("{}{}{}", timestamp, indent, msg);
+        }
     }
 
     Ok(Value::Undefined)
