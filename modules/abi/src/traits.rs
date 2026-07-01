@@ -245,19 +245,15 @@ use simd_json::OwnedValue;
 impl ToNativeValue for OwnedValue {
     fn to_native_value(&self) -> Result<NativeValue, String> {
         match self {
-            OwnedValue::Static(node) => {
-                match node {
-                    simd_json::StaticNode::Null => Ok(crate::null()),
-                    simd_json::StaticNode::Bool(b) => Ok(crate::boolean(*b)),
-                    simd_json::StaticNode::I64(i) => Ok(crate::integer(*i)),
-                    simd_json::StaticNode::U64(u) => Ok(crate::integer(*u as i64)),
-                    simd_json::StaticNode::F64(f) => Ok(crate::number(*f)),
-                }
-            }
+            OwnedValue::Static(node) => match node {
+                simd_json::StaticNode::Null => Ok(crate::null()),
+                simd_json::StaticNode::Bool(b) => Ok(crate::boolean(*b)),
+                simd_json::StaticNode::I64(i) => Ok(crate::integer(*i)),
+                simd_json::StaticNode::U64(u) => Ok(crate::integer(*u as i64)),
+                simd_json::StaticNode::F64(f) => Ok(crate::number(*f)),
+            },
             OwnedValue::String(s) => Ok(crate::string(s)),
-            OwnedValue::Array(_) | OwnedValue::Object(_) => {
-                Ok(crate::store_handle(self.clone()))
-            }
+            OwnedValue::Array(_) | OwnedValue::Object(_) => Ok(crate::store_handle(self.clone())),
         }
     }
 }
@@ -267,7 +263,9 @@ impl FromNativeValue for OwnedValue {
         match val.tag {
             crate::TAG_NULL => Ok(OwnedValue::Static(simd_json::StaticNode::Null)),
             crate::TAG_UNDEFINED => Ok(OwnedValue::Static(simd_json::StaticNode::Null)),
-            crate::TAG_BOOLEAN => Ok(OwnedValue::Static(simd_json::StaticNode::Bool(crate::get_boolean(val)))),
+            crate::TAG_BOOLEAN => Ok(OwnedValue::Static(simd_json::StaticNode::Bool(
+                crate::get_boolean(val),
+            ))),
             crate::TAG_NUMBER => {
                 let n = crate::get_number(val);
                 if n.fract() == 0.0 && n.abs() <= i64::MAX as f64 {
@@ -283,10 +281,14 @@ impl FromNativeValue for OwnedValue {
                 if let Ok(parsed) = simd_json::from_slice::<OwnedValue>(&mut s_bytes) {
                     match parsed {
                         OwnedValue::Array(_) | OwnedValue::Object(_) => Ok(parsed),
-                        _ => Ok(OwnedValue::String(String::from_utf8_lossy(&s_bytes).to_string())),
+                        _ => Ok(OwnedValue::String(
+                            String::from_utf8_lossy(&s_bytes).to_string(),
+                        )),
                     }
                 } else {
-                    Ok(OwnedValue::String(String::from_utf8_lossy(&s_bytes).to_string()))
+                    Ok(OwnedValue::String(
+                        String::from_utf8_lossy(&s_bytes).to_string(),
+                    ))
                 }
             }
             crate::TAG_OBJECT | crate::TAG_ARRAY => {
@@ -294,12 +296,18 @@ impl FromNativeValue for OwnedValue {
                     match crate::get_handle(val.data) {
                         Some(v) => Ok(v),
                         None => {
-                            eprintln!("[abi-debug] handle {} not found, registry size={}", val.data, crate::HANDLE_REGISTRY.lock().unwrap().len());
+                            eprintln!(
+                                "[abi-debug] handle {} not found, registry size={}",
+                                val.data,
+                                crate::HANDLE_REGISTRY.lock().unwrap().len()
+                            );
                             Ok(OwnedValue::Static(simd_json::StaticNode::Null))
                         }
                     }
                 } else {
-                    Ok(OwnedValue::Object(Box::new(simd_json::value::owned::Object::new())))
+                    Ok(OwnedValue::Object(Box::new(
+                        simd_json::value::owned::Object::new(),
+                    )))
                 }
             }
             _ => Ok(OwnedValue::Static(simd_json::StaticNode::Null)),
@@ -318,14 +326,12 @@ fn simd_to_serde(v: &OwnedValue) -> serde_json::Value {
             simd_json::StaticNode::Bool(b) => serde_json::Value::Bool(*b),
             simd_json::StaticNode::I64(i) => serde_json::Value::Number((*i).into()),
             simd_json::StaticNode::U64(u) => serde_json::Value::Number((*u).into()),
-            simd_json::StaticNode::F64(f) => serde_json::Value::Number(
-                serde_json::Number::from_f64(*f).unwrap_or(0.into()),
-            ),
+            simd_json::StaticNode::F64(f) => {
+                serde_json::Value::Number(serde_json::Number::from_f64(*f).unwrap_or(0.into()))
+            }
         },
         OwnedValue::String(s) => serde_json::Value::String(s.clone()),
-        OwnedValue::Array(arr) => {
-            serde_json::Value::Array(arr.iter().map(simd_to_serde).collect())
-        }
+        OwnedValue::Array(arr) => serde_json::Value::Array(arr.iter().map(simd_to_serde).collect()),
         OwnedValue::Object(obj) => {
             let mut map = serde_json::Map::new();
             for (k, v) in obj.iter() {

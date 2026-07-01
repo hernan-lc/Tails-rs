@@ -30,7 +30,10 @@ impl<'a> SafeTypedArray<'a> {
     /// Get the length (number of elements) of the typed array
     pub fn length(&self) -> usize {
         let element_size = Self::element_size(&self.inner.kind);
-        self.inner.byte_length.checked_div(element_size).unwrap_or(0)
+        self.inner
+            .byte_length
+            .checked_div(element_size)
+            .unwrap_or(0)
     }
 
     /// Get the element size for a given kind
@@ -68,7 +71,7 @@ pub struct TypedArrayRef<'a, T> {
 
 impl<'a, T> TypedArrayRef<'a, T> {
     /// Create a new TypedArrayRef from a raw pointer
-    /// 
+    ///
     /// # Safety
     /// The pointer must be valid and properly aligned for type T
     pub unsafe fn new(ptr: *mut T) -> Self {
@@ -79,7 +82,7 @@ impl<'a, T> TypedArrayRef<'a, T> {
     }
 
     /// Get a reference to the element
-    /// 
+    ///
     /// # Safety
     /// The pointer must be valid
     pub unsafe fn as_ref(&self) -> &T {
@@ -87,7 +90,7 @@ impl<'a, T> TypedArrayRef<'a, T> {
     }
 
     /// Get a mutable reference to the element
-    /// 
+    ///
     /// # Safety
     /// The pointer must be valid and no other references exist
     pub unsafe fn as_mut(&mut self) -> &mut T {
@@ -108,7 +111,7 @@ impl<'a, T> TypedArrayRef<'a, T> {
 /// Safe typed array access functions
 impl TypedArray {
     /// Get a safe reference to an element at the given index
-    /// 
+    ///
     /// # Safety
     /// The index must be within bounds and the type T must match the element type
     pub unsafe fn get_ref<T>(&self, index: usize) -> Option<TypedArrayRef<'_, T>> {
@@ -172,7 +175,7 @@ mod tests {
     fn test_typed_array_ref_creation() {
         let mut value = 42i32;
         let ptr = &mut value as *mut i32;
-        
+
         unsafe {
             let mut ref_ = TypedArrayRef::new(ptr);
             assert_eq!(*ref_.as_ref(), 42);
@@ -218,14 +221,35 @@ mod tests {
     fn test_element_size() {
         assert_eq!(SafeTypedArray::element_size(&TypedArrayType::Int8Array), 1);
         assert_eq!(SafeTypedArray::element_size(&TypedArrayType::Uint8Array), 1);
-        assert_eq!(SafeTypedArray::element_size(&TypedArrayType::Uint8ClampedArray), 1);
+        assert_eq!(
+            SafeTypedArray::element_size(&TypedArrayType::Uint8ClampedArray),
+            1
+        );
         assert_eq!(SafeTypedArray::element_size(&TypedArrayType::Int16Array), 2);
-        assert_eq!(SafeTypedArray::element_size(&TypedArrayType::Uint16Array), 2);
+        assert_eq!(
+            SafeTypedArray::element_size(&TypedArrayType::Uint16Array),
+            2
+        );
         assert_eq!(SafeTypedArray::element_size(&TypedArrayType::Int32Array), 4);
-        assert_eq!(SafeTypedArray::element_size(&TypedArrayType::Uint32Array), 4);
-        assert_eq!(SafeTypedArray::element_size(&TypedArrayType::Float32Array), 4);
-        assert_eq!(SafeTypedArray::element_size(&TypedArrayType::Float64Array), 8);
-        assert_eq!(SafeTypedArray::element_size(&TypedArrayType::BigInt64Array), 8);
-        assert_eq!(SafeTypedArray::element_size(&TypedArrayType::BigUint64Array), 8);
+        assert_eq!(
+            SafeTypedArray::element_size(&TypedArrayType::Uint32Array),
+            4
+        );
+        assert_eq!(
+            SafeTypedArray::element_size(&TypedArrayType::Float32Array),
+            4
+        );
+        assert_eq!(
+            SafeTypedArray::element_size(&TypedArrayType::Float64Array),
+            8
+        );
+        assert_eq!(
+            SafeTypedArray::element_size(&TypedArrayType::BigInt64Array),
+            8
+        );
+        assert_eq!(
+            SafeTypedArray::element_size(&TypedArrayType::BigUint64Array),
+            8
+        );
     }
 }

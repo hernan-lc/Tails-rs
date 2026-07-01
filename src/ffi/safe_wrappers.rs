@@ -17,7 +17,7 @@ pub struct SafePtr<'a, T> {
 
 impl<'a, T> SafePtr<'a, T> {
     /// Create a new SafePtr from a raw pointer
-    /// 
+    ///
     /// # Safety
     /// The caller must ensure:
     /// - The pointer is valid for the lifetime 'a
@@ -31,7 +31,7 @@ impl<'a, T> SafePtr<'a, T> {
     }
 
     /// Get a reference to the underlying data
-    /// 
+    ///
     /// # Safety
     /// The pointer must be valid and properly aligned
     pub unsafe fn as_ref(&self) -> &'a T {
@@ -39,7 +39,7 @@ impl<'a, T> SafePtr<'a, T> {
     }
 
     /// Get a mutable reference to the underlying data
-    /// 
+    ///
     /// # Safety
     /// The pointer must be valid, properly aligned, and no other references exist
     pub unsafe fn as_mut(&mut self) -> &'a mut T {
@@ -65,7 +65,7 @@ pub struct SafeCStr<'a> {
 
 impl<'a> SafeCStr<'a> {
     /// Create a new SafeCStr from a raw pointer
-    /// 
+    ///
     /// # Safety
     /// The pointer must point to a valid null-terminated C string
     pub unsafe fn new(ptr: *const c_char) -> Self {
@@ -76,7 +76,7 @@ impl<'a> SafeCStr<'a> {
     }
 
     /// Convert to a Rust string slice
-    /// 
+    ///
     /// Returns None if the pointer is null or the string is not valid UTF-8
     pub fn to_str(&self) -> Option<&'a str> {
         if self.ptr.is_null() {
@@ -106,7 +106,7 @@ pub struct SafeSlice<'a, T> {
 
 impl<'a, T> SafeSlice<'a, T> {
     /// Create a new SafeSlice from a raw pointer and length
-    /// 
+    ///
     /// # Safety
     /// The pointer must be valid for `len` elements
     pub unsafe fn new(ptr: *const T, len: usize) -> Self {
@@ -118,7 +118,7 @@ impl<'a, T> SafeSlice<'a, T> {
     }
 
     /// Get a slice of the data
-    /// 
+    ///
     /// # Safety
     /// The pointer must be valid for `len` elements
     pub unsafe fn as_slice(&self) -> &'a [T] {
@@ -198,4 +198,3 @@ mod tests {
         assert_eq!(s, &[1, 2, 3, 4, 5]);
     }
 }
-

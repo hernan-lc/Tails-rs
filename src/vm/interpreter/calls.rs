@@ -320,14 +320,13 @@ impl Interpreter {
             Value::Boolean(b) => simd_json::OwnedValue::Static(simd_json::StaticNode::Bool(*b)),
             Value::Null => simd_json::OwnedValue::Static(simd_json::StaticNode::Null),
             Value::Undefined => simd_json::OwnedValue::Static(simd_json::StaticNode::Null),
-            Value::NativeObject(obj_id) => {
-                tails_abi::get_handle(obj_id.0 as u64).unwrap_or(simd_json::OwnedValue::Static(simd_json::StaticNode::Null))
-            }
+            Value::NativeObject(obj_id) => tails_abi::get_handle(obj_id.0 as u64)
+                .unwrap_or(simd_json::OwnedValue::Static(simd_json::StaticNode::Null)),
             Value::Array(arr_idx) => {
                 if let HeapValue::Array(arr) = &self.heap[*arr_idx] {
-                    simd_json::OwnedValue::Array(
-                        Box::new(arr.elements.iter().map(|v| self.value_to_json(v)).collect()),
-                    )
+                    simd_json::OwnedValue::Array(Box::new(
+                        arr.elements.iter().map(|v| self.value_to_json(v)).collect(),
+                    ))
                 } else {
                     simd_json::OwnedValue::Static(simd_json::StaticNode::Null)
                 }

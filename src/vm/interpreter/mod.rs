@@ -1,7 +1,5 @@
 mod builtins;
 mod call_frame;
-pub mod safe_function;
-pub mod safe_library;
 mod calls;
 mod class_ops;
 mod control_flow;
@@ -16,6 +14,8 @@ pub(crate) mod native_loader;
 mod ops;
 mod promise_runtime;
 mod property_access;
+pub mod safe_function;
+pub mod safe_library;
 mod value_ops;
 
 pub(crate) use call_frame::{CallFrame, ExceptionHandler};

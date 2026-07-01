@@ -2,12 +2,8 @@ use crate::ffi::TailsValue;
 use crate::TailsRuntime;
 
 /// The standard signature for native function pointers in Tails-rs.
-pub type NativeFunctionPtr = extern "C" fn(
-    *mut std::ffi::c_void,
-    TailsValue,
-    *const TailsValue,
-    i32,
-) -> TailsValue;
+pub type NativeFunctionPtr =
+    extern "C" fn(*mut std::ffi::c_void, TailsValue, *const TailsValue, i32) -> TailsValue;
 
 /// A safe wrapper around a native function pointer.
 ///
@@ -129,9 +125,8 @@ mod tests {
     #[test]
     fn test_function_pointer_wrapper() {
         let f: NativeFunctionPtr = test_function;
-        let wrapper: FunctionPointerWrapper<NativeFunctionPtr> = unsafe {
-            FunctionPointerWrapper::new(&f as *const NativeFunctionPtr, "test")
-        };
+        let wrapper: FunctionPointerWrapper<NativeFunctionPtr> =
+            unsafe { FunctionPointerWrapper::new(&f as *const NativeFunctionPtr, "test") };
         assert_eq!(wrapper.name(), "test");
         assert!(!wrapper.as_ptr().is_null());
     }
@@ -145,9 +140,8 @@ mod tests {
     #[test]
     fn test_function_pointer_wrapper_as_ref() {
         let f: NativeFunctionPtr = test_function;
-        let wrapper: FunctionPointerWrapper<NativeFunctionPtr> = unsafe {
-            FunctionPointerWrapper::new(&f as *const NativeFunctionPtr, "test")
-        };
+        let wrapper: FunctionPointerWrapper<NativeFunctionPtr> =
+            unsafe { FunctionPointerWrapper::new(&f as *const NativeFunctionPtr, "test") };
         let func_ref = unsafe { wrapper.as_ref() };
         assert_eq!(*func_ref as usize, test_function as *const () as usize);
     }

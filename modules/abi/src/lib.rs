@@ -193,7 +193,9 @@ pub fn take_handle(id: u64) -> Option<simd_json::OwnedValue> {
     HANDLE_REGISTRY.lock().unwrap().remove(&id)
 }
 
-pub fn peek_handle(id: u64) -> Option<std::sync::MutexGuard<'static, HashMap<u64, simd_json::OwnedValue>>> {
+pub fn peek_handle(
+    id: u64,
+) -> Option<std::sync::MutexGuard<'static, HashMap<u64, simd_json::OwnedValue>>> {
     let guard = HANDLE_REGISTRY.lock().unwrap();
     if guard.contains_key(&id) {
         Some(guard)
