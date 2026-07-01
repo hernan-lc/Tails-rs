@@ -161,6 +161,7 @@ mod promise_fns;
 mod proxy_fns;
 mod reflect_fns;
 mod regexp_fns;
+mod require_fns;
 mod string_fns;
 mod symbol_fns;
 mod typed_array_fns;
@@ -595,4 +596,6 @@ pub static NATIVE_TABLE: &[NativeFn] = &[
     child_process_fns::native_child_process_spawn,
     // Object.prototype methods
     object_fns::native_object_has_own_property,
+    // CommonJS require()
+    require_fns::native_require,
 ];

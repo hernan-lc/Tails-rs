@@ -38,6 +38,10 @@ impl Interpreter {
         self.globals
             .insert("clearInterval".into(), Value::NativeFunction(17));
 
+        // CommonJS require() — NativeFunction(381)
+        self.globals
+            .insert("require".into(), Value::NativeFunction(381));
+
         // console object
         let mut console_props = HashMap::new();
         console_props.insert("log".into(), Value::NativeFunction(0));

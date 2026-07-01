@@ -29,6 +29,7 @@
 - **Encoding** — `atob()` and `btoa()` for base64 encoding/decoding
 - **path module** — `path.join()`, `path.resolve()`, `path.basename()`, `path.dirname()`, `path.extname()`, `path.relative()`, `path.isAbsolute()`, `path.normalize()`, `path.sep`, `path.delimiter`
 - **fs module** — `fs.readFileSync()`, `fs.writeFileSync()`, `fs.existsSync()`, `fs.mkdirSync()`, `fs.readdirSync()`, `fs.statSync()`, `fs.unlinkSync()`, `fs.rmSync()`, `fs.copyFileSync()`, `fs.renameSync()`, `fs.appendFileSync()`
+- **CommonJS Support** — `require()` for CJS module loading with `module.exports`/`exports`, `__dirname`/`__filename` globals, module caching, circular dependency handling, `.cjs` extension support, native module resolution via `require("path")` etc.
 
 ### Future / Research
 - **More Native Modules**

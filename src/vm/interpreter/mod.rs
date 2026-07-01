@@ -10,7 +10,7 @@ mod heap_types;
 mod instructions;
 mod iterators;
 mod modules;
-mod native_loader;
+pub(crate) mod native_loader;
 mod ops;
 mod promise_runtime;
 mod property_access;
@@ -59,6 +59,7 @@ pub struct Interpreter {
     pub(crate) module_exports: HashMap<String, Value>,
     pub(crate) current_module_path: Option<String>,
     pub(crate) module_globals: Option<HashMap<String, Value>>,
+    pub(crate) require_cache: HashMap<String, Value>,
     pub(crate) block_scope_stack: Vec<usize>,
     pub(crate) next_symbol_id: u64,
     pub(crate) symbol_registry: HashMap<String, u64>,
@@ -90,6 +91,7 @@ impl Interpreter {
             module_exports: HashMap::new(),
             module_globals: None,
             current_module_path: None,
+            require_cache: HashMap::new(),
             block_scope_stack: Vec::new(),
             next_symbol_id: crate::objects::USER_SYMBOL_START,
             symbol_registry: HashMap::new(),

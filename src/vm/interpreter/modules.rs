@@ -53,10 +53,31 @@ impl Interpreter {
                 || key == "globalThis"
                 || key == "fetch"
                 || key == "WebSocket"
+                || key == "require"
             {
                 self.globals.insert(key.clone(), saved_globals[key].clone());
             }
         }
+
+        // Inject __filename, __dirname, module, exports globals
+        if let Some(ref path) = self.current_module_path {
+            self.globals
+                .insert("__filename".to_string(), Value::String(path.clone()));
+            let dir = std::path::Path::new(path)
+                .parent()
+                .map(|p| p.to_string_lossy().to_string())
+                .unwrap_or_else(|| ".".to_string());
+            self.globals
+                .insert("__dirname".to_string(), Value::String(dir));
+
+            // Also inject module and exports for CJS compatibility
+            let module_obj = self.new_object();
+            let exports_obj = self.new_object();
+            self.set_property_str(&module_obj, "exports", exports_obj.clone());
+            self.globals.insert("module".to_string(), module_obj);
+            self.globals.insert("exports".to_string(), exports_obj);
+        }
+
         let result = self.execute(module);
         let module_globals = std::mem::replace(&mut self.globals, saved_globals.clone());
         let exec_exports = std::mem::replace(&mut self.module_exports, prev_exports);
@@ -196,7 +217,7 @@ impl Interpreter {
             if normalized.exists() && normalized.is_file() {
                 return Ok(normalized.to_string_lossy().to_string());
             }
-            for ext in &[".ts", ".js"] {
+            for ext in &[".ts", ".js", ".cjs"] {
                 let stem = normalized.with_extension("");
                 let candidate =
                     std::path::PathBuf::from(format!("{}{}", stem.to_string_lossy(), ext));
@@ -205,7 +226,7 @@ impl Interpreter {
                 }
             }
             if normalized.is_dir() {
-                for name in &["index.ts", "index.js"] {
+                for name in &["index.ts", "index.js", "index.cjs"] {
                     let idx = normalized.join(name);
                     if idx.exists() {
                         return Ok(idx.to_string_lossy().to_string());
@@ -361,12 +382,12 @@ impl Interpreter {
         }
     }
 
-    /// Try resolving a path with .ts, .js, /index.ts, /index.js fallbacks
+    /// Try resolving a path with .ts, .js, .cjs, /index.ts, /index.js fallbacks
     fn resolve_with_fallbacks(&self, path: &std::path::Path) -> Option<String> {
         if path.exists() && path.is_file() {
             return Some(path.to_string_lossy().to_string());
         }
-        for ext in &[".ts", ".js", ".mjs"] {
+        for ext in &[".ts", ".js", ".mjs", ".cjs"] {
             let with_ext = path.with_extension("");
             let candidate =
                 std::path::PathBuf::from(format!("{}{}", with_ext.to_string_lossy(), ext));
@@ -375,7 +396,7 @@ impl Interpreter {
             }
         }
         if path.is_dir() {
-            for name in &["index.ts", "index.js", "index.mjs"] {
+            for name in &["index.ts", "index.js", "index.mjs", "index.cjs"] {
                 let idx = path.join(name);
                 if idx.exists() {
                     return Some(idx.to_string_lossy().to_string());
@@ -385,7 +406,10 @@ impl Interpreter {
         None
     }
 
-    fn build_module_object_from_exports(&mut self, exports: &HashMap<String, Value>) -> Value {
+    pub(crate) fn build_module_object_from_exports(
+        &mut self,
+        exports: &HashMap<String, Value>,
+    ) -> Value {
         let heap_idx = self.heap.len();
         let mut props = HashMap::new();
         for (k, v) in exports {

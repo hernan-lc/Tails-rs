@@ -49,7 +49,15 @@ fn discover_imports(script_path: &Path) -> Vec<PathBuf> {
         // import ... from "./path"
         // import "./path"
         // export ... from "./path"
-        for pattern in ["from \"", "from '", "import \"", "import '"] {
+        // require("./path")
+        for pattern in [
+            "from \"",
+            "from '",
+            "import \"",
+            "import '",
+            "require(\"",
+            "require('",
+        ] {
             if let Some(idx) = trimmed.find(pattern) {
                 let rest = &trimmed[idx + pattern.len()..];
                 if let Some(end) = rest.find('"').or_else(|| rest.find('\'')) {
