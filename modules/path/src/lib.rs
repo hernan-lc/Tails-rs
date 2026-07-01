@@ -1,12 +1,14 @@
 use std::env;
 use std::path::{Component, Path, PathBuf};
 
+use tails_native_macros::{tails_function, tails_module};
+
+// ============================================================================
+// Public API for direct Rust usage
+// ============================================================================
+
 pub const SEP: char = std::path::MAIN_SEPARATOR;
-pub const DELIMITER: char = if cfg!(target_os = "windows") {
-    ';'
-} else {
-    ':'
-};
+pub const DELIMITER: char = if cfg!(target_os = "windows") { ';' } else { ':' };
 
 pub fn join(parts: &[String]) -> String {
     let mut result = PathBuf::new();
@@ -145,4 +147,121 @@ pub fn normalize(path: &str) -> String {
     }
 
     result
+}
+
+// ============================================================================
+// Native module (cdylib FFI exports)
+// ============================================================================
+
+#[tails_module(name = "tails-path")]
+mod path_native {
+    use super::*;
+    #[tails_function]
+    pub fn join(parts: String) -> String {
+        let arr: Vec<String> = serde_json::from_str(&parts).unwrap_or_default();
+        super::join(&arr)
+    }
+
+    #[tails_function]
+    pub fn resolve(parts: String) -> String {
+        let arr: Vec<String> = serde_json::from_str(&parts).unwrap_or_default();
+        super::resolve(&arr)
+    }
+
+    #[tails_function]
+    pub fn basename(path: String, ext: String) -> String {
+        if ext.is_empty() {
+            super::basename(&path, None)
+        } else {
+            super::basename(&path, Some(&ext))
+        }
+    }
+
+    #[tails_function]
+    pub fn dirname(path: String) -> String {
+        super::dirname(&path)
+    }
+
+    #[tails_function]
+    pub fn extname(path: String) -> String {
+        super::extname(&path)
+    }
+
+    #[tails_function]
+    pub fn filename(path: String) -> String {
+        Path::new(&path)
+            .file_stem()
+            .map(|s| s.to_string_lossy().to_string())
+            .unwrap_or_default()
+    }
+
+    #[tails_function]
+    pub fn relative(from: String, to: String) -> String {
+        super::relative(&from, &to)
+    }
+
+    #[tails_function]
+    pub fn is_absolute(path: String) -> bool {
+        super::is_absolute(&path)
+    }
+
+    #[tails_function]
+    pub fn normalize(path: String) -> String {
+        super::normalize(&path)
+    }
+
+    #[tails_function]
+    pub fn sep() -> String {
+        std::path::MAIN_SEPARATOR.to_string()
+    }
+
+    #[tails_function]
+    pub fn delimiter() -> String {
+        super::DELIMITER.to_string()
+    }
+
+    #[tails_function]
+    pub fn parse(path: String) -> String {
+        let p = Path::new(&path);
+        let root = if p.is_absolute() {
+            Some(std::path::MAIN_SEPARATOR.to_string())
+        } else {
+            None
+        };
+        let ext = p.extension().map(|s| format!(".{}", s.to_string_lossy()));
+        let name = p.file_stem().map(|s| s.to_string_lossy().to_string());
+        let dir = p.parent().map(|d| d.to_string_lossy().to_string());
+
+        serde_json::json!({
+            "root": root,
+            "dir": dir,
+            "base": p.file_name().map(|s| s.to_string_lossy().to_string()),
+            "ext": ext,
+            "name": name,
+        }).to_string()
+    }
+
+    #[tails_function]
+    pub fn format(parts: String) -> String {
+        let obj: serde_json::Value = serde_json::from_str(&parts).unwrap_or(serde_json::Value::Null);
+        let dir = obj.get("dir").and_then(|v| v.as_str()).unwrap_or("");
+        let base = obj.get("base").and_then(|v| v.as_str()).unwrap_or("");
+        let root = obj.get("root").and_then(|v| v.as_str()).unwrap_or("");
+
+        if !dir.is_empty() && !base.is_empty() {
+            let sep = std::path::MAIN_SEPARATOR;
+            format!("{}{}{}", dir.trim_end_matches(sep), sep, base)
+        } else if !root.is_empty() {
+            format!("{}{}", root, base)
+        } else {
+            base.to_string()
+        }
+    }
+
+    #[tails_function]
+    pub fn contains(haystack: String, needle: String) -> bool {
+        Path::new(&haystack).components().any(|c| {
+            matches!(c, Component::Normal(s) if s.to_string_lossy() == needle)
+        })
+    }
 }

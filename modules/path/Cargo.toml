@@ -5,3 +5,9 @@ edition = "2021"
 description = "Tails native path module"
 
 [lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+tails-abi = { path = "../abi" }
+tails-native-macros = { path = "../native-macros" }
+serde_json = "1"

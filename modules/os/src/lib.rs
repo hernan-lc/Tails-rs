@@ -1,3 +1,9 @@
+use tails_native_macros::{tails_function, tails_module};
+
+// ============================================================================
+// Public API for direct Rust usage
+// ============================================================================
+
 #[derive(Debug, Clone)]
 pub struct CpuInfo {
     pub model: String,
@@ -163,4 +169,193 @@ pub fn homedir() -> String {
 
 pub fn tmpdir() -> String {
     std::env::temp_dir().to_string_lossy().to_string()
+}
+
+// ============================================================================
+// Native module (cdylib FFI exports)
+// ============================================================================
+
+#[tails_module(name = "tails-os")]
+mod os_native {
+    use super::*;
+    #[tails_function]
+    pub fn platform() -> String {
+        super::platform().to_string()
+    }
+
+    #[tails_function]
+    pub fn arch() -> String {
+        super::arch().to_string()
+    }
+
+    #[tails_function]
+    pub fn cpus() -> String {
+        let cpus: Vec<serde_json::Value> = super::cpus()
+            .into_iter()
+            .map(|cpu| {
+                serde_json::json!({
+                    "model": cpu.model,
+                    "speed": cpu.speed,
+                    "times": {
+                        "user": cpu.times.user,
+                        "nice": cpu.times.nice,
+                        "sys": cpu.times.sys,
+                        "idle": cpu.times.idle,
+                        "irq": cpu.times.irq
+                    }
+                })
+            })
+            .collect();
+        serde_json::to_string(&cpus).unwrap_or_else(|_| "[]".to_string())
+    }
+
+    #[tails_function]
+    pub fn totalmem() -> f64 {
+        super::totalmem()
+    }
+
+    #[tails_function]
+    pub fn freemem() -> f64 {
+        super::freemem()
+    }
+
+    #[tails_function]
+    pub fn uptime() -> f64 {
+        super::uptime()
+    }
+
+    #[tails_function]
+    pub fn hostname() -> String {
+        super::hostname().unwrap_or_else(|_| "localhost".to_string())
+    }
+
+    #[tails_function]
+    pub fn os_type() -> String {
+        super::os_type().to_string()
+    }
+
+    #[tails_function]
+    pub fn release() -> String {
+        super::release()
+    }
+
+    #[tails_function]
+    pub fn homedir() -> String {
+        super::homedir()
+    }
+
+    #[tails_function]
+    pub fn tmpdir() -> String {
+        super::tmpdir()
+    }
+
+    #[tails_function]
+    pub fn type_name() -> String {
+        "Tails".to_string()
+    }
+
+    #[tails_function]
+    pub fn endianness() -> String {
+        if cfg!(target_endian = "little") {
+            "LE".to_string()
+        } else {
+            "BE".to_string()
+        }
+    }
+
+    #[tails_function]
+    pub fn loadavg() -> String {
+        #[cfg(target_os = "linux")]
+        {
+            if let Ok(content) = std::fs::read_to_string("/proc/loadavg") {
+                let parts: Vec<&str> = content.split_whitespace().collect();
+                if parts.len() >= 3 {
+                    return serde_json::json!([
+                        parts[0].parse::<f64>().unwrap_or(0.0),
+                        parts[1].parse::<f64>().unwrap_or(0.0),
+                        parts[2].parse::<f64>().unwrap_or(0.0)
+                    ]).to_string();
+                }
+            }
+        }
+        "[0.0, 0.0, 0.0]".to_string()
+    }
+
+    #[tails_function]
+    pub fn env_var(name: String) -> String {
+        std::env::var(&name).unwrap_or_default()
+    }
+
+    #[tails_function]
+    pub fn env_vars() -> String {
+        let vars: Vec<serde_json::Value> = std::env::vars()
+            .map(|(k, v)| serde_json::json!({"key": k, "value": v}))
+            .collect();
+        serde_json::to_string(&vars).unwrap_or_else(|_| "[]".to_string())
+    }
+
+    #[tails_function]
+    pub fn pid() -> f64 {
+        std::process::id() as f64
+    }
+
+    #[tails_function]
+    pub fn ppidd() -> f64 {
+        #[cfg(unix)]
+        {
+            unsafe { libc::getppid() as f64 }
+        }
+        #[cfg(not(unix))]
+        {
+            0.0
+        }
+    }
+
+    #[tails_function]
+    pub fn getegid() -> f64 {
+        #[cfg(unix)]
+        {
+            unsafe { libc::getegid() as f64 }
+        }
+        #[cfg(not(unix))]
+        {
+            0.0
+        }
+    }
+
+    #[tails_function]
+    pub fn geteuid() -> f64 {
+        #[cfg(unix)]
+        {
+            unsafe { libc::geteuid() as f64 }
+        }
+        #[cfg(not(unix))]
+        {
+            0.0
+        }
+    }
+
+    #[tails_function]
+    pub fn getgid() -> f64 {
+        #[cfg(unix)]
+        {
+            unsafe { libc::getgid() as f64 }
+        }
+        #[cfg(not(unix))]
+        {
+            0.0
+        }
+    }
+
+    #[tails_function]
+    pub fn getuid() -> f64 {
+        #[cfg(unix)]
+        {
+            unsafe { libc::getuid() as f64 }
+        }
+        #[cfg(not(unix))]
+        {
+            0.0
+        }
+    }
 }

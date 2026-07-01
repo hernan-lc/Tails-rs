@@ -66,9 +66,31 @@ impl NativeModuleRegistry {
 
             let mut exports = HashMap::new();
 
-            // Try to find tails_native_init
             type InitFn = fn() -> *mut tails_abi::ModuleHandle;
-            if let Ok(init_fn) = library.get::<InitFn>(b"tails_native_init") {
+
+            // Try module-specific init first, then fallback to generic
+            let module_stem = lib_path.file_stem()
+                .and_then(|s| s.to_str())
+                .unwrap_or("");
+            let base_name = module_stem
+                .strip_prefix("lib")
+                .unwrap_or(module_stem);
+
+            let init_result = {
+                let init_name = format!("tails_native_init_{}\0", base_name.replace('-', "_"));
+                if let Ok(init_fn) = library.get::<InitFn>(init_name.as_bytes()) {
+                    Some(init_fn)
+                } else {
+                    let init_name2 = format!("tails_native_init_{}\0", base_name);
+                    if let Ok(init_fn) = library.get::<InitFn>(init_name2.as_bytes()) {
+                        Some(init_fn)
+                    } else {
+                        library.get::<InitFn>(b"tails_native_init\0").ok()
+                    }
+                }
+            };
+
+            if let Some(init_fn) = init_result {
                 let handle = init_fn();
                 if !handle.is_null() {
                     let handle = Box::from_raw(handle);

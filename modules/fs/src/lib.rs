@@ -1,6 +1,39 @@
-use std::fs;
 use std::io::Write;
 use std::path::Path;
+
+use tails_native_macros::{tails_function, tails_module};
+
+// ============================================================================
+// Public API for direct Rust usage
+// ============================================================================
+
+pub fn read_file(path: &str) -> std::io::Result<String> {
+    std::fs::read_to_string(path)
+}
+
+pub fn write_file(path: &str, content: &str) -> std::io::Result<()> {
+    std::fs::write(path, content)
+}
+
+pub fn exists(path: &str) -> bool {
+    Path::new(path).exists()
+}
+
+pub fn mkdir(path: &str, recursive: bool) -> std::io::Result<()> {
+    if recursive {
+        std::fs::create_dir_all(path)
+    } else {
+        std::fs::create_dir(path)
+    }
+}
+
+pub fn readdir(path: &str) -> std::io::Result<Vec<String>> {
+    let entries: Vec<String> = std::fs::read_dir(path)?
+        .filter_map(|entry| entry.ok())
+        .map(|entry| entry.file_name().to_string_lossy().to_string())
+        .collect();
+    Ok(entries)
+}
 
 #[derive(Debug, Clone)]
 pub struct FileStat {
@@ -13,36 +46,8 @@ pub struct FileStat {
     pub birthtime_ms: Option<f64>,
 }
 
-pub fn read_file(path: &str) -> std::io::Result<String> {
-    fs::read_to_string(path)
-}
-
-pub fn write_file(path: &str, content: &str) -> std::io::Result<()> {
-    fs::write(path, content)
-}
-
-pub fn exists(path: &str) -> bool {
-    Path::new(path).exists()
-}
-
-pub fn mkdir(path: &str, recursive: bool) -> std::io::Result<()> {
-    if recursive {
-        fs::create_dir_all(path)
-    } else {
-        fs::create_dir(path)
-    }
-}
-
-pub fn readdir(path: &str) -> std::io::Result<Vec<String>> {
-    let entries: Vec<String> = fs::read_dir(path)?
-        .filter_map(|entry| entry.ok())
-        .map(|entry| entry.file_name().to_string_lossy().to_string())
-        .collect();
-    Ok(entries)
-}
-
 pub fn stat(path: &str) -> std::io::Result<FileStat> {
-    let metadata = fs::metadata(path)?;
+    let metadata = std::fs::metadata(path)?;
 
     let mode = {
         #[cfg(unix)]
@@ -89,29 +94,267 @@ pub fn stat(path: &str) -> std::io::Result<FileStat> {
 }
 
 pub fn unlink(path: &str) -> std::io::Result<()> {
-    fs::remove_file(path)
+    std::fs::remove_file(path)
 }
 
 pub fn rm(path: &str, recursive: bool) -> std::io::Result<()> {
     if recursive {
-        fs::remove_dir_all(path)
+        std::fs::remove_dir_all(path)
     } else {
-        fs::remove_file(path)
+        std::fs::remove_file(path)
     }
 }
 
 pub fn copy_file(src: &str, dest: &str) -> std::io::Result<u64> {
-    fs::copy(src, dest)
+    std::fs::copy(src, dest)
 }
 
 pub fn rename(old_path: &str, new_path: &str) -> std::io::Result<()> {
-    fs::rename(old_path, new_path)
+    std::fs::rename(old_path, new_path)
 }
 
 pub fn append_file(path: &str, content: &str) -> std::io::Result<()> {
-    let mut file = fs::OpenOptions::new()
+    let mut file = std::fs::OpenOptions::new()
         .create(true)
         .append(true)
         .open(path)?;
     file.write_all(content.as_bytes())
+}
+
+// ============================================================================
+// Base64 helpers (for binary I/O)
+// ============================================================================
+
+fn base64_encode(data: &[u8]) -> String {
+    const CHARS: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    let mut result = String::with_capacity((data.len() + 2) / 3 * 4);
+    for chunk in data.chunks(3) {
+        let b0 = chunk[0] as u32;
+        let b1 = if chunk.len() > 1 { chunk[1] as u32 } else { 0 };
+        let b2 = if chunk.len() > 2 { chunk[2] as u32 } else { 0 };
+        let triple = (b0 << 16) | (b1 << 8) | b2;
+        result.push(CHARS[((triple >> 18) & 0x3F) as usize] as char);
+        result.push(CHARS[((triple >> 12) & 0x3F) as usize] as char);
+        if chunk.len() > 1 {
+            result.push(CHARS[((triple >> 6) & 0x3F) as usize] as char);
+        } else {
+            result.push('=');
+        }
+        if chunk.len() > 2 {
+            result.push(CHARS[(triple & 0x3F) as usize] as char);
+        } else {
+            result.push('=');
+        }
+    }
+    result
+}
+
+fn base64_decode(data: &str) -> Option<Vec<u8>> {
+    const TABLE: [i8; 256] = {
+        let mut table = [(-1i8); 256];
+        let chars = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+        let mut i = 0;
+        while i < chars.len() {
+            table[chars[i] as usize] = i as i8;
+            i += 1;
+        }
+        table[b'=' as usize] = 0;
+        table
+    };
+
+    let data = data.trim_end_matches('=');
+    if data.is_empty() {
+        return Some(Vec::new());
+    }
+
+    let mut output = Vec::with_capacity(data.len() * 3 / 4);
+    for chunk in data.as_bytes().chunks(4) {
+        let mut buf = [0u8; 4];
+        for (i, &b) in chunk.iter().enumerate() {
+            let val = TABLE[b as usize];
+            if val < 0 {
+                return None;
+            }
+            buf[i] = val as u8;
+        }
+        let triple = ((buf[0] as u32) << 18)
+            | ((buf[1] as u32) << 12)
+            | ((buf[2] as u32) << 6)
+            | (buf[3] as u32);
+        output.push((triple >> 16) as u8);
+        if chunk.len() > 2 {
+            output.push((triple >> 8) as u8);
+        }
+        if chunk.len() > 3 {
+            output.push(triple as u8);
+        }
+    }
+    Some(output)
+}
+
+// ============================================================================
+// Native module (cdylib FFI exports)
+// ============================================================================
+
+#[tails_module(name = "tails-fs")]
+mod fs_native {
+    use super::*;
+    #[tails_function]
+    pub fn read_file(path: String) -> String {
+        super::read_file(&path).unwrap_or_default()
+    }
+
+    #[tails_function]
+    pub fn write_file(path: String, content: String) -> bool {
+        super::write_file(&path, &content).is_ok()
+    }
+
+    #[tails_function]
+    pub fn exists(path: String) -> bool {
+        super::exists(&path)
+    }
+
+    #[tails_function]
+    pub fn mkdir(path: String, recursive: bool) -> bool {
+        super::mkdir(&path, recursive).is_ok()
+    }
+
+    #[tails_function]
+    pub fn readdir(path: String) -> String {
+        super::readdir(&path)
+            .map(|entries| serde_json::to_string(&entries).unwrap_or_else(|_| "[]".to_string()))
+            .unwrap_or_else(|_| "[]".to_string())
+    }
+
+    #[tails_function]
+    pub fn stat(path: String) -> String {
+        match super::stat(&path) {
+            Ok(s) => serde_json::json!({
+                "size": s.size,
+                "isFile": s.is_file,
+                "isDirectory": s.is_directory,
+                "isSymbolicLink": s.is_symbolic_link,
+                "mode": s.mode,
+                "mtimeMs": s.mtime_ms,
+                "birthtimeMs": s.birthtime_ms,
+            }).to_string(),
+            Err(_) => "{}".to_string(),
+        }
+    }
+
+    #[tails_function]
+    pub fn unlink(path: String) -> bool {
+        super::unlink(&path).is_ok()
+    }
+
+    #[tails_function]
+    pub fn rm(path: String, recursive: bool) -> bool {
+        super::rm(&path, recursive).is_ok()
+    }
+
+    #[tails_function]
+    pub fn copy_file(src: String, dest: String) -> f64 {
+        super::copy_file(&src, &dest).unwrap_or(0) as f64
+    }
+
+    #[tails_function]
+    pub fn rename(old_path: String, new_path: String) -> bool {
+        super::rename(&old_path, &new_path).is_ok()
+    }
+
+    #[tails_function]
+    pub fn append_file(path: String, content: String) -> bool {
+        super::append_file(&path, &content).is_ok()
+    }
+
+    #[tails_function]
+    pub fn read_file_bytes(path: String) -> String {
+        match std::fs::read(&path) {
+            Ok(bytes) => {
+                let encoded = base64_encode(&bytes);
+                serde_json::to_string(&encoded).unwrap_or_default()
+            }
+            Err(_) => "".to_string(),
+        }
+    }
+
+    #[tails_function]
+    pub fn write_file_bytes(path: String, data: String) -> bool {
+        match base64_decode(&data) {
+            Some(bytes) => std::fs::write(&path, &bytes).is_ok(),
+            None => false,
+        }
+    }
+
+    #[tails_function]
+    pub fn chmod(path: String, mode: f64) -> bool {
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(&path, std::fs::Permissions::from_mode(mode as u32)).is_ok()
+        }
+        #[cfg(not(unix))]
+        {
+            let _ = (path, mode);
+            false
+        }
+    }
+
+    #[tails_function]
+    pub fn lstat(path: String) -> String {
+        match std::fs::symlink_metadata(&path) {
+            Ok(metadata) => {
+                #[cfg(unix)]
+                let mode = {
+                    use std::os::unix::fs::MetadataExt;
+                    Some(metadata.mode())
+                };
+                #[cfg(not(unix))]
+                let mode: Option<u32> = None;
+
+                let mtime_ms = metadata.modified().ok().and_then(|t| {
+                    t.duration_since(std::time::UNIX_EPOCH)
+                        .ok()
+                        .map(|d| d.as_secs_f64() * 1000.0)
+                });
+
+                serde_json::json!({
+                    "size": metadata.len(),
+                    "isFile": metadata.is_file(),
+                    "isDirectory": metadata.is_dir(),
+                    "isSymbolicLink": metadata.file_type().is_symlink(),
+                    "mode": mode,
+                    "mtimeMs": mtime_ms,
+                }).to_string()
+            }
+            Err(_) => "{}".to_string(),
+        }
+    }
+
+    #[tails_function]
+    pub fn readlink(path: String) -> String {
+        std::fs::read_link(&path)
+            .map(|p| p.to_string_lossy().to_string())
+            .unwrap_or_default()
+    }
+
+    #[tails_function]
+    pub fn symlink(src: String, dest: String) -> bool {
+        #[cfg(unix)]
+        {
+            std::os::unix::fs::symlink(&src, &dest).is_ok()
+        }
+        #[cfg(not(unix))]
+        {
+            let _ = (src, dest);
+            false
+        }
+    }
+
+    #[tails_function]
+    pub fn realpath(path: String) -> String {
+        std::fs::canonicalize(&path)
+            .map(|p| p.to_string_lossy().to_string())
+            .unwrap_or(path)
+    }
 }

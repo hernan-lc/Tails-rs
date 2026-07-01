@@ -13,8 +13,30 @@ impl Interpreter {
         let mut props = HashMap::new();
 
         type InitFn = fn() -> *mut tails_abi::ModuleHandle;
-        let init_fn =
-            unsafe { library.get_function::<InitFn>("tails_native_init") }.ok()?;
+
+        // Try module-specific init first, then fallback to generic
+        let module_stem = lib_path.file_stem()
+            .and_then(|s| s.to_str())
+            .unwrap_or("");
+        let base_name = module_stem
+            .strip_prefix("lib")
+            .unwrap_or(module_stem);
+
+        let init_fn = unsafe {
+            let init_name = format!("tails_native_init_{}\0", base_name.replace('-', "_"));
+            if let Ok(f) = library.get_function::<InitFn>(&init_name.trim_end_matches('\0')) {
+                Some(f)
+            } else {
+                let init_name2 = format!("tails_native_init_{}\0", base_name);
+                if let Ok(f) = library.get_function::<InitFn>(&init_name2.trim_end_matches('\0')) {
+                    Some(f)
+                } else {
+                    library.get_function::<InitFn>("tails_native_init").ok()
+                }
+            }
+        };
+
+        let init_fn = init_fn?;
         let handle = init_fn();
         if handle.is_null() {
             return None;
@@ -699,11 +721,10 @@ impl Interpreter {
 
     pub(crate) fn exec_native_import(&mut self, source: &str, local_name: &str) -> Result<Value> {
         match self.load_and_run_module(source)? {
-            Some(_module_path) => {
+            Some(module_path) => {
                 let exports = self
                     .module_registry
-                    .values()
-                    .last()
+                    .get(&module_path)
                     .cloned()
                     .unwrap_or_default();
                 let val = exports

@@ -80,10 +80,11 @@ pub fn expand_module(item: ItemMod, options: ModuleOptions) -> TokenStream {
         }
     }
 
-    let init_fn_name = format_ident!("tails_native_init");
+    let safe_module_name = module_name.replace('-', "_");
+    let unique_init_name = format_ident!("tails_native_init_{}", safe_module_name);
     let meta_name = format_ident!(
         "__TAILS_MODULE_META_{}",
-        module_name.replace('-', "_").to_uppercase()
+        safe_module_name.to_uppercase()
     );
 
     let meta_fn = quote! {
@@ -95,7 +96,7 @@ pub fn expand_module(item: ItemMod, options: ModuleOptions) -> TokenStream {
 
     let init_fn = quote! {
         #[no_mangle]
-        pub extern "C" fn #init_fn_name() -> *mut ::tails_abi::ModuleHandle {
+        pub extern "C" fn #unique_init_name() -> *mut ::tails_abi::ModuleHandle {
             let module = ::tails_abi::NativeModule::new(#module_name);
             let mut handle = ::tails_abi::ModuleHandle::new(module);
 

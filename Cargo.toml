@@ -1,5 +1,5 @@
 [workspace]
-members = [".", "modules/abi", "modules/native-macros", "modules/my-tails-module", "modules/tails-validator", "modules/fs", "modules/path", "modules/process", "modules/os", "modules/websocket"]
+members = [".", "modules/abi", "modules/native-macros", "modules/tails-validator", "modules/fs", "modules/path", "modules/process", "modules/os", "modules/websocket"]
 
 [package]
 name = "tails-rs"

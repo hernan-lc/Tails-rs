@@ -22,22 +22,48 @@ impl NativeLibrary {
         let mut functions = HashMap::new();
         let constants = HashMap::new();
 
-        // Look for the init function
-        unsafe {
-            type InitFn = fn() -> *mut crate::ModuleHandle;
-            let init_fn: libloading::Symbol<InitFn> = library
-                .get(b"tails_native_init\0")
-                .map_err(|e| format!("Failed to find tails_native_init: {}", e))?;
+        // Try module-specific init first (tails_native_init_<name>), then fallback to generic
+        type InitFn = fn() -> *mut crate::ModuleHandle;
 
-            let handle = init_fn();
-            if handle.is_null() {
-                return Err("tails_native_init returned null".to_string());
-            }
+        let init_result = unsafe {
+            // First try to find any tails_native_init_* symbol via nm-like approach
+            // We'll try common module names
+            let module_stem = path.file_stem()
+                .and_then(|s| s.to_str())
+                .unwrap_or("");
 
-            let handle = Box::from_raw(handle);
-            for (func_name, func_ptr) in &handle.module.functions {
-                functions.insert(func_name.clone(), *func_ptr);
+            // Strip lib prefix and convert underscores to hyphens for module name
+            let base_name = module_stem
+                .strip_prefix("lib")
+                .unwrap_or(module_stem);
+
+            // Try tails_native_init_<base_name> (with underscores)
+            let init_name = format!("tails_native_init_{}\0", base_name.replace('-', "_"));
+            if let Ok(init_fn) = library.get::<InitFn>(init_name.as_bytes()) {
+                Some(init_fn)
+            } else {
+                // Try the original module name pattern
+                let init_name2 = format!("tails_native_init_{}\0", base_name);
+                if let Ok(init_fn) = library.get::<InitFn>(init_name2.as_bytes()) {
+                    Some(init_fn)
+                } else {
+                    // Fallback to generic tails_native_init for backward compatibility
+                    library.get::<InitFn>(b"tails_native_init\0").ok()
+                }
             }
+        };
+
+        let init_fn = init_result
+            .ok_or_else(|| format!("No init function found in '{}'", path.display()))?;
+
+        let handle = init_fn();
+        if handle.is_null() {
+            return Err("init function returned null".to_string());
+        }
+
+        let handle = unsafe { Box::from_raw(handle) };
+        for (func_name, func_ptr) in &handle.module.functions {
+            functions.insert(func_name.clone(), *func_ptr);
         }
 
         Ok(Self {
