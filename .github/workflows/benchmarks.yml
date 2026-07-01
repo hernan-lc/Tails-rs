@@ -1,0 +1,59 @@
+name: Cross-Runtime Benchmarks
+
+on:
+  schedule:
+    - cron: '0 3 * * *'   # nightly at 03:00 UTC
+  workflow_dispatch:
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+          cache: 'npm'
+
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v1.40.5
+
+      - uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: 1.1.32
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+
+      - name: Generate fixtures
+        run: node benchmarks/tools/generate_fixtures.js
+
+      - name: Build Tails-rs
+        run: cargo build --quiet --release
+
+      - name: Run benchmarks
+        run: bash benchmarks/runner.sh
+        env:
+          WARMUP: 2
+          RUNS: 5
+
+      - name: Upload report
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-report
+          path: benchmarks/results/REPORT.md
+          retention-days: 30
+
+      - name: Upload results JSON
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-results
+          path: benchmarks/results/latest.json
+          retention-days: 30

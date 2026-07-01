@@ -2,4 +2,5 @@
 .commandcode/
 node_modules/
 dist/
-dist/
+benchmarks/results/
+benchmarks/.tmp_*.jsonl
