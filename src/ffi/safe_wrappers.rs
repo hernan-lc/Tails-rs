@@ -2,6 +2,13 @@ use std::ffi::CStr;
 use std::marker::PhantomData;
 use std::os::raw::c_char;
 
+// SAFETY: The raw pointer is managed by SafePtr's lifetime constraints.
+// The struct enforces that the pointer is valid for the lifetime 'a,
+// and the PhantomData ensures the lifetime is properly tracked.
+// Send/Sync are safe because SafePtr enforces single-threaded access via lifetimes.
+unsafe impl<'a, T: Send> Send for SafePtr<'a, T> {}
+unsafe impl<'a, T: Sync> Sync for SafePtr<'a, T> {}
+
 /// A safe wrapper around a raw pointer with lifetime tracking
 pub struct SafePtr<'a, T> {
     ptr: *mut T,
@@ -45,6 +52,11 @@ impl<'a, T> SafePtr<'a, T> {
     }
 }
 
+// SAFETY: SafeCStr wraps a const pointer to a C string. The pointer is managed
+// by SafeCStr's lifetime constraints, ensuring it remains valid for the lifetime 'a.
+unsafe impl<'a> Send for SafeCStr<'a> {}
+unsafe impl<'a> Sync for SafeCStr<'a> {}
+
 /// A safe wrapper around a C string pointer
 pub struct SafeCStr<'a> {
     ptr: *const c_char,
@@ -78,6 +90,12 @@ impl<'a> SafeCStr<'a> {
         self.ptr.is_null()
     }
 }
+
+// SAFETY: SafeSlice wraps a const pointer and length. The pointer is managed
+// by SafeSlice's lifetime constraints, ensuring it remains valid for the lifetime 'a.
+// Send/Sync are safe because the slice data is read-only (const pointer).
+unsafe impl<'a, T: Send> Send for SafeSlice<'a, T> {}
+unsafe impl<'a, T: Sync> Sync for SafeSlice<'a, T> {}
 
 /// A safe wrapper around a raw slice
 pub struct SafeSlice<'a, T> {
@@ -150,4 +168,34 @@ mod tests {
         assert!(slice.is_empty());
         assert_eq!(slice.len(), 0);
     }
+
+    #[test]
+    fn test_safe_ptr_as_ref() {
+        let value = 42;
+        let ptr = unsafe { SafePtr::new(&value as *const i32 as *mut i32) };
+        assert!(!ptr.is_null());
+        let r = unsafe { ptr.as_ref() };
+        assert_eq!(*r, 42);
+    }
+
+    #[test]
+    fn test_safe_ptr_as_mut() {
+        let mut value = 10;
+        let mut ptr = unsafe { SafePtr::new(&mut value as *mut i32) };
+        assert!(!ptr.is_null());
+        let r = unsafe { ptr.as_mut() };
+        *r = 20;
+        assert_eq!(value, 20);
+    }
+
+    #[test]
+    fn test_safe_slice_as_slice() {
+        let data = [1, 2, 3, 4, 5];
+        let slice = unsafe { SafeSlice::new(data.as_ptr(), data.len()) };
+        assert!(!slice.is_empty());
+        assert_eq!(slice.len(), 5);
+        let s = unsafe { slice.as_slice() };
+        assert_eq!(s, &[1, 2, 3, 4, 5]);
+    }
 }
+
