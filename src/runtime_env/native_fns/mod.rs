@@ -617,6 +617,8 @@ pub static NATIVE_TABLE: &[NativeFn] = &[
     number_fns::native_boolean_value_of,
     // String.prototype.matchAll (393)
     string_fns::native_string_match_all,
+    // Generator[Symbol.iterator] (394)
+    generator_fns::native_generator_symbol_iterator,
 ];
 
 const _: () = assert!(

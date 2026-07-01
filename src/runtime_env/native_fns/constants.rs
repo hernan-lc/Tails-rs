@@ -394,6 +394,7 @@ pub const NUMBER_PARSE_FLOAT: usize = 390;
 pub const BOOLEAN_TO_STRING: usize = 391;
 pub const BOOLEAN_VALUE_OF: usize = 392;
 pub const STRING_MATCH_ALL: usize = 393;
+pub const GENERATOR_SYMBOL_ITERATOR: usize = 394;
 
 #[cfg(test)]
 mod tests {
@@ -411,4 +412,4 @@ mod tests {
     }
 }
 
-pub const NATIVE_TABLE_LEN: usize = 394;
+pub const NATIVE_TABLE_LEN: usize = 395;

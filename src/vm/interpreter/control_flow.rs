@@ -126,6 +126,7 @@ impl Interpreter {
                             gen.saved_stack = saved_stack;
                             gen.saved_block_scope_stack = self.block_scope_stack.clone();
                             gen.func_heap_idx = frame.func_heap_idx;
+                            gen.generator_yielded = true;
                         }
                     }
                 }

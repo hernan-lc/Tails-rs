@@ -88,25 +88,45 @@ pub(super) fn native_regexp_exec(
         None => return Err(Error::TypeError("Not a RegExp".into())),
     };
 
-    let result = if let HeapValue::RegExp(ref regexp) = interp.heap[idx] {
-        regexp.exec(&input)
+    let matches = if let HeapValue::RegExp(ref mut regexp) = interp.heap[idx] {
+        if regexp.global || regexp.sticky {
+            let start = regexp.last_index as usize;
+            if start > input.len() {
+                regexp.last_index = 0.0;
+                return Ok(Value::Null);
+            }
+            match regexp.exec_at(&input, start) {
+                Some((caps, end)) => {
+                    if end <= start {
+                        regexp.last_index = (start + 1) as f64;
+                    } else {
+                        regexp.last_index = end as f64;
+                    }
+                    caps
+                }
+                None => {
+                    regexp.last_index = 0.0;
+                    return Ok(Value::Null);
+                }
+            }
+        } else {
+            match regexp.exec(&input) {
+                Some(m) => m,
+                None => return Ok(Value::Null),
+            }
+        }
     } else {
         return Err(Error::TypeError("Not a RegExp".into()));
     };
 
-    match result {
-        Some(matches) => {
-            let elements: Vec<Value> = matches.into_iter().map(Value::String).collect();
-            let arr_idx = interp.heap.len();
-            interp
-                .heap
-                .push(HeapValue::Array(crate::vm::interpreter::JsArray {
-                    elements,
-                }));
-            Ok(Value::Array(arr_idx))
-        }
-        None => Ok(Value::Null),
-    }
+    let elements: Vec<Value> = matches.into_iter().map(Value::String).collect();
+    let arr_idx = interp.heap.len();
+    interp
+        .heap
+        .push(HeapValue::Array(crate::vm::interpreter::JsArray {
+            elements,
+        }));
+    Ok(Value::Array(arr_idx))
 }
 
 pub(super) fn native_regexp_to_string(

@@ -482,6 +482,11 @@ impl Interpreter {
             }
             Value::Generator(_gen_idx) => {
                 if let Some(proto_idx) = self.generator_proto_idx {
+                    if let Value::Symbol(sym_id) = key {
+                        if *sym_id == crate::objects::SYMBOL_ITERATOR {
+                            return Ok(Value::NativeFunction(c::GENERATOR_SYMBOL_ITERATOR));
+                        }
+                    }
                     let proto_val = Value::Object(proto_idx);
                     return self.get_property_with_this(&proto_val, key, this);
                 }

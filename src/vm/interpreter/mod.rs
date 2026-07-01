@@ -365,14 +365,14 @@ impl Interpreter {
                                 if cfg!(debug_assertions) && std::env::var("GEN_TRACE").is_ok() {
                                     eprintln!("[GEN_TRACE] Detected generator, creating object");
                                 }
-                                // Create a generator object instead of executing immediately
                                 let gen_idx = self.heap.len();
                                 self.heap.push(HeapValue::Generator(JsGenerator {
                                     yield_value: Value::Undefined,
                                     resume_pc: bytecode_index,
-                                    saved_stack: Vec::new(),
+                                    saved_stack: args.clone(),
                                     saved_block_scope_stack: Vec::new(),
                                     func_heap_idx: Some(*func_idx),
+                                    generator_yielded: false,
                                 }));
                                 self.stack.push(Value::Generator(gen_idx));
                                 pc += 1;

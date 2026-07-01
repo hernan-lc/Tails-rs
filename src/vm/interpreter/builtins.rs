@@ -886,6 +886,10 @@ impl Interpreter {
         generator_proto_props.insert("next".into(), Value::NativeFunction(c::GENERATOR_NEXT));
         generator_proto_props.insert("return".into(), Value::NativeFunction(c::GENERATOR_RETURN));
         generator_proto_props.insert("throw".into(), Value::NativeFunction(c::GENERATOR_THROW));
+        generator_proto_props.insert(
+            "Symbol.iterator".into(),
+            Value::NativeFunction(c::GENERATOR_SYMBOL_ITERATOR),
+        );
         let generator_proto_idx = self.gc.allocate(
             &mut self.heap,
             HeapValue::Object(JsObject {

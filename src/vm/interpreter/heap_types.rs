@@ -88,6 +88,7 @@ pub struct JsGenerator {
     pub saved_stack: Vec<Value>,
     pub saved_block_scope_stack: Vec<usize>,
     pub func_heap_idx: Option<usize>,
+    pub generator_yielded: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -160,21 +161,23 @@ impl JsRegExp {
         }
     }
 
-    pub fn exec(&self, input: &str) -> Option<Vec<String>> {
-        if let Some(ref compiled) = self.compiled {
-            let caps = compiled.pattern.captures(input).ok()??;
-            let mut results = Vec::new();
-            for i in 0..caps.len() {
-                results.push(
-                    caps.get(i)
-                        .map(|m| m.as_str().to_string())
-                        .unwrap_or_default(),
-                );
-            }
-            Some(results)
-        } else {
-            None
+    pub fn exec_at(&self, input: &str, start: usize) -> Option<(Vec<String>, usize)> {
+        let tail = &input[start..];
+        let caps = self.compiled.as_ref()?.pattern.captures(tail).ok()??;
+        let mut results = Vec::with_capacity(caps.len());
+        for i in 0..caps.len() {
+            results.push(
+                caps.get(i)
+                    .map(|m| input[start + m.start()..start + m.end()].to_string())
+                    .unwrap_or_default(),
+            );
         }
+        let match_end = caps.get(0).map(|m| m.end()).unwrap_or(0);
+        Some((results, start + match_end))
+    }
+
+    pub fn exec(&self, input: &str) -> Option<Vec<String>> {
+        self.exec_at(input, 0).map(|(v, _)| v)
     }
 
     pub fn find_all(&self, input: &str) -> Vec<String> {
