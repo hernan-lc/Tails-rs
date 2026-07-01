@@ -109,11 +109,28 @@ pub fn run_build(opts: BuildOptions) -> Result<()> {
     fs::copy(&src_path, &dst_path).context("Failed to copy library to dist/")?;
     eprintln!("[tails] Output: {}", dst_path.display());
 
-    // Generate .d.ts
+    // Generate or copy .d.ts
     let dts_path = dist_dir.join(format!("{}.d.ts", package_name));
-    let dts_content = generate_dts(&src_path, &package_name)?;
-    fs::write(&dts_path, &dts_content).context("Failed to write .d.ts file")?;
-    eprintln!("[tails] TypeScript definitions: {}", dts_path.display());
+
+    // Check if there's a .d.ts file in the package directory
+    let pkg_dir = workspace_root.join("modules").join(&package_name);
+    let pkg_dts = pkg_dir.join(format!("{}.d.ts", package_name));
+    let alt_pkg_dts = pkg_dir.join("index.d.ts");
+
+    if pkg_dts.exists() {
+        fs::copy(&pkg_dts, &dts_path)
+            .with_context(|| format!("Failed to copy {} to dist/", pkg_dts.display()))?;
+        eprintln!("[tails] TypeScript definitions: {}", dts_path.display());
+    } else if alt_pkg_dts.exists() {
+        fs::copy(&alt_pkg_dts, &dts_path)
+            .with_context(|| format!("Failed to copy {} to dist/", alt_pkg_dts.display()))?;
+        eprintln!("[tails] TypeScript definitions: {}", dts_path.display());
+    } else {
+        // Generate from library metadata
+        let dts_content = generate_dts(&src_path, &package_name)?;
+        fs::write(&dts_path, &dts_content).context("Failed to write .d.ts file")?;
+        eprintln!("[tails] TypeScript definitions: {}", dts_path.display());
+    }
 
     // Print summary
     let target_triple = detect_target_triple();
@@ -202,93 +219,86 @@ fn find_cdylib_package(cargo_toml: &str, workspace_root: &Path) -> Result<String
 fn generate_dts(lib_path: &Path, package_name: &str) -> Result<String> {
     use std::os::raw::c_char;
 
-    // Try to load the library and extract metadata
-    unsafe {
-        let lib = libloading::Library::new(lib_path)
-            .context("Failed to load library for .d.ts generation")?;
+    // First, find all __TAILS_DTS_* symbols using nm
+    let dts_symbols = find_all_dts_symbols(lib_path)?;
 
-        let mut dts_entries = Vec::new();
-
-        // Try to find __TAILS_DTS_* symbols
-        let mut idx = 0;
-        loop {
-            let symbol_name = format!("__TAILS_DTS_{}\0", idx);
-            if let Ok(func) = lib.get::<*const c_char>(symbol_name.as_bytes()) {
-                let c_str = *func;
-                if !c_str.is_null() {
-                    let rust_str = std::ffi::CStr::from_ptr(c_str).to_str().unwrap_or("");
-                    if !rust_str.is_empty() {
-                        dts_entries.push(rust_str.to_string());
-                    }
-                }
-                idx += 1;
-            } else {
-                break;
-            }
-        }
-
-        // Try named DTS symbols (e.g., __TAILS_DTS_GREET, __TAILS_DTS_ADD)
-        let known_symbols = find_dts_symbols(&lib);
-
-        // Also try to find the module metadata
-        if let Ok(meta) = lib.get::<*const c_char>(b"__TAILS_MODULE_META_MY_MODULE\0") {
-            let _ = meta; // Just check it exists
-        }
-
-        // Combine all DTS entries
-        let mut all_entries: Vec<String> = dts_entries;
-        all_entries.extend(known_symbols);
-
-        // Remove duplicates
-        all_entries.sort();
-        all_entries.dedup();
-
-        if all_entries.is_empty() {
-            // Generate a placeholder
-            Ok(format!(
-                "// Auto-generated TypeScript definitions for {}\n// No metadata symbols found in the library.\n// Add __TAILS_DTS_* static strings to your Rust module for auto-generation.\n",
-                package_name
-            ))
-        } else {
-            let mut dts = format!(
-                "// Auto-generated TypeScript definitions for {}\n\n",
-                package_name
-            );
-            for entry in &all_entries {
-                dts.push_str(entry);
-                dts.push('\n');
-            }
-            Ok(dts)
-        }
+    if dts_symbols.is_empty() {
+        return Ok(format!(
+            "// Auto-generated TypeScript definitions for {}\n\
+             // No metadata symbols found in the library.\n\
+             // Add #[used] static __TAILS_DTS_* strings to your Rust module.\n",
+            package_name
+        ));
     }
-}
 
-fn find_dts_symbols(lib: &libloading::Library) -> Vec<String> {
-    let mut entries = Vec::new();
-
-    // Try common DTS symbol names
-    let symbols = [
-        "__TAILS_DTS_GREET",
-        "__TAILS_DTS_ADD",
-        "__TAILS_DTS_MULTIPLY",
-        "__TAILS_DTS_COUNTER_CLASS",
-    ];
+    // Load the library to read the symbol values
+    // Use full absolute path to ensure libloading can find it
+    let abs_path = lib_path
+        .canonicalize()
+        .with_context(|| format!("Failed to canonicalize path: {}", lib_path.display()))?;
 
     unsafe {
-        for symbol in &symbols {
-            let name = format!("{}\0", symbol);
-            if let Ok(func) = lib.get::<*const std::os::raw::c_char>(name.as_bytes()) {
+        let lib = libloading::Library::new(&abs_path)
+            .with_context(|| format!("Failed to load library at: {}", abs_path.display()))?;
+
+        let mut dts_entries: Vec<String> = Vec::new();
+
+        for symbol_name in &dts_symbols {
+            let c_name = format!("{}\0", symbol_name);
+            if let Ok(func) = lib.get::<*const c_char>(c_name.as_bytes()) {
                 let c_str = *func;
                 if !c_str.is_null() {
                     if let Ok(rust_str) = std::ffi::CStr::from_ptr(c_str).to_str() {
                         if !rust_str.is_empty() {
-                            entries.push(rust_str.to_string());
+                            dts_entries.push(rust_str.to_string());
                         }
                     }
                 }
             }
         }
+
+        // Sort and deduplicate
+        dts_entries.sort();
+        dts_entries.dedup();
+
+        let mut dts = format!(
+            "// Auto-generated TypeScript definitions for {}\n\n",
+            package_name
+        );
+        for entry in &dts_entries {
+            dts.push_str(entry);
+            dts.push('\n');
+        }
+        Ok(dts)
+    }
+}
+
+fn find_all_dts_symbols(lib_path: &Path) -> Result<Vec<String>> {
+    // Use nm to find all __TAILS_DTS_* symbols
+    let output = Command::new("nm")
+        .arg("-D")
+        .arg(lib_path)
+        .output()
+        .context("Failed to run nm. Is binutils installed?")?;
+
+    if !output.status.success() {
+        anyhow::bail!("nm failed: {}", String::from_utf8_lossy(&output.stderr));
     }
 
-    entries
+    let stdout = String::from_utf8(output.stdout)?;
+    let mut symbols = Vec::new();
+
+    for line in stdout.lines() {
+        // Format: "0000000000051d48 D __TAILS_DTS_ADD"
+        let parts: Vec<&str> = line.split_whitespace().collect();
+        if parts.len() >= 3 {
+            let sym = parts[2];
+            if sym.starts_with("__TAILS_DTS_") {
+                symbols.push(sym.to_string());
+            }
+        }
+    }
+
+    symbols.sort();
+    Ok(symbols)
 }

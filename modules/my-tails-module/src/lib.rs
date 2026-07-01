@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::sync::Mutex;
 use tails_abi::{
-    FromNativeValue, ModuleHandle, NativeFn, NativeModule, NativeValue, TailsModule, ToNativeValue,
+    FromNativeValue, ModuleHandle, NativeFn, NativeModule, NativeValue, ToNativeValue,
 };
 
 // --- Counter class ---
@@ -221,27 +221,4 @@ pub extern "C" fn tails_native_init() -> *mut ModuleHandle {
     Box::into_raw(Box::new(handle))
 }
 
-#[used]
-#[doc(hidden)]
-#[no_mangle]
-pub static __TAILS_DTS_GREET: &str = "export function greet(name: string) => string;";
-
-#[used]
-#[doc(hidden)]
-#[no_mangle]
-pub static __TAILS_DTS_ADD: &str = "export function add(a: number, b: number) => number;";
-
-#[used]
-#[doc(hidden)]
-#[no_mangle]
-pub static __TAILS_DTS_MULTIPLY: &str = "export function multiply(a: number, b: number) => number;";
-
-#[used]
-#[doc(hidden)]
-#[no_mangle]
-pub static __TAILS_DTS_COUNTER_CLASS: &str = "export class Counter { constructor(initial?: number); increment(): void; decrement(): void; getCount(): number; }";
-
-#[used]
-#[doc(hidden)]
-#[no_mangle]
-pub static __TAILS_MODULE_META_MY_MODULE: &str = "my-tails-module";
+// DTS metadata is in dist/my-tails-module.d.ts

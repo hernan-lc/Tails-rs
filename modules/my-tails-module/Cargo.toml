@@ -9,6 +9,3 @@ crate-type = ["cdylib"]
 
 [dependencies]
 tails-abi = { path = "../abi" }
-
-[build-dependencies]
-tails-abi = { path = "../abi" }
