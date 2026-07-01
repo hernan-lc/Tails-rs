@@ -13,6 +13,7 @@ pub type NativeFunctionPtr = extern "C" fn(
 ///
 /// Holds the raw function pointer along with a human-readable name
 /// for diagnostics and debugging.
+#[derive(Debug)]
 pub struct SafeNativeFunction {
     ptr: NativeFunctionPtr,
     name: String,
@@ -51,11 +52,13 @@ impl SafeNativeFunction {
     }
 
     /// Get the name of the function.
+    #[inline]
     pub fn name(&self) -> &str {
         &self.name
     }
 
     /// Get the raw function pointer.
+    #[inline]
     pub fn as_ptr(&self) -> NativeFunctionPtr {
         self.ptr
     }
@@ -64,6 +67,7 @@ impl SafeNativeFunction {
 /// A generic wrapper for function pointers with type-safe accessors.
 ///
 /// Stores a raw pointer along with a descriptive name.
+#[derive(Debug)]
 pub struct FunctionPointerWrapper<T> {
     ptr: *const T,
     name: String,
@@ -90,11 +94,13 @@ impl<T> FunctionPointerWrapper<T> {
     }
 
     /// Get the name of the function.
+    #[inline]
     pub fn name(&self) -> &str {
         &self.name
     }
 
     /// Get the raw pointer.
+    #[inline]
     pub fn as_ptr(&self) -> *const T {
         self.ptr
     }
