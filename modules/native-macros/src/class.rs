@@ -1,6 +1,6 @@
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
-use syn::Type;
+use syn::{FnArg, Type};
 
 fn snake_to_camel(s: &str) -> String {
     let mut result = String::new();
@@ -16,6 +16,34 @@ fn snake_to_camel(s: &str) -> String {
         }
     }
     result
+}
+
+fn rust_type_to_ts(ty: &Type) -> String {
+    match ty {
+        Type::Path(tp) => {
+            if let Some(segment) = tp.path.segments.last() {
+                let name = segment.ident.to_string();
+                match name.as_str() {
+                    "String" | "str" => "string".to_string(),
+                    "f64" | "f32" | "i64" | "i32" | "u64" | "u32" => "number".to_string(),
+                    "bool" => "boolean".to_string(),
+                    "Self" => "void".to_string(),
+                    "()" => "void".to_string(),
+                    _ => "unknown".to_string(),
+                }
+            } else {
+                "unknown".to_string()
+            }
+        }
+        Type::Tuple(tuple) => {
+            if tuple.elems.is_empty() {
+                "void".to_string()
+            } else {
+                "unknown".to_string()
+            }
+        }
+        _ => "unknown".to_string(),
+    }
 }
 
 pub fn expand_class_struct(item_impl: syn::ItemImpl) -> TokenStream {
@@ -34,6 +62,7 @@ pub fn expand_class_struct(item_impl: syn::ItemImpl) -> TokenStream {
 
     let mut ffi_functions = Vec::new();
     let mut register_calls = Vec::new();
+    let mut dts_entries = Vec::new();
 
     for item in methods {
         if let syn::ImplItem::Fn(method) = item {
@@ -53,7 +82,7 @@ pub fn expand_class_struct(item_impl: syn::ItemImpl) -> TokenStream {
             let mut param_indices = Vec::new();
 
             for (i, arg) in method.sig.inputs.iter().enumerate() {
-                if let syn::FnArg::Typed(pt) = arg {
+                if let FnArg::Typed(pt) = arg {
                     if let syn::Pat::Ident(ident) = &*pt.pat {
                         param_names.push(ident.ident.clone());
                         param_types.push(pt.ty.clone());
@@ -150,21 +179,66 @@ pub fn expand_class_struct(item_impl: syn::ItemImpl) -> TokenStream {
             register_calls.push(quote! {
                 handle.module.register(#js_name, #ffi_name as ::tails_abi::NativeFn);
             });
+
+            // Generate DTS metadata
+            let param_dts: Vec<String> = param_names
+                .iter()
+                .zip(param_types.iter())
+                .map(|(name, ty)| format!("{}: {}", name, rust_type_to_ts(ty)))
+                .collect();
+            let ret_ts = match &method.sig.output {
+                syn::ReturnType::Default => "void".to_string(),
+                syn::ReturnType::Type(_, ty) => {
+                    if is_constructor {
+                        struct_name.to_string()
+                    } else {
+                        rust_type_to_ts(ty)
+                    }
+                }
+            };
+            let dts_name =
+                format!("__TAILS_DTS_{}_{}", struct_name, method_name_str).to_uppercase();
+            let dts_sig = if is_constructor {
+                format!(
+                    "export function {}({}): {};",
+                    js_name,
+                    param_dts.join(", "),
+                    ret_ts
+                )
+            } else {
+                format!(
+                    "export function {}({}): {};",
+                    js_name,
+                    param_dts.join(", "),
+                    ret_ts
+                )
+            };
+            let dts_ident = format_ident!("{}", dts_name);
+            dts_entries.push(quote! {
+                #[used]
+                #[doc(hidden)]
+                #[no_mangle]
+                pub static #dts_ident: &str = #dts_sig;
+            });
         }
     }
 
     quote! {
+        #[allow(dead_code)]
         #item_impl
 
+        #[allow(dead_code, non_snake_case, non_upper_case_globals)]
         static #registry_name: ::std::sync::Mutex<Option<::std::collections::HashMap<u32, #struct_name>>> =
             ::std::sync::Mutex::new(None);
 
+        #[allow(non_snake_case, non_upper_case_globals)]
         fn #next_id_name() -> u32 {
             use ::std::sync::atomic::{AtomicU32, Ordering};
             static COUNTER: AtomicU32 = AtomicU32::new(1);
             COUNTER.fetch_add(1, Ordering::SeqCst)
         }
 
+        #[allow(non_snake_case)]
         pub(crate) fn #with_instances_name<F, R>(f: F) -> R
         where
             F: FnOnce(&mut ::std::collections::HashMap<u32, #struct_name>) -> R,
@@ -178,6 +252,9 @@ pub fn expand_class_struct(item_impl: syn::ItemImpl) -> TokenStream {
 
         #(#ffi_functions)*
 
+        #(#dts_entries)*
+
+        #[allow(non_snake_case)]
         fn #init_fn_name(handle: &mut ::tails_abi::ModuleHandle) {
             #(#register_calls)*
         }

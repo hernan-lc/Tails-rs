@@ -103,7 +103,7 @@ pub fn expand_function(item: ItemFn, options: FnOptions) -> TokenStream {
         .map(|p| format!("{}: {}", p.name, p.ts_type))
         .collect();
     let dts_sig = format!(
-        "export function {}({}) => {};",
+        "export function {}({}): {};",
         js_name,
         param_dts.join(", "),
         ret_ts

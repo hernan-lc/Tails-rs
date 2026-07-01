@@ -6,6 +6,7 @@ mod my_module {
 
     // --- Counter class ---
 
+    #[allow(dead_code)]
     pub struct Counter {
         count: f64,
     }
