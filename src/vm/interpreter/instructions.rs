@@ -183,16 +183,28 @@ impl Interpreter {
                 self.stack.push(this);
             }
             Instruction::BlockEnter => {
-                self.block_scope_stack.push(self.stack.len());
+                let is_generator = self.call_stack.last().map(|f| f.generator_heap_idx.is_some()).unwrap_or(false);
+                if is_generator {
+                    // Skip BlockEnter in generators — block scope is managed by
+                    // the yield/resume mechanism via saved_block_scope_stack.
+                } else {
+                    self.block_scope_stack.push(self.stack.len());
+                }
             }
             Instruction::BlockExit => {
-                if let Some(block_base) = self.block_scope_stack.pop() {
-                    if self.stack.len() > block_base {
-                        let top_value = self.stack.pop().unwrap_or(Value::Undefined);
-                        self.stack.truncate(block_base);
-                        self.stack.push(top_value);
-                    } else {
-                        self.stack.truncate(block_base);
+                let is_generator = self.call_stack.last().map(|f| f.generator_heap_idx.is_some()).unwrap_or(false);
+                if is_generator {
+                    // Skip BlockExit in generators — block scope cleanup is
+                    // handled by saved_stack truncation in native_generator_next.
+                } else {
+                    if let Some(block_base) = self.block_scope_stack.pop() {
+                        if self.stack.len() > block_base {
+                            let top_value = self.stack.pop().unwrap_or(Value::Undefined);
+                            self.stack.truncate(block_base);
+                            self.stack.push(top_value);
+                        } else {
+                            self.stack.truncate(block_base);
+                        }
                     }
                 }
             }
