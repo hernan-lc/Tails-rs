@@ -10,7 +10,11 @@ fn test_websocket_constructor_exists() {
     "#,
         Path::new("/tmp/test_websocket_module.ts"),
     );
-    assert!(r.is_ok(), "WebSocket constructor check failed: {:?}", r.err());
+    assert!(
+        r.is_ok(),
+        "WebSocket constructor check failed: {:?}",
+        r.err()
+    );
     assert_eq!(r.unwrap(), tails::Value::Boolean(true));
 }
 
@@ -25,7 +29,10 @@ fn test_websocket_instance_properties() {
         Path::new("/tmp/test_websocket_module.ts"),
     );
     assert!(r.is_ok(), "WebSocket instance failed: {:?}", r.err());
-    assert_eq!(r.unwrap(), tails::Value::String("wss://example.com/ws".to_string()));
+    assert_eq!(
+        r.unwrap(),
+        tails::Value::String("wss://example.com/ws".to_string())
+    );
 }
 
 #[test]
@@ -41,7 +48,9 @@ fn test_websocket_ready_state() {
     assert!(r.is_ok(), "WebSocket readyState failed: {:?}", r.err());
     match r.unwrap() {
         tails::Value::Integer(n) => assert_eq!(n, 0, "Initial readyState should be CONNECTING (0)"),
-        tails::Value::Float(n) => assert_eq!(n as i64, 0, "Initial readyState should be CONNECTING (0)"),
+        tails::Value::Float(n) => {
+            assert_eq!(n as i64, 0, "Initial readyState should be CONNECTING (0)")
+        }
         other => panic!("Expected number for readyState, got {:?}", other),
     }
 }
@@ -78,8 +87,16 @@ fn test_websocket_event_listeners() {
     "#,
         Path::new("/tmp/test_websocket_module.ts"),
     );
-    assert!(r.is_ok(), "WebSocket event listener test failed: {:?}", r.err());
-    assert_eq!(r.unwrap(), tails::Value::Boolean(false), "Handler should not have been called");
+    assert!(
+        r.is_ok(),
+        "WebSocket event listener test failed: {:?}",
+        r.err()
+    );
+    assert_eq!(
+        r.unwrap(),
+        tails::Value::Boolean(false),
+        "Handler should not have been called"
+    );
 }
 
 #[test]

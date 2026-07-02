@@ -26,7 +26,11 @@ fn test_events_emitter_has_listeners_property() {
     "#,
         Path::new("/tmp/test_events_module.ts"),
     );
-    assert!(r.is_ok(), "EventEmitter instantiation failed: {:?}", r.err());
+    assert!(
+        r.is_ok(),
+        "EventEmitter instantiation failed: {:?}",
+        r.err()
+    );
     assert_eq!(r.unwrap(), tails::Value::Boolean(true));
 }
 
@@ -42,8 +46,16 @@ fn test_events_emitter_creates_unique_instances() {
     "#,
         Path::new("/tmp/test_events_module.ts"),
     );
-    assert!(r.is_ok(), "EventEmitter instance comparison failed: {:?}", r.err());
-    assert_eq!(r.unwrap(), tails::Value::Boolean(true), "Each new EventEmitter should be a unique object");
+    assert!(
+        r.is_ok(),
+        "EventEmitter instance comparison failed: {:?}",
+        r.err()
+    );
+    assert_eq!(
+        r.unwrap(),
+        tails::Value::Boolean(true),
+        "Each new EventEmitter should be a unique object"
+    );
 }
 
 #[test]
@@ -102,7 +114,11 @@ fn test_events_emitter_has_listener_count_method() {
     "#,
         Path::new("/tmp/test_events_module.ts"),
     );
-    assert!(r.is_ok(), "EventEmitter.listenerCount check failed: {:?}", r.err());
+    assert!(
+        r.is_ok(),
+        "EventEmitter.listenerCount check failed: {:?}",
+        r.err()
+    );
     assert_eq!(r.unwrap(), tails::Value::Boolean(true));
 }
 
@@ -224,7 +240,11 @@ fn test_events_emit_returns_false_with_no_listeners() {
         Path::new("/tmp/test_events_module.ts"),
     );
     assert!(r.is_ok(), "events emit return value failed: {:?}", r.err());
-    assert_eq!(r.unwrap(), tails::Value::Boolean(false), "Should return false when no listeners");
+    assert_eq!(
+        r.unwrap(),
+        tails::Value::Boolean(false),
+        "Should return false when no listeners"
+    );
 }
 
 #[test]
@@ -241,5 +261,9 @@ fn test_events_emit_returns_true_with_listeners() {
         Path::new("/tmp/test_events_module.ts"),
     );
     assert!(r.is_ok(), "events emit return value failed: {:?}", r.err());
-    assert_eq!(r.unwrap(), tails::Value::Boolean(true), "Should return true when listeners exist");
+    assert_eq!(
+        r.unwrap(),
+        tails::Value::Boolean(true),
+        "Should return true when listeners exist"
+    );
 }

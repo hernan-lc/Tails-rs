@@ -13,7 +13,11 @@ fn test_child_process_exec_sync() {
         Path::new("/tmp/test_child_process_module.ts"),
     );
     assert!(r.is_ok(), "child_process.execSync failed: {:?}", r.err());
-    assert_eq!(r.unwrap(), tails::Value::Boolean(true), "execSync should return a string");
+    assert_eq!(
+        r.unwrap(),
+        tails::Value::Boolean(true),
+        "execSync should return a string"
+    );
 }
 
 #[test]
@@ -27,7 +31,11 @@ fn test_child_process_exec_sync_output() {
     "#,
         Path::new("/tmp/test_child_process_module.ts"),
     );
-    assert!(r.is_ok(), "child_process.execSync output failed: {:?}", r.err());
+    assert!(
+        r.is_ok(),
+        "child_process.execSync output failed: {:?}",
+        r.err()
+    );
     assert_eq!(
         r.unwrap(),
         tails::Value::String("tails-test".to_string()),

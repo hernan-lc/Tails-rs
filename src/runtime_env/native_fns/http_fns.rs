@@ -216,14 +216,12 @@ pub(super) fn native_http_server_listen(
     }
 
     // Register the listener as an event source so the event loop will poll it.
-    interp
-        .pending_event_sources
-        .push(Box::new(HttpEventSource {
-            server_idx,
-            listener,
-            max_connections,
-            handled: 0,
-        }));
+    interp.pending_event_sources.push(Box::new(HttpEventSource {
+        server_idx,
+        listener,
+        max_connections,
+        handled: 0,
+    }));
 
     // Invoke the "listening" callback synchronously.
     if let Some(cb) = ready_cb {

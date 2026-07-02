@@ -45,7 +45,13 @@ fn get_stream_id(interp: &Interpreter, obj_idx: usize) -> i64 {
     if let HeapValue::Object(obj) = &interp.heap[obj_idx] {
         obj.properties
             .get("__stream_id")
-            .and_then(|v| if let Value::Integer(id) = v { Some(*id) } else { None })
+            .and_then(|v| {
+                if let Value::Integer(id) = v {
+                    Some(*id)
+                } else {
+                    None
+                }
+            })
             .unwrap_or(-1)
     } else {
         -1
@@ -63,7 +69,13 @@ pub(super) fn native_net_create_connection(
     let port = args.first().map(to_f64).unwrap_or(0.0) as u16;
     let host = args
         .get(1)
-        .and_then(|v| if let Value::String(s) = v { Some(s.clone()) } else { None })
+        .and_then(|v| {
+            if let Value::String(s) = v {
+                Some(s.clone())
+            } else {
+                None
+            }
+        })
         .unwrap_or_else(|| "127.0.0.1".to_string());
 
     // The connect listener can be 2nd or 3rd arg depending on whether host was given.
@@ -174,7 +186,13 @@ pub(super) fn native_net_socket_write(
 
     let data = args
         .first()
-        .and_then(|v| if let Value::String(s) = v { Some(s.as_bytes().to_vec()) } else { None })
+        .and_then(|v| {
+            if let Value::String(s) = v {
+                Some(s.as_bytes().to_vec())
+            } else {
+                None
+            }
+        })
         .unwrap_or_default();
 
     let ok = with_stream_mut(sid, |stream| tails_net::write(stream, &data))
@@ -225,7 +243,13 @@ pub(super) fn native_net_socket_on(
     };
     let event = args
         .first()
-        .and_then(|v| if let Value::String(s) = v { Some(s.clone()) } else { None })
+        .and_then(|v| {
+            if let Value::String(s) = v {
+                Some(s.clone())
+            } else {
+                None
+            }
+        })
         .unwrap_or_default();
     let cb = args.get(1).cloned().unwrap_or(Value::Undefined);
     let key = format!("__listeners_{}", event);

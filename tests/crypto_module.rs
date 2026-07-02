@@ -15,7 +15,9 @@ fn test_crypto_random_bytes() {
     assert!(r.is_ok(), "crypto.randomBytes() failed: {:?}", r.err());
     match r.unwrap() {
         tails::Value::Integer(n) => assert_eq!(n, 16, "randomBytes(16) should return 16 bytes"),
-        tails::Value::Float(n) => assert_eq!(n as i64, 16, "randomBytes(16) should return 16 bytes"),
+        tails::Value::Float(n) => {
+            assert_eq!(n as i64, 16, "randomBytes(16) should return 16 bytes")
+        }
         other => panic!("Expected number for randomBytes length, got {:?}", other),
     }
 }
@@ -33,8 +35,16 @@ fn test_crypto_random_bytes_different() {
     "#,
         Path::new("/tmp/test_crypto_module.ts"),
     );
-    assert!(r.is_ok(), "crypto.randomBytes comparison failed: {:?}", r.err());
-    assert_eq!(r.unwrap(), tails::Value::Boolean(true), "Both buffers should have length 32");
+    assert!(
+        r.is_ok(),
+        "crypto.randomBytes comparison failed: {:?}",
+        r.err()
+    );
+    assert_eq!(
+        r.unwrap(),
+        tails::Value::Boolean(true),
+        "Both buffers should have length 32"
+    );
 }
 
 #[test]
@@ -69,8 +79,16 @@ fn test_crypto_random_uuid_format() {
     "#,
         Path::new("/tmp/test_crypto_module.ts"),
     );
-    assert!(r.is_ok(), "crypto.randomUUID() format check failed: {:?}", r.err());
-    assert_eq!(r.unwrap(), tails::Value::Boolean(true), "UUID should be 36 chars with dashes");
+    assert!(
+        r.is_ok(),
+        "crypto.randomUUID() format check failed: {:?}",
+        r.err()
+    );
+    assert_eq!(
+        r.unwrap(),
+        tails::Value::Boolean(true),
+        "UUID should be 36 chars with dashes"
+    );
 }
 
 #[test]
@@ -85,7 +103,11 @@ fn test_crypto_create_hash() {
         Path::new("/tmp/test_crypto_module.ts"),
     );
     assert!(r.is_ok(), "crypto.createHash() failed: {:?}", r.err());
-    assert_eq!(r.unwrap(), tails::Value::Boolean(true), "Hash should have update and digest methods");
+    assert_eq!(
+        r.unwrap(),
+        tails::Value::Boolean(true),
+        "Hash should have update and digest methods"
+    );
 }
 
 #[test]
@@ -126,5 +148,9 @@ fn test_crypto_hash_deterministic() {
         Path::new("/tmp/test_crypto_module.ts"),
     );
     assert!(r.is_ok(), "crypto hash determinism failed: {:?}", r.err());
-    assert_eq!(r.unwrap(), tails::Value::Boolean(true), "Same input should produce same hash");
+    assert_eq!(
+        r.unwrap(),
+        tails::Value::Boolean(true),
+        "Same input should produce same hash"
+    );
 }
