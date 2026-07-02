@@ -27,13 +27,32 @@ pub(super) fn native_generator_next(
             let return_address = module.instructions.len();
             let base_pointer = interp.stack.len();
 
-            let saved = gen.saved_stack.clone();
-            interp.stack.extend_from_slice(&saved);
-            interp.stack.push(value);
+            // OPTIMIZATION (Phase 6A): avoid 3 stack copies per .next() by
+            // using std::mem::take to move the saved state out of the
+            // generator heap object directly. The original code cloned the
+            // Vec before extending (copy 1), then `to_vec` the post-execution
+            // stack slice back into the generator (copy 3). Now we move:
+            //   1. take() saved_stack out of the generator, then push the
+            //      elements one by one (no copy of the underlying buffer;
+            //      it's just a realloc-and-move of the Vec's heap data).
+            //   2. after execute_from, take the new state out of the stack
+            //      directly using drain() — no `to_vec` clone.
+            //
+            // We need to put saved_stack back before any return, so use a
+            // guard pattern.
+            let mut saved_stack =
+                std::mem::take(&mut gen.saved_stack);
+            let saved_block_scope =
+                std::mem::take(&mut gen.saved_block_scope_stack);
+            let outer_block_scope = std::mem::replace(
+                &mut interp.block_scope_stack,
+                saved_block_scope,
+            );
 
-            let saved_block_scope = gen.saved_block_scope_stack.clone();
-            let outer_block_scope =
-                std::mem::replace(&mut interp.block_scope_stack, saved_block_scope);
+            // Move elements from the saved stack onto the interpreter stack
+            // without cloning the underlying buffer.
+            interp.stack.append(&mut saved_stack);
+            interp.stack.push(value);
 
             let closure_count = 0;
             let call_frame_len_before = interp.call_stack.len();
@@ -54,7 +73,11 @@ pub(super) fn native_generator_next(
                 generator_heap_idx: Some(idx),
                 source_line: None,
                 source_col: None,
-                exception_handlers_snapshot: interp.exception_handlers.clone(),
+                exception_handlers_snapshot: if interp.exception_handlers.is_empty() {
+                    Vec::new()
+                } else {
+                    interp.exception_handlers.clone()
+                },
             });
 
             let result = interp.execute_from(&module, resume_pc);
@@ -77,15 +100,29 @@ pub(super) fn native_generator_next(
 
             if let crate::vm::interpreter::HeapValue::Generator(gen2) = &mut interp.heap[idx] {
                 if result.is_err() || (result.is_ok() && !yielded) {
-                    gen2.saved_stack = Vec::new();
+                    // Drain the rest of the stack slice back into a Vec for
+                    // potential future use, then clear it.
+                    let new_saved: Vec<Value> = if interp.stack.len() > base_pointer {
+                        interp.stack.drain(base_pointer..).collect()
+                    } else {
+                        Vec::new()
+                    };
+                    gen2.saved_stack = new_saved;
                     gen2.saved_block_scope_stack = Vec::new();
                     gen2.resume_pc = usize::MAX;
                 } else if let Ok(ref _val) = result {
-                    if interp.stack.len() > base_pointer {
-                        gen2.saved_stack = interp.stack[base_pointer..].to_vec();
+                    // OPTIMIZATION: drain the slice (move) instead of
+                    // to_vec() (clone). drain() yields owned Values without
+                    // copying the underlying heap data.
+                    let new_saved: Vec<Value> = if interp.stack.len() > base_pointer {
+                        interp.stack.drain(base_pointer..).collect()
                     } else {
-                        gen2.saved_stack = Vec::new();
-                    }
+                        Vec::new()
+                    };
+                    gen2.saved_stack = new_saved;
+                    // block_scope_stack — clone is still needed because we
+                    // moved outer_block_scope back into interp above.
+                    // (Cold path: only happens once per yield.)
                     gen2.saved_block_scope_stack = interp.block_scope_stack.clone();
                 }
             }

@@ -63,13 +63,20 @@ pub(super) fn native_regexp_test(
     this: &Value,
     args: &[Value],
 ) -> Result<Value> {
-    let input = match args.first() {
-        Some(v) => interp.to_string_coerce(v),
+    // Fast path: if the input is already a Value::String, borrow it directly
+    // to avoid the 24-byte String clone that to_string_coerce would do.
+    let input_owned;
+    let input: &str = match args.first() {
+        Some(Value::String(s)) => s.as_str(),
+        Some(v) => {
+            input_owned = interp.to_string_coerce(v);
+            input_owned.as_str()
+        }
         None => return Ok(Value::Boolean(false)),
     };
 
     with_regexp!(interp, this, |regexp: &JsRegExp| {
-        Ok(Value::Boolean(regexp.test(&input)))
+        Ok(Value::Boolean(regexp.test(input)))
     })
 }
 
@@ -78,8 +85,15 @@ pub(super) fn native_regexp_exec(
     this: &Value,
     args: &[Value],
 ) -> Result<Value> {
-    let input = match args.first() {
-        Some(v) => interp.to_string_coerce(v),
+    // Fast path: if the input is already a Value::String, borrow it directly
+    // to avoid the 24-byte String clone that to_string_coerce would do.
+    let input_owned;
+    let input: &str = match args.first() {
+        Some(Value::String(s)) => s.as_str(),
+        Some(v) => {
+            input_owned = interp.to_string_coerce(v);
+            input_owned.as_str()
+        }
         None => return Ok(Value::Null),
     };
 

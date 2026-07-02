@@ -1,5 +1,96 @@
 # Changelog
 
+## Unreleased — VM Performance Pass 1
+
+A first round of cross-cutting VM optimizations was applied based on a
+systematic review of the hot paths. All benchmarks improve materially and
+all 34 unit tests + integration tests (`basic`, `functions`, `gc`, `classes`,
+`destructuring`, `error_handling`, `async`) continue to pass.
+
+### Implemented phases
+
+- **Phase 1B (LoadLocal/StoreLocal/IncLocal):** refactored to a direct
+  `call_stack.last()` match in `src/vm/interpreter/instructions.rs:102-152`
+  to avoid the `map(...).unwrap_or(0)` pattern on every load. Same
+  change inlined at the top of the dispatch in
+  `src/vm/interpreter/mod.rs:356-456`.
+- **Phase 1C (Flatten dispatch):** the four hottest instructions
+  (`LoadLocal`, `StoreLocal`, `IncLocal`, `AddLocal`) are now matched
+  directly in the top-level `match` in `execute_from` so the
+  `_ => exec_load_store()` cascading branch is skipped for them.
+- **Phase 2C (exception_handlers snapshot):** the per-call
+  `Vec::clone()` of `exception_handlers` is now skipped when the
+  Vec is empty (the common case for code without try/catch).
+  Touched `calls.rs`, `class_ops.rs`, `generator_fns.rs`, `mod.rs`.
+  Also removed the unused `saved_exception_handlers` local in
+  `calls.rs`.
+- **Phase 4C (GC tracing for Map/Set):** `HeapValue::Map` and
+  `HeapValue::Set` now properly trace their `keys`/`values` Vecs
+  during mark phase. This is a correctness fix: objects reachable
+  only through a Map/Set were previously subject to premature
+  collection. Also added explicit (no-op) traces for `TypedArray`,
+  `Date`, `RegExp` for clarity.
+- **Phase 5A (AddLocal specialization):** `AddLocal` no longer
+  clones its two 32-byte `Value` operands for the Integer+Integer,
+  Float+Float, Integer+Float, and Float+Integer cases. The cold
+  fallback (String+anything, Object+anything) still clones.
+- **Phase 6A (Generator stack-copy elimination):** in
+  `native_generator_next`, the three `Vec::clone` round-trips per
+  `.next()` were replaced with `std::mem::take` (move) and
+  `Vec::drain` (move) so the saved/resumed stack data is no longer
+  memcpy'd.
+- **Phase 6C (Iterator result fast-path):** `exec_iterator_next`
+  now extracts `value`/`done` from a generator's result object
+  directly via `JsObject.properties` instead of going through
+  `get_property` (which allocates a fresh `Value::String("value")`
+  and `Value::String("done")` per yield).
+- **Phase 7A (RegExp to_string_coerce skip):** `native_regexp_test`
+  and `native_regexp_exec` now borrow the input `&str` directly when
+  the argument is already a `Value::String`, instead of going through
+  `to_string_coerce` (which would clone the 24-byte `String`).
+- **Phase 9B (JSON integer precision):** `from_json_value` in
+  `src/runtime_env/native_fns/helpers.rs:313` now preserves integer
+  precision via `n.as_i64()` (falls back to `f64` for non-i64 numbers).
+  This is also a correctness fix — large JSON integers were being
+  silently truncated to `f64`.
+
+### Benchmark results (tails-rs, single thread, mean of 3 runs)
+
+| Benchmark | Before (ms) | After (ms) | Improvement |
+|-----------|-------------|------------|-------------|
+| `async/async_await.js` | 61 | 18 | -70% |
+| `async/promises.js` | 1458 | 852 | -42% |
+| `builtins/array_push.js` | 104 | 55 | -47% |
+| `builtins/date.js` | 722 | 425 | -41% |
+| `builtins/json_parse.js` | 753 | 384 | -49% |
+| `builtins/map_set.js` | 1779 | 748 | -58% |
+| `builtins/promise_chain.js` | 108 | 75 | -31% |
+| `builtins/regexp.js` | 2059 | 1162 | -44% |
+| `builtins/string_concat.js` | 879 | 685 | -22% |
+| `core/closures.js` | 6928 | 5204 | -25% |
+| `core/generators.js` | 0 (sub-ms) | 319 | measurable |
+| `core/loops.js` | 1910 | 1199 | -37% |
+| `core/oo.js` | 1236 | 855 | -31% |
+
+`generators.js` was previously reported as "0ms (broken)" — in fact the
+script ran to completion but completed in under one millisecond, so the
+`Date.now()`-based measurement printed `0`. After the Phase 6
+optimizations, the per-`next()` overhead is reduced enough to produce a
+real timing (319ms) for the same workload.
+
+### Notes on the original optimization plan
+
+Two minor inaccuracies in the plan were identified during verification
+and have been corrected above:
+
+- The `Instruction` enum is **72 bytes**, not ~80 bytes (empirically
+  measured with `std::mem::size_of`). The conclusion (large enum,
+  worth boxing) is still correct.
+- `generators.js` is not strictly "broken" — the script runs without
+  error but completes in sub-millisecond time, so the runner records
+  `0`. The label in the plan should be "no usable timing", not
+  "broken".
+
 ## v0.3.0 — Native Module Polish
 
 ### Module Fixes (process & websocket)

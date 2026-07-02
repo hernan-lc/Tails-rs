@@ -166,7 +166,11 @@ impl Interpreter {
             generator_heap_idx: None,
             source_line: None,
             source_col: None,
-            exception_handlers_snapshot: self.exception_handlers.clone(),
+            exception_handlers_snapshot: if self.exception_handlers.is_empty() {
+                Vec::new()
+            } else {
+                self.exception_handlers.clone()
+            },
         });
         let mut result = self.execute_from(module, 0);
 
@@ -350,6 +354,108 @@ impl Interpreter {
             }
 
             match instruction {
+                // OPTIMIZATION (Phase 1C): Hot-path instructions are inlined
+                // directly in the main match to skip the cascading
+                // `_ => exec_load_store()` dispatch (one branch per iter).
+                Instruction::LoadLocal(slot) => {
+                    if let Some(frame) = self.call_stack.last() {
+                        let idx = frame.base_pointer + *slot as usize;
+                        if let Some(value) = self.stack.get(idx) {
+                            self.stack.push(value.clone());
+                            pc += 1;
+                            continue;
+                        }
+                    } else if let Some(value) = self.stack.get(*slot as usize) {
+                        self.stack.push(value.clone());
+                        pc += 1;
+                        continue;
+                    }
+                    self.stack.push(Value::Undefined);
+                    pc += 1;
+                    continue;
+                }
+                Instruction::StoreLocal(slot) => {
+                    if let Some(value) = self.stack.pop() {
+                        let base = self
+                            .call_stack
+                            .last()
+                            .map(|f| f.base_pointer)
+                            .unwrap_or(0);
+                        let idx = base + *slot as usize;
+                        if idx >= self.stack.len() {
+                            self.stack.resize(idx + 1, Value::Undefined);
+                        }
+                        self.stack[idx] = value;
+                    } else {
+                        return Err(self.err_at_location(Error::RuntimeError(
+                            "Stack underflow".into(),
+                        )));
+                    }
+                    pc += 1;
+                    continue;
+                }
+                Instruction::IncLocal(slot, delta) => {
+                    if let Some(frame) = self.call_stack.last() {
+                        let idx = frame.base_pointer + *slot as usize;
+                        if idx < self.stack.len() {
+                            match &self.stack[idx] {
+                                Value::Integer(n) => {
+                                    self.stack[idx] = Value::Integer(n + delta);
+                                    pc += 1;
+                                    continue;
+                                }
+                                Value::Float(n) => {
+                                    self.stack[idx] = Value::Float(n + *delta as f64);
+                                    pc += 1;
+                                    continue;
+                                }
+                                _ => {}
+                            }
+                        }
+                    }
+                    // Cold path: fall through to exec_load_store.
+                }
+                Instruction::AddLocal(dst, src) => {
+                    let base = self
+                        .call_stack
+                        .last()
+                        .map(|f| f.base_pointer)
+                        .unwrap_or(0);
+                    let dst_idx = base + *dst as usize;
+                    let src_idx = base + *src as usize;
+                    if dst_idx < self.stack.len() && src_idx < self.stack.len() {
+                        match (&self.stack[dst_idx], &self.stack[src_idx]) {
+                            (Value::Integer(a), Value::Integer(b)) => {
+                                if let Some(result) = a.checked_add(*b) {
+                                    self.stack[dst_idx] = Value::Integer(result);
+                                } else {
+                                    self.stack[dst_idx] =
+                                        Value::Float(*a as f64 + *b as f64);
+                                }
+                                pc += 1;
+                                continue;
+                            }
+                            (Value::Float(a), Value::Float(b)) => {
+                                self.stack[dst_idx] = Value::Float(a + b);
+                                pc += 1;
+                                continue;
+                            }
+                            (Value::Integer(a), Value::Float(b)) => {
+                                self.stack[dst_idx] = Value::Float(*a as f64 + *b);
+                                pc += 1;
+                                continue;
+                            }
+                            (Value::Float(a), Value::Integer(b)) => {
+                                self.stack[dst_idx] = Value::Float(*a + *b as f64);
+                                pc += 1;
+                                continue;
+                            }
+                            _ => {
+                                // Cold path: fall through to exec_load_store.
+                            }
+                        }
+                    }
+                }
                 Instruction::Jump(_)
                 | Instruction::JumpIf(_)
                 | Instruction::JumpIfNot(_)

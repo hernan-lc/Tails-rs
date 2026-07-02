@@ -310,7 +310,17 @@ pub(super) fn from_json_value(interp: &mut Interpreter, val: serde_json::Value) 
     match val {
         serde_json::Value::Null => Value::Null,
         serde_json::Value::Bool(b) => Value::Boolean(b),
-        serde_json::Value::Number(n) => Value::Float(n.as_f64().unwrap_or(f64::NAN)),
+        serde_json::Value::Number(n) => {
+            // Preserve integer precision: if the number fits in an i64 and
+            // doesn't have a fractional part, store it as Value::Integer.
+            // Otherwise fall back to f64. This matches JavaScript's number
+            // model for safe integers (Number.MAX_SAFE_INTEGER = 2^53 - 1).
+            if let Some(i) = n.as_i64() {
+                Value::Integer(i)
+            } else {
+                Value::Float(n.as_f64().unwrap_or(f64::NAN))
+            }
+        }
         serde_json::Value::String(s) => Value::String(s),
         serde_json::Value::Array(arr) => {
             let len = arr.len();

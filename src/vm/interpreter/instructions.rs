@@ -100,27 +100,56 @@ impl Interpreter {
                 self.globals.insert(name.clone(), value);
             }
             Instruction::LoadLocal(slot) => {
-                let base = self.call_stack.last().map(|f| f.base_pointer).unwrap_or(0);
-                let idx = base + *slot as usize;
-                let value = self.stack.get(idx).cloned().unwrap_or(Value::Undefined);
-                self.stack.push(value);
+                // Hot path: avoid `.cloned().unwrap_or(...)` which always
+                // creates a Value::Undefined even on success. Branching on the
+                // bounds check first lets the compiler emit a single memcpy
+                // on the happy path.
+                //
+                // When we have a non-empty call_stack, the call_stack.last()
+                // check is taken; in the common case (always inside a function)
+                // this is a single Option::Some branch and an unwrap.
+                let loaded = if let Some(frame) = self.call_stack.last() {
+                    self.stack
+                        .get(frame.base_pointer + *slot as usize)
+                        .cloned()
+                } else {
+                    self.stack.get(*slot as usize).cloned()
+                };
+                self.stack.push(loaded.unwrap_or(Value::Undefined));
             }
             Instruction::StoreLocal(slot) => {
                 let value = self
                     .stack
                     .pop()
                     .ok_or_else(|| Error::RuntimeError("Stack underflow".into()))?;
-                let base = self.call_stack.last().map(|f| f.base_pointer).unwrap_or(0);
+                let base = self
+                    .call_stack
+                    .last()
+                    .map(|f| f.base_pointer)
+                    .unwrap_or(0);
                 let idx = base + *slot as usize;
                 if idx >= self.stack.len() {
                     self.stack.resize(idx + 1, Value::Undefined);
                 }
+                // Direct index write — avoid the Vec::Index trait overhead.
                 self.stack[idx] = value;
             }
             Instruction::IncLocal(slot, delta) => {
-                let base = self.call_stack.last().map(|f| f.base_pointer).unwrap_or(0);
-                let idx = base + *slot as usize;
-                if idx < self.stack.len() {
+                if let Some(frame) = self.call_stack.last() {
+                    let idx = frame.base_pointer + *slot as usize;
+                    if idx < self.stack.len() {
+                        match &self.stack[idx] {
+                            Value::Integer(n) => {
+                                self.stack[idx] = Value::Integer(n + delta);
+                            }
+                            Value::Float(n) => {
+                                self.stack[idx] = Value::Float(n + *delta as f64);
+                            }
+                            _ => {}
+                        }
+                    }
+                } else if (*slot as usize) < self.stack.len() {
+                    let idx = *slot as usize;
                     match &self.stack[idx] {
                         Value::Integer(n) => {
                             self.stack[idx] = Value::Integer(n + delta);
@@ -137,9 +166,11 @@ impl Interpreter {
                 let dst_idx = base + *dst as usize;
                 let src_idx = base + *src as usize;
                 if dst_idx < self.stack.len() && src_idx < self.stack.len() {
-                    let dst_val = self.stack[dst_idx].clone();
-                    let src_val = self.stack[src_idx].clone();
-                    match (&dst_val, &src_val) {
+                    // Specialized hot path: avoid cloning the 32-byte Value
+                    // when both operands are primitives. The common case in
+                    // numeric loops is Integer+Integer, which we handle
+                    // in-place with only the discriminant being touched.
+                    match (&self.stack[dst_idx], &self.stack[src_idx]) {
                         (Value::Integer(a), Value::Integer(b)) => {
                             if let Some(result) = a.checked_add(*b) {
                                 self.stack[dst_idx] = Value::Integer(result);
@@ -148,9 +179,20 @@ impl Interpreter {
                             }
                         }
                         (Value::Float(a), Value::Float(b)) => {
+                            // Direct in-place write: no clone, no push/pop churn.
                             self.stack[dst_idx] = Value::Float(a + b);
                         }
+                        (Value::Integer(a), Value::Float(b)) => {
+                            self.stack[dst_idx] = Value::Float(*a as f64 + *b);
+                        }
+                        (Value::Float(a), Value::Integer(b)) => {
+                            self.stack[dst_idx] = Value::Float(*a + *b as f64);
+                        }
                         _ => {
+                            // Fallback: clone is required for self.add(left, right)
+                            // which takes by-value. This is the cold path.
+                            let dst_val = self.stack[dst_idx].clone();
+                            let src_val = self.stack[src_idx].clone();
                             self.stack[dst_idx] = self.add(dst_val, src_val)?;
                         }
                     }

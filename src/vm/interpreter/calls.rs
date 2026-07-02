@@ -41,7 +41,21 @@ impl Interpreter {
 
                     let saved_module = self.current_module.clone();
                     let saved_path = self.current_module_path.clone();
-                    let saved_exception_handlers = self.exception_handlers.clone();
+                    // OPTIMIZATION (Phase 2C): skip the Vec::clone of
+                    // exception_handlers when it's empty (the common case
+                    // for code without try/catch). The saved value is
+                    // restored after the call; the snapshot below is the
+                    // copy that lives in the CallFrame.
+                    let saved_exception_handlers = if self.exception_handlers.is_empty() {
+                        Vec::new()
+                    } else {
+                        self.exception_handlers.clone()
+                    };
+                    let exception_handlers_snapshot = if self.exception_handlers.is_empty() {
+                        Vec::new()
+                    } else {
+                        self.exception_handlers.clone()
+                    };
                     if let Some(ref mod_ref) = func_module {
                         self.current_module = Some(mod_ref.clone());
                     }
@@ -75,7 +89,7 @@ impl Interpreter {
                         generator_heap_idx: None,
                         source_line: f_clone.source_line,
                         source_col: None,
-                        exception_handlers_snapshot: self.exception_handlers.clone(),
+                        exception_handlers_snapshot,
                     });
 
                     for closure_var in &f_clone.closure {

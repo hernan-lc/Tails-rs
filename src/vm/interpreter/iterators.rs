@@ -258,6 +258,26 @@ impl Interpreter {
 
         let next_fn = self.get_property(&iterator, &Value::String("next".to_string()))?;
         let next_result = self.call_value(&next_fn, &iterator, &[])?;
+        // OPTIMIZATION (Phase 6C): for generator results, extract `done` and
+        // `value` directly from the JsObject properties without re-doing
+        // get_property (which would allocate 2 more strings "done" and
+        // "value" and walk the prototype chain). The native generator
+        // implementation always returns an Object with these two keys.
+        if let Value::Object(obj_idx) = &next_result {
+            if let HeapValue::Object(obj) = &self.heap[*obj_idx] {
+                if let Some(done_val) = obj.properties.get("done") {
+                    if matches!(done_val, Value::Boolean(true)) {
+                        return Ok(ControlFlowOutcome::Jump(target));
+                    }
+                    if let Some(value) = obj.properties.get("value") {
+                        self.stack.push(value.clone());
+                        return Ok(ControlFlowOutcome::Next);
+                    }
+                }
+            }
+        }
+        // Slow path: fall back to the original property-access logic for
+        // custom iterators that don't follow the generator protocol.
         let done = self.get_property(&next_result, &Value::String("done".to_string()))?;
         match done {
             Value::Boolean(true) => Ok(ControlFlowOutcome::Jump(target)),

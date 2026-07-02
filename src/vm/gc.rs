@@ -251,13 +251,50 @@ impl GarbageCollector {
                             }
                         }
                     }
-                    HeapValue::TypedArray(_) => {}
-                    HeapValue::Map(_) => {}
-                    HeapValue::Set(_) => {}
+                    HeapValue::TypedArray(_) => {
+                        // TypedArray holds a `Vec<u8>` (the raw buffer) which is
+                        // a value type, not a heap object. Nothing to trace.
+                    }
+                    HeapValue::Map(m) => {
+                        // Trace keys (Vec<Value>) and values (Vec<Value>) so that
+                        // objects referenced only by Map entries are not collected.
+                        for val in &m.keys {
+                            if let Some(child_idx) = heap_value_to_index(val) {
+                                if !self.is_marked(child_idx, heap.len()) {
+                                    self.mark(child_idx, heap.len());
+                                    worklist.push(child_idx);
+                                }
+                            }
+                        }
+                        for val in &m.values {
+                            if let Some(child_idx) = heap_value_to_index(val) {
+                                if !self.is_marked(child_idx, heap.len()) {
+                                    self.mark(child_idx, heap.len());
+                                    worklist.push(child_idx);
+                                }
+                            }
+                        }
+                    }
+                    HeapValue::Set(s) => {
+                        // Trace values (Vec<Value>) so that objects referenced
+                        // only by Set entries are not collected.
+                        for val in &s.values {
+                            if let Some(child_idx) = heap_value_to_index(val) {
+                                if !self.is_marked(child_idx, heap.len()) {
+                                    self.mark(child_idx, heap.len());
+                                    worklist.push(child_idx);
+                                }
+                            }
+                        }
+                    }
                     HeapValue::WeakMap(_) => {}
                     HeapValue::WeakSet(_) => {}
-                    HeapValue::Date(_) => {}
-                    HeapValue::RegExp(_) => {}
+                    HeapValue::Date(_) => {
+                        // JsDate stores `utc_ms: f64` (value type) — nothing to trace.
+                    }
+                    HeapValue::RegExp(_) => {
+                        // JsRegExp holds Strings and flags (value types) — nothing to trace.
+                    }
                     HeapValue::Buffer(_) => {}
                 }
             }
