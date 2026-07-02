@@ -27,12 +27,13 @@
 ## v0.3.0 — Native Module Polish
 
 ### DTS Generation
-- [ ] Auto-generate `.d.ts` type definitions for native modules (currently only `tails-validator` has them)
-- [ ] `tails build` should output `dist/<name>.d.ts` alongside `.so`
+- [x] Auto-generate `.d.ts` type definitions for native modules — `src/cli/build.rs` reads `__TAILS_DTS_*` / `__TAILS_<MODULE>_DTS_*` symbols from the built `.so` via `nm` and writes `dist/<name>.d.ts`. Works for every `tails-*` cdylib (fs, path, os, process, websocket, validator).
+- [x] `tails build` outputs `dist/<name>.d.ts` alongside `.so` — also emits a `lib<module>.so` alias in `dist/` so `import x from "./x.native"` resolves from any working directory.
 
 ### Module Fixes
-- [ ] **process module** (`modules/process`) — Has bare Rust functions but no `#[tails_module]` macro annotation. The runtime has built-in implementations in `src/runtime_env/` but the standalone crate is incomplete
-- [ ] **websocket module** (`modules/websocket`) — Rust-only struct with no FFI bridge. Needs `#[tails_module]` annotation for `.native` import support
+- [x] **process module** (`modules/process`) — added `crate-type = ["cdylib", "rlib"]` plus a `#[tails_module(name = "tails-process")]` block with `#[tails_function]` exports for `cwd`, `chdir`, `stdout_write`, `hrtime`, `hrtime_bigint`, `platform`, `arch`, `pid`, `env_vars`, `argv`. Auto-generated `dist/tails-process.d.ts` is shipped.
+- [x] **websocket module** (`modules/websocket`) — same treatment: cdylib + rlib, `#[tails_module(name = "tails-websocket")]` with `create`, `url`, `connect`, `send`, `receive`, `close`, `destroy`. Bridges the existing async `WebSocket` struct onto a synchronous FFI surface using a shared tokio runtime. `dist/tails-websocket.d.ts` is generated automatically.
+- [x] **macro improvements** — `#[tails_function]` now accepts `module = "<name>"` so per-function FFI / DTS symbols are namespaced (`__tails_<module>_ffi_<fn>` / `__TAILS_<MODULE>_DTS_<FN>`), letting multiple `tails-*` modules link into the same binary without `#[no_mangle]` collisions. `src/cli/build.rs` was updated to recognise both legacy and namespaced DTS symbols.
 
 ### New Modules (Lower Priority)
 - [ ] `stream` — Readable/Writable/Transform streams

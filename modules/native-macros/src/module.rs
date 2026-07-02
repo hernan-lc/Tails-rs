@@ -53,15 +53,44 @@ pub fn expand_module(item: ItemMod, options: ModuleOptions) -> TokenStream {
                         continue;
                     }
 
-                    let actual_js_name =
-                        extract_js_name(&func.attrs).unwrap_or_else(|| func_name_str.clone());
+                    // Detect whether this function has `#[tails_function]`. If
+                    // so, rewrite the attribute to inject `module = "<name>"`
+                    // so the function-level macro generates module-scoped
+                    // symbol names and avoids collisions when multiple native
+                    // modules are linked into the same binary.
+                    let mut new_func = func.clone();
+                    let mut has_tails_function = false;
+                    for attr in new_func.attrs.iter_mut() {
+                        if attr.path().is_ident("tails_function") {
+                            has_tails_function = true;
+                            // Replace the attribute with one that includes
+                            // `module = "<name>"`.
+                            let new_attr_tokens = quote! {
+                                #[tails_function(module = #module_name)]
+                            };
+                            *attr = syn::parse_quote!(#new_attr_tokens);
+                        }
+                    }
 
-                    let ffi_name = format_ident!("__tails_ffi_{}", func.sig.ident);
+                    let actual_js_name =
+                        extract_js_name(&new_func.attrs).unwrap_or_else(|| func_name_str.clone());
+
+                    // Use the module-scoped FFI name to match the function
+                    // macro's emission.
+                    let safe_mod = module_name.replace('-', "_");
+                    let ffi_name = format_ident!("__tails_{}_ffi_{}", safe_mod, new_func.sig.ident);
                     registrations.push(quote! {
                         handle.module.register(#actual_js_name, #ffi_name as ::tails_abi::NativeFn);
                     });
 
-                    function_items.push(quote! { #func });
+                    if has_tails_function {
+                        // The function has been re-emitted with the rewritten
+                        // attribute; pass it through so `#[tails_function]`
+                        // expands with the module prefix.
+                        function_items.push(quote! { #new_func });
+                    } else {
+                        function_items.push(quote! { #func });
+                    }
                 }
                 syn::Item::Struct(s) => {
                     let struct_name = &s.ident;

@@ -46,6 +46,14 @@ pub fn get_lib_filename(crate_name: &str) -> String {
     }
 }
 
+pub fn get_lib_ext() -> &'static str {
+    match std::env::consts::OS {
+        "windows" => "dll",
+        "macos" => "dylib",
+        _ => "so",
+    }
+}
+
 pub fn run_build(opts: BuildOptions) -> Result<()> {
     let manifest_dir = find_manifest_dir()?;
     let workspace_root = &manifest_dir;
@@ -128,6 +136,18 @@ pub fn run_build(opts: BuildOptions) -> Result<()> {
     let dst_path = dist_dir.join(&lib_filename);
     fs::copy(&src_path, &dst_path).context("Failed to copy library to dist/")?;
     eprintln!("[tails] Output: {}", dst_path.display());
+
+    // Also copy under a module-name alias so that `import x from
+    // "x.native"` works for any package following the `tails-<module>`
+    // naming convention. Without this, the runtime's loader would search
+    // for `lib<x>.so` in dist/, but cargo produces `lib<package>.so`.
+    if let Some(stripped) = package_name.strip_prefix("tails-") {
+        let alias_name = format!("lib{}.{}", stripped, get_lib_ext());
+        let alias_path = dist_dir.join(&alias_name);
+        if dst_path != alias_path && fs::copy(&dst_path, &alias_path).is_ok() {
+            eprintln!("[tails] Alias: {}", alias_path.display());
+        }
+    }
 
     // Generate or copy .d.ts
     let dts_path = dist_dir.join(format!("{}.d.ts", package_name));
@@ -425,7 +445,8 @@ fn parse_class_method(entry: &str, class_names: &[String]) -> Option<(String, St
 }
 
 fn find_all_dts_symbols(lib_path: &Path) -> Result<Vec<String>> {
-    // Use nm to find all __TAILS_DTS_* symbols
+    // Use nm to find all `__TAILS_DTS_*` (legacy, unscoped) and
+    // `__TAILS_<MODULE>_DTS_*` (new, module-scoped) symbols.
     let output = Command::new("nm")
         .arg("-D")
         .arg(lib_path)
@@ -440,11 +461,12 @@ fn find_all_dts_symbols(lib_path: &Path) -> Result<Vec<String>> {
     let mut symbols = Vec::new();
 
     for line in stdout.lines() {
-        // Format: "0000000000051d48 D __TAILS_DTS_ADD"
+        // Format: "0000000000051d48 D __TAILS_DTS_ADD" or
+        //         "0000000000051d48 D __TAILS_TAILS_FS_DTS_READ_FILE"
         let parts: Vec<&str> = line.split_whitespace().collect();
         if parts.len() >= 3 {
             let sym = parts[2];
-            if sym.starts_with("__TAILS_DTS_") {
+            if sym.starts_with("__TAILS_") && sym.contains("_DTS_") {
                 symbols.push(sym.to_string());
             }
         }

@@ -798,15 +798,15 @@ fn test_process_globals() {
     let r = rt.eval_module(
         r#"
     import process from "./process.native";
-    typeof process.platform + "," + typeof process.arch + "," + typeof process.pid + "," +
-    typeof process.cwd() + "," + typeof process.env;
+    typeof process.platform() + "," + typeof process.arch() + "," +
+    typeof process.pid() + "," + typeof process.cwd() + "," + typeof process.env_vars;
     "#,
         std::path::Path::new("/tmp/test_module.ts"),
     );
     assert!(r.is_ok());
     assert_eq!(
         r.unwrap(),
-        Value::String("string,string,number,string,object".to_string())
+        Value::String("string,string,number,string,function".to_string())
     );
 }
 
@@ -818,15 +818,16 @@ fn test_path_module() {
     let r = rt.eval(
         r#"
     import path from "./path.native";
-    path.join("/foo", "bar", "baz") + "," +
-    path.basename("/foo/bar.txt") + "," +
+    path.join('["/foo","bar","baz"]') + "," +
+    path.basename("/foo/bar.txt", "") + "," +
     path.dirname("/foo/bar.txt") + "," +
     path.extname("/foo/bar.txt") + "," +
-    path.isAbsolute("/foo") + "," +
+    path.is_absolute("/foo") + "," +
     path.normalize("/foo/../bar") + "," +
-    (path.sep === "/" || path.sep === "\\");
+    (path.sep() === "/" || path.sep() === "\\");
     "#,
     );
+    assert!(r.is_ok(), "path test failed: {:?}", r.err());
     assert!(r.is_ok());
     assert_eq!(
         r.unwrap(),
@@ -842,11 +843,11 @@ fn test_fs_module() {
     let r = rt.eval(
         r#"
     import fs from "./fs.native";
-    fs.writeFileSync("/tmp/tails_test.txt", "Hello from Tails!");
-    let read = fs.readFileSync("/tmp/tails_test.txt");
-    let exists1 = fs.existsSync("/tmp/tails_test.txt");
-    fs.unlinkSync("/tmp/tails_test.txt");
-    let exists2 = fs.existsSync("/tmp/tails_test.txt");
+    fs.write_file("/tmp/tails_test.txt", "Hello from Tails!");
+    let read = fs.read_file("/tmp/tails_test.txt");
+    let exists1 = fs.exists("/tmp/tails_test.txt");
+    fs.unlink("/tmp/tails_test.txt");
+    let exists2 = fs.exists("/tmp/tails_test.txt");
     read + "," + exists1 + "," + exists2;
     "#,
     );

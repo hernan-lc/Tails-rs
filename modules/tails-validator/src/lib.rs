@@ -68,7 +68,8 @@ mod validator {
                 .unwrap_or_default()
             }
         };
-        let result = match engine::validate_value(&schema_def, &value_val) {
+
+        match engine::validate_value(&schema_def, &value_val) {
             Ok(data) => serde_json::to_string(&types::ValidationOk {
                 success: true,
                 data,
@@ -79,8 +80,7 @@ mod validator {
                 error: types::ValidationError { issues },
             })
             .unwrap_or_default(),
-        };
-        result
+        }
     }
 
     #[tails_function]

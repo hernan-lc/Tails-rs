@@ -11,9 +11,23 @@ use function::expand_function;
 use module::expand_module;
 
 #[proc_macro_attribute]
-pub fn tails_function(_attr: TokenStream, item: TokenStream) -> TokenStream {
+pub fn tails_function(attr: TokenStream, item: TokenStream) -> TokenStream {
     let item_fn = parse_macro_input!(item as ItemFn);
-    let options = function::parse_fn_options(&item_fn.attrs);
+
+    // Parse `module = "..."` and `js_name = "..."` from the attribute args.
+    // These are typically injected by `#[tails_module]` but can also be
+    // supplied directly by callers (e.g. when not using the module macro).
+    let mut options = function::parse_fn_options_from_attr(&attr);
+
+    // Also accept the legacy `#[tails(...)]` form attached to the function.
+    let inner = function::parse_fn_options(&item_fn.attrs);
+    if options.js_name.is_none() {
+        options.js_name = inner.js_name;
+    }
+    if options.module.is_none() {
+        options.module = inner.module;
+    }
+
     expand_function(item_fn, options).into()
 }
 

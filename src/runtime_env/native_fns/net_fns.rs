@@ -15,7 +15,7 @@ use std::collections::HashMap;
 thread_local! {
     static STREAM_REGISTRY: RefCell<HashMap<i64, std::net::TcpStream>> =
         RefCell::new(HashMap::new());
-    static NEXT_STREAM_ID: std::cell::Cell<i64> = std::cell::Cell::new(1);
+    static NEXT_STREAM_ID: std::cell::Cell<i64> = const { std::cell::Cell::new(1) };
 }
 
 fn alloc_stream_id(stream: std::net::TcpStream) -> i64 {
@@ -28,13 +28,7 @@ fn alloc_stream_id(stream: std::net::TcpStream) -> i64 {
 }
 
 fn with_stream_mut<R>(id: i64, f: impl FnOnce(&mut std::net::TcpStream) -> R) -> Option<R> {
-    STREAM_REGISTRY.with(|reg| {
-        if let Some(stream) = reg.borrow_mut().get_mut(&id) {
-            Some(f(stream))
-        } else {
-            None
-        }
-    })
+    STREAM_REGISTRY.with(|reg| reg.borrow_mut().get_mut(&id).map(f))
 }
 
 fn remove_stream(id: i64) -> Option<std::net::TcpStream> {
@@ -118,7 +112,7 @@ pub(super) fn native_net_create_connection(
 
     // Invoke the connect listener synchronously.
     if let Some(cb) = connect_cb {
-        let _ = interp.call_value(&cb, &Value::Undefined, &[sock_val.clone()]);
+        let _ = interp.call_value(&cb, &Value::Undefined, std::slice::from_ref(&sock_val));
     }
 
     // After the callback (which may have called write + end), attempt to read
@@ -136,7 +130,7 @@ pub(super) fn native_net_create_connection(
     if has_data_listeners {
         let mut collected = Vec::new();
         for _ in 0..100 {
-            if let Some(result) = with_stream_mut(sid, |s| tails_net::read_available(s)) {
+            if let Some(result) = with_stream_mut(sid, tails_net::read_available) {
                 match result {
                     Ok(data) if !data.is_empty() => {
                         collected.extend_from_slice(&data);

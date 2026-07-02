@@ -68,5 +68,5 @@ pub fn is_valid_base64(s: &str) -> bool {
     }
     s.chars()
         .all(|c| c.is_ascii_alphanumeric() || c == '+' || c == '/' || c == '=')
-        && s.len() % 4 == 0
+        && s.len().is_multiple_of(4)
 }

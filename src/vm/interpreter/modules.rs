@@ -19,17 +19,25 @@ impl Interpreter {
         let base_name = module_stem.strip_prefix("lib").unwrap_or(module_stem);
 
         let init_fn = unsafe {
-            let init_name = format!("tails_native_init_{}\0", base_name.replace('-', "_"));
-            if let Ok(f) = library.get_function::<InitFn>(init_name.trim_end_matches('\0')) {
-                Some(f)
-            } else {
-                let init_name2 = format!("tails_native_init_{}\0", base_name);
-                if let Ok(f) = library.get_function::<InitFn>(init_name2.trim_end_matches('\0')) {
-                    Some(f)
-                } else {
-                    library.get_function::<InitFn>("tails_native_init").ok()
+            // Try several naming conventions to find the init function. The
+            // `tails_native_init_*` macro emits a symbol that includes the
+            // full module name (e.g. `tails_native_init_tails_process`), so
+            // we also try prepending the `tails_` prefix.
+            let candidates = [
+                format!("tails_native_init_{}", base_name.replace('-', "_")),
+                format!("tails_native_init_{}", base_name),
+                format!("tails_native_init_tails_{}", base_name.replace('-', "_")),
+                format!("tails_native_init_tails_{}", base_name),
+                "tails_native_init".to_string(),
+            ];
+            let mut found = None;
+            for name in &candidates {
+                if let Ok(f) = library.get_function::<InitFn>(name) {
+                    found = Some(f);
+                    break;
                 }
             }
+            found
         };
 
         let init_fn = init_fn?;
@@ -293,6 +301,20 @@ impl Interpreter {
                     }
                 }
 
+                // As a last resort, look in the project's ./dist/ directory.
+                // This makes relative imports like `import x from "./x.native"`
+                // work even when the script is in a temp directory, provided
+                // the user has run `tails build` and the .so is in dist/.
+                let dist_dir = std::env::current_dir().unwrap_or_default().join("dist");
+                if let Some(lib_path) =
+                    super::native_loader::find_library_in_dir(&dist_dir, module_name)
+                {
+                    if let Some(props) = self.load_native_library(&lib_path) {
+                        self.module_registry.insert(module_name.to_string(), props);
+                        return Ok(Some(module_name.to_string()));
+                    }
+                }
+
                 // Fall back to static registration
                 super::native_loader::discover_module(module_name, &mut self.native_loader);
             }
@@ -325,14 +347,17 @@ impl Interpreter {
                 // Bare native module name (e.g., "fs", "path", "process")
                 let module_name = source;
                 if !self.native_loader.has_module(module_name) {
-                    // Try to load from ./dist/ first
-                    if let Some(dyn_exports) = self.native_loader.try_load_dynamic(module_name) {
-                        let mut props = HashMap::new();
-                        for (name, val) in &dyn_exports {
-                            props.insert(name.clone(), val.clone());
+                    // Try to load from ./dist/ first via the proper
+                    // `load_native_library` path so the function pointers
+                    // get registered in `dynamic_native_fns`.
+                    let dist_dir = std::env::current_dir().unwrap_or_default().join("dist");
+                    if let Some(lib_path) =
+                        super::native_loader::find_library_in_dir(&dist_dir, module_name)
+                    {
+                        if let Some(props) = self.load_native_library(&lib_path) {
+                            self.module_registry.insert(module_name.to_string(), props);
+                            return Ok(Some(module_name.to_string()));
                         }
-                        self.module_registry.insert(module_name.to_string(), props);
-                        return Ok(Some(module_name.to_string()));
                     }
                     // Fall back to static registration
                     super::native_loader::discover_module(module_name, &mut self.native_loader);

@@ -8,18 +8,12 @@ type NativeModuleFactory = fn(&mut Vec<HeapValue>, &mut GarbageCollector) -> Has
 
 pub struct NativeModuleRegistry {
     modules: HashMap<String, Box<NativeModuleFactory>>,
-    dynamic_libraries: Vec<DynamicLibraryEntry>,
-}
-
-struct DynamicLibraryEntry {
-    _library: libloading::Library,
 }
 
 impl NativeModuleRegistry {
     pub fn new() -> Self {
         Self {
             modules: HashMap::new(),
-            dynamic_libraries: Vec::new(),
         }
     }
 
@@ -44,64 +38,6 @@ impl NativeModuleRegistry {
                 "Native module '{}' not found in registry",
                 name
             )))
-        }
-    }
-
-    pub fn try_load_dynamic(&mut self, name: &str) -> Option<HashMap<String, Value>> {
-        let dist_dir = std::env::current_dir().ok()?.join("dist");
-        let lib_path = find_library_in_dir(&dist_dir, name)?;
-
-        self.try_load_from_path(&lib_path)
-    }
-
-    pub fn try_load_from_path(
-        &mut self,
-        lib_path: &std::path::Path,
-    ) -> Option<HashMap<String, Value>> {
-        if !lib_path.exists() {
-            return None;
-        }
-
-        unsafe {
-            let library = libloading::Library::new(lib_path).ok()?;
-
-            let mut exports = HashMap::new();
-
-            type InitFn = fn() -> *mut tails_abi::ModuleHandle;
-
-            // Try module-specific init first, then fallback to generic
-            let module_stem = lib_path.file_stem().and_then(|s| s.to_str()).unwrap_or("");
-            let base_name = module_stem.strip_prefix("lib").unwrap_or(module_stem);
-
-            let init_result = {
-                let init_name = format!("tails_native_init_{}\0", base_name.replace('-', "_"));
-                if let Ok(init_fn) = library.get::<InitFn>(init_name.as_bytes()) {
-                    Some(init_fn)
-                } else {
-                    let init_name2 = format!("tails_native_init_{}\0", base_name);
-                    if let Ok(init_fn) = library.get::<InitFn>(init_name2.as_bytes()) {
-                        Some(init_fn)
-                    } else {
-                        library.get::<InitFn>(b"tails_native_init\0").ok()
-                    }
-                }
-            };
-
-            if let Some(init_fn) = init_result {
-                let handle = init_fn();
-                if !handle.is_null() {
-                    let handle = Box::from_raw(handle);
-                    for func_name in handle.module.functions.keys() {
-                        let id = self.modules.len() + 2000;
-                        exports.insert(func_name.clone(), Value::NativeFunction(id));
-                    }
-                }
-            }
-
-            self.dynamic_libraries
-                .push(DynamicLibraryEntry { _library: library });
-
-            Some(exports)
         }
     }
 }

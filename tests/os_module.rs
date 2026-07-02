@@ -143,11 +143,11 @@ fn test_os_type() {
     let r = rt.eval_module(
         r#"
         import os from "os";
-        os.type();
+        os.os_type();
     "#,
         Path::new("/tmp/test_os_module.ts"),
     );
-    assert!(r.is_ok(), "os.type() failed: {:?}", r.err());
+    assert!(r.is_ok(), "os.os_type() failed: {:?}", r.err());
     if let tails::Value::String(s) = r.unwrap() {
         assert!(!s.is_empty(), "type should not be empty");
     } else {

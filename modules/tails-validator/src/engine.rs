@@ -208,6 +208,7 @@ fn validate_string(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn validate_number(
     value: &serde_json::Value,
     min: Option<f64>,

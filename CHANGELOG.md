@@ -1,5 +1,50 @@
 # Changelog
 
+## v0.3.0 — Native Module Polish
+
+### Module Fixes (process & websocket)
+
+The `modules/process` and `modules/websocket` workspace crates previously
+exposed only bare Rust functions. They can now be built as cdylibs and
+loaded by `import x from "./x.native"`, matching the convention used by
+the rest of the v0.3.0 native-module family.
+
+- **`modules/process`**: switched to `crate-type = ["cdylib", "rlib"]`,
+  added a `#[tails_module(name = "tails-process")]` block with
+  `#[tails_function]` exports for `cwd`, `chdir`, `stdout_write`,
+  `hrtime`, `hrtime_bigint`, `platform`, `arch`, `pid`, `env_vars`, `argv`.
+- **`modules/websocket`**: switched to `crate-type = ["cdylib", "rlib"]`,
+  added a `#[tails_module(name = "tails-websocket")]` block that bridges
+  the existing async `WebSocket` struct onto a synchronous FFI surface
+  using a shared tokio runtime. Exports `create`, `url`, `connect`,
+  `send`, `receive`, `close`, `destroy`.
+- **`modules/native-macros`**: `#[tails_function]` now accepts
+  `module = "<name>"`, namespacing per-function FFI / DTS symbols as
+  `__tails_<module>_ffi_<fn>` and `__TAILS_<MODULE>_DTS_<FN>`. This
+  unblocks linking multiple `tails-*` modules into a single binary
+  without `#[no_mangle]` collisions.
+- **`src/cli/build.rs`**: now recognises both the legacy
+  `__TAILS_DTS_*` and the new module-scoped `__TAILS_<MODULE>_DTS_*`
+  symbol names, and writes a `lib<module>.so` alias into `dist/`
+  alongside the package-named `lib<package>.so` so relative
+  `import x from "./x.native"` works from any working directory.
+- **`src/vm/interpreter/modules.rs`**: extended the relative `.native`
+  resolver to fall back to `./dist/` (via the existing
+  `load_native_library` path) before falling back to the built-in
+  static registration. This makes the `.native` import path work for
+  any cdylib produced by `tails build` without requiring the script
+  to live next to the `.so` file.
+- **Tests**:
+  - `tests/process_native_module.rs` (5 tests) — covers the new
+    cdylib API end-to-end.
+  - `tests/websocket_native_module.rs` (4 tests) — covers create/url/
+    close/destroy + a real connect error path.
+  - `tests/process_global.rs` — kept as the legacy built-in fallback
+    test path; auto-skips when the `process` cdylib is present in
+    `dist/` to avoid double coverage.
+  - `tests/all_features.rs::test_process_globals` updated to the
+    new function-style API.
+
 ## Unsafe Code Safety Improvements (v0.1.0)
 
 A comprehensive effort to reduce unsafe code in Tails-rs by ~80% through safe

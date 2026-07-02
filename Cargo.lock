@@ -1857,6 +1857,11 @@ dependencies = [
 [[package]]
 name = "tails-process"
 version = "0.1.0"
+dependencies = [
+ "serde_json",
+ "tails-abi",
+ "tails-native-macros",
+]
 
 [[package]]
 name = "tails-rs"
@@ -1911,6 +1916,10 @@ name = "tails-websocket"
 version = "0.1.0"
 dependencies = [
  "futures-util",
+ "once_cell",
+ "serde_json",
+ "tails-abi",
+ "tails-native-macros",
  "tokio",
  "tokio-tungstenite",
  "tungstenite",

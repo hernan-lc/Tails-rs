@@ -183,7 +183,11 @@ impl Interpreter {
                 self.stack.push(this);
             }
             Instruction::BlockEnter => {
-                let is_generator = self.call_stack.last().map(|f| f.generator_heap_idx.is_some()).unwrap_or(false);
+                let is_generator = self
+                    .call_stack
+                    .last()
+                    .map(|f| f.generator_heap_idx.is_some())
+                    .unwrap_or(false);
                 if is_generator {
                     // Skip BlockEnter in generators — block scope is managed by
                     // the yield/resume mechanism via saved_block_scope_stack.
@@ -192,7 +196,11 @@ impl Interpreter {
                 }
             }
             Instruction::BlockExit => {
-                let is_generator = self.call_stack.last().map(|f| f.generator_heap_idx.is_some()).unwrap_or(false);
+                let is_generator = self
+                    .call_stack
+                    .last()
+                    .map(|f| f.generator_heap_idx.is_some())
+                    .unwrap_or(false);
                 if is_generator {
                     // Skip BlockExit in generators — block scope cleanup is
                     // handled by saved_stack truncation in native_generator_next.
