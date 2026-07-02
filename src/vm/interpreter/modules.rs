@@ -185,7 +185,7 @@ impl Interpreter {
         }
 
         let result = {
-            self.module_globals_rc = Some(std::rc::Rc::new(self.globals.clone()));
+            self.module_globals_rc = None;
             self.execute(module)
         };
         self.module_globals_rc = Some(std::rc::Rc::new(self.globals.clone()));
