@@ -6,10 +6,18 @@ impl Interpreter {
     pub(super) fn add(&self, left: Value, right: Value) -> Result<Value> {
         match (&left, &right) {
             (Value::String(a), r) => {
-                Ok(Value::String(format!("{}{}", a, self.to_string_coerce(r))))
+                let coerced = self.to_string_coerce(r);
+                let mut result = String::with_capacity(a.len() + coerced.len());
+                result.push_str(a);
+                result.push_str(&coerced);
+                Ok(Value::String(result))
             }
             (l, Value::String(b)) => {
-                Ok(Value::String(format!("{}{}", self.to_string_coerce(l), b)))
+                let coerced = self.to_string_coerce(l);
+                let mut result = String::with_capacity(coerced.len() + b.len());
+                result.push_str(&coerced);
+                result.push_str(b);
+                Ok(Value::String(result))
             }
             (Value::BigInt(a), Value::BigInt(b)) => Ok(Value::BigInt(a + b)),
             _ => {

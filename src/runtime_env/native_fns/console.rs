@@ -258,20 +258,20 @@ fn pretty_format(
         }
         Value::Map(idx) => {
             if let crate::vm::interpreter::HeapValue::Map(map) = &interp.heap[*idx] {
-                if map.entries.is_empty() {
+                if map.keys.is_empty() {
                     return "Map(0) {}".to_string();
                 }
                 let pad = INDENT.repeat(depth + 1);
                 let closing_pad = INDENT.repeat(depth);
                 let mut lines: Vec<String> = Vec::new();
-                for (k, val) in &map.entries {
+                for (k, val) in map.keys.iter().zip(map.values.iter()) {
                     let k_str = pretty_format(interp, k, depth + 1, use_colors, include_quotes);
                     let v_str = pretty_format(interp, val, depth + 1, use_colors, include_quotes);
                     lines.push(format!("{}{} => {}", pad, k_str, v_str));
                 }
                 format!(
                     "Map({}) {{\n{}\n{}}}",
-                    map.entries.len(),
+                    map.keys.len(),
                     lines.join(",\n"),
                     closing_pad
                 )

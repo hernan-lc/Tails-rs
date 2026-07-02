@@ -71,13 +71,13 @@ impl Interpreter {
                 Ok(Value::Object(iter_idx))
             }
             Value::Map(map_idx) => {
-                let entries = if let HeapValue::Map(m) = &self.heap[*map_idx] {
-                    m.entries.clone()
+                let (keys, values) = if let HeapValue::Map(m) = &self.heap[*map_idx] {
+                    (m.keys.clone(), m.values.clone())
                 } else {
-                    Vec::new()
+                    (Vec::new(), Vec::new())
                 };
                 let mut elements = Vec::new();
-                for (k, v) in &entries {
+                for (k, v) in keys.iter().zip(values.iter()) {
                     let pair_idx = self.heap.len();
                     self.heap.push(HeapValue::Array(JsArray {
                         elements: vec![k.clone(), v.clone()],

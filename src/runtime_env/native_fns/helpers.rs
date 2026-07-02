@@ -94,8 +94,9 @@ pub(super) fn to_string_value(interp: &Interpreter, v: &Value) -> String {
         Value::Map(idx) => {
             if let crate::vm::interpreter::HeapValue::Map(map) = &interp.heap[*idx] {
                 let entries: Vec<String> = map
-                    .entries
+                    .keys
                     .iter()
+                    .zip(map.values.iter())
                     .map(|(k, v)| {
                         format!(
                             "{} => {}",
@@ -104,7 +105,7 @@ pub(super) fn to_string_value(interp: &Interpreter, v: &Value) -> String {
                         )
                     })
                     .collect();
-                format!("Map({}) {{{}}}", map.entries.len(), entries.join(", "))
+                format!("Map({}) {{{}}}", map.keys.len(), entries.join(", "))
             } else {
                 "[Map]".to_string()
             }
@@ -192,8 +193,9 @@ fn format_property_value(interp: &Interpreter, v: &Value) -> String {
         Value::Map(idx) => {
             if let crate::vm::interpreter::HeapValue::Map(map) = &interp.heap[*idx] {
                 let entries: Vec<String> = map
-                    .entries
+                    .keys
                     .iter()
+                    .zip(map.values.iter())
                     .map(|(k, v)| {
                         format!(
                             "{} => {}",
@@ -202,7 +204,7 @@ fn format_property_value(interp: &Interpreter, v: &Value) -> String {
                         )
                     })
                     .collect();
-                format!("Map({}) {{{}}}", map.entries.len(), entries.join(", "))
+                format!("Map({}) {{{}}}", map.keys.len(), entries.join(", "))
             } else {
                 "[Map]".to_string()
             }

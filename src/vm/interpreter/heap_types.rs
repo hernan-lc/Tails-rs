@@ -108,7 +108,7 @@ pub struct JsRegExp {
     pub unicode: bool,
     pub sticky: bool,
     pub last_index: f64,
-    compiled: Option<JsCompiledRegex>,
+    pub(crate) compiled: Option<JsCompiledRegex>,
 }
 
 #[derive(Debug, Clone)]

@@ -308,17 +308,17 @@ impl Interpreter {
 
             self.current_pc = pc;
 
-            if self.gc.should_collect() {
+            if pc & 127 == 0 && self.gc.should_collect() {
                 self.collect_garbage();
             }
 
-            let instruction = module.instructions[pc].clone();
+            let instruction = &module.instructions[pc];
 
             if cfg!(debug_assertions) && std::env::var("GEN_TRACE").is_ok() {
                 eprintln!("[GEN_TRACE] pc={}, instr={:?}", pc, instruction);
             }
 
-            match &instruction {
+            match instruction {
                 Instruction::Jump(_)
                 | Instruction::JumpIf(_)
                 | Instruction::JumpIfNot(_)
@@ -446,13 +446,26 @@ impl Interpreter {
                                         false
                                     };
                                 if same_module {
-                                    let func = self.heap[*func_idx].clone();
-                                    if let HeapValue::Function(f) = func {
+                                    let func_info = {
+                                        if let HeapValue::Function(f) = &self.heap[*func_idx] {
+                                            Some((
+                                                f.closure.clone(),
+                                                f.bytecode_index,
+                                                f.is_arrow,
+                                                f.captured_this.clone(),
+                                                f.rest_param.is_some(),
+                                                f.params.len(),
+                                            ))
+                                        } else {
+                                            None
+                                        }
+                                    };
+                                    if let Some((closure_vars, bytecode_index, is_arrow, captured_this, has_rest, param_count)) = func_info {
                                         let return_address = pc + 1;
                                         let base_pointer = self.stack.len();
-                                        let closure_count = f.closure.len();
-                                        let this_for_frame = if f.is_arrow {
-                                            f.captured_this.clone().unwrap_or(Value::Undefined)
+                                        let closure_count = closure_vars.len();
+                                        let this_for_frame = if is_arrow {
+                                            captured_this.unwrap_or(Value::Undefined)
                                         } else {
                                             Value::Undefined
                                         };
@@ -475,11 +488,10 @@ impl Interpreter {
                                                 .exception_handlers
                                                 .clone(),
                                         });
-                                        for closure_var in &f.closure {
-                                            self.stack.push(closure_var.clone());
+                                        for closure_var in closure_vars {
+                                            self.stack.push(closure_var);
                                         }
-                                        if f.rest_param.is_some() {
-                                            let param_count = f.params.len();
+                                        if has_rest {
                                             for arg in args.iter().take(param_count) {
                                                 self.stack.push(arg.clone());
                                             }
@@ -497,7 +509,7 @@ impl Interpreter {
                                                 self.stack.push(arg);
                                             }
                                         }
-                                        pc = f.bytecode_index;
+                                        pc = bytecode_index;
                                         continue;
                                     }
                                 }
@@ -563,67 +575,72 @@ impl Interpreter {
                     match method {
                         Value::Function(func_idx) => {
                             if let HeapValue::Function(f) = &self.heap[func_idx] {
-                                let f_clone = f.clone();
+                                let func_info = Some((
+                                    f.closure.clone(),
+                                    f.bytecode_index,
+                                    f.is_arrow,
+                                    f.captured_this.clone(),
+                                    f.rest_param.is_some(),
+                                    f.params.len(),
+                                ));
                                 let same_module =
-                                    match (&f_clone.owner_module, &self.current_module) {
+                                    match (&f.owner_module, &self.current_module) {
                                         (Some(om), Some(cm)) => Rc::ptr_eq(om, cm),
                                         (None, None) => true,
                                         _ => false,
                                     };
                                 if same_module {
-                                    let return_address = pc + 1;
-                                    let base_pointer = self.stack.len();
-                                    let closure_count = f_clone.closure.len();
-                                    let this_for_frame = if f_clone.is_arrow {
-                                        f_clone
-                                            .captured_this
-                                            .clone()
-                                            .unwrap_or_else(|| object.clone())
-                                    } else {
-                                        object.clone()
-                                    };
-                                    if self.call_stack.len() >= self.max_call_stack_depth {
-                                        self.throw_stack_overflow(&mut pc)?;
+                                    if let Some((closure_vars, bytecode_index, is_arrow, captured_this, has_rest, param_count)) = func_info {
+                                        let return_address = pc + 1;
+                                        let base_pointer = self.stack.len();
+                                        let closure_count = closure_vars.len();
+                                        let this_for_frame = if is_arrow {
+                                            captured_this.unwrap_or_else(|| object.clone())
+                                        } else {
+                                            object.clone()
+                                        };
+                                        if self.call_stack.len() >= self.max_call_stack_depth {
+                                            self.throw_stack_overflow(&mut pc)?;
+                                            continue;
+                                        }
+                                        self.call_stack.push(CallFrame {
+                                            return_address,
+                                            base_pointer,
+                                            closure_var_count: closure_count,
+                                            func_heap_idx: Some(func_idx),
+                                            this_value: Some(this_for_frame),
+                                            is_construct: false,
+                                            source_name: self.current_module_path.clone(),
+                                            generator_heap_idx: None,
+                                            source_line: self.current_source_line(pc),
+                                            source_col: self.current_source_col(pc),
+                                            exception_handlers_snapshot: self
+                                                .exception_handlers
+                                                .clone(),
+                                        });
+                                        for closure_var in closure_vars {
+                                            self.stack.push(closure_var);
+                                        }
+                                        if has_rest {
+                                            for arg in args.iter().take(param_count) {
+                                                self.stack.push(arg.clone());
+                                            }
+                                            let rest_args: Vec<Value> = args[param_count..].to_vec();
+                                            let rest_arr_idx = self.gc.allocate(
+                                                &mut self.heap,
+                                                HeapValue::Array(JsArray {
+                                                    elements: rest_args,
+                                                }),
+                                            );
+                                            self.stack.push(Value::Array(rest_arr_idx));
+                                        } else {
+                                            for arg in args {
+                                                self.stack.push(arg);
+                                            }
+                                        }
+                                        pc = bytecode_index;
                                         continue;
                                     }
-                                    self.call_stack.push(CallFrame {
-                                        return_address,
-                                        base_pointer,
-                                        closure_var_count: closure_count,
-                                        func_heap_idx: Some(func_idx),
-                                        this_value: Some(this_for_frame),
-                                        is_construct: false,
-                                        source_name: self.current_module_path.clone(),
-                                        generator_heap_idx: None,
-                                        source_line: self.current_source_line(pc),
-                                        source_col: self.current_source_col(pc),
-                                        exception_handlers_snapshot: self
-                                            .exception_handlers
-                                            .clone(),
-                                    });
-                                    for closure_var in &f_clone.closure {
-                                        self.stack.push(closure_var.clone());
-                                    }
-                                    if f_clone.rest_param.is_some() {
-                                        let param_count = f_clone.params.len();
-                                        for arg in args.iter().take(param_count) {
-                                            self.stack.push(arg.clone());
-                                        }
-                                        let rest_args: Vec<Value> = args[param_count..].to_vec();
-                                        let rest_arr_idx = self.gc.allocate(
-                                            &mut self.heap,
-                                            HeapValue::Array(JsArray {
-                                                elements: rest_args,
-                                            }),
-                                        );
-                                        self.stack.push(Value::Array(rest_arr_idx));
-                                    } else {
-                                        for arg in args {
-                                            self.stack.push(arg);
-                                        }
-                                    }
-                                    pc = f_clone.bytecode_index;
-                                    continue;
                                 }
                                 let result = self.call_value(&method, &object, &args)?;
                                 self.stack.push(result);
@@ -743,44 +760,59 @@ impl Interpreter {
                                     }
                                     self.stack.push(this_val);
                                 } else {
-                                    let f_clone = f.clone();
-                                    let same_module =
-                                        match (&f_clone.owner_module, &self.current_module) {
-                                            (Some(om), Some(cm)) => Rc::ptr_eq(om, cm),
-                                            (None, None) => true,
-                                            _ => false,
-                                        };
-                                    if same_module {
-                                        let return_address = pc + 1;
-                                        let base_pointer = self.stack.len();
-                                        let closure_count = f_clone.closure.len();
-                                        if self.call_stack.len() >= self.max_call_stack_depth {
-                                            self.throw_stack_overflow(&mut pc)?;
+                                    let func_info = {
+                                        if let HeapValue::Function(f) = &self.heap[*func_idx] {
+                                            Some((
+                                                f.closure.clone(),
+                                                f.bytecode_index,
+                                            ))
+                                        } else {
+                                            None
+                                        }
+                                    };
+                                    if let Some((closure_vars, bytecode_index)) = func_info {
+                                        let same_module =
+                                            if let HeapValue::Function(f) = &self.heap[*func_idx] {
+                                                match (&f.owner_module, &self.current_module) {
+                                                    (Some(om), Some(cm)) => Rc::ptr_eq(om, cm),
+                                                    (None, None) => true,
+                                                    _ => false,
+                                                }
+                                            } else {
+                                                false
+                                            };
+                                        if same_module {
+                                            let return_address = pc + 1;
+                                            let base_pointer = self.stack.len();
+                                            let closure_count = closure_vars.len();
+                                            if self.call_stack.len() >= self.max_call_stack_depth {
+                                                self.throw_stack_overflow(&mut pc)?;
+                                                continue;
+                                            }
+                                            self.call_stack.push(CallFrame {
+                                                return_address,
+                                                base_pointer,
+                                                closure_var_count: closure_count,
+                                                func_heap_idx: Some(*func_idx),
+                                                this_value: Some(this_val.clone()),
+                                                is_construct: true,
+                                                source_name: self.current_module_path.clone(),
+                                                generator_heap_idx: None,
+                                                source_line: self.current_source_line(pc),
+                                                source_col: self.current_source_col(pc),
+                                                exception_handlers_snapshot: self
+                                                    .exception_handlers
+                                                    .clone(),
+                                            });
+                                            for closure_var in closure_vars {
+                                                self.stack.push(closure_var);
+                                            }
+                                            for arg in args {
+                                                self.stack.push(arg);
+                                            }
+                                            pc = bytecode_index;
                                             continue;
                                         }
-                                        self.call_stack.push(CallFrame {
-                                            return_address,
-                                            base_pointer,
-                                            closure_var_count: closure_count,
-                                            func_heap_idx: Some(*func_idx),
-                                            this_value: Some(this_val.clone()),
-                                            is_construct: true,
-                                            source_name: self.current_module_path.clone(),
-                                            generator_heap_idx: None,
-                                            source_line: self.current_source_line(pc),
-                                            source_col: self.current_source_col(pc),
-                                            exception_handlers_snapshot: self
-                                                .exception_handlers
-                                                .clone(),
-                                        });
-                                        for closure_var in &f_clone.closure {
-                                            self.stack.push(closure_var.clone());
-                                        }
-                                        for arg in args {
-                                            self.stack.push(arg);
-                                        }
-                                        pc = f_clone.bytecode_index;
-                                        continue;
                                     }
                                     let result = self.call_value(&constructor, &this_val, &args)?;
                                     match result {
@@ -922,14 +954,12 @@ impl Interpreter {
                                     let frame = SuspendedFrame {
                                         promise_idx: *promise_idx,
                                         resume_pc: pc + 1,
-                                        stack_snapshot: self.stack.clone(),
-                                        call_stack_snapshot: self.call_stack.clone(),
+                                        stack_snapshot: std::mem::take(&mut self.stack),
+                                        call_stack_snapshot: std::mem::take(&mut self.call_stack),
                                         module: self.current_module.clone(),
                                         module_path: self.current_module_path.clone(),
-                                        exception_handlers_snapshot: self
-                                            .exception_handlers
-                                            .clone(),
-                                        block_scope_stack_snapshot: self.block_scope_stack.clone(),
+                                        exception_handlers_snapshot: std::mem::take(&mut self.exception_handlers),
+                                        block_scope_stack_snapshot: std::mem::take(&mut self.block_scope_stack),
                                     };
                                     self.suspended_frames.push_back(frame);
                                     return Ok(Value::Undefined);

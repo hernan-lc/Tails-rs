@@ -66,6 +66,40 @@ impl CodeGenerator {
         self.source_cols.push(self.current_source_col);
     }
 
+    fn peephole_optimize(&mut self) {
+        let mut optimized = Vec::with_capacity(self.instructions.len());
+        let mut i = 0;
+        while i < self.instructions.len() {
+            if i + 3 < self.instructions.len() {
+                if let (
+                    Instruction::LoadLocal(x),
+                    Instruction::LoadConst(c),
+                    Instruction::Add,
+                    Instruction::StoreLocal(y),
+                ) = (
+                    &self.instructions[i],
+                    &self.instructions[i + 1],
+                    &self.instructions[i + 2],
+                    &self.instructions[i + 3],
+                ) {
+                    if x == y {
+                        if let Value::Integer(n) = self.constants[*c as usize] {
+                            optimized.push(Instruction::IncLocal(*x, n));
+                            // Also remove the LoadConst, Add, StoreLocal source mappings
+                            self.source_lines.drain(i + 1..=i + 3);
+                            self.source_cols.drain(i + 1..=i + 3);
+                            i += 4;
+                            continue;
+                        }
+                    }
+                }
+            }
+            optimized.push(self.instructions[i].clone());
+            i += 1;
+        }
+        self.instructions = optimized;
+    }
+
     fn record_line_from_span(&mut self, span: &Option<crate::errors::Span>) {
         if let Some(s) = span {
             if s.line > 0 {
@@ -99,6 +133,8 @@ impl CodeGenerator {
                 ))
             }
         }
+
+        self.peephole_optimize();
 
         Ok(CompiledModule {
             instructions: self.instructions.clone(),

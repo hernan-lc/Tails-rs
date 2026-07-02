@@ -117,6 +117,21 @@ impl Interpreter {
                 }
                 self.stack[idx] = value;
             }
+            Instruction::IncLocal(slot, delta) => {
+                let base = self.call_stack.last().map(|f| f.base_pointer).unwrap_or(0);
+                let idx = base + *slot as usize;
+                if idx < self.stack.len() {
+                    match &self.stack[idx] {
+                        Value::Integer(n) => {
+                            self.stack[idx] = Value::Integer(n + delta);
+                        }
+                        Value::Float(n) => {
+                            self.stack[idx] = Value::Float(n + *delta as f64);
+                        }
+                        _ => {}
+                    }
+                }
+            }
             Instruction::Pop => {
                 self.stack.pop();
             }

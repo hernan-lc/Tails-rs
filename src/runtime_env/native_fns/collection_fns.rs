@@ -144,7 +144,7 @@ pub(super) fn native_map_for_each(
     // Clone entries to avoid borrow issues
     let entries: Vec<(Value, Value)> =
         if let crate::vm::interpreter::HeapValue::Map(map) = &interp.heap[idx] {
-            map.entries.clone()
+            map.keys.iter().zip(map.values.iter()).map(|(k, v)| (k.clone(), v.clone())).collect()
         } else {
             return Err(Error::TypeError("Not a Map".into()));
         };

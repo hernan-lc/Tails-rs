@@ -350,65 +350,43 @@ fn days_in_month(year: i64, month: i32) -> i64 {
 fn days_since_epoch(year: i64, month: i32, day: i64) -> i64 {
     let y = year;
     let mut m = month;
-
-    // Adjust for JS month (0-based) if month is 0-based
-    // Our components use 0-based months from JS
     m = m.clamp(0, 11);
 
     let mut total_days = 0i64;
 
-    // Days from years
     for yr in 1970..y {
         total_days += if is_leap_year(yr) { 366 } else { 365 };
     }
-    // Subtract for years before 1970
     for yr in y..1970 {
         total_days -= if is_leap_year(yr) { 366 } else { 365 };
     }
 
-    // Days from months (0-based month)
     for mo in 0..m {
         total_days += days_in_month(y, mo + 1);
     }
 
-    // Days
     total_days += day - 1;
-
     total_days
 }
 
+fn civil_from_days(days: i64) -> (i64, i32, i64) {
+    let z = days + 719468;
+    let era = z.div_euclid(146097);
+    let doe = z.rem_euclid(146097);
+    let yoe = (doe - doe.div_euclid(1460) + doe.div_euclid(36524) - doe.div_euclid(146096)).div_euclid(365);
+    let y = yoe + era * 400;
+    let doy = doe - (yoe * 365) - yoe.div_euclid(4) + yoe.div_euclid(100);
+    let mp = (5 * doy + 2).div_euclid(153);
+    let d = doy - (mp * 153 + 2).div_euclid(5) + 1;
+    let m = if mp < 10 { mp + 3 } else { mp - 9 };
+    let year = if m <= 2 { y + 1 } else { y };
+    (year, m as i32, d)
+}
+
 fn date_from_millis(ms: f64) -> (i64, i32, i64) {
-    let mut days = (ms / 86400000.0).floor() as i64;
-
-    // Handle negative days (before epoch)
-    let mut year = 1970i64;
-    if days >= 0 {
-        loop {
-            let days_in_year = if is_leap_year(year) { 366 } else { 365 };
-            if days < days_in_year {
-                break;
-            }
-            days -= days_in_year;
-            year += 1;
-        }
-    } else {
-        while days < 0 {
-            year -= 1;
-            days += if is_leap_year(year) { 366 } else { 365 };
-        }
-    }
-
-    let mut month = 1i32;
-    for mo in 1..=12 {
-        let dim = days_in_month(year, mo);
-        if days < dim {
-            break;
-        }
-        days -= dim;
-        month = mo + 1;
-    }
-
-    (year, month, days + 1)
+    let days = (ms / 86400000.0).floor() as i64;
+    let (year, month, day) = civil_from_days(days);
+    (year, month, day)
 }
 
 fn parse_iso8601(s: &str) -> Option<f64> {

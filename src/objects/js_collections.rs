@@ -1,69 +1,88 @@
 use crate::objects::Value;
+use rustc_hash::FxHashMap;
+use rustc_hash::FxHashSet;
 use std::hash::{Hash, Hasher};
 
 #[derive(Debug, Clone)]
 pub struct JsMap {
-    pub entries: Vec<(Value, Value)>,
+    map: FxHashMap<Value, usize>,
+    pub(crate) keys: Vec<Value>,
+    pub(crate) values: Vec<Value>,
 }
 
 impl JsMap {
     pub fn new() -> Self {
         Self {
-            entries: Vec::new(),
+            map: FxHashMap::default(),
+            keys: Vec::new(),
+            values: Vec::new(),
         }
     }
 
     pub fn get(&self, key: &Value) -> Option<&Value> {
-        for (k, v) in &self.entries {
-            if k == key {
-                return Some(v);
-            }
-        }
-        None
+        self.map.get(key).map(|&idx| &self.values[idx])
     }
 
     pub fn set(&mut self, key: Value, value: Value) {
-        for (k, v) in &mut self.entries {
-            if k == &key {
-                *v = value;
-                return;
-            }
+        if let Some(&idx) = self.map.get(&key) {
+            self.values[idx] = value;
+        } else {
+            let idx = self.keys.len();
+            self.map.insert(key.clone(), idx);
+            self.keys.push(key);
+            self.values.push(value);
         }
-        self.entries.push((key, value));
     }
 
     pub fn has(&self, key: &Value) -> bool {
-        self.entries.iter().any(|(k, _)| k == key)
+        self.map.contains_key(key)
     }
 
     pub fn delete(&mut self, key: &Value) -> bool {
-        let len = self.entries.len();
-        self.entries.retain(|(k, _)| k != key);
-        self.entries.len() < len
+        if let Some(idx) = self.map.remove(key) {
+            let last = self.keys.len() - 1;
+            if idx != last {
+                self.keys.swap(idx, last);
+                self.values.swap(idx, last);
+                let moved_key = &self.keys[idx];
+                *self.map.get_mut(moved_key).unwrap() = idx;
+            }
+            self.keys.pop();
+            self.values.pop();
+            true
+        } else {
+            false
+        }
     }
 
     pub fn clear(&mut self) {
-        self.entries.clear();
+        self.map.clear();
+        self.keys.clear();
+        self.values.clear();
     }
 
     pub fn size(&self) -> usize {
-        self.entries.len()
+        self.keys.len()
     }
 
     pub fn keys(&self) -> Vec<Value> {
-        self.entries.iter().map(|(k, _)| k.clone()).collect()
+        self.keys.clone()
     }
 
     pub fn values(&self) -> Vec<Value> {
-        self.entries.iter().map(|(_, v)| v.clone()).collect()
+        self.values.clone()
     }
 
     pub fn entries(&self) -> Vec<(Value, Value)> {
-        self.entries.clone()
+        self.keys
+            .iter()
+            .zip(self.values.iter())
+            .map(|(k, v)| (k.clone(), v.clone()))
+            .collect()
     }
 
     pub fn for_each(&self, f: &mut dyn FnMut(&Value, &Value)) {
-        for (k, v) in &self.entries {
+        for (k, v) in self.keys.iter().zip(self.values.iter()) {
             f(k, v);
         }
     }
@@ -77,31 +96,44 @@ impl Default for JsMap {
 
 #[derive(Debug, Clone)]
 pub struct JsSet {
-    pub values: Vec<Value>,
+    set: FxHashSet<Value>,
+    pub(crate) values: Vec<Value>,
 }
 
 impl JsSet {
     pub fn new() -> Self {
-        Self { values: Vec::new() }
+        Self {
+            set: FxHashSet::default(),
+            values: Vec::new(),
+        }
     }
 
     pub fn add(&mut self, value: Value) {
-        if !self.values.iter().any(|v| v == &value) {
+        if self.set.insert(value.clone()) {
             self.values.push(value);
         }
     }
 
     pub fn has(&self, value: &Value) -> bool {
-        self.values.iter().any(|v| v == value)
+        self.set.contains(value)
     }
 
     pub fn delete(&mut self, value: &Value) -> bool {
-        let len = self.values.len();
-        self.values.retain(|v| v != value);
-        self.values.len() < len
+        if self.set.remove(value) {
+            let idx = self.values.iter().position(|v| v == value).unwrap();
+            let last = self.values.len() - 1;
+            if idx != last {
+                self.values.swap(idx, last);
+            }
+            self.values.pop();
+            true
+        } else {
+            false
+        }
     }
 
     pub fn clear(&mut self) {
+        self.set.clear();
         self.values.clear();
     }
 
@@ -232,29 +264,30 @@ impl Default for JsWeakSet {
 impl Hash for Value {
     fn hash<H: Hasher>(&self, state: &mut H) {
         match self {
-            Value::Undefined => 0.hash(state),
-            Value::Null => 1.hash(state),
-            Value::Boolean(b) => b.hash(state),
-            Value::Integer(i) => i.hash(state),
-            Value::Float(f) => f.to_bits().hash(state),
-            Value::String(s) => s.hash(state),
-            Value::BigInt(i) => i.hash(state),
-            Value::Symbol(id) => id.hash(state),
-            Value::Function(i) => i.hash(state),
-            Value::NativeFunction(i) => i.hash(state),
-            Value::Object(i) => i.hash(state),
-            Value::Array(i) => i.hash(state),
-            Value::Promise(i) => i.hash(state),
-            Value::Proxy(i) => i.hash(state),
-            Value::Generator(i) => i.hash(state),
-            Value::TypedArray(i) => i.hash(state),
-            Value::Map(i) => i.hash(state),
-            Value::Set(i) => i.hash(state),
-            Value::WeakMap(i) => i.hash(state),
-            Value::WeakSet(i) => i.hash(state),
-            Value::Date(_) | Value::RegExp(_) | Value::Buffer(_) | Value::NativeObject(_) => {
-                todo!()
-            }
+            Value::Undefined => 0u8.hash(state),
+            Value::Null => 1u8.hash(state),
+            Value::Boolean(b) => { 2u8.hash(state); b.hash(state); }
+            Value::Integer(i) => { 3u8.hash(state); i.hash(state); }
+            Value::Float(f) => { 4u8.hash(state); f.to_bits().hash(state); }
+            Value::String(s) => { 5u8.hash(state); s.hash(state); }
+            Value::BigInt(i) => { 6u8.hash(state); i.hash(state); }
+            Value::Symbol(id) => { 7u8.hash(state); id.hash(state); }
+            Value::Function(i) => { 8u8.hash(state); i.hash(state); }
+            Value::NativeFunction(i) => { 9u8.hash(state); i.hash(state); }
+            Value::Object(i) => { 10u8.hash(state); i.hash(state); }
+            Value::Array(i) => { 11u8.hash(state); i.hash(state); }
+            Value::Promise(i) => { 12u8.hash(state); i.hash(state); }
+            Value::Proxy(i) => { 13u8.hash(state); i.hash(state); }
+            Value::Generator(i) => { 14u8.hash(state); i.hash(state); }
+            Value::TypedArray(i) => { 15u8.hash(state); i.hash(state); }
+            Value::Map(i) => { 16u8.hash(state); i.hash(state); }
+            Value::Set(i) => { 17u8.hash(state); i.hash(state); }
+            Value::WeakMap(i) => { 18u8.hash(state); i.hash(state); }
+            Value::WeakSet(i) => { 19u8.hash(state); i.hash(state); }
+            Value::Date(i) => { 20u8.hash(state); i.hash(state); }
+            Value::RegExp(i) => { 21u8.hash(state); i.hash(state); }
+            Value::Buffer(i) => { 22u8.hash(state); i.hash(state); }
+            Value::NativeObject(id) => { 23u8.hash(state); id.hash(state); }
         }
     }
 }

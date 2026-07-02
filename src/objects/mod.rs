@@ -48,6 +48,8 @@ pub enum Value {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct NativeObjectId(pub u32);
 
+impl Eq for Value {}
+
 impl PartialEq for Value {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {

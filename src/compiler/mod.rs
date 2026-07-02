@@ -105,6 +105,7 @@ pub enum Instruction {
     LoadGlobal(String),
     StoreLocal(u16),
     LoadLocal(u16),
+    IncLocal(u16, i64),
     Add,
     Sub,
     Mul,
