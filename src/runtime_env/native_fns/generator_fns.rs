@@ -40,14 +40,10 @@ pub(super) fn native_generator_next(
             //
             // We need to put saved_stack back before any return, so use a
             // guard pattern.
-            let mut saved_stack =
-                std::mem::take(&mut gen.saved_stack);
-            let saved_block_scope =
-                std::mem::take(&mut gen.saved_block_scope_stack);
-            let outer_block_scope = std::mem::replace(
-                &mut interp.block_scope_stack,
-                saved_block_scope,
-            );
+            let mut saved_stack = std::mem::take(&mut gen.saved_stack);
+            let saved_block_scope = std::mem::take(&mut gen.saved_block_scope_stack);
+            let outer_block_scope =
+                std::mem::replace(&mut interp.block_scope_stack, saved_block_scope);
 
             // Move elements from the saved stack onto the interpreter stack
             // without cloning the underlying buffer.

@@ -1,7 +1,7 @@
-use std::collections::HashMap;
+use rustc_hash::FxHashMap;
 
 pub struct WeakRefManager {
-    refs: HashMap<usize, WeakRef>,
+    refs: FxHashMap<usize, WeakRef>,
     finalizers: Vec<FinalizationRegistry>,
     next_id: usize,
 }
@@ -19,7 +19,7 @@ pub struct FinalizationRegistry {
 impl WeakRefManager {
     pub fn new() -> Self {
         Self {
-            refs: HashMap::new(),
+            refs: FxHashMap::default(),
             finalizers: Vec::new(),
             next_id: 0,
         }

@@ -1,7 +1,7 @@
-use std::collections::HashMap;
+use rustc_hash::FxHashMap;
 use std::path::{Path, PathBuf};
 
-/// Parse a `.env` file into a HashMap of key-value pairs.
+/// Parse a `.env` file into a FxHashMap of key-value pairs.
 ///
 /// Supports:
 /// - Comments (lines starting with #)
@@ -9,8 +9,8 @@ use std::path::{Path, PathBuf};
 /// - Quoted values (single, double, or backtick)
 /// - $VAR and ${VAR} expansion
 /// - Inline comments after values
-pub fn parse_env_file(content: &str) -> HashMap<String, String> {
-    let mut vars = HashMap::new();
+pub fn parse_env_file(content: &str) -> FxHashMap<String, String> {
+    let mut vars = FxHashMap::default();
     for line in content.lines() {
         let line = line.trim();
         // Skip empty lines and comments
@@ -36,7 +36,7 @@ pub fn parse_env_file(content: &str) -> HashMap<String, String> {
 }
 
 /// Remove surrounding quotes and expand $VAR / ${VAR} references.
-fn unquote_and_expand(raw: &str, vars: &HashMap<String, String>) -> String {
+fn unquote_and_expand(raw: &str, vars: &FxHashMap<String, String>) -> String {
     let unquoted = unquote(raw);
     expand_vars(&unquoted, vars)
 }
@@ -58,7 +58,7 @@ fn unquote(s: &str) -> String {
 }
 
 /// Expand `$VAR` and `${VAR}` references. Escape with `\$` to prevent expansion.
-fn expand_vars(s: &str, vars: &HashMap<String, String>) -> String {
+fn expand_vars(s: &str, vars: &FxHashMap<String, String>) -> String {
     let mut result = String::with_capacity(s.len());
     let bytes = s.as_bytes();
     let len = bytes.len();
@@ -147,7 +147,7 @@ pub fn find_env_files(start_dir: &Path, node_env: Option<&str>) -> Vec<PathBuf> 
 
 /// Load and apply `.env` files. Returns the number of variables loaded.
 pub fn load_env_files(files: &[PathBuf]) -> usize {
-    let mut loaded = HashMap::new();
+    let mut loaded = FxHashMap::default();
     let mut count = 0;
 
     for file in files {

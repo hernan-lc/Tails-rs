@@ -1,13 +1,13 @@
 use crate::objects::Value;
-use std::collections::HashMap;
+use rustc_hash::FxHashMap;
 
 pub struct Builtins {
-    pub globals: HashMap<String, Value>,
+    pub globals: FxHashMap<String, Value>,
 }
 
 impl Builtins {
     pub fn new() -> Self {
-        let mut globals = HashMap::new();
+        let mut globals = FxHashMap::default();
 
         // Math constants
         globals.insert("Math".to_string(), Value::Undefined);

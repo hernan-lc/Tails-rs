@@ -1,16 +1,16 @@
 use crate::errors::Result;
-use std::collections::HashMap;
+use rustc_hash::FxHashMap;
 use std::path::{Path, PathBuf};
 
 pub struct ModuleLoader {
-    modules: HashMap<String, Vec<u8>>,
+    modules: FxHashMap<String, Vec<u8>>,
     base_path: PathBuf,
 }
 
 impl ModuleLoader {
     pub fn new(base_path: &Path) -> Self {
         Self {
-            modules: HashMap::new(),
+            modules: FxHashMap::default(),
             base_path: base_path.to_path_buf(),
         }
     }

@@ -1,7 +1,7 @@
 use crate::compiler::type_checker::Type;
 use crate::errors::Result;
 use crate::objects::Value;
-use std::collections::HashMap;
+use rustc_hash::FxHashMap;
 
 pub mod bytecode;
 pub mod lexer;
@@ -10,18 +10,18 @@ pub mod type_checker;
 
 pub struct Compiler {
     type_checking: bool,
-    known_globals: HashMap<String, Type>,
+    known_globals: FxHashMap<String, Type>,
 }
 
 impl Compiler {
     pub fn new(type_checking: bool) -> Self {
         Self {
             type_checking,
-            known_globals: HashMap::new(),
+            known_globals: FxHashMap::default(),
         }
     }
 
-    pub fn with_globals(type_checking: bool, known_globals: HashMap<String, Type>) -> Self {
+    pub fn with_globals(type_checking: bool, known_globals: FxHashMap<String, Type>) -> Self {
         Self {
             type_checking,
             known_globals,
@@ -32,7 +32,7 @@ impl Compiler {
         self.known_globals.insert(name, ty);
     }
 
-    pub fn set_known_globals(&mut self, globals: HashMap<String, Type>) {
+    pub fn set_known_globals(&mut self, globals: FxHashMap<String, Type>) {
         self.known_globals = globals;
     }
 

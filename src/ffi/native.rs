@@ -1,19 +1,19 @@
 use crate::objects::Value;
-use std::collections::HashMap;
+use rustc_hash::FxHashMap;
 use std::sync::{Arc, Mutex};
 
 pub type NativeFunction = fn(args: &[Value]) -> Result<Value, String>;
 
 pub struct NativeRegistry {
     functions: Vec<NativeFunction>,
-    named_functions: HashMap<String, usize>,
+    named_functions: FxHashMap<String, usize>,
 }
 
 impl NativeRegistry {
     pub fn new() -> Self {
         Self {
             functions: Vec::new(),
-            named_functions: HashMap::new(),
+            named_functions: FxHashMap::default(),
         }
     }
 

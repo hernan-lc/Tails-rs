@@ -376,20 +376,16 @@ impl Interpreter {
                 }
                 Instruction::StoreLocal(slot) => {
                     if let Some(value) = self.stack.pop() {
-                        let base = self
-                            .call_stack
-                            .last()
-                            .map(|f| f.base_pointer)
-                            .unwrap_or(0);
+                        let base = self.call_stack.last().map(|f| f.base_pointer).unwrap_or(0);
                         let idx = base + *slot as usize;
                         if idx >= self.stack.len() {
                             self.stack.resize(idx + 1, Value::Undefined);
                         }
                         self.stack[idx] = value;
                     } else {
-                        return Err(self.err_at_location(Error::RuntimeError(
-                            "Stack underflow".into(),
-                        )));
+                        return Err(
+                            self.err_at_location(Error::RuntimeError("Stack underflow".into()))
+                        );
                     }
                     pc += 1;
                     continue;
@@ -416,11 +412,7 @@ impl Interpreter {
                     // Cold path: fall through to exec_load_store.
                 }
                 Instruction::AddLocal(dst, src) => {
-                    let base = self
-                        .call_stack
-                        .last()
-                        .map(|f| f.base_pointer)
-                        .unwrap_or(0);
+                    let base = self.call_stack.last().map(|f| f.base_pointer).unwrap_or(0);
                     let dst_idx = base + *dst as usize;
                     let src_idx = base + *src as usize;
                     if dst_idx < self.stack.len() && src_idx < self.stack.len() {
@@ -429,8 +421,7 @@ impl Interpreter {
                                 if let Some(result) = a.checked_add(*b) {
                                     self.stack[dst_idx] = Value::Integer(result);
                                 } else {
-                                    self.stack[dst_idx] =
-                                        Value::Float(*a as f64 + *b as f64);
+                                    self.stack[dst_idx] = Value::Float(*a as f64 + *b as f64);
                                 }
                                 pc += 1;
                                 continue;

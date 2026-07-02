@@ -3,7 +3,7 @@ use crate::compiler::Compiler;
 use crate::errors::Result;
 use crate::objects::Value;
 use crate::vm::{EventSource, Interpreter};
-use std::collections::HashMap;
+use rustc_hash::FxHashMap;
 use std::path::Path;
 
 pub struct RuntimeConfig {
@@ -47,7 +47,7 @@ impl TailsRuntime {
         let mut compiler = Compiler::new(self.config.enable_type_checking);
         // Pass known globals to the compiler for type checking
         if self.config.enable_type_checking {
-            let globals: HashMap<String, Type> = self
+            let globals: FxHashMap<String, Type> = self
                 .interpreter
                 .globals
                 .keys()

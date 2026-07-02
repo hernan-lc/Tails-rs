@@ -109,9 +109,7 @@ impl Interpreter {
                 // check is taken; in the common case (always inside a function)
                 // this is a single Option::Some branch and an unwrap.
                 let loaded = if let Some(frame) = self.call_stack.last() {
-                    self.stack
-                        .get(frame.base_pointer + *slot as usize)
-                        .cloned()
+                    self.stack.get(frame.base_pointer + *slot as usize).cloned()
                 } else {
                     self.stack.get(*slot as usize).cloned()
                 };
@@ -122,11 +120,7 @@ impl Interpreter {
                     .stack
                     .pop()
                     .ok_or_else(|| Error::RuntimeError("Stack underflow".into()))?;
-                let base = self
-                    .call_stack
-                    .last()
-                    .map(|f| f.base_pointer)
-                    .unwrap_or(0);
+                let base = self.call_stack.last().map(|f| f.base_pointer).unwrap_or(0);
                 let idx = base + *slot as usize;
                 if idx >= self.stack.len() {
                     self.stack.resize(idx + 1, Value::Undefined);

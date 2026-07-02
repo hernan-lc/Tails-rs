@@ -4,8 +4,8 @@ use crate::vm::interpreter::Interpreter;
 
 use super::helpers::to_display_string;
 use colored::*;
+use rustc_hash::FxHashMap;
 use std::cell::RefCell;
-use std::collections::HashMap;
 
 const MAX_DEPTH: usize = 4;
 const INDENT: &str = "  ";
@@ -14,7 +14,7 @@ thread_local! {
     static USE_COLORS: std::cell::Cell<bool> = const { std::cell::Cell::new(true) };
     static USE_TIMESTAMPS: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
     static GROUP_DEPTH: std::cell::Cell<i32> = const { std::cell::Cell::new(0) };
-    static TIMERS: RefCell<HashMap<String, u128>> = RefCell::new(HashMap::new());
+    static TIMERS: RefCell<FxHashMap<String, u128>> = RefCell::new(FxHashMap::default());
 }
 
 pub fn set_colors(enabled: bool) {

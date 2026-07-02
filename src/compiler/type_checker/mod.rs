@@ -6,7 +6,7 @@ mod statements;
 
 use crate::compiler::parser::{AstNode, BinaryOperator, Expression, Statement, VarKind};
 use crate::errors::{Error, Result};
-use std::collections::HashMap;
+use rustc_hash::FxHashMap;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Type {
@@ -65,26 +65,26 @@ pub struct EnumDecl {
 }
 
 pub struct TypeChecker {
-    scopes: Vec<HashMap<String, Type>>,
-    interfaces: HashMap<String, InterfaceDecl>,
-    type_aliases: HashMap<String, TypeAliasDecl>,
-    enums: HashMap<String, EnumDecl>,
-    narrowed_types: HashMap<String, Type>,
-    known_globals: HashMap<String, Type>,
+    scopes: Vec<FxHashMap<String, Type>>,
+    interfaces: FxHashMap<String, InterfaceDecl>,
+    type_aliases: FxHashMap<String, TypeAliasDecl>,
+    enums: FxHashMap<String, EnumDecl>,
+    narrowed_types: FxHashMap<String, Type>,
+    known_globals: FxHashMap<String, Type>,
 }
 
 impl TypeChecker {
     pub fn new() -> Self {
-        Self::with_globals(HashMap::new())
+        Self::with_globals(FxHashMap::default())
     }
 
-    pub fn with_globals(known_globals: HashMap<String, Type>) -> Self {
+    pub fn with_globals(known_globals: FxHashMap<String, Type>) -> Self {
         Self {
-            scopes: vec![HashMap::new()],
-            interfaces: HashMap::new(),
-            type_aliases: HashMap::new(),
-            enums: HashMap::new(),
-            narrowed_types: HashMap::new(),
+            scopes: vec![FxHashMap::default()],
+            interfaces: FxHashMap::default(),
+            type_aliases: FxHashMap::default(),
+            enums: FxHashMap::default(),
+            narrowed_types: FxHashMap::default(),
             known_globals,
         }
     }
@@ -94,7 +94,7 @@ impl TypeChecker {
         checker.check_node(ast)
     }
 
-    pub fn check_with_globals(ast: &AstNode, known_globals: HashMap<String, Type>) -> Result<()> {
+    pub fn check_with_globals(ast: &AstNode, known_globals: FxHashMap<String, Type>) -> Result<()> {
         let mut checker = Self::with_globals(known_globals);
         checker.check_node(ast)
     }
@@ -112,7 +112,7 @@ impl TypeChecker {
     }
 
     pub(crate) fn enter_scope(&mut self) {
-        self.scopes.push(HashMap::new());
+        self.scopes.push(FxHashMap::default());
     }
 
     pub(crate) fn exit_scope(&mut self) {
