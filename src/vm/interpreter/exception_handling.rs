@@ -1,9 +1,9 @@
 use super::*;
-use rustc_hash::FxHashMap;
 use crate::compiler::Instruction;
 use crate::errors::runtime_errors::runtime_error_stack_overflow;
 use crate::errors::{Error, Result};
 use crate::objects::Value;
+use crate::props;
 
 impl Interpreter {
     pub(crate) fn exec_exception(
@@ -133,10 +133,11 @@ impl Interpreter {
         let message = "Maximum call stack size exceeded";
         let obj_idx = self.heap.len();
         let stack = self.build_stack_trace("RangeError", message);
-        let mut props = FxHashMap::default();
-        props.insert("message".into(), Value::String(message.into()));
-        props.insert("name".into(), Value::String("RangeError".into()));
-        props.insert("stack".into(), Value::String(stack));
+        let props = props! {
+            "message" => Value::String(message.into()),
+            "name" => Value::String("RangeError".into()),
+            "stack" => Value::String(stack),
+        };
         let proto_idx = self.find_error_prototype("RangeError");
         self.heap.push(HeapValue::Object(JsObject {
             properties: props,

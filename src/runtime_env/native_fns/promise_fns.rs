@@ -1,7 +1,7 @@
-use rustc_hash::FxHashMap;
 use crate::errors::Result;
 use crate::objects::Value;
 use crate::vm::interpreter::Interpreter;
+use crate::props;
 
 pub(super) fn native_promise_constructor(
     interp: &mut Interpreter,
@@ -370,9 +370,10 @@ pub(super) fn native_promise_all_settled(
         if let crate::vm::interpreter::HeapValue::Promise(p) = &interp.heap[p_idx] {
             match &p.state {
                 crate::objects::js_promise::PromiseState::Fulfilled(v) => {
-                    let mut props = FxHashMap::default();
-                    props.insert("status".to_string(), Value::String("fulfilled".to_string()));
-                    props.insert("value".to_string(), v.clone());
+                    let props = props! {
+                        "status" => Value::String("fulfilled".to_string()),
+                        "value" => v.clone(),
+                    };
                     let obj_idx = interp.heap.len();
                     interp.heap.push(crate::vm::interpreter::HeapValue::Object(
                         crate::vm::interpreter::JsObject {
@@ -384,9 +385,10 @@ pub(super) fn native_promise_all_settled(
                     results.push(Value::Object(obj_idx));
                 }
                 crate::objects::js_promise::PromiseState::Rejected(r) => {
-                    let mut props = FxHashMap::default();
-                    props.insert("status".to_string(), Value::String("rejected".to_string()));
-                    props.insert("reason".to_string(), r.clone());
+                    let props = props! {
+                        "status" => Value::String("rejected".to_string()),
+                        "reason" => r.clone(),
+                    };
                     let obj_idx = interp.heap.len();
                     interp.heap.push(crate::vm::interpreter::HeapValue::Object(
                         crate::vm::interpreter::JsObject {
@@ -468,19 +470,17 @@ pub(super) fn native_promise_any(
     }
 
     if all_rejected && !rejections.is_empty() {
-        // Create an AggregateError-like object
-        let mut props = FxHashMap::default();
-        props.insert(
-            "message".to_string(),
-            Value::String("All promises were rejected".to_string()),
-        );
         let errors_idx = interp.heap.len();
         interp.heap.push(crate::vm::interpreter::HeapValue::Array(
             crate::vm::interpreter::JsArray {
                 elements: rejections,
             },
         ));
-        props.insert("errors".to_string(), Value::Array(errors_idx));
+        // Create an AggregateError-like object
+        let props = props! {
+            "message" => Value::String("All promises were rejected".to_string()),
+            "errors" => Value::Array(errors_idx),
+        };
         let err_obj_idx = interp.heap.len();
         interp.heap.push(crate::vm::interpreter::HeapValue::Object(
             crate::vm::interpreter::JsObject {
@@ -508,10 +508,11 @@ pub(super) fn native_promise_with_resolvers(
     let resolve_fn = interp.create_resolve_fn(promise_idx);
     let reject_fn = interp.create_reject_fn(promise_idx);
 
-    let mut props = FxHashMap::default();
-    props.insert("promise".to_string(), Value::Promise(promise_idx));
-    props.insert("resolve".to_string(), resolve_fn);
-    props.insert("reject".to_string(), reject_fn);
+    let props = props! {
+        "promise" => Value::Promise(promise_idx),
+        "resolve" => resolve_fn,
+        "reject" => reject_fn,
+    };
     let obj_idx = interp.heap.len();
     interp.heap.push(crate::vm::interpreter::HeapValue::Object(
         crate::vm::interpreter::JsObject {

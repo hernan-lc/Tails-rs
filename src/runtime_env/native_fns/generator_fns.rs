@@ -1,7 +1,7 @@
-use rustc_hash::FxHashMap;
 use crate::errors::{Error, Result};
 use crate::objects::Value;
 use crate::vm::interpreter::Interpreter;
+use crate::props;
 
 pub(super) fn native_generator_next(
     interp: &mut Interpreter,
@@ -128,9 +128,10 @@ pub(super) fn native_generator_next(
 
             let final_result = match result {
                 Ok(yield_value) if yielded => {
-                    let mut result_obj = FxHashMap::default();
-                    result_obj.insert("value".into(), yield_value);
-                    result_obj.insert("done".into(), Value::Boolean(false));
+                    let result_obj = props! {
+                        "value" => yield_value,
+                        "done" => Value::Boolean(false),
+                    };
                     let obj_idx = interp.gc.allocate(
                         &mut interp.heap,
                         crate::vm::interpreter::HeapValue::Object(
@@ -144,9 +145,10 @@ pub(super) fn native_generator_next(
                     Ok(Value::Object(obj_idx))
                 }
                 _ => {
-                    let mut result_obj = FxHashMap::default();
-                    result_obj.insert("value".into(), Value::Undefined);
-                    result_obj.insert("done".into(), Value::Boolean(true));
+                    let result_obj = props! {
+                        "value" => Value::Undefined,
+                        "done" => Value::Boolean(true),
+                    };
                     let obj_idx = interp.gc.allocate(
                         &mut interp.heap,
                         crate::vm::interpreter::HeapValue::Object(

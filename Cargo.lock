@@ -1810,8 +1810,19 @@ dependencies = [
 name = "tails-fs"
 version = "0.1.0"
 dependencies = [
+ "once_cell",
  "serde_json",
  "tails-abi",
+ "tails-native-macros",
+]
+
+[[package]]
+name = "tails-fs-promises"
+version = "0.1.0"
+dependencies = [
+ "serde_json",
+ "tails-abi",
+ "tails-fs",
  "tails-native-macros",
 ]
 
@@ -1889,6 +1900,7 @@ dependencies = [
  "simd-json",
  "tails-abi",
  "tails-fs",
+ "tails-fs-promises",
  "tails-http",
  "tails-net",
  "tails-os",

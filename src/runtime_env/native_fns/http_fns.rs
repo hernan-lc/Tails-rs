@@ -2,6 +2,7 @@ use crate::errors::{Error, Result};
 use crate::objects::Value;
 use crate::runtime_env::native_fns::constants as c;
 use crate::vm::interpreter::{HeapValue, Interpreter, JsObject};
+use crate::props;
 
 use super::helpers::{to_f64, to_string_value};
 use rustc_hash::FxHashMap;
@@ -17,16 +18,13 @@ pub(super) fn native_http_create_server(
 ) -> Result<Value> {
     let handler = args.first().cloned().unwrap_or(Value::Undefined);
 
-    let mut props = FxHashMap::default();
-    props.insert("__handler".into(), handler);
-    props.insert("__closed".into(), Value::Boolean(false));
-    props.insert("__port".into(), Value::Integer(0));
-    // Methods
-    props.insert(
-        "listen".into(),
-        Value::NativeFunction(c::HTTP_SERVER_LISTEN),
-    );
-    props.insert("close".into(), Value::NativeFunction(c::HTTP_SERVER_CLOSE));
+    let props = props! {
+        "__handler" => handler,
+        "__closed" => Value::Boolean(false),
+        "__port" => Value::Integer(0),
+        "listen" => Value::NativeFunction(c::HTTP_SERVER_LISTEN),
+        "close" => Value::NativeFunction(c::HTTP_SERVER_CLOSE),
+    };
 
     let idx = interp.heap.len();
     interp.heap.push(HeapValue::Object(JsObject {
@@ -332,17 +330,15 @@ fn handle_one_request(
     let req_val = Value::Object(req_idx);
 
     // --- res object ---
-    let mut res_props = FxHashMap::default();
-    res_props.insert("statusCode".into(), Value::Integer(200));
-    res_props.insert("__status".into(), Value::Integer(200));
-    res_props.insert("__body".into(), Value::String(String::new()));
-    res_props.insert("__ended".into(), Value::Boolean(false));
-    res_props.insert(
-        "writeHead".into(),
-        Value::NativeFunction(c::HTTP_RES_WRITE_HEAD),
-    );
-    res_props.insert("write".into(), Value::NativeFunction(c::HTTP_RES_WRITE));
-    res_props.insert("end".into(), Value::NativeFunction(c::HTTP_RES_END));
+    let res_props = props! {
+        "statusCode" => Value::Integer(200),
+        "__status" => Value::Integer(200),
+        "__body" => Value::String(String::new()),
+        "__ended" => Value::Boolean(false),
+        "writeHead" => Value::NativeFunction(c::HTTP_RES_WRITE_HEAD),
+        "write" => Value::NativeFunction(c::HTTP_RES_WRITE),
+        "end" => Value::NativeFunction(c::HTTP_RES_END),
+    };
     let res_idx = interp.heap.len();
     interp.heap.push(HeapValue::Object(JsObject {
         properties: res_props,

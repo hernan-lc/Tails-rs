@@ -190,3 +190,118 @@ fn test_fs_rm_recursive() {
         "#);
     assert_eq!(val, tails::Value::Boolean(false));
 }
+
+// ---------------------------------------------------------------------------
+// v0.5.0 additions: createReadStream + watch
+// ---------------------------------------------------------------------------
+
+#[test]
+fn test_fs_create_read_stream_reads_full_file() {
+    if !cdylib_present() {
+        eprintln!("skipping: no fs cdylib in dist/");
+        return;
+    }
+    // Open a 12-byte file as a stream and drain it in two chunks of
+    // 5 bytes each. The first chunk returns `done: false`, the
+    // second returns `done: true` after EOF, and a final dummy call
+    // also returns `done: true` so we know the table cleanup is
+    // idempotent.
+    let val = run(r#"
+        import fs from "./fs.native";
+        fs.write_file("/tmp/test_fs_crs.txt", "Hello, Tails!");
+        const open = JSON.parse(fs.create_read_stream("/tmp/test_fs_crs.txt"));
+        const id = open.id;
+        const c1 = JSON.parse(fs.stream_read(id, 5));
+        const c2 = JSON.parse(fs.stream_read(id, 5));
+        const c3 = JSON.parse(fs.stream_read(id, 5));
+        const dec1 = Buffer.from(c1.data, "base64").toString("utf8");
+        const dec2 = Buffer.from(c2.data, "base64").toString("utf8");
+        const closed = fs.stream_close(id);
+        fs.unlink("/tmp/test_fs_crs.txt");
+        open.ok === true &&
+        c1.ok === true && c1.done === false && c2.ok === true && c2.done === false &&
+        c3.ok === true && c3.done === true &&
+        dec1 === "Hello" && dec2 === ", Tai" && closed === true;
+        "#);
+    assert_eq!(val, tails::Value::Boolean(true));
+}
+
+#[test]
+fn test_fs_create_read_stream_missing_file_errors() {
+    if !cdylib_present() {
+        eprintln!("skipping: no fs cdylib in dist/");
+        return;
+    }
+    let val = run(r#"
+        import fs from "./fs.native";
+        const r = JSON.parse(fs.create_read_stream("/tmp/__definitely_missing__.bin"));
+        r.ok === false && typeof r.error === "string" && r.error.indexOf("ENOENT") !== -1;
+        "#);
+    assert_eq!(val, tails::Value::Boolean(true));
+}
+
+#[test]
+fn test_fs_stream_close_invalid_id_is_false() {
+    if !cdylib_present() {
+        eprintln!("skipping: no fs cdylib in dist/");
+        return;
+    }
+    // Closing a never-allocated id should return false, not panic.
+    let val = run(r#"
+        import fs from "./fs.native";
+        fs.stream_close(999999) === false;
+        "#);
+    assert_eq!(val, tails::Value::Boolean(true));
+}
+
+#[test]
+fn test_fs_watch_detects_create() {
+    if !cdylib_present() {
+        eprintln!("skipping: no fs cdylib in dist/");
+        return;
+    }
+    // Watch an empty directory, write a new file into it, and then
+    // poll the watcher. The polling interval is clamped to >= 10ms
+    // so we sleep for ~150ms before polling to guarantee the
+    // background snapshot diff has run.
+    let val = run(r#"
+        import fs from "./fs.native";
+        const dir = "/tmp/test_fs_watch_create";
+        fs.mkdir(dir, true);
+        const w = JSON.parse(fs.watch(dir, 50));
+        if (!w.ok) { fs.rm(dir, true); false; }
+        fs.write_file(dir + "/new.txt", "hello");
+        // Poll the watcher in a loop, breaking early as soon as we
+        // see the create event. A single-threaded runtime never
+        // yields to a background thread between awaits, but the
+        // watcher's `poll()` re-snapshots on every call when the
+        // interval has elapsed — so the very first poll after the
+        // interval will see the new file.
+        let events = [];
+        for (let i = 0; i < 30 && events.length === 0; i++) {
+            const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+            await sleep(20);
+            events = JSON.parse(fs.watch_poll(w.id));
+        }
+        const closed = fs.watch_close(w.id);
+        fs.rm(dir, true);
+        w.ok === true && closed === true && events.length > 0 &&
+        events[0].type === "create" &&
+        events[0].path.indexOf("/tmp/test_fs_watch_create/new.txt") !== -1;
+        "#);
+    assert_eq!(val, tails::Value::Boolean(true));
+}
+
+#[test]
+fn test_fs_watch_missing_path_errors() {
+    if !cdylib_present() {
+        eprintln!("skipping: no fs cdylib in dist/");
+        return;
+    }
+    let val = run(r#"
+        import fs from "./fs.native";
+        const r = JSON.parse(fs.watch("/tmp/__definitely_missing_watch__.dir", 100));
+        r.ok === false && typeof r.error === "string" && r.error.length > 0;
+        "#);
+    assert_eq!(val, tails::Value::Boolean(true));
+}

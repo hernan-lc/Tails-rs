@@ -236,6 +236,32 @@ impl Interpreter {
 
     pub(crate) fn load_and_run_module(&mut self, source: &str) -> Result<Option<String>> {
         if source.ends_with(".native") {
+            // Try the full source as the module name first (e.g.
+            // `import fs from "fs/promises"` registers the module
+            // under `"fs/promises"`, not under the file-stem
+            // `"promises"`). This lets users keep the Node.js
+            // subpath import style without having to write
+            // `import fs from "./fs-promises.native"`.
+            let full_name = source.trim_end_matches(".native");
+            if !self.native_loader.has_module(full_name) {
+                super::native_loader::discover_module(full_name, &mut self.native_loader);
+            }
+            if self.native_loader.has_module(full_name) {
+                let module_name = full_name;
+                let exports =
+                    self.native_loader
+                        .load_module(module_name, &mut self.heap, &mut self.gc)?;
+                let mut props = FxHashMap::default();
+                for (name, val) in &exports {
+                    props.insert(name.clone(), val.clone());
+                }
+                self.module_registry.insert(module_name.to_string(), props);
+                return Ok(Some(module_name.to_string()));
+            }
+
+            // Fall back to the file-stem (last path segment without
+            // extension), used for traditional cdylib imports like
+            // `import x from "./x.native"`.
             let module_name = super::native_loader::extract_module_name(source);
             if !self.native_loader.has_module(module_name) {
                 // Resolve the path relative to the importing file's directory

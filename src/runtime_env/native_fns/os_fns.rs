@@ -1,7 +1,7 @@
-use rustc_hash::FxHashMap;
 use crate::errors::Result;
 use crate::objects::Value;
 use crate::vm::interpreter::{HeapValue, Interpreter, JsObject};
+use crate::props;
 
 pub(super) fn native_os_platform(
     _interp: &mut Interpreter,
@@ -28,12 +28,13 @@ pub(super) fn native_os_cpus(
     let cpus: Vec<Value> = cpus_info
         .iter()
         .map(|cpu| {
-            let mut times_props = FxHashMap::default();
-            times_props.insert("user".into(), Value::Integer(cpu.times.user));
-            times_props.insert("nice".into(), Value::Integer(cpu.times.nice));
-            times_props.insert("sys".into(), Value::Integer(cpu.times.sys));
-            times_props.insert("idle".into(), Value::Integer(cpu.times.idle));
-            times_props.insert("irq".into(), Value::Integer(cpu.times.irq));
+            let times_props = props! {
+                "user" => Value::Integer(cpu.times.user),
+                "nice" => Value::Integer(cpu.times.nice),
+                "sys" => Value::Integer(cpu.times.sys),
+                "idle" => Value::Integer(cpu.times.idle),
+                "irq" => Value::Integer(cpu.times.irq),
+            };
             let times_idx = interp.gc.allocate(
                 &mut interp.heap,
                 HeapValue::Object(JsObject {
@@ -42,10 +43,11 @@ pub(super) fn native_os_cpus(
                     extensible: true,
                 }),
             );
-            let mut props = FxHashMap::default();
-            props.insert("model".into(), Value::String(cpu.model.clone()));
-            props.insert("speed".into(), Value::Float(cpu.speed));
-            props.insert("times".into(), Value::Object(times_idx));
+            let props = props! {
+                "model" => Value::String(cpu.model.clone()),
+                "speed" => Value::Float(cpu.speed),
+                "times" => Value::Object(times_idx),
+            };
             let cpu_idx = interp.heap.len();
             interp.heap.push(HeapValue::Object(JsObject {
                 properties: props,

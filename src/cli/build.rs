@@ -260,6 +260,12 @@ fn generate_dts(lib_path: &Path, package_name: &str) -> Result<String> {
     // First, find all __TAILS_DTS_* symbols using nm
     let dts_symbols = find_all_dts_symbols(lib_path)?;
 
+    // When the package's cdylib links statically against another
+    // `tails-*` module, the .so carries *both* modules' DTS symbols.
+    // Filter down to only the ones that belong to *this* package so
+    // `dist/<pkg>.d.ts` stays accurate. See `filter_symbols_for_package`.
+    let dts_symbols = filter_symbols_for_package(&dts_symbols, package_name);
+
     if dts_symbols.is_empty() {
         return Ok(format!(
             "// Auto-generated TypeScript definitions for {}\n\
@@ -474,6 +480,28 @@ fn find_all_dts_symbols(lib_path: &Path) -> Result<Vec<String>> {
 
     symbols.sort();
     Ok(symbols)
+}
+
+/// Filter DTS symbols down to only those that belong to `package_name`.
+///
+/// When a cdylib links statically against another `tails-*` module, the
+/// final `.so` ends up with *both* modules' `__TAILS_*_DTS_*` symbols
+/// (e.g. `tails-fs-promises` carries every `__TAILS_TAILS_FS_DTS_*` from
+/// the static-linked `tails-fs`). To keep each `dist/<pkg>.d.ts`
+/// accurate we filter by the module-scoped prefix derived from the
+/// package name (`tails-fs` → `__TAILS_TAILS_FS_DTS_`). Legacy
+/// unscoped `__TAILS_DTS_*` symbols (no module prefix) are kept for
+/// backwards compatibility with pre-`tails_module` libraries.
+fn filter_symbols_for_package(symbols: &[String], package_name: &str) -> Vec<String> {
+    // Map "tails-fs" -> "TAILS_FS" (uppercase, hyphens → underscores).
+    let module_upper = package_name.to_uppercase().replace('-', "_");
+    let module_prefix = format!("__TAILS_{}_DTS_", module_upper);
+
+    symbols
+        .iter()
+        .filter(|s| s.starts_with(&module_prefix) || s.starts_with("__TAILS_DTS_"))
+        .cloned()
+        .collect()
 }
 
 fn extract_package_name(toml_content: &str) -> Option<String> {

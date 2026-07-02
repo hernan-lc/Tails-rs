@@ -124,7 +124,7 @@ Critical hotspots after Pass 1 (vs Node.js, current state):
 
 ## v0.5.0 — Node.js Compatibility
 
-### Core Modules
+### Core Modules 
 - [ ] `util` — `format`, `inspect`, `promisify`, `callbackify`
 - [ ] `events` — Expand EventEmitter (prependListener, once, MaxListeners)
 - [ ] `timers` — `setImmediate`, `clearImmediate`
@@ -133,7 +133,7 @@ Critical hotspots after Pass 1 (vs Node.js, current state):
 ### API Completeness
 - [x] `Buffer` — Added `isEncoding(enc)`, `transcode(src, fromEnc, toEnc)`, and the `byteLength(string, encoding)` encoding overload. `transcode` supports `utf8` ⇄ `latin1` / `ascii` / `hex` / `base64` / `base64url`; `utf16le` is recognised as a valid encoding name but the actual transcoding returns `null` (queued for a follow-up). Unknown encodings also return `null`. See `src/runtime_env/native_fns/buffer_fns.rs` (`is_supported_encoding`, `native_buffer_is_encoding`, `native_buffer_transcode`).
 - [x] `process` — Added `kill(pid, signal)`, `on('exit', handler)`, `memoryUsage()`, `uptime()`. `kill` accepts both POSIX signal names (`"SIGTERM"`, `"SIGKILL"`, …) and raw integers (e.g. `9`); signal 0 is the standard "existence check". Exit handlers are stored in a process-global `Mutex<Vec<Value>>` and invoked in LIFO order (matching Node) before the process actually terminates. `memoryUsage` returns `{rss, heapTotal, heapUsed, external, arrayBuffers}` with `rss` read from `/proc/self/status` on Linux and `ps -o rss=` on macOS. `uptime` returns wall-clock seconds since first call. The `process` module gains a `libc = "0.2"` dependency to call `kill(2)`.
-- [ ] `fs` — Add `promises` API, `createReadStream`, `watch`
+- [x] `fs` — `promises` API + `createReadStream` + `watch` are now shipped as `modules/fs-promises/` (cdylib) and additions to `modules/fs/src/lib.rs`. The `fs/promises` cdylib exposes `readFile`, `writeFile`, `readdir`, `stat`, `mkdir`, `unlink`, `copyFile`, `rename`, `appendFile`, `exists` with a uniform `{ok, value|error}` JSON envelope that works with `await` (same shape as the runtime's built-in `native_fs_read_file` etc.). The `fs` cdylib gains `createRead_stream` / `stream_read` / `stream_close` (chunked reads with base64-encoded payloads) and `watch` / `watch_poll` / `watch_close` (polling-based directory snapshot diff producing `create` / `modify` / `delete` events). 9 new integration tests in `tests/fs_promises_module.rs` + 5 in `tests/fs_module.rs` cover both surfaces. `dist/tails-fs.d.ts` and `dist/tails-fs-promises.d.ts` are auto-generated (with module-scoped DTS symbol filtering so cross-cdylib static links don't bleed into the wrong package).
 - [x] `path` — `parse()` and `format()` are already shipped in `modules/path/src/lib.rs`; the roadmap entry was stale. `tests/api_completeness_v050.rs` now has regression tests covering the full `parse()` round-trip and `format()` → `parse()` round-trip for `/home/user/file.txt`.
 
 ### Implemented (v0.5.0 Pass 1)
@@ -156,8 +156,8 @@ compatibility. 15 new integration tests in
 ### Strategy (remaining)
 - [ ] `Buffer.transcode` — actually implement `utf16le` ⇄ `utf8` (currently returns `null`)
 - [ ] `process.kill` — Windows support (`GenerateConsoleCtrlEvent` / `OpenProcess` + `TerminateProcess`)
-- [ ] `fs.promises` / `fs.createReadStream` / `fs.watch` — see above
 - [ ] Refactor remaining `props.insert(...)` sites in the codebase to use `crate::props!` (currently only `url_fns.rs` was migrated)
+- [ ] `fs.promises` / `fs.createReadStream` / `fs.watch` — done as of the `fs` entry above
 
 ## v1.0.0 — Stability
 

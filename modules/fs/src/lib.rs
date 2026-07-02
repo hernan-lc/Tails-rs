@@ -196,6 +196,161 @@ fn base64_decode(data: &str) -> Option<Vec<u8>> {
 // Native module (cdylib FFI exports)
 // ============================================================================
 
+/// A buffered streaming reader, analogous to Node's
+/// `fs.createReadStream(path)`. The handle is owned by the
+/// `fs_native::STREAMS` table and is removed when the user calls
+/// `stream_close` (or drops the `id` on the JS side).
+pub struct ReadStream {
+    file: std::fs::File,
+    size: u64,
+}
+
+impl ReadStream {
+    pub fn open(path: &str) -> std::io::Result<Self> {
+        let file = std::fs::File::open(path)?;
+        let size = file.metadata().map(|m| m.len()).unwrap_or(0);
+        Ok(Self { file, size })
+    }
+
+    pub fn size(&self) -> u64 {
+        self.size
+    }
+
+    /// Read up to `chunk_size` bytes. Returns `Ok(None)` at EOF.
+    pub fn read_chunk(&mut self, chunk_size: usize) -> std::io::Result<Option<Vec<u8>>> {
+        use std::io::Read;
+        let mut buf = vec![0u8; chunk_size];
+        match self.file.read(&mut buf)? {
+            0 => Ok(None),
+            n => {
+                buf.truncate(n);
+                Ok(Some(buf))
+            }
+        }
+    }
+}
+
+/// A polling file-system watcher. The `notify` crate is too heavy
+/// for the cdylib surface, so we use a simpler design: every
+/// `interval_ms` we walk the watched path (file or directory) and
+/// diff the entries against the previous snapshot. New entries
+/// become `create` events, removed ones become `delete` events,
+/// and size/mtime changes become `modify` events.
+pub struct FileWatcher {
+    path: std::path::PathBuf,
+    interval: std::time::Duration,
+    /// Last observed `(path, size, mtime_ms)` snapshot. `None` means
+    /// we have not yet produced the initial snapshot.
+    snapshot: Option<std::collections::HashMap<String, (u64, Option<u64>)>>,
+    /// Pending events to drain on the next `poll()`.
+    events: Vec<serde_json::Value>,
+    /// Last time we walked the watched path.
+    last_walk: std::time::Instant,
+}
+
+impl FileWatcher {
+    pub fn new(path: &str, interval_ms: u64) -> std::io::Result<Self> {
+        let p = std::path::PathBuf::from(path);
+        if !p.exists() {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::NotFound,
+                format!("watch path does not exist: {}", path),
+            ));
+        }
+        Ok(Self {
+            path: p,
+            interval: std::time::Duration::from_millis(interval_ms),
+            snapshot: None,
+            events: Vec::new(),
+            last_walk: std::time::Instant::now(),
+        })
+    }
+
+    fn walk(&self) -> std::collections::HashMap<String, (u64, Option<u64>)> {
+        let mut out = std::collections::HashMap::new();
+        let metadata = match std::fs::metadata(&self.path) {
+            Ok(m) => m,
+            Err(_) => return out,
+        };
+        if metadata.is_file() {
+            let key = self.path.to_string_lossy().to_string();
+            let mtime = metadata
+                .modified()
+                .ok()
+                .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+                .map(|d| d.as_millis() as u64);
+            out.insert(key, (metadata.len(), mtime));
+        } else if metadata.is_dir() {
+            if let Ok(entries) = std::fs::read_dir(&self.path) {
+                for entry in entries.flatten() {
+                    let p = entry.path();
+                    if let Ok(md) = entry.metadata() {
+                        let key = p.to_string_lossy().to_string();
+                        let mtime = md
+                            .modified()
+                            .ok()
+                            .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+                            .map(|d| d.as_millis() as u64);
+                        out.insert(key, (md.len(), mtime));
+                    }
+                }
+            }
+        }
+        out
+    }
+
+    fn now_ms() -> u64 {
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_millis() as u64)
+            .unwrap_or(0)
+    }
+
+    /// Drain pending events, walking the watched path if the poll
+    /// interval has elapsed.
+    pub fn poll(&mut self) -> Vec<serde_json::Value> {
+        if self.last_walk.elapsed() >= self.interval || self.snapshot.is_none() {
+            let current = self.walk();
+            let now = Self::now_ms();
+            if let Some(prev) = self.snapshot.take() {
+                for (k, v) in &current {
+                    match prev.get(k) {
+                        None => self.events.push(serde_json::json!({
+                            "type": "create",
+                            "path": k,
+                            "size": v.0,
+                            "timeMs": now,
+                        })),
+                        Some((old_size, old_mtime)) => {
+                            if old_size != &v.0 || old_mtime != &v.1 {
+                                self.events.push(serde_json::json!({
+                                    "type": "modify",
+                                    "path": k,
+                                    "size": v.0,
+                                    "timeMs": now,
+                                }));
+                            }
+                        }
+                    }
+                }
+                for (k, v) in &prev {
+                    if !current.contains_key(k) {
+                        self.events.push(serde_json::json!({
+                            "type": "delete",
+                            "path": k,
+                            "size": v.0,
+                            "timeMs": now,
+                        }));
+                    }
+                }
+            }
+            self.snapshot = Some(current);
+            self.last_walk = std::time::Instant::now();
+        }
+        std::mem::take(&mut self.events)
+    }
+}
+
 #[tails_module(name = "tails-fs")]
 mod fs_native {
     use super::*;
@@ -359,4 +514,145 @@ mod fs_native {
             .map(|p| p.to_string_lossy().to_string())
             .unwrap_or(path)
     }
+
+    // -----------------------------------------------------------------
+    // Streams & Watchers (v0.5.0 roadmap additions)
+    // -----------------------------------------------------------------
+
+    /// Open a file for streaming reads. The handle id can be passed
+    /// to `stream_read`, `stream_close`, etc. Returns a JSON object
+    /// describing the stream (path, id, size).
+    #[tails_function]
+    pub fn create_read_stream(path: String) -> String {
+        let id = __tails_next_id();
+        let stream = super::ReadStream::open(&path);
+        match stream {
+            Ok(stream) => {
+                let size = stream.size();
+                STREAMS.lock().unwrap().insert(id, stream);
+                serde_json::json!({
+                    "ok": true,
+                    "id": id,
+                    "path": path,
+                    "size": size,
+                })
+                .to_string()
+            }
+            Err(e) => serde_json::json!({
+                "ok": false,
+                "error": format!("ENOENT: cannot open '{}': {}", path, e),
+            })
+            .to_string(),
+        }
+    }
+
+    /// Read the next chunk of bytes (base64-encoded) from a stream
+    /// opened with `create_read_stream`. Returns `{done: true}` when
+    /// the stream is exhausted.
+    #[tails_function]
+    pub fn stream_read(id: f64, chunk_size: f64) -> String {
+        let id = id as u32;
+        let chunk_size = chunk_size.max(1.0) as usize;
+        let mut guard = STREAMS.lock().unwrap();
+        match guard.get_mut(&id) {
+            Some(stream) => match stream.read_chunk(chunk_size) {
+                Ok(Some(bytes)) => serde_json::json!({
+                    "ok": true,
+                    "done": false,
+                    "data": super::base64_encode(&bytes),
+                })
+                .to_string(),
+                Ok(None) => serde_json::json!({
+                    "ok": true,
+                    "done": true,
+                })
+                .to_string(),
+                Err(e) => serde_json::json!({
+                    "ok": false,
+                    "error": format!("read error: {}", e),
+                })
+                .to_string(),
+            },
+            None => serde_json::json!({
+                "ok": false,
+                "error": "invalid stream id",
+            })
+            .to_string(),
+        }
+    }
+
+    /// Close a stream opened with `create_read_stream`.
+    #[tails_function]
+    pub fn stream_close(id: f64) -> bool {
+        STREAMS.lock().unwrap().remove(&(id as u32)).is_some()
+    }
+
+    /// Start a watcher on a path. Returns a JSON object with the
+    /// watcher id. The watcher polls every `interval_ms` (default
+    /// 100ms) and accumulates events in a queue readable via
+    /// `watch_poll`. Use `watch_close` to stop.
+    #[tails_function]
+    pub fn watch(path: String, interval_ms: f64) -> String {
+        let id = __tails_next_id();
+        let interval = if interval_ms < 10.0 { 100 } else { interval_ms as u64 };
+        let watcher = super::FileWatcher::new(&path, interval);
+        match watcher {
+            Ok(watcher) => {
+                WATCHERS.lock().unwrap().insert(id, watcher);
+                serde_json::json!({
+                    "ok": true,
+                    "id": id,
+                    "path": path,
+                    "intervalMs": interval,
+                })
+                .to_string()
+            }
+            Err(e) => serde_json::json!({
+                "ok": false,
+                "error": format!("cannot watch '{}': {}", path, e),
+            })
+            .to_string(),
+        }
+    }
+
+    /// Drain pending events from a watcher. Returns a JSON array
+    /// of `{type, path, timeMs}` events. Empty array if no events.
+    #[tails_function]
+    pub fn watch_poll(id: f64) -> String {
+        let id = id as u32;
+        let mut guard = WATCHERS.lock().unwrap();
+        match guard.get_mut(&id) {
+            Some(watcher) => {
+                let events = watcher.poll();
+                serde_json::to_string(&events).unwrap_or_else(|_| "[]".to_string())
+            }
+            None => "[]".to_string(),
+        }
+    }
+
+    /// Stop a watcher.
+    #[tails_function]
+    pub fn watch_close(id: f64) -> bool {
+        WATCHERS.lock().unwrap().remove(&(id as u32)).is_some()
+    }
+
+    // Per-instance state tables. Using a function-local `__tails_`
+    // helper for the id counter so the `#[tails_module]` macro
+    // does not export it as a JS function.
+    fn __tails_next_id() -> u32 {
+        use std::sync::atomic::{AtomicU32, Ordering};
+        static COUNTER: AtomicU32 = AtomicU32::new(1);
+        COUNTER.fetch_add(1, Ordering::SeqCst)
+    }
+
+    static STREAMS: once_cell::sync::Lazy<
+        std::sync::Mutex<std::collections::HashMap<u32, super::ReadStream>>,
+    > = once_cell::sync::Lazy::new(|| {
+        std::sync::Mutex::new(std::collections::HashMap::new())
+    });
+    static WATCHERS: once_cell::sync::Lazy<
+        std::sync::Mutex<std::collections::HashMap<u32, super::FileWatcher>>,
+    > = once_cell::sync::Lazy::new(|| {
+        std::sync::Mutex::new(std::collections::HashMap::new())
+    });
 }

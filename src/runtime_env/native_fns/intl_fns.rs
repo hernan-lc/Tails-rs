@@ -3,6 +3,7 @@ use crate::errors::Result;
 use crate::objects::Value;
 use crate::runtime_env::native_fns::constants as c;
 use crate::vm::interpreter::{HeapValue, Interpreter, JsObject};
+use crate::props;
 
 use super::helpers::{to_f64, to_string_value};
 
@@ -369,9 +370,10 @@ pub(super) fn native_datetime_format_format_to_parts(
         let parts: Vec<Value> = s
             .chars()
             .map(|c| {
-                let mut props = FxHashMap::default();
-                props.insert("type".into(), Value::String("literal".into()));
-                props.insert("value".into(), Value::String(c.to_string()));
+                let props = props! {
+                    "type" => Value::String("literal".into()),
+                    "value" => Value::String(c.to_string()),
+                };
                 let idx = interp.heap.len();
                 interp.heap.push(HeapValue::Object(JsObject {
                     properties: props,

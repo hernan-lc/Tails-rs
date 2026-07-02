@@ -1,7 +1,7 @@
-use rustc_hash::FxHashMap;
 use crate::errors::{Error, Result};
 use crate::objects::Value;
 use crate::vm::interpreter::Interpreter;
+use crate::props;
 
 pub(super) fn native_reflect_get(
     interp: &mut Interpreter,
@@ -241,15 +241,16 @@ pub(super) fn native_reflect_get_own_property_descriptor(
         _ => return Ok(Value::Undefined),
     };
 
-    let mut descriptor = FxHashMap::default();
     match &target {
         Value::Object(obj_idx) => {
             if let crate::vm::interpreter::HeapValue::Object(obj) = &interp.heap[*obj_idx] {
                 if let Some(val) = obj.properties.get(&property) {
-                    descriptor.insert("value".to_string(), val.clone());
-                    descriptor.insert("writable".to_string(), Value::Boolean(true));
-                    descriptor.insert("enumerable".to_string(), Value::Boolean(true));
-                    descriptor.insert("configurable".to_string(), Value::Boolean(true));
+                    let descriptor = props! {
+                        "value" => val.clone(),
+                        "writable" => Value::Boolean(true),
+                        "enumerable" => Value::Boolean(true),
+                        "configurable" => Value::Boolean(true),
+                    };
                     let desc_idx = interp.heap.len();
                     interp.heap.push(crate::vm::interpreter::HeapValue::Object(
                         crate::vm::interpreter::JsObject {
@@ -265,10 +266,12 @@ pub(super) fn native_reflect_get_own_property_descriptor(
         Value::Array(arr_idx) => {
             if let crate::vm::interpreter::HeapValue::Array(arr) = &interp.heap[*arr_idx] {
                 if property == "length" {
-                    descriptor.insert("value".to_string(), Value::Float(arr.elements.len() as f64));
-                    descriptor.insert("writable".to_string(), Value::Boolean(false));
-                    descriptor.insert("enumerable".to_string(), Value::Boolean(false));
-                    descriptor.insert("configurable".to_string(), Value::Boolean(false));
+                    let descriptor = props! {
+                        "value" => Value::Float(arr.elements.len() as f64),
+                        "writable" => Value::Boolean(false),
+                        "enumerable" => Value::Boolean(false),
+                        "configurable" => Value::Boolean(false),
+                    };
                     let desc_idx = interp.heap.len();
                     interp.heap.push(crate::vm::interpreter::HeapValue::Object(
                         crate::vm::interpreter::JsObject {
@@ -281,10 +284,12 @@ pub(super) fn native_reflect_get_own_property_descriptor(
                 }
                 if let Ok(index) = property.parse::<usize>() {
                     if index < arr.elements.len() {
-                        descriptor.insert("value".to_string(), arr.elements[index].clone());
-                        descriptor.insert("writable".to_string(), Value::Boolean(true));
-                        descriptor.insert("enumerable".to_string(), Value::Boolean(true));
-                        descriptor.insert("configurable".to_string(), Value::Boolean(true));
+                        let descriptor = props! {
+                            "value" => arr.elements[index].clone(),
+                            "writable" => Value::Boolean(true),
+                            "enumerable" => Value::Boolean(true),
+                            "configurable" => Value::Boolean(true),
+                        };
                         let desc_idx = interp.heap.len();
                         interp.heap.push(crate::vm::interpreter::HeapValue::Object(
                             crate::vm::interpreter::JsObject {

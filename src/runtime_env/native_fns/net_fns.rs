@@ -2,10 +2,10 @@ use crate::errors::{Error, Result};
 use crate::objects::Value;
 use crate::runtime_env::native_fns::constants as c;
 use crate::vm::interpreter::{HeapValue, Interpreter, JsObject};
+use crate::props;
 
 use super::helpers::to_f64;
 use std::cell::RefCell;
-use rustc_hash::FxHashMap;
 use std::collections::HashMap;
 
 // ---------------------------------------------------------------------------
@@ -96,12 +96,13 @@ pub(super) fn native_net_create_connection(
     let stream_id = alloc_stream_id(stream);
 
     // Build the socket JS object.
-    let mut props = FxHashMap::default();
-    props.insert("__stream_id".into(), Value::Integer(stream_id));
-    props.insert("readyState".into(), Value::String("open".into()));
-    props.insert("write".into(), Value::NativeFunction(c::NET_SOCKET_WRITE));
-    props.insert("end".into(), Value::NativeFunction(c::NET_SOCKET_END));
-    props.insert("on".into(), Value::NativeFunction(c::NET_SOCKET_ON));
+    let props = props! {
+        "__stream_id" => Value::Integer(stream_id),
+        "readyState" => Value::String("open".into()),
+        "write" => Value::NativeFunction(c::NET_SOCKET_WRITE),
+        "end" => Value::NativeFunction(c::NET_SOCKET_END),
+        "on" => Value::NativeFunction(c::NET_SOCKET_ON),
+    };
 
     let sock_idx = interp.heap.len();
     interp.heap.push(HeapValue::Object(JsObject {

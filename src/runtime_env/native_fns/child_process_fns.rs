@@ -2,6 +2,7 @@ use rustc_hash::FxHashMap;
 use crate::errors::{Error, Result};
 use crate::objects::Value;
 use crate::vm::interpreter::{HeapValue, Interpreter, JsObject};
+use crate::props;
 
 use super::helpers::to_string_value;
 
@@ -70,15 +71,13 @@ pub(super) fn native_child_process_exec_sync(
         let stdout_str = String::from_utf8_lossy(&output.stdout).to_string();
 
         // Create error object similar to Node.js
-        let mut err_props = FxHashMap::default();
-        err_props.insert(
-            "message".into(),
-            Value::String(format!("Command failed: {}", command.trim())),
-        );
-        err_props.insert("status".into(), Value::Integer(exit_code as i64));
-        err_props.insert("stderr".into(), Value::String(stderr_str.clone()));
-        err_props.insert("stdout".into(), Value::String(stdout_str.clone()));
-        err_props.insert("signal".into(), Value::Null);
+        let err_props = props! {
+            "message" => Value::String(format!("Command failed: {}", command.trim())),
+            "status" => Value::Integer(exit_code as i64),
+            "stderr" => Value::String(stderr_str.clone()),
+            "stdout" => Value::String(stdout_str.clone()),
+            "signal" => Value::Null,
+        };
 
         let _err_idx = interp.heap.len();
         interp.heap.push(HeapValue::Object(JsObject {
@@ -171,10 +170,11 @@ pub(super) fn native_child_process_exec(
     let stderr_str = String::from_utf8_lossy(&output.stderr).to_string();
 
     // Build result object
-    let mut result_props = FxHashMap::default();
-    result_props.insert("stdout".into(), Value::String(stdout_str));
-    result_props.insert("stderr".into(), Value::String(stderr_str));
-    result_props.insert("status".into(), Value::Integer(exit_code as i64));
+    let result_props = props! {
+        "stdout" => Value::String(stdout_str),
+        "stderr" => Value::String(stderr_str),
+        "status" => Value::Integer(exit_code as i64),
+    };
 
     let result_idx = interp.heap.len();
     interp.heap.push(HeapValue::Object(JsObject {

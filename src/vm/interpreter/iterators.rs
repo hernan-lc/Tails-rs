@@ -3,28 +3,20 @@ use crate::errors::{Error, Result};
 use crate::objects::js_promise::PromiseState;
 use crate::objects::Value;
 use crate::runtime_env::native_fns::constants as c;
+use crate::props;
 
 impl Interpreter {
     fn make_builtin_iter_props() -> FxHashMap<String, Value> {
-        let mut props = FxHashMap::default();
-        props.insert("__type".to_string(), Value::String("array".to_string()));
-        props.insert("__index".to_string(), Value::Integer(0));
-        props.insert("map".to_string(), Value::NativeFunction(c::ITERATOR_MAP));
-        props.insert(
-            "filter".to_string(),
-            Value::NativeFunction(c::ITERATOR_FILTER),
-        );
-        props.insert("take".to_string(), Value::NativeFunction(c::ITERATOR_TAKE));
-        props.insert("drop".to_string(), Value::NativeFunction(c::ITERATOR_DROP));
-        props.insert(
-            "forEach".to_string(),
-            Value::NativeFunction(c::ITERATOR_FOR_EACH),
-        );
-        props.insert(
-            "toArray".to_string(),
-            Value::NativeFunction(c::ITERATOR_TO_ARRAY),
-        );
-        props
+        props! {
+            "__type" => Value::String("array".to_string()),
+            "__index" => Value::Integer(0),
+            "map" => Value::NativeFunction(c::ITERATOR_MAP),
+            "filter" => Value::NativeFunction(c::ITERATOR_FILTER),
+            "take" => Value::NativeFunction(c::ITERATOR_TAKE),
+            "drop" => Value::NativeFunction(c::ITERATOR_DROP),
+            "forEach" => Value::NativeFunction(c::ITERATOR_FOR_EACH),
+            "toArray" => Value::NativeFunction(c::ITERATOR_TO_ARRAY),
+        }
     }
 
     pub(crate) fn exec_get_iterator(&mut self, iterable: Value) -> Result<Value> {

@@ -1,4 +1,3 @@
-use rustc_hash::FxHashMap;
 use crate::errors::{Error, Result};
 use crate::objects::Value;
 use crate::runtime_env::native_fns::constants as c;
@@ -78,44 +77,22 @@ pub(super) fn native_url_to_string(
 }
 
 fn create_search_params(interp: &mut Interpreter, query: &str) -> usize {
-    let mut props = FxHashMap::default();
-    props.insert("__entries".into(), Value::String(query.to_string()));
-    props.insert(
-        "size".into(),
-        Value::Integer(query.split('&').filter(|s| !s.is_empty()).count() as i64),
-    );
-    props.insert("get".into(), Value::NativeFunction(c::SEARCH_PARAMS_GET));
-    props.insert(
-        "getAll".into(),
-        Value::NativeFunction(c::SEARCH_PARAMS_GET_ALL),
-    );
-    props.insert("has".into(), Value::NativeFunction(c::SEARCH_PARAMS_HAS));
-    props.insert("set".into(), Value::NativeFunction(c::SEARCH_PARAMS_SET));
-    props.insert(
-        "append".into(),
-        Value::NativeFunction(c::SEARCH_PARAMS_APPEND),
-    );
-    props.insert(
-        "delete".into(),
-        Value::NativeFunction(c::SEARCH_PARAMS_DELETE),
-    );
-    props.insert(
-        "toString".into(),
-        Value::NativeFunction(c::SEARCH_PARAMS_TO_STRING),
-    );
-    props.insert(
-        "entries".into(),
-        Value::NativeFunction(c::SEARCH_PARAMS_ENTRIES),
-    );
-    props.insert("keys".into(), Value::NativeFunction(c::SEARCH_PARAMS_KEYS));
-    props.insert(
-        "values".into(),
-        Value::NativeFunction(c::SEARCH_PARAMS_VALUES),
-    );
-    props.insert(
-        "forEach".into(),
-        Value::NativeFunction(c::SEARCH_PARAMS_FOR_EACH),
-    );
+    let size = query.split('&').filter(|s| !s.is_empty()).count() as i64;
+    let props = props! {
+        "__entries" => Value::String(query.to_string()),
+        "size" => Value::Integer(size),
+        "get" => Value::NativeFunction(c::SEARCH_PARAMS_GET),
+        "getAll" => Value::NativeFunction(c::SEARCH_PARAMS_GET_ALL),
+        "has" => Value::NativeFunction(c::SEARCH_PARAMS_HAS),
+        "set" => Value::NativeFunction(c::SEARCH_PARAMS_SET),
+        "append" => Value::NativeFunction(c::SEARCH_PARAMS_APPEND),
+        "delete" => Value::NativeFunction(c::SEARCH_PARAMS_DELETE),
+        "toString" => Value::NativeFunction(c::SEARCH_PARAMS_TO_STRING),
+        "entries" => Value::NativeFunction(c::SEARCH_PARAMS_ENTRIES),
+        "keys" => Value::NativeFunction(c::SEARCH_PARAMS_KEYS),
+        "values" => Value::NativeFunction(c::SEARCH_PARAMS_VALUES),
+        "forEach" => Value::NativeFunction(c::SEARCH_PARAMS_FOR_EACH),
+    };
 
     let idx = interp.heap.len();
     interp.heap.push(HeapValue::Object(JsObject {

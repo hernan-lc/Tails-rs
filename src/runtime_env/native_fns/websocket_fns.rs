@@ -1,8 +1,8 @@
-use rustc_hash::FxHashMap;
 use crate::errors::{Error, Result};
 use crate::objects::Value;
 use crate::runtime_env::native_fns::constants as c;
 use crate::vm::interpreter::{HeapValue, Interpreter, JsObject};
+use crate::props;
 
 use super::helpers::to_string_value;
 
@@ -20,28 +20,18 @@ pub(super) fn native_websocket_constructor(
         return Err(Error::TypeError("WebSocket requires a URL".into()));
     }
 
-    let mut props = FxHashMap::default();
-    props.insert("url".into(), Value::String(url));
-    props.insert("readyState".into(), Value::Integer(0)); // CONNECTING
-    props.insert("bufferedAmount".into(), Value::Integer(0));
-    props.insert("binaryType".into(), Value::String("blob".into()));
-    props.insert("protocol".into(), Value::String(String::new()));
-    props.insert("extensions".into(), Value::String(String::new()));
-
-    // Methods
-    props.insert("send".into(), Value::NativeFunction(c::URL_TO_JSON));
-    props.insert(
-        "close".into(),
-        Value::NativeFunction(c::HEADERS_CONSTRUCTOR),
-    );
-    props.insert(
-        "addEventListener".into(),
-        Value::NativeFunction(c::HEADERS_APPEND),
-    );
-    props.insert(
-        "removeEventListener".into(),
-        Value::NativeFunction(c::HEADERS_GET),
-    );
+    let props = props! {
+        "url" => Value::String(url),
+        "readyState" => Value::Integer(0),
+        "bufferedAmount" => Value::Integer(0),
+        "binaryType" => Value::String("blob".into()),
+        "protocol" => Value::String(String::new()),
+        "extensions" => Value::String(String::new()),
+        "send" => Value::NativeFunction(c::URL_TO_JSON),
+        "close" => Value::NativeFunction(c::HEADERS_CONSTRUCTOR),
+        "addEventListener" => Value::NativeFunction(c::HEADERS_APPEND),
+        "removeEventListener" => Value::NativeFunction(c::HEADERS_GET),
+    };
 
     let ws_idx = interp.heap.len();
     interp.heap.push(HeapValue::Object(JsObject {

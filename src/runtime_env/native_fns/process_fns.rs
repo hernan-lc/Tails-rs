@@ -3,6 +3,7 @@ use std::sync::{Mutex, OnceLock};
 use crate::errors::Result;
 use crate::objects::Value;
 use crate::vm::interpreter::Interpreter;
+use crate::props;
 
 use super::helpers::to_string_value;
 
@@ -186,15 +187,13 @@ pub(super) fn native_process_memory_usage(
     _args: &[Value],
 ) -> Result<Value> {
     let mu = tails_process::memory_usage();
-    let mut props = rustc_hash::FxHashMap::default();
-    props.insert("rss".into(), Value::Integer(mu.rss as i64));
-    props.insert("heapTotal".into(), Value::Integer(mu.heap_total as i64));
-    props.insert("heapUsed".into(), Value::Integer(mu.heap_used as i64));
-    props.insert("external".into(), Value::Integer(mu.external as i64));
-    props.insert(
-        "arrayBuffers".into(),
-        Value::Integer(mu.array_buffers as i64),
-    );
+    let props = props! {
+        "rss" => Value::Integer(mu.rss as i64),
+        "heapTotal" => Value::Integer(mu.heap_total as i64),
+        "heapUsed" => Value::Integer(mu.heap_used as i64),
+        "external" => Value::Integer(mu.external as i64),
+        "arrayBuffers" => Value::Integer(mu.array_buffers as i64),
+    };
     let obj_idx = interp.heap.len();
     interp.heap.push(crate::vm::interpreter::HeapValue::Object(
         crate::vm::interpreter::JsObject {
