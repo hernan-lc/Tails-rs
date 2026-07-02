@@ -68,6 +68,7 @@ impl CodeGenerator {
 
     fn peephole_optimize(&mut self) {
         let mut optimized = Vec::with_capacity(self.instructions.len());
+        let mut keep = Vec::with_capacity(self.instructions.len());
         let mut i = 0;
         while i < self.instructions.len() {
             // Pattern 1: LoadLocal(x) + LoadConst(n) + Add + StoreLocal(x) → IncLocal(x, n)
@@ -86,8 +87,7 @@ impl CodeGenerator {
                     if x == y {
                         if let Value::Integer(n) = self.constants[*c as usize] {
                             optimized.push(Instruction::IncLocal(*x, n));
-                            self.source_lines.drain(i + 1..=i + 3);
-                            self.source_cols.drain(i + 1..=i + 3);
+                            keep.push(i);
                             i += 4;
                             continue;
                         }
@@ -110,8 +110,7 @@ impl CodeGenerator {
                 ) {
                     if x == z && x != y {
                         optimized.push(Instruction::AddLocal(*x, *y));
-                        self.source_lines.drain(i + 1..=i + 3);
-                        self.source_cols.drain(i + 1..=i + 3);
+                        keep.push(i);
                         i += 4;
                         continue;
                     }
@@ -130,9 +129,6 @@ impl CodeGenerator {
                         | Instruction::LoadFalse
                         | Instruction::LoadGlobal(_)
                         | Instruction::LoadGlobalOrUndefined(_) => {
-                            // Skip both the side-effect-free instruction and the Pop
-                            self.source_lines.drain(i..=i + 1);
-                            self.source_cols.drain(i..=i + 1);
                             i += 2;
                             continue;
                         }
@@ -142,9 +138,12 @@ impl CodeGenerator {
             }
 
             optimized.push(self.instructions[i].clone());
+            keep.push(i);
             i += 1;
         }
         self.instructions = optimized;
+        self.source_lines = keep.iter().map(|&i| self.source_lines[i]).collect();
+        self.source_cols = keep.iter().map(|&i| self.source_cols[i]).collect();
     }
 
     fn record_line_from_span(&mut self, span: &Option<crate::errors::Span>) {

@@ -123,12 +123,12 @@ fn has_advanced_features(pattern: &str) -> bool {
     let len = bytes.len();
     let mut i = 0;
     while i < len {
-        if bytes[i] == b'(' && i + 1 < len && bytes[i + 1] == b'?' {
-            if i + 2 < len {
-                match bytes[i + 2] {
-                    b'=' | b'!' | b'<' => return true, // lookahead/lookbehind
-                    _ => {}
-                }
+        if bytes[i] == b'(' && i + 1 < len && bytes[i + 1] == b'?'
+            && i + 2 < len
+        {
+            match bytes[i + 2] {
+                b'=' | b'!' | b'<' => return true, // lookahead/lookbehind
+                _ => {}
             }
         }
         if bytes[i] == b'\\' && i + 1 < len && bytes[i + 1].is_ascii_digit() {
@@ -162,12 +162,10 @@ impl JsRegExp {
 
         let compiled = if has_advanced_features(pattern) {
             JsCompiledRegex::Advanced(
-                fancy_regex::Regex::new(&regex_flags).map_err(|e| e.to_string())?
+                fancy_regex::Regex::new(&regex_flags).map_err(|e| e.to_string())?,
             )
         } else {
-            JsCompiledRegex::Simple(
-                regex::Regex::new(&regex_flags).map_err(|e| e.to_string())?
-            )
+            JsCompiledRegex::Simple(regex::Regex::new(&regex_flags).map_err(|e| e.to_string())?)
         };
 
         Ok(JsRegExp {
@@ -235,17 +233,15 @@ impl JsRegExp {
     pub fn find_all(&self, input: &str) -> Vec<String> {
         if let Some(ref compiled) = self.compiled {
             match compiled {
-                JsCompiledRegex::Simple(re) => {
-                    re.find_iter(input)
-                        .map(|m| m.as_str().to_string())
-                        .collect()
-                }
-                JsCompiledRegex::Advanced(re) => {
-                    re.find_iter(input)
-                        .filter_map(|m| m.ok())
-                        .map(|m| m.as_str().to_string())
-                        .collect()
-                }
+                JsCompiledRegex::Simple(re) => re
+                    .find_iter(input)
+                    .map(|m| m.as_str().to_string())
+                    .collect(),
+                JsCompiledRegex::Advanced(re) => re
+                    .find_iter(input)
+                    .filter_map(|m| m.ok())
+                    .map(|m| m.as_str().to_string())
+                    .collect(),
             }
         } else {
             Vec::new()
@@ -269,9 +265,12 @@ impl JsRegExp {
                 JsCompiledRegex::Simple(re) => {
                     re.find(input).map(|m| m.start() as i64).unwrap_or(-1)
                 }
-                JsCompiledRegex::Advanced(re) => {
-                    re.find(input).ok().flatten().map(|m| m.start() as i64).unwrap_or(-1)
-                }
+                JsCompiledRegex::Advanced(re) => re
+                    .find(input)
+                    .ok()
+                    .flatten()
+                    .map(|m| m.start() as i64)
+                    .unwrap_or(-1),
             }
         } else {
             -1
@@ -281,12 +280,12 @@ impl JsRegExp {
     pub fn split(&self, input: &str) -> Vec<String> {
         if let Some(ref compiled) = self.compiled {
             match compiled {
-                JsCompiledRegex::Simple(re) => {
-                    re.split(input).map(|s| s.to_string()).collect()
-                }
-                JsCompiledRegex::Advanced(re) => {
-                    re.split(input).filter_map(|s| s.ok()).map(|s| s.to_string()).collect()
-                }
+                JsCompiledRegex::Simple(re) => re.split(input).map(|s| s.to_string()).collect(),
+                JsCompiledRegex::Advanced(re) => re
+                    .split(input)
+                    .filter_map(|s| s.ok())
+                    .map(|s| s.to_string())
+                    .collect(),
             }
         } else {
             vec![input.to_string()]

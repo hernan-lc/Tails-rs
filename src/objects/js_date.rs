@@ -373,7 +373,8 @@ fn civil_from_days(days: i64) -> (i64, i32, i64) {
     let z = days + 719468;
     let era = z.div_euclid(146097);
     let doe = z.rem_euclid(146097);
-    let yoe = (doe - doe.div_euclid(1460) + doe.div_euclid(36524) - doe.div_euclid(146096)).div_euclid(365);
+    let yoe = (doe - doe.div_euclid(1460) + doe.div_euclid(36524) - doe.div_euclid(146096))
+        .div_euclid(365);
     let y = yoe + era * 400;
     let doy = doe - (yoe * 365) - yoe.div_euclid(4) + yoe.div_euclid(100);
     let mp = (5 * doy + 2).div_euclid(153);

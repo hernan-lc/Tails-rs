@@ -327,7 +327,7 @@ impl Interpreter {
                 | Instruction::Return
                 | Instruction::Yield => {
                     let mut pc_mut = pc;
-                    match self.exec_control_flow(&instruction, module, &mut pc_mut)? {
+                    match self.exec_control_flow(instruction, module, &mut pc_mut)? {
                         ControlFlowOutcome::Continue => {
                             pc = pc_mut;
                             continue;
@@ -460,7 +460,15 @@ impl Interpreter {
                                             None
                                         }
                                     };
-                                    if let Some((closure_vars, bytecode_index, is_arrow, captured_this, has_rest, param_count)) = func_info {
+                                    if let Some((
+                                        closure_vars,
+                                        bytecode_index,
+                                        is_arrow,
+                                        captured_this,
+                                        has_rest,
+                                        param_count,
+                                    )) = func_info
+                                    {
                                         let return_address = pc + 1;
                                         let base_pointer = self.stack.len();
                                         let closure_count = closure_vars.len();
@@ -583,14 +591,21 @@ impl Interpreter {
                                     f.rest_param.is_some(),
                                     f.params.len(),
                                 ));
-                                let same_module =
-                                    match (&f.owner_module, &self.current_module) {
-                                        (Some(om), Some(cm)) => Rc::ptr_eq(om, cm),
-                                        (None, None) => true,
-                                        _ => false,
-                                    };
+                                let same_module = match (&f.owner_module, &self.current_module) {
+                                    (Some(om), Some(cm)) => Rc::ptr_eq(om, cm),
+                                    (None, None) => true,
+                                    _ => false,
+                                };
                                 if same_module {
-                                    if let Some((closure_vars, bytecode_index, is_arrow, captured_this, has_rest, param_count)) = func_info {
+                                    if let Some((
+                                        closure_vars,
+                                        bytecode_index,
+                                        is_arrow,
+                                        captured_this,
+                                        has_rest,
+                                        param_count,
+                                    )) = func_info
+                                    {
                                         let return_address = pc + 1;
                                         let base_pointer = self.stack.len();
                                         let closure_count = closure_vars.len();
@@ -625,7 +640,8 @@ impl Interpreter {
                                             for arg in args.iter().take(param_count) {
                                                 self.stack.push(arg.clone());
                                             }
-                                            let rest_args: Vec<Value> = args[param_count..].to_vec();
+                                            let rest_args: Vec<Value> =
+                                                args[param_count..].to_vec();
                                             let rest_arr_idx = self.gc.allocate(
                                                 &mut self.heap,
                                                 HeapValue::Array(JsArray {
@@ -762,10 +778,7 @@ impl Interpreter {
                                 } else {
                                     let func_info = {
                                         if let HeapValue::Function(f) = &self.heap[*func_idx] {
-                                            Some((
-                                                f.closure.clone(),
-                                                f.bytecode_index,
-                                            ))
+                                            Some((f.closure.clone(), f.bytecode_index))
                                         } else {
                                             None
                                         }
@@ -896,7 +909,7 @@ impl Interpreter {
                 | Instruction::SuperConstruct(_)
                 | Instruction::SuperGet => {
                     let mut pc_mut = pc;
-                    self.exec_class_ops(&instruction, &mut pc_mut, module)?;
+                    self.exec_class_ops(instruction, &mut pc_mut, module)?;
                     if pc_mut != pc {
                         pc = pc_mut;
                         continue;
@@ -958,8 +971,12 @@ impl Interpreter {
                                         call_stack_snapshot: std::mem::take(&mut self.call_stack),
                                         module: self.current_module.clone(),
                                         module_path: self.current_module_path.clone(),
-                                        exception_handlers_snapshot: std::mem::take(&mut self.exception_handlers),
-                                        block_scope_stack_snapshot: std::mem::take(&mut self.block_scope_stack),
+                                        exception_handlers_snapshot: std::mem::take(
+                                            &mut self.exception_handlers,
+                                        ),
+                                        block_scope_stack_snapshot: std::mem::take(
+                                            &mut self.block_scope_stack,
+                                        ),
                                     };
                                     self.suspended_frames.push_back(frame);
                                     return Ok(Value::Undefined);
@@ -1072,15 +1089,15 @@ impl Interpreter {
                 _ =>
                 {
                     #[allow(clippy::if_same_then_else)]
-                    if self.exec_load_store(&instruction, module)? {
-                    } else if self.exec_arithmetic(&instruction)? {
-                    } else if self.exec_comparison(&instruction)? {
-                    } else if self.exec_property_ops(&instruction)? {
-                    } else if self.exec_make_function(&instruction, module, pc)? {
-                    } else if self.exec_class_ops(&instruction, &mut pc, module)? {
+                    if self.exec_load_store(instruction, module)? {
+                    } else if self.exec_arithmetic(instruction)? {
+                    } else if self.exec_comparison(instruction)? {
+                    } else if self.exec_property_ops(instruction)? {
+                    } else if self.exec_make_function(instruction, module, pc)? {
+                    } else if self.exec_class_ops(instruction, &mut pc, module)? {
                     } else {
                         let saved_pc = pc;
-                        if self.exec_exception(&instruction, &mut pc)? {
+                        if self.exec_exception(instruction, &mut pc)? {
                             if pc != saved_pc {
                                 continue;
                             }
