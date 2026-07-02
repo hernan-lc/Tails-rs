@@ -1,0 +1,10 @@
+[package]
+name = "tails-net"
+version = "0.1.0"
+edition = "2021"
+description = "Tails native net module (pure TCP client primitives)"
+
+[lib]
+crate-type = ["rlib"]
+
+[dependencies]

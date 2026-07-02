@@ -85,6 +85,33 @@ mod http_fns {
     http_stub!(native_http_res_write);
     http_stub!(native_http_res_end);
 }
+#[cfg(feature = "net")]
+mod net_fns;
+#[cfg(not(feature = "net"))]
+mod net_fns {
+    use crate::errors::{Error, Result};
+    use crate::objects::Value;
+    use crate::vm::interpreter::Interpreter;
+
+    macro_rules! net_stub {
+        ($name:ident) => {
+            pub(super) fn $name(
+                _interp: &mut Interpreter,
+                _this: &Value,
+                _args: &[Value],
+            ) -> Result<Value> {
+                Err(Error::RuntimeError(
+                    "net module is not enabled. Rebuild with --features net".into(),
+                ))
+            }
+        };
+    }
+
+    net_stub!(native_net_create_connection);
+    net_stub!(native_net_socket_write);
+    net_stub!(native_net_socket_end);
+    net_stub!(native_net_socket_on);
+}
 mod global_fns;
 mod helpers;
 mod intl_fns;
@@ -657,6 +684,11 @@ pub static NATIVE_TABLE: &[NativeFn] = &[
     http_fns::native_http_res_write_head,
     http_fns::native_http_res_write,
     http_fns::native_http_res_end,
+    // Net (TCP client) (402-405)
+    net_fns::native_net_create_connection,
+    net_fns::native_net_socket_write,
+    net_fns::native_net_socket_end,
+    net_fns::native_net_socket_on,
 ];
 
 const _: () = assert!(

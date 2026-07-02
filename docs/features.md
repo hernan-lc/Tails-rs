@@ -128,6 +128,13 @@
 - Response: `res.writeHead()`, `res.write()`, `res.end()`
 - Options: `maxConnections`, `timeoutMs`
 
+## net (native module)
+- `net.createConnection(port[, host][, connectListener])` — create a TCP client connection
+- `socket.write(data)` — write data to the socket
+- `socket.end([data])` — half-close the connection (sends FIN)
+- `socket.on(event, listener)` — register event listeners (`'data'`, `'error'`, `'close'`)
+- `socket.readyState` — `'open'` or `'closed'`
+
 ## websocket (native module)
 - `new WebSocket(url)`, `ws.send()`, `ws.close()`
 - `ws.addEventListener('open'/'message'/'error'/'close', callback)`

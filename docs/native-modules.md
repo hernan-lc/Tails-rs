@@ -6,6 +6,7 @@ import path from "path";
 import process from "process";
 import os from "os";
 import http from "http";
+import net from "net";
 import WebSocket from "websocket";
 import Buffer from "./buffer.native";
 import Intl from "./intl.native";
@@ -33,6 +34,7 @@ import path from "./path.native";
 | `process` | `process` | `modules/process` | Process info and control (env, argv, exit, etc.) |
 | `os` | `os` | `modules/os` | OS information (platform, arch, cpus, memory, etc.) |
 | `http` | `http` | `modules/http` | HTTP/1.1 server (`createServer`, `listen`, `req`/`res` objects) |
+| `net` | `net` | `modules/net` | TCP client (`createConnection`, `write`, `end`, `on`) |
 | `websocket` | `websocket` | `modules/websocket` | WebSocket client (`send`, `close`, event listeners) |
 | `buffer` | *(always)* | *(built-in)* | Node.js-compatible binary data handling |
 | `intl` | *(always)* | *(built-in)* | Internationalization (DateTimeFormat, NumberFormat) |

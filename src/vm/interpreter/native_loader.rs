@@ -137,6 +137,8 @@ pub fn discover_module(name: &str, registry: &mut NativeModuleRegistry) {
         "url" => registry.register("url", create_url_module),
         #[cfg(feature = "http")]
         "http" => registry.register("http", create_http_module),
+        #[cfg(feature = "net")]
+        "net" => registry.register("net", create_net_module),
         _ => {}
     }
 }
@@ -578,6 +580,19 @@ pub fn create_http_module(
     props.insert(
         "createServer".into(),
         Value::NativeFunction(c::HTTP_CREATE_SERVER),
+    );
+    props
+}
+
+#[cfg(feature = "net")]
+pub fn create_net_module(
+    _heap: &mut Vec<HeapValue>,
+    _gc: &mut GarbageCollector,
+) -> HashMap<String, Value> {
+    let mut props = HashMap::new();
+    props.insert(
+        "createConnection".into(),
+        Value::NativeFunction(c::NET_CREATE_CONNECTION),
     );
     props
 }

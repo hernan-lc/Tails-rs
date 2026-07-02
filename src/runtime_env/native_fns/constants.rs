@@ -403,6 +403,11 @@ pub const HTTP_REQ_ON: usize = 398;
 pub const HTTP_RES_WRITE_HEAD: usize = 399;
 pub const HTTP_RES_WRITE: usize = 400;
 pub const HTTP_RES_END: usize = 401;
+// Net (TCP client) (402-405)
+pub const NET_CREATE_CONNECTION: usize = 402;
+pub const NET_SOCKET_WRITE: usize = 403;
+pub const NET_SOCKET_END: usize = 404;
+pub const NET_SOCKET_ON: usize = 405;
 
 #[cfg(test)]
 mod tests {
@@ -420,4 +425,4 @@ mod tests {
     }
 }
 
-pub const NATIVE_TABLE_LEN: usize = 402;
+pub const NATIVE_TABLE_LEN: usize = 406;

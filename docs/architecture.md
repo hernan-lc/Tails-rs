@@ -35,7 +35,7 @@ src/
 │       ├── constants.rs       # NATIVE_TABLE index constants
 │       ├── console.rs, math_fns.rs, string_fns.rs, ...
 │       ├── fs_fns.rs, path_fns.rs, process_fns.rs, os_fns.rs
-│       ├── http_fns.rs, websocket_fns.rs, fetch_fns.rs, url_fns.rs
+│       ├── http_fns.rs, net_fns.rs, websocket_fns.rs, fetch_fns.rs, url_fns.rs
 │       ├── buffer_fns.rs, intl_fns.rs, events_fns.rs, crypto_fns.rs
 │       └── ...
 ├── objects/            # JS value types
@@ -66,7 +66,8 @@ modules/                # Workspace member crates
 ├── process/            # Pure Rust process operations (feature-gated)
 ├── os/                 # Pure Rust os operations (feature-gated)
 ├── websocket/          # Pure Rust WebSocket client (feature-gated)
-└── http/               # Pure Rust HTTP/1.1 server (feature-gated)
+├── http/               # Pure Rust HTTP/1.1 server (feature-gated)
+└── net/                # Pure Rust TCP client (feature-gated)
 
 tests/
 ├── unit/               # Unit tests (parser, lexer, vm, minified)
@@ -87,5 +88,5 @@ dist/                   # Build output for native modules
 3. **Type Checker** (`compiler/type_checker/`) — optional type checking with narrowing
 4. **Bytecode Generator** (`compiler/bytecode/`) — compiles AST to bytecode instructions
 5. **VM / Interpreter** (`vm/interpreter/`) — stack-based bytecode interpreter with GC, exception handling, promises, and class support
-6. **Runtime Environment** (`runtime_env/`) — 40+ native function modules providing Node.js-like APIs (fs, path, http, websocket, crypto, fetch, url, etc.)
+6. **Runtime Environment** (`runtime_env/`) — 40+ native function modules providing Node.js-like APIs (fs, path, http, net, websocket, crypto, fetch, url, etc.)
 7. **Native Module System** (`modules/`) — workspace crates compiled as dynamic libraries loaded at runtime via `libloading`

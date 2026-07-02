@@ -1832,6 +1832,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "tails-net"
+version = "0.1.0"
+
+[[package]]
 name = "tails-os"
 version = "0.1.0"
 dependencies = [
@@ -1880,6 +1884,7 @@ dependencies = [
  "tails-abi",
  "tails-fs",
  "tails-http",
+ "tails-net",
  "tails-os",
  "tails-path",
  "tails-process",
