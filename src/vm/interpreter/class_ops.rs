@@ -3,7 +3,7 @@ use crate::compiler::CompiledModule;
 use crate::compiler::Instruction;
 use crate::errors::{Error, Result};
 use crate::objects::Value;
-use std::collections::HashMap;
+use rustc_hash::FxHashMap;
 
 impl Interpreter {
     fn handle_make_class(&mut self, class_info_idx: &u32, module: &CompiledModule) -> Result<()> {
@@ -53,7 +53,7 @@ impl Interpreter {
                     closure: Vec::new(),
                     prototype: Some(proto_obj_idx),
                     super_class: Some(super_val.clone()),
-                    properties: HashMap::new(),
+                    properties: FxHashMap::default(),
                     owner_module: owner,
                     module_scope: None,
                     is_generator: false,
@@ -76,7 +76,7 @@ impl Interpreter {
                     closure: Vec::new(),
                     prototype: Some(proto_obj_idx),
                     super_class: Some(super_val.clone()),
-                    properties: HashMap::new(),
+                    properties: FxHashMap::default(),
                     owner_module: None,
                     module_scope: None,
                     is_generator: false,
@@ -110,7 +110,7 @@ impl Interpreter {
                     closure: Vec::new(),
                     prototype: Some(method_proto_idx),
                     super_class: None,
-                    properties: HashMap::new(),
+                    properties: FxHashMap::default(),
                     owner_module: owner,
                     module_scope: None,
                     is_generator: false,

@@ -76,19 +76,27 @@ impl Interpreter {
                     if frame.closure_var_count > 0 {
                         if let Some(heap_idx) = frame.func_heap_idx {
                             if let HeapValue::Function(f) = &mut self.heap[heap_idx] {
+                                // Only write back if values actually changed
+                                let mut changed = false;
                                 for i in 0..frame.closure_var_count {
-                                    let val = self
+                                    let stack_val = self
                                         .stack
                                         .get(frame.base_pointer + i)
                                         .cloned()
                                         .unwrap_or(Value::Undefined);
                                     if i < f.closure.len() {
-                                        f.closure[i] = val;
+                                        if f.closure[i] != stack_val {
+                                            f.closure[i] = stack_val;
+                                            changed = true;
+                                        }
                                     } else {
-                                        f.closure.push(val);
+                                        f.closure.push(stack_val);
+                                        changed = true;
                                     }
                                 }
-                                f.closure.truncate(frame.closure_var_count);
+                                if changed {
+                                    f.closure.truncate(frame.closure_var_count);
+                                }
                             }
                         }
                     }

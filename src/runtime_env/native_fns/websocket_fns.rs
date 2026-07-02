@@ -1,3 +1,4 @@
+use rustc_hash::FxHashMap;
 use crate::errors::{Error, Result};
 use crate::objects::Value;
 use crate::runtime_env::native_fns::constants as c;
@@ -19,7 +20,7 @@ pub(super) fn native_websocket_constructor(
         return Err(Error::TypeError("WebSocket requires a URL".into()));
     }
 
-    let mut props = std::collections::HashMap::new();
+    let mut props = FxHashMap::default();
     props.insert("url".into(), Value::String(url));
     props.insert("readyState".into(), Value::Integer(0)); // CONNECTING
     props.insert("bufferedAmount".into(), Value::Integer(0));

@@ -1,3 +1,4 @@
+use rustc_hash::FxHashMap;
 use crate::errors::Result;
 use crate::objects::Value;
 use crate::vm::interpreter::Interpreter;
@@ -14,7 +15,7 @@ pub(super) fn native_error_constructor(
         .map(|v| to_string_value(interp, v))
         .unwrap_or_default();
     let obj_idx = interp.heap.len();
-    let mut props = std::collections::HashMap::new();
+    let mut props = FxHashMap::default();
     props.insert("message".into(), Value::String(message.clone()));
     props.insert("name".into(), Value::String("Error".into()));
 
@@ -43,7 +44,7 @@ pub(super) fn native_type_error_constructor(
         .map(|v| to_string_value(interp, v))
         .unwrap_or_default();
     let obj_idx = interp.heap.len();
-    let mut props = std::collections::HashMap::new();
+    let mut props = FxHashMap::default();
     props.insert("message".into(), Value::String(message.clone()));
     props.insert("name".into(), Value::String("TypeError".into()));
 
@@ -71,7 +72,7 @@ pub(super) fn native_reference_error_constructor(
         .map(|v| to_string_value(interp, v))
         .unwrap_or_default();
     let obj_idx = interp.heap.len();
-    let mut props = std::collections::HashMap::new();
+    let mut props = FxHashMap::default();
     props.insert("message".into(), Value::String(message.clone()));
     props.insert("name".into(), Value::String("ReferenceError".into()));
 
@@ -99,7 +100,7 @@ pub(super) fn native_syntax_error_constructor(
         .map(|v| to_string_value(interp, v))
         .unwrap_or_default();
     let obj_idx = interp.heap.len();
-    let mut props = std::collections::HashMap::new();
+    let mut props = FxHashMap::default();
     props.insert("message".into(), Value::String(message.clone()));
     props.insert("name".into(), Value::String("SyntaxError".into()));
 
@@ -127,7 +128,7 @@ pub(super) fn native_range_error_constructor(
         .map(|v| to_string_value(interp, v))
         .unwrap_or_default();
     let obj_idx = interp.heap.len();
-    let mut props = std::collections::HashMap::new();
+    let mut props = FxHashMap::default();
     props.insert("message".into(), Value::String(message.clone()));
     props.insert("name".into(), Value::String("RangeError".into()));
 

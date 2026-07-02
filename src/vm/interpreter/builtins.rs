@@ -2,7 +2,7 @@ use super::{HeapValue, Interpreter, JsObject};
 use crate::objects::js_array::{TypedArray, TypedArrayType};
 use crate::objects::Value;
 use crate::runtime_env::native_fns::constants as c;
-use std::collections::HashMap;
+use rustc_hash::FxHashMap;
 
 impl Interpreter {
     pub(super) fn init_builtins(&mut self) {
@@ -48,7 +48,7 @@ impl Interpreter {
             .insert("require".into(), Value::NativeFunction(c::REQUIRE));
 
         // console object
-        let mut console_props = HashMap::new();
+        let mut console_props = FxHashMap::default();
         console_props.insert("log".into(), Value::NativeFunction(c::CONSOLE_LOG));
         console_props.insert("warn".into(), Value::NativeFunction(c::CONSOLE_WARN));
         console_props.insert("error".into(), Value::NativeFunction(c::CONSOLE_ERROR));
@@ -87,7 +87,7 @@ impl Interpreter {
             .insert("console".into(), Value::Object(console_obj_idx));
 
         // Object
-        let mut object_props = HashMap::new();
+        let mut object_props = FxHashMap::default();
         object_props.insert("keys".into(), Value::NativeFunction(c::OBJECT_KEYS));
         object_props.insert("values".into(), Value::NativeFunction(c::OBJECT_VALUES));
         object_props.insert("entries".into(), Value::NativeFunction(c::OBJECT_ENTRIES));
@@ -129,7 +129,7 @@ impl Interpreter {
         );
 
         // Object.prototype with hasOwnProperty
-        let mut object_proto_props = HashMap::new();
+        let mut object_proto_props = FxHashMap::default();
         object_proto_props.insert(
             "hasOwnProperty".into(),
             Value::NativeFunction(c::OBJECT_HAS_OWN_PROPERTY),
@@ -160,7 +160,7 @@ impl Interpreter {
             .insert("Proxy".into(), Value::NativeFunction(c::PROXY_CONSTRUCTOR));
 
         // Reflect
-        let mut reflect_props = HashMap::new();
+        let mut reflect_props = FxHashMap::default();
         reflect_props.insert("get".into(), Value::NativeFunction(c::REFLECT_GET));
         reflect_props.insert("set".into(), Value::NativeFunction(c::REFLECT_SET));
         reflect_props.insert("has".into(), Value::NativeFunction(c::REFLECT_HAS));
@@ -216,7 +216,7 @@ impl Interpreter {
         );
 
         // JSON
-        let mut json_props = HashMap::new();
+        let mut json_props = FxHashMap::default();
         json_props.insert("parse".into(), Value::NativeFunction(c::JSON_PARSE));
         json_props.insert("stringify".into(), Value::NativeFunction(c::JSON_STRINGIFY));
         let json_obj_idx = self.gc.allocate(
@@ -231,7 +231,7 @@ impl Interpreter {
             .insert("JSON".into(), Value::Object(json_obj_idx));
 
         // Array
-        let mut array_props = HashMap::new();
+        let mut array_props = FxHashMap::default();
         array_props.insert("isArray".into(), Value::NativeFunction(c::ARRAY_IS_ARRAY));
         array_props.insert("from".into(), Value::NativeFunction(c::ARRAY_FROM));
         array_props.insert("of".into(), Value::NativeFunction(c::ARRAY_OF));
@@ -259,7 +259,7 @@ impl Interpreter {
             .insert("btoa".into(), Value::NativeFunction(c::BTOA));
 
         // URL object with static methods
-        let mut url_props = HashMap::new();
+        let mut url_props = FxHashMap::default();
         url_props.insert("canParse".into(), Value::NativeFunction(c::URL_CAN_PARSE));
         url_props.insert("parse".into(), Value::NativeFunction(c::URL_PARSE));
         let _url_obj_idx = self.gc.allocate(
@@ -304,7 +304,7 @@ impl Interpreter {
             .insert("fetch".into(), Value::NativeFunction(c::FETCH));
 
         // Date
-        let mut date_proto_props = HashMap::new();
+        let mut date_proto_props = FxHashMap::default();
         date_proto_props.insert("getTime".into(), Value::NativeFunction(c::DATE_GET_TIME));
         date_proto_props.insert(
             "getFullYear".into(),
@@ -444,7 +444,7 @@ impl Interpreter {
         self.date_proto_idx = Some(date_proto_idx);
 
         // RegExp
-        let mut regexp_proto_props = HashMap::new();
+        let mut regexp_proto_props = FxHashMap::default();
         regexp_proto_props.insert("test".into(), Value::NativeFunction(c::REGEXP_TEST));
         regexp_proto_props.insert("exec".into(), Value::NativeFunction(c::REGEXP_EXEC));
         regexp_proto_props.insert(
@@ -486,7 +486,7 @@ impl Interpreter {
         self.regexp_proto_idx = Some(regexp_proto_idx);
 
         // Math
-        let mut math_props = HashMap::new();
+        let mut math_props = FxHashMap::default();
         math_props.insert("PI".into(), Value::Float(std::f64::consts::PI));
         math_props.insert("E".into(), Value::Float(std::f64::consts::E));
         math_props.insert("abs".into(), Value::NativeFunction(c::MATH_ABS));
@@ -514,7 +514,7 @@ impl Interpreter {
             .insert("Math".into(), Value::Object(math_obj_idx));
 
         // Number constructor
-        let mut number_props = HashMap::new();
+        let mut number_props = FxHashMap::default();
         number_props.insert("isFinite".into(), Value::NativeFunction(c::IS_FINITE));
         number_props.insert("isNaN".into(), Value::NativeFunction(c::IS_NAN));
         number_props.insert("parseFloat".into(), Value::NativeFunction(c::PARSE_FLOAT));
@@ -539,7 +539,7 @@ impl Interpreter {
             .insert("Number".into(), Value::Object(number_obj_idx));
 
         // Promise constructor and prototype
-        let mut promise_proto_props = HashMap::new();
+        let mut promise_proto_props = FxHashMap::default();
         promise_proto_props.insert("then".into(), Value::NativeFunction(c::PROMISE_THEN));
         promise_proto_props.insert("catch".into(), Value::NativeFunction(c::PROMISE_CATCH));
         promise_proto_props.insert("finally".into(), Value::NativeFunction(c::PROMISE_FINALLY));
@@ -552,7 +552,7 @@ impl Interpreter {
             }),
         );
 
-        let mut promise_ctor_props = HashMap::new();
+        let mut promise_ctor_props = FxHashMap::default();
         promise_ctor_props.insert("prototype".into(), Value::Object(promise_proto_idx));
         promise_ctor_props.insert("resolve".into(), Value::NativeFunction(c::PROMISE_RESOLVE));
         promise_ctor_props.insert("reject".into(), Value::NativeFunction(c::PROMISE_REJECT));
@@ -575,7 +575,7 @@ impl Interpreter {
         let error_proto_idx = self
             .gc
             .allocate(&mut self.heap, HeapValue::Object(JsObject::new()));
-        let mut error_ctor_props = HashMap::new();
+        let mut error_ctor_props = FxHashMap::default();
         error_ctor_props.insert("prototype".into(), Value::Object(error_proto_idx));
         self.gc.allocate(
             &mut self.heap,
@@ -589,7 +589,7 @@ impl Interpreter {
             .insert("Error".into(), Value::NativeFunction(c::ERROR_CONSTRUCTOR));
 
         // TypeError constructor
-        let mut type_error_proto_props = HashMap::new();
+        let mut type_error_proto_props = FxHashMap::default();
         type_error_proto_props.insert("name".into(), Value::String("TypeError".into()));
         let type_error_proto_idx = self.gc.allocate(
             &mut self.heap,
@@ -599,7 +599,7 @@ impl Interpreter {
                 extensible: true,
             }),
         );
-        let mut type_error_ctor_props = HashMap::new();
+        let mut type_error_ctor_props = FxHashMap::default();
         type_error_ctor_props.insert("prototype".into(), Value::Object(type_error_proto_idx));
         self.gc.allocate(
             &mut self.heap,
@@ -615,7 +615,7 @@ impl Interpreter {
         );
 
         // ReferenceError constructor
-        let mut ref_error_proto_props = HashMap::new();
+        let mut ref_error_proto_props = FxHashMap::default();
         ref_error_proto_props.insert("name".into(), Value::String("ReferenceError".into()));
         let ref_error_proto_idx = self.gc.allocate(
             &mut self.heap,
@@ -625,7 +625,7 @@ impl Interpreter {
                 extensible: true,
             }),
         );
-        let mut ref_error_ctor_props = HashMap::new();
+        let mut ref_error_ctor_props = FxHashMap::default();
         ref_error_ctor_props.insert("prototype".into(), Value::Object(ref_error_proto_idx));
         self.gc.allocate(
             &mut self.heap,
@@ -641,7 +641,7 @@ impl Interpreter {
         );
 
         // SyntaxError constructor
-        let mut syntax_error_proto_props = HashMap::new();
+        let mut syntax_error_proto_props = FxHashMap::default();
         syntax_error_proto_props.insert("name".into(), Value::String("SyntaxError".into()));
         let syntax_error_proto_idx = self.gc.allocate(
             &mut self.heap,
@@ -651,7 +651,7 @@ impl Interpreter {
                 extensible: true,
             }),
         );
-        let mut syntax_error_ctor_props = HashMap::new();
+        let mut syntax_error_ctor_props = FxHashMap::default();
         syntax_error_ctor_props.insert("prototype".into(), Value::Object(syntax_error_proto_idx));
         self.gc.allocate(
             &mut self.heap,
@@ -667,7 +667,7 @@ impl Interpreter {
         );
 
         // RangeError constructor
-        let mut range_error_proto_props = HashMap::new();
+        let mut range_error_proto_props = FxHashMap::default();
         range_error_proto_props.insert("name".into(), Value::String("RangeError".into()));
         let range_error_proto_idx = self.gc.allocate(
             &mut self.heap,
@@ -677,7 +677,7 @@ impl Interpreter {
                 extensible: true,
             }),
         );
-        let mut range_error_ctor_props = HashMap::new();
+        let mut range_error_ctor_props = FxHashMap::default();
         range_error_ctor_props.insert("prototype".into(), Value::Object(range_error_proto_idx));
         self.gc.allocate(
             &mut self.heap,
@@ -709,7 +709,7 @@ impl Interpreter {
 
         for (name, ctor_idx) in typed_array_constructors.iter() {
             // Create prototype
-            let mut proto_props = HashMap::new();
+            let mut proto_props = FxHashMap::default();
             proto_props.insert(
                 "BYTES_PER_ELEMENT".into(),
                 Value::Integer(TypedArray::element_size(&parse_typed_array_type(name)) as i64),
@@ -735,7 +735,7 @@ impl Interpreter {
             );
 
             // Create constructor
-            let mut ctor_props = HashMap::new();
+            let mut ctor_props = FxHashMap::default();
             ctor_props.insert("prototype".into(), Value::Object(proto_idx));
             ctor_props.insert(
                 "BYTES_PER_ELEMENT".into(),
@@ -756,7 +756,7 @@ impl Interpreter {
         }
 
         // Map
-        let mut map_proto_props = HashMap::new();
+        let mut map_proto_props = FxHashMap::default();
         map_proto_props.insert("get".into(), Value::NativeFunction(c::MAP_GET));
         map_proto_props.insert("set".into(), Value::NativeFunction(c::MAP_SET));
         map_proto_props.insert("has".into(), Value::NativeFunction(c::MAP_HAS));
@@ -776,7 +776,7 @@ impl Interpreter {
             }),
         );
 
-        let mut map_ctor_props = HashMap::new();
+        let mut map_ctor_props = FxHashMap::default();
         map_ctor_props.insert("prototype".into(), Value::Object(map_proto_idx));
         let _map_ctor_idx = self.gc.allocate(
             &mut self.heap,
@@ -790,7 +790,7 @@ impl Interpreter {
             .insert("Map".into(), Value::NativeFunction(c::MAP_CONSTRUCTOR));
 
         // Set
-        let mut set_proto_props = HashMap::new();
+        let mut set_proto_props = FxHashMap::default();
         set_proto_props.insert("add".into(), Value::NativeFunction(c::SET_ADD));
         set_proto_props.insert("has".into(), Value::NativeFunction(c::SET_HAS));
         set_proto_props.insert("delete".into(), Value::NativeFunction(c::SET_DELETE));
@@ -809,7 +809,7 @@ impl Interpreter {
             }),
         );
 
-        let mut set_ctor_props = HashMap::new();
+        let mut set_ctor_props = FxHashMap::default();
         set_ctor_props.insert("prototype".into(), Value::Object(set_proto_idx));
         let _set_ctor_idx = self.gc.allocate(
             &mut self.heap,
@@ -823,7 +823,7 @@ impl Interpreter {
             .insert("Set".into(), Value::NativeFunction(c::SET_CONSTRUCTOR));
 
         // WeakMap
-        let mut weakmap_proto_props = HashMap::new();
+        let mut weakmap_proto_props = FxHashMap::default();
         weakmap_proto_props.insert("get".into(), Value::NativeFunction(c::WEAKMAP_GET));
         weakmap_proto_props.insert("set".into(), Value::NativeFunction(c::WEAKMAP_SET));
         weakmap_proto_props.insert("has".into(), Value::NativeFunction(c::WEAKMAP_HAS));
@@ -837,7 +837,7 @@ impl Interpreter {
             }),
         );
 
-        let mut weakmap_ctor_props = HashMap::new();
+        let mut weakmap_ctor_props = FxHashMap::default();
         weakmap_ctor_props.insert("prototype".into(), Value::Object(weakmap_proto_idx));
         let _weakmap_ctor_idx = self.gc.allocate(
             &mut self.heap,
@@ -853,7 +853,7 @@ impl Interpreter {
         );
 
         // WeakSet
-        let mut weakset_proto_props = HashMap::new();
+        let mut weakset_proto_props = FxHashMap::default();
         weakset_proto_props.insert("add".into(), Value::NativeFunction(c::WEAKSET_ADD));
         weakset_proto_props.insert("has".into(), Value::NativeFunction(c::WEAKSET_HAS));
         weakset_proto_props.insert("delete".into(), Value::NativeFunction(c::WEAKSET_DELETE));
@@ -866,7 +866,7 @@ impl Interpreter {
             }),
         );
 
-        let mut weakset_ctor_props = HashMap::new();
+        let mut weakset_ctor_props = FxHashMap::default();
         weakset_ctor_props.insert("prototype".into(), Value::Object(weakset_proto_idx));
         let _weakset_ctor_idx = self.gc.allocate(
             &mut self.heap,
@@ -882,7 +882,7 @@ impl Interpreter {
         );
 
         // Generator
-        let mut generator_proto_props = HashMap::new();
+        let mut generator_proto_props = FxHashMap::default();
         generator_proto_props.insert("next".into(), Value::NativeFunction(c::GENERATOR_NEXT));
         generator_proto_props.insert("return".into(), Value::NativeFunction(c::GENERATOR_RETURN));
         generator_proto_props.insert("throw".into(), Value::NativeFunction(c::GENERATOR_THROW));
@@ -900,7 +900,7 @@ impl Interpreter {
         );
         self.generator_proto_idx = Some(generator_proto_idx);
 
-        let mut generator_ctor_props = HashMap::new();
+        let mut generator_ctor_props = FxHashMap::default();
         generator_ctor_props.insert("prototype".into(), Value::Object(generator_proto_idx));
         let generator_ctor_idx = self.gc.allocate(
             &mut self.heap,

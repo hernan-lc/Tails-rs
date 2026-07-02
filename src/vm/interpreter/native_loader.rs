@@ -2,18 +2,18 @@ use crate::objects::Value;
 use crate::runtime_env::native_fns::constants as c;
 use crate::vm::gc::GarbageCollector;
 use crate::vm::interpreter::{HeapValue, JsObject};
-use std::collections::HashMap;
+use rustc_hash::FxHashMap;
 
-type NativeModuleFactory = fn(&mut Vec<HeapValue>, &mut GarbageCollector) -> HashMap<String, Value>;
+type NativeModuleFactory = fn(&mut Vec<HeapValue>, &mut GarbageCollector) -> FxHashMap<String, Value>;
 
 pub struct NativeModuleRegistry {
-    modules: HashMap<String, Box<NativeModuleFactory>>,
+    modules: FxHashMap<String, Box<NativeModuleFactory>>,
 }
 
 impl NativeModuleRegistry {
     pub fn new() -> Self {
         Self {
-            modules: HashMap::new(),
+            modules: FxHashMap::default(),
         }
     }
 
@@ -30,7 +30,7 @@ impl NativeModuleRegistry {
         name: &str,
         heap: &mut Vec<HeapValue>,
         gc: &mut GarbageCollector,
-    ) -> crate::errors::Result<HashMap<String, Value>> {
+    ) -> crate::errors::Result<FxHashMap<String, Value>> {
         if let Some(factory) = self.modules.get(name) {
             Ok(factory(heap, gc))
         } else {
@@ -83,8 +83,8 @@ pub fn discover_module(name: &str, registry: &mut NativeModuleRegistry) {
 pub fn create_fs_module(
     _heap: &mut Vec<HeapValue>,
     _gc: &mut GarbageCollector,
-) -> HashMap<String, Value> {
-    let mut props = HashMap::new();
+) -> FxHashMap<String, Value> {
+    let mut props = FxHashMap::default();
     props.insert(
         "readFileSync".into(),
         Value::NativeFunction(c::FS_READ_FILE_SYNC),
@@ -127,8 +127,8 @@ pub fn create_fs_module(
 pub fn create_fs_promises_module(
     _heap: &mut Vec<HeapValue>,
     _gc: &mut GarbageCollector,
-) -> HashMap<String, Value> {
-    let mut props = HashMap::new();
+) -> FxHashMap<String, Value> {
+    let mut props = FxHashMap::default();
     props.insert("readdir".into(), Value::NativeFunction(c::FS_READDIR));
     props.insert("readFile".into(), Value::NativeFunction(c::FS_READ_FILE));
     props.insert("writeFile".into(), Value::NativeFunction(c::FS_WRITE_FILE));
@@ -144,8 +144,8 @@ pub fn create_fs_promises_module(
 pub fn create_path_module(
     _heap: &mut Vec<HeapValue>,
     _gc: &mut GarbageCollector,
-) -> HashMap<String, Value> {
-    let mut props = HashMap::new();
+) -> FxHashMap<String, Value> {
+    let mut props = FxHashMap::default();
     props.insert("join".into(), Value::NativeFunction(c::PATH_JOIN));
     props.insert("resolve".into(), Value::NativeFunction(c::PATH_RESOLVE));
     props.insert("basename".into(), Value::NativeFunction(c::PATH_BASENAME));
@@ -179,8 +179,8 @@ pub fn create_path_module(
 pub fn create_process_module(
     heap: &mut Vec<HeapValue>,
     gc: &mut GarbageCollector,
-) -> HashMap<String, Value> {
-    let mut props = HashMap::new();
+) -> FxHashMap<String, Value> {
+    let mut props = FxHashMap::default();
 
     // Scalar properties
     props.insert("exit".into(), Value::NativeFunction(c::PROCESS_EXIT));
@@ -217,7 +217,7 @@ pub fn create_process_module(
     props.insert("pid".into(), Value::Integer(std::process::id() as i64));
 
     // process.env
-    let mut env_props = HashMap::new();
+    let mut env_props = FxHashMap::default();
     for (key, value) in std::env::vars() {
         env_props.insert(key, Value::String(value));
     }
@@ -240,7 +240,7 @@ pub fn create_process_module(
     props.insert("argv".into(), Value::Array(argv_idx));
 
     // process.stdout
-    let mut stdout_props = HashMap::new();
+    let mut stdout_props = FxHashMap::default();
     stdout_props.insert(
         "write".into(),
         Value::NativeFunction(c::PROCESS_STDOUT_WRITE),
@@ -256,7 +256,7 @@ pub fn create_process_module(
     props.insert("stdout".into(), Value::Object(stdout_idx));
 
     // process.stderr
-    let mut stderr_props = HashMap::new();
+    let mut stderr_props = FxHashMap::default();
     stderr_props.insert(
         "write".into(),
         Value::NativeFunction(c::PROCESS_STDOUT_WRITE),
@@ -287,8 +287,8 @@ pub fn create_process_module(
 pub fn create_buffer_module(
     heap: &mut Vec<HeapValue>,
     gc: &mut GarbageCollector,
-) -> HashMap<String, Value> {
-    let mut props = HashMap::new();
+) -> FxHashMap<String, Value> {
+    let mut props = FxHashMap::default();
 
     // Static methods
     props.insert("alloc".into(), Value::NativeFunction(c::BUFFER_ALLOC));
@@ -321,7 +321,7 @@ pub fn create_buffer_module(
         heap,
         HeapValue::Object(JsObject {
             properties: {
-                let mut proto_props = HashMap::new();
+                let mut proto_props = FxHashMap::default();
                 proto_props.insert(
                     "toString".into(),
                     Value::NativeFunction(c::BUFFER_TO_STRING),
@@ -348,10 +348,10 @@ pub fn create_buffer_module(
 pub fn create_intl_module(
     heap: &mut Vec<HeapValue>,
     gc: &mut GarbageCollector,
-) -> HashMap<String, Value> {
-    let mut props = HashMap::new();
+) -> FxHashMap<String, Value> {
+    let mut props = FxHashMap::default();
 
-    let mut intl_obj_props = HashMap::new();
+    let mut intl_obj_props = FxHashMap::default();
     intl_obj_props.insert(
         "DateTimeFormat".into(),
         Value::NativeFunction(c::DATETIME_FORMAT_CONSTRUCTOR),
@@ -377,8 +377,8 @@ pub fn create_intl_module(
 pub fn create_events_module(
     heap: &mut Vec<HeapValue>,
     gc: &mut GarbageCollector,
-) -> HashMap<String, Value> {
-    let mut props = HashMap::new();
+) -> FxHashMap<String, Value> {
+    let mut props = FxHashMap::default();
 
     // EventEmitter constructor
     props.insert(
@@ -387,7 +387,7 @@ pub fn create_events_module(
     );
 
     // Prototype methods
-    let mut proto_props = HashMap::new();
+    let mut proto_props = FxHashMap::default();
     proto_props.insert("on".into(), Value::NativeFunction(c::EVENT_EMITTER_ON));
     proto_props.insert("emit".into(), Value::NativeFunction(c::EVENT_EMITTER_EMIT));
     proto_props.insert("off".into(), Value::NativeFunction(c::EVENT_EMITTER_OFF));
@@ -413,8 +413,8 @@ pub fn create_events_module(
 pub fn create_os_module(
     _heap: &mut Vec<HeapValue>,
     _gc: &mut GarbageCollector,
-) -> HashMap<String, Value> {
-    let mut props = HashMap::new();
+) -> FxHashMap<String, Value> {
+    let mut props = FxHashMap::default();
     props.insert("platform".into(), Value::NativeFunction(c::OS_PLATFORM));
     props.insert("arch".into(), Value::NativeFunction(c::OS_ARCH));
     props.insert("cpus".into(), Value::NativeFunction(c::OS_CPUS));
@@ -432,8 +432,8 @@ pub fn create_os_module(
 pub fn create_crypto_module(
     _heap: &mut Vec<HeapValue>,
     _gc: &mut GarbageCollector,
-) -> HashMap<String, Value> {
-    let mut props = HashMap::new();
+) -> FxHashMap<String, Value> {
+    let mut props = FxHashMap::default();
     props.insert(
         "randomBytes".into(),
         Value::NativeFunction(c::CRYPTO_RANDOM_BYTES),
@@ -452,10 +452,10 @@ pub fn create_crypto_module(
 pub fn create_assert_module(
     heap: &mut Vec<HeapValue>,
     gc: &mut GarbageCollector,
-) -> HashMap<String, Value> {
-    let mut props = HashMap::new();
+) -> FxHashMap<String, Value> {
+    let mut props = FxHashMap::default();
 
-    let mut assert_props = HashMap::new();
+    let mut assert_props = FxHashMap::default();
     assert_props.insert("strictEqual".into(), Value::NativeFunction(c::HEADERS_HAS));
     assert_props.insert("ok".into(), Value::NativeFunction(c::HEADERS_SET));
     assert_props.insert("equal".into(), Value::NativeFunction(c::HEADERS_HAS));
@@ -481,8 +481,8 @@ pub fn create_assert_module(
 pub fn create_child_process_module(
     _heap: &mut Vec<HeapValue>,
     _gc: &mut GarbageCollector,
-) -> HashMap<String, Value> {
-    let mut props = HashMap::new();
+) -> FxHashMap<String, Value> {
+    let mut props = FxHashMap::default();
     props.insert(
         "execSync".into(),
         Value::NativeFunction(c::CHILD_PROCESS_EXEC_SYNC),
@@ -498,8 +498,8 @@ pub fn create_child_process_module(
 pub fn create_url_module(
     _heap: &mut Vec<HeapValue>,
     _gc: &mut GarbageCollector,
-) -> HashMap<String, Value> {
-    let mut props = HashMap::new();
+) -> FxHashMap<String, Value> {
+    let mut props = FxHashMap::default();
     props.insert(
         "fileURLToPath".into(),
         Value::NativeFunction(c::URL_FILE_URL_TO_PATH),
@@ -511,8 +511,8 @@ pub fn create_url_module(
 pub fn create_http_module(
     _heap: &mut Vec<HeapValue>,
     _gc: &mut GarbageCollector,
-) -> HashMap<String, Value> {
-    let mut props = HashMap::new();
+) -> FxHashMap<String, Value> {
+    let mut props = FxHashMap::default();
     props.insert(
         "createServer".into(),
         Value::NativeFunction(c::HTTP_CREATE_SERVER),
@@ -524,8 +524,8 @@ pub fn create_http_module(
 pub fn create_net_module(
     _heap: &mut Vec<HeapValue>,
     _gc: &mut GarbageCollector,
-) -> HashMap<String, Value> {
-    let mut props = HashMap::new();
+) -> FxHashMap<String, Value> {
+    let mut props = FxHashMap::default();
     props.insert(
         "createConnection".into(),
         Value::NativeFunction(c::NET_CREATE_CONNECTION),

@@ -1,3 +1,4 @@
+use rustc_hash::FxHashMap;
 use crate::errors::{Error, Result};
 use crate::objects::Value;
 use crate::runtime_env::native_fns::constants as c;
@@ -24,7 +25,7 @@ pub(super) fn native_url_constructor(
     let search_params_idx = create_search_params(interp, &query_str);
 
     // Build all properties
-    let mut props = std::collections::HashMap::new();
+    let mut props = FxHashMap::default();
     props.insert(
         "href".to_string(),
         Value::String(parsed.as_str().to_string()),
@@ -102,7 +103,7 @@ pub(super) fn native_url_to_string(
 }
 
 fn create_search_params(interp: &mut Interpreter, query: &str) -> usize {
-    let mut props = std::collections::HashMap::new();
+    let mut props = FxHashMap::default();
     props.insert("__entries".into(), Value::String(query.to_string()));
     props.insert(
         "size".into(),

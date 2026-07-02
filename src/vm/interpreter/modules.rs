@@ -3,14 +3,14 @@ use super::*;
 use crate::errors::Result;
 use crate::objects::Value;
 use crate::runtime_env::native_fns::NATIVE_TABLE;
-use std::collections::HashMap;
+use rustc_hash::FxHashMap;
 use std::path::Path;
 use std::rc::Rc;
 
 impl Interpreter {
-    fn load_native_library(&mut self, lib_path: &Path) -> Option<HashMap<String, Value>> {
+    fn load_native_library(&mut self, lib_path: &Path) -> Option<FxHashMap<String, Value>> {
         let library = SafeLibrary::new(lib_path).ok()?;
-        let mut props = HashMap::new();
+        let mut props = FxHashMap::default();
 
         type InitFn = fn() -> *mut tails_abi::ModuleHandle;
 
@@ -60,7 +60,7 @@ impl Interpreter {
         }
 
         // Register class methods from DTS metadata
-        let mut class_methods: HashMap<String, HashMap<String, Value>> = HashMap::new();
+        let mut class_methods: HashMap<String, FxHashMap<String, Value>> = HashMap::new();
         for func_name in props.keys() {
             if let Some(method_name) = func_name.strip_prefix("counter_") {
                 class_methods
@@ -161,7 +161,7 @@ impl Interpreter {
                     path
                 )
             };
-            let mut meta_props = std::collections::HashMap::new();
+            let mut meta_props = FxHashMap::default();
             meta_props.insert("url".to_string(), Value::String(file_url));
             let meta_obj_idx = self.gc.allocate(
                 &mut self.heap,
@@ -171,7 +171,7 @@ impl Interpreter {
                     extensible: true,
                 }),
             );
-            let mut import_props = std::collections::HashMap::new();
+            let mut import_props = FxHashMap::default();
             import_props.insert("meta".to_string(), Value::Object(meta_obj_idx));
             let import_obj_idx = self.gc.allocate(
                 &mut self.heap,
@@ -328,7 +328,7 @@ impl Interpreter {
                         self.buffer_proto_idx = Some(*proto_idx);
                     }
                 }
-                let mut props = HashMap::new();
+                let mut props = FxHashMap::default();
                 for (name, val) in &exports {
                     props.insert(name.clone(), val.clone());
                 }
@@ -373,7 +373,7 @@ impl Interpreter {
                             self.buffer_proto_idx = Some(*proto_idx);
                         }
                     }
-                    let mut props = HashMap::new();
+                    let mut props = FxHashMap::default();
                     for (name, val) in &exports {
                         props.insert(name.clone(), val.clone());
                     }
@@ -396,7 +396,7 @@ impl Interpreter {
         let prev_path = self.current_module_path.take();
         self.current_module_path = Some(module_path.clone());
         self.module_registry
-            .insert(module_path.clone(), HashMap::new());
+            .insert(module_path.clone(), FxHashMap::default());
         let result = self.execute_module(&compiled);
         let exports = std::mem::take(&mut self.module_exports);
         *self.module_registry.entry(module_path.clone()).or_default() = exports;
@@ -618,10 +618,10 @@ impl Interpreter {
 
     pub(crate) fn build_module_object_from_exports(
         &mut self,
-        exports: &HashMap<String, Value>,
+        exports: &FxHashMap<String, Value>,
     ) -> Value {
         let heap_idx = self.heap.len();
-        let mut props = HashMap::new();
+        let mut props = FxHashMap::default();
         for (k, v) in exports {
             props.insert(k.clone(), v.clone());
         }
@@ -635,7 +635,7 @@ impl Interpreter {
 
     pub(crate) fn build_error_promise(&mut self, message: String) -> Value {
         let reason_idx = self.heap.len();
-        let mut props = HashMap::new();
+        let mut props = FxHashMap::default();
         props.insert("message".into(), Value::String(message));
         self.heap.push(HeapValue::Object(JsObject {
             properties: props,
@@ -649,7 +649,7 @@ impl Interpreter {
         Value::Promise(promise_idx)
     }
 
-    pub(crate) fn build_module_promise(&mut self, exports: HashMap<String, Value>) -> Value {
+    pub(crate) fn build_module_promise(&mut self, exports: FxHashMap<String, Value>) -> Value {
         let module_obj = self.build_module_object_from_exports(&exports);
         let promise_idx = self.heap.len();
         self.heap.push(HeapValue::Promise(

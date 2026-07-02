@@ -1,3 +1,4 @@
+use rustc_hash::FxHashMap;
 use crate::errors::Result;
 use crate::objects::Value;
 use crate::runtime_env::native_fns::constants as c;
@@ -69,7 +70,7 @@ pub(super) fn native_crypto_create_hash(
     interp.heap.push(HeapValue::Buffer(Vec::new()));
 
     // Create the hash object
-    let mut props = std::collections::HashMap::new();
+    let mut props = FxHashMap::default();
     props.insert("_algorithm".into(), Value::String(algorithm));
     props.insert("_data".into(), Value::Object(data_buf_idx));
     props.insert(

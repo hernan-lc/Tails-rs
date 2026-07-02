@@ -1,3 +1,4 @@
+use rustc_hash::FxHashMap;
 use crate::errors::Result;
 use crate::objects::Value;
 use crate::runtime_env::native_fns::constants as c;
@@ -15,7 +16,7 @@ pub(super) fn native_datetime_format_constructor(
         .map(|v| to_string_value(interp, v))
         .unwrap_or_else(|| "en-US".to_string());
 
-    let mut options = std::collections::HashMap::new();
+    let mut options = FxHashMap::default();
     if let Some(Value::Object(opts_idx)) = args.get(1) {
         if let HeapValue::Object(obj) = &interp.heap[*opts_idx] {
             for (k, v) in &obj.properties {
@@ -40,7 +41,7 @@ pub(super) fn native_datetime_format_constructor(
     let minute = options.get("minute").cloned();
     let second = options.get("second").cloned();
 
-    let mut formatter_props = std::collections::HashMap::new();
+    let mut formatter_props = FxHashMap::default();
     formatter_props.insert("type".into(), Value::String("datetime".into()));
     formatter_props.insert("dateStyle".into(), Value::String(date_style));
     formatter_props.insert("timeStyle".into(), Value::String(time_style));
@@ -368,7 +369,7 @@ pub(super) fn native_datetime_format_format_to_parts(
         let parts: Vec<Value> = s
             .chars()
             .map(|c| {
-                let mut props = std::collections::HashMap::new();
+                let mut props = FxHashMap::default();
                 props.insert("type".into(), Value::String("literal".into()));
                 props.insert("value".into(), Value::String(c.to_string()));
                 let idx = interp.heap.len();
@@ -408,7 +409,7 @@ pub(super) fn native_number_format_constructor(
         .map(|v| to_string_value(interp, v))
         .unwrap_or_else(|| "en-US".to_string());
 
-    let mut options = std::collections::HashMap::new();
+    let mut options = FxHashMap::default();
     if let Some(Value::Object(opts_idx)) = args.get(1) {
         if let HeapValue::Object(obj) = &interp.heap[*opts_idx] {
             for (k, v) in &obj.properties {
@@ -431,7 +432,7 @@ pub(super) fn native_number_format_constructor(
         .and_then(|v| v.parse::<usize>().ok())
         .unwrap_or(3);
 
-    let mut formatter_props = std::collections::HashMap::new();
+    let mut formatter_props = FxHashMap::default();
     formatter_props.insert("type".into(), Value::String("number".into()));
     formatter_props.insert("style".into(), Value::String(style));
     if let Some(c) = currency {

@@ -1,3 +1,4 @@
+use rustc_hash::FxHashMap;
 use crate::errors::{Error, Result};
 use crate::objects::Value;
 use crate::vm::interpreter::{HeapValue, Interpreter, JsObject};
@@ -69,7 +70,7 @@ pub(super) fn native_child_process_exec_sync(
         let stdout_str = String::from_utf8_lossy(&output.stdout).to_string();
 
         // Create error object similar to Node.js
-        let mut err_props = std::collections::HashMap::new();
+        let mut err_props = FxHashMap::default();
         err_props.insert(
             "message".into(),
             Value::String(format!("Command failed: {}", command.trim())),
@@ -170,7 +171,7 @@ pub(super) fn native_child_process_exec(
     let stderr_str = String::from_utf8_lossy(&output.stderr).to_string();
 
     // Build result object
-    let mut result_props = std::collections::HashMap::new();
+    let mut result_props = FxHashMap::default();
     result_props.insert("stdout".into(), Value::String(stdout_str));
     result_props.insert("stderr".into(), Value::String(stderr_str));
     result_props.insert("status".into(), Value::Integer(exit_code as i64));
@@ -306,11 +307,11 @@ pub(super) fn native_child_process_spawn(
     let stderr_str = String::from_utf8_lossy(&output.stderr).to_string();
 
     // Build ChildProcess-like object
-    let mut child_props = std::collections::HashMap::new();
+    let mut child_props = FxHashMap::default();
     child_props.insert("pid".into(), Value::Integer(pid as i64));
 
     // stdout object
-    let mut stdout_props = std::collections::HashMap::new();
+    let mut stdout_props = FxHashMap::default();
     stdout_props.insert("data".into(), Value::String(stdout_str));
     let stdout_idx = interp.heap.len();
     interp.heap.push(HeapValue::Object(JsObject {
@@ -321,7 +322,7 @@ pub(super) fn native_child_process_spawn(
     child_props.insert("stdout".into(), Value::Object(stdout_idx));
 
     // stderr object
-    let mut stderr_props = std::collections::HashMap::new();
+    let mut stderr_props = FxHashMap::default();
     stderr_props.insert("data".into(), Value::String(stderr_str));
     let stderr_idx = interp.heap.len();
     interp.heap.push(HeapValue::Object(JsObject {

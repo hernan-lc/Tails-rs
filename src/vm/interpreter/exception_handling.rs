@@ -1,4 +1,5 @@
 use super::*;
+use rustc_hash::FxHashMap;
 use crate::compiler::Instruction;
 use crate::errors::runtime_errors::runtime_error_stack_overflow;
 use crate::errors::{Error, Result};
@@ -132,7 +133,7 @@ impl Interpreter {
         let message = "Maximum call stack size exceeded";
         let obj_idx = self.heap.len();
         let stack = self.build_stack_trace("RangeError", message);
-        let mut props = std::collections::HashMap::new();
+        let mut props = FxHashMap::default();
         props.insert("message".into(), Value::String(message.into()));
         props.insert("name".into(), Value::String("RangeError".into()));
         props.insert("stack".into(), Value::String(stack));

@@ -1,11 +1,14 @@
 use super::{HeapValue, Interpreter, JsFunction, JsObject};
 use crate::objects::js_promise::PromiseState;
 use crate::objects::Value;
-use std::collections::HashMap;
+use rustc_hash::FxHashMap;
 
 impl Interpreter {
     pub(crate) fn drain_microtasks(&mut self) {
-        while let Some(task) = self.async_runtime.dequeue_microtask() {
+        // Batch collect all pending microtasks before execution
+        // This avoids re-entrant issues and reduces overhead
+        let tasks = self.async_runtime.run_microtasks();
+        for task in tasks {
             let _ = self.call_value(&task.callback, &Value::Undefined, &[task.arg]);
         }
     }
@@ -24,7 +27,7 @@ impl Interpreter {
                 closure: vec![Value::Promise(promise_idx)],
                 prototype: Some(proto_idx),
                 super_class: None,
-                properties: HashMap::new(),
+                properties: FxHashMap::default(),
                 owner_module: None,
                 module_scope: None,
                 is_generator: false,
@@ -51,7 +54,7 @@ impl Interpreter {
                 closure: vec![Value::Promise(promise_idx)],
                 prototype: Some(proto_idx),
                 super_class: None,
-                properties: HashMap::new(),
+                properties: FxHashMap::default(),
                 owner_module: None,
                 module_scope: None,
                 is_generator: false,

@@ -109,7 +109,13 @@ Critical hotspots after Pass 1 (vs Node.js, current state):
 | promises | 32x slower | <5x | Phase 8A (allocation reduction) |
 | oo | 10x slower | <5x | Phase 10A (inline property storage) |
 
-### Strategy
+### Implemented (v0.4.0 Pass 2a)
+- [x] **FxHashMap for all property maps** — replaced `std::collections::HashMap` with `FxHashMap` across the entire codebase: `JsObject.properties`, `JsFunction.properties`, `Interpreter.globals`, all prototype property bags, native module factories, and one-shot property constructors. `rustc-hash` was already a dependency.
+- [x] **Closure clone reduction** — `call_value()` in `calls.rs` now extracts only the needed fields from `JsFunction` (bytecode_index, closure, owner_module, module_scope, is_arrow, captured_this, source_file, source_line, rest_param, params.len()) instead of cloning the entire struct.
+- [x] **Closure write-back skip** — `control_flow.rs` now compares each closure variable against the heap value before writing back on `Return`. If unchanged (the common case for non-mutated captures), the write-back is skipped entirely.
+- [x] **Microtask queue batching** — `drain_microtasks()` now uses `async_runtime.run_microtasks()` to batch-collect all pending microtasks before executing them, avoiding re-entrant scheduling overhead.
+
+### Strategy (remaining)
 - [ ] **Phase 1A — NaN-boxing** (foundational; unblocks 2-4x across all benchmarks)
 - [ ] **Phase 2A — Closure env sharing** (Rc<RefCell<Vec<Value>>>)
 - [ ] **Phase 3A — ConsString rope** for string concat

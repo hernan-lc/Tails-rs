@@ -1,3 +1,4 @@
+use rustc_hash::FxHashMap;
 use crate::errors::Result;
 use crate::objects::Value;
 use crate::vm::interpreter::{HeapValue, Interpreter, JsObject};
@@ -27,7 +28,7 @@ pub(super) fn native_os_cpus(
     let cpus: Vec<Value> = cpus_info
         .iter()
         .map(|cpu| {
-            let mut times_props = std::collections::HashMap::new();
+            let mut times_props = FxHashMap::default();
             times_props.insert("user".into(), Value::Integer(cpu.times.user));
             times_props.insert("nice".into(), Value::Integer(cpu.times.nice));
             times_props.insert("sys".into(), Value::Integer(cpu.times.sys));
@@ -41,7 +42,7 @@ pub(super) fn native_os_cpus(
                     extensible: true,
                 }),
             );
-            let mut props = std::collections::HashMap::new();
+            let mut props = FxHashMap::default();
             props.insert("model".into(), Value::String(cpu.model.clone()));
             props.insert("speed".into(), Value::Float(cpu.speed));
             props.insert("times".into(), Value::Object(times_idx));

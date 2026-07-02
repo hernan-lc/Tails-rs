@@ -109,7 +109,7 @@ pub(super) fn native_regexp_exec(
                 regexp.last_index = 0.0;
                 return Ok(Value::Null);
             }
-            match regexp.exec_at(&input, start) {
+            match regexp.exec_at(input, start) {
                 Some((caps, end)) => {
                     if end <= start {
                         regexp.last_index = (start + 1) as f64;
@@ -124,7 +124,7 @@ pub(super) fn native_regexp_exec(
                 }
             }
         } else {
-            match regexp.exec(&input) {
+            match regexp.exec(input) {
                 Some(m) => m,
                 None => return Ok(Value::Null),
             }

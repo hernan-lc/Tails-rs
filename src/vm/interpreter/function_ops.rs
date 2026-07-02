@@ -3,10 +3,10 @@ use crate::compiler::CompiledModule;
 use crate::compiler::Instruction;
 use crate::errors::Result;
 use crate::objects::Value;
-use std::collections::HashMap;
+use rustc_hash::FxHashMap;
 
 impl Interpreter {
-    fn module_globals_rc(&self) -> std::rc::Rc<HashMap<String, Value>> {
+    fn module_globals_rc(&self) -> std::rc::Rc<FxHashMap<String, Value>> {
         self.module_globals_rc
             .clone()
             .unwrap_or_else(|| std::rc::Rc::new(self.globals.clone()))
@@ -38,7 +38,7 @@ impl Interpreter {
                         closure: Vec::new(),
                         prototype: Some(proto_obj_idx),
                         super_class: None,
-                        properties: HashMap::new(),
+                        properties: FxHashMap::default(),
                         owner_module: owner,
                         module_scope: Some(scope),
                         is_generator: func_info.is_generator,
@@ -84,7 +84,7 @@ impl Interpreter {
                         closure: closure_vars,
                         prototype: Some(proto_obj_idx),
                         super_class: None,
-                        properties: HashMap::new(),
+                        properties: FxHashMap::default(),
                         owner_module: owner,
                         module_scope: Some(scope),
                         is_generator: func_info.is_generator,

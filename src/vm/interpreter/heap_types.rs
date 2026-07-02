@@ -4,12 +4,12 @@ use crate::objects::js_collections::{JsMap, JsSet, JsWeakMap, JsWeakSet};
 use crate::objects::js_date::JsDate;
 use crate::objects::js_promise::JsPromise;
 use crate::objects::Value;
-use std::collections::HashMap;
+use rustc_hash::FxHashMap;
 use std::rc::Rc;
 
 #[derive(Debug, Clone)]
 pub struct JsObject {
-    pub properties: HashMap<String, Value>,
+    pub properties: FxHashMap<String, Value>,
     pub prototype: Option<usize>,
     pub extensible: bool,
 }
@@ -23,7 +23,7 @@ impl Default for JsObject {
 impl JsObject {
     pub fn new() -> Self {
         Self {
-            properties: HashMap::new(),
+            properties: FxHashMap::default(),
             prototype: None,
             extensible: true,
         }
@@ -31,7 +31,7 @@ impl JsObject {
 
     pub fn with_prototype(prototype: Option<usize>) -> Self {
         Self {
-            properties: HashMap::new(),
+            properties: FxHashMap::default(),
             prototype,
             extensible: true,
         }
@@ -52,9 +52,9 @@ pub struct JsFunction {
     pub closure: Vec<Value>,
     pub prototype: Option<usize>,
     pub super_class: Option<Value>,
-    pub properties: HashMap<String, Value>,
+    pub properties: FxHashMap<String, Value>,
     pub owner_module: Option<Rc<CompiledModule>>,
-    pub module_scope: Option<Rc<HashMap<String, Value>>>,
+    pub module_scope: Option<Rc<FxHashMap<String, Value>>>,
     pub is_generator: bool,
     pub source_file: Option<String>,
     pub source_line: Option<usize>,

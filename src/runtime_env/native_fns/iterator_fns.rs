@@ -1,3 +1,4 @@
+use rustc_hash::FxHashMap;
 use crate::errors::{Error, Result};
 use crate::objects::Value;
 use crate::runtime_env::native_fns::constants as c;
@@ -25,7 +26,7 @@ pub(super) fn native_array_iterator(
         &mut interp.heap,
         HeapValue::Array(JsArray { elements: arr_data }),
     );
-    let mut props = std::collections::HashMap::new();
+    let mut props = FxHashMap::default();
     props.insert("__type".to_string(), Value::String("array".to_string()));
     props.insert("__index".to_string(), Value::Integer(0));
     props.insert("__data".to_string(), Value::Array(data_idx));
@@ -71,7 +72,7 @@ pub(super) fn native_iterator_map(
     }
 
     // Create a wrapper iterator object
-    let mut props = std::collections::HashMap::new();
+    let mut props = FxHashMap::default();
     props.insert("__type".to_string(), Value::String("mapped".to_string()));
     props.insert("__source".to_string(), this.clone());
     props.insert("__callback".to_string(), callback);
@@ -117,7 +118,7 @@ pub(super) fn native_iterator_filter(
         ));
     }
 
-    let mut props = std::collections::HashMap::new();
+    let mut props = FxHashMap::default();
     props.insert("__type".to_string(), Value::String("filtered".to_string()));
     props.insert("__source".to_string(), this.clone());
     props.insert("__callback".to_string(), callback);
@@ -162,7 +163,7 @@ pub(super) fn native_iterator_take(
         _ => 0,
     };
 
-    let mut props = std::collections::HashMap::new();
+    let mut props = FxHashMap::default();
     props.insert("__type".to_string(), Value::String("taking".to_string()));
     props.insert("__source".to_string(), this.clone());
     props.insert("__remaining".to_string(), Value::Integer(count));
@@ -207,7 +208,7 @@ pub(super) fn native_iterator_drop(
         _ => 0,
     };
 
-    let mut props = std::collections::HashMap::new();
+    let mut props = FxHashMap::default();
     props.insert("__type".to_string(), Value::String("dropping".to_string()));
     props.insert("__source".to_string(), this.clone());
     props.insert("__remaining".to_string(), Value::Integer(count));

@@ -9,43 +9,47 @@ impl Interpreter {
         match callee {
             Value::Function(func_idx) => {
                 if let HeapValue::Function(f) = &self.heap[*func_idx] {
-                    let f_clone = f.clone();
-
-                    if f_clone.bytecode_index == usize::MAX {
-                        if let Some(Value::Promise(promise_idx)) = f_clone.closure.first() {
+                    // Quick path: resolve/reject promise callbacks
+                    if f.bytecode_index == usize::MAX {
+                        if let Some(Value::Promise(promise_idx)) = f.closure.first() {
                             let value = args.first().cloned().unwrap_or(Value::Undefined);
-                            if f_clone.name.as_deref() == Some("resolve") {
+                            if f.name.as_deref() == Some("resolve") {
                                 self.resolve_promise(*promise_idx, value);
-                            } else if f_clone.name.as_deref() == Some("reject") {
+                            } else if f.name.as_deref() == Some("reject") {
                                 self.reject_promise(*promise_idx, value);
                             }
                             return Ok(Value::Undefined);
                         }
                     }
 
-                    let func_module: Option<Rc<CompiledModule>> = f_clone
-                        .owner_module
-                        .clone()
+                    // Extract only the fields we need (avoids cloning entire JsFunction)
+                    let bytecode_index = f.bytecode_index;
+                    let closure = f.closure.clone();
+                    let owner_module = f.owner_module.clone();
+                    let module_scope = f.module_scope.clone();
+                    let is_arrow = f.is_arrow;
+                    let captured_this = f.captured_this.clone();
+                    let source_file = f.source_file.clone();
+                    let source_line = f.source_line;
+                    let rest_param = f.rest_param.is_some();
+                    let param_count = f.params.len();
+
+                    let func_module: Option<Rc<CompiledModule>> = owner_module
                         .or_else(|| self.current_module.clone());
                     let return_address = func_module
                         .as_ref()
                         .map(|m| m.instructions.len())
                         .unwrap_or(0);
                     let base_pointer = self.stack.len();
-                    let closure_count = f_clone.closure.len();
+                    let closure_count = closure.len();
 
                     let saved_mg = self.module_globals.take();
-                    if let Some(ref scope) = f_clone.module_scope {
+                    if let Some(ref scope) = module_scope {
                         self.module_globals = Some((**scope).clone());
                     }
 
                     let saved_module = self.current_module.clone();
                     let saved_path = self.current_module_path.clone();
-                    // OPTIMIZATION (Phase 2C): skip the Vec::clone of
-                    // exception_handlers when it's empty (the common case
-                    // for code without try/catch). The saved value is
-                    // restored after the call; the snapshot below is the
-                    // copy that lives in the CallFrame.
                     let saved_exception_handlers = if self.exception_handlers.is_empty() {
                         Vec::new()
                     } else {
@@ -59,15 +63,12 @@ impl Interpreter {
                     if let Some(ref mod_ref) = func_module {
                         self.current_module = Some(mod_ref.clone());
                     }
-                    if f_clone.source_file.is_some() {
-                        self.current_module_path = f_clone.source_file.clone();
+                    if source_file.is_some() {
+                        self.current_module_path = source_file.clone();
                     }
 
-                    let this_for_frame = if f_clone.is_arrow {
-                        f_clone
-                            .captured_this
-                            .clone()
-                            .unwrap_or_else(|| this.clone())
+                    let this_for_frame = if is_arrow {
+                        captured_this.unwrap_or_else(|| this.clone())
                     } else {
                         this.clone()
                     };
@@ -82,21 +83,18 @@ impl Interpreter {
                         func_heap_idx: Some(*func_idx),
                         this_value: Some(this_for_frame),
                         is_construct: false,
-                        source_name: f_clone
-                            .source_file
-                            .clone()
+                        source_name: source_file
                             .or_else(|| self.current_module_path.clone()),
                         generator_heap_idx: None,
-                        source_line: f_clone.source_line,
+                        source_line,
                         source_col: None,
                         exception_handlers_snapshot,
                     });
 
-                    for closure_var in &f_clone.closure {
-                        self.stack.push(closure_var.clone());
+                    for closure_var in closure {
+                        self.stack.push(closure_var);
                     }
-                    if f_clone.rest_param.is_some() {
-                        let param_count = f_clone.params.len();
+                    if rest_param {
                         for arg in args.iter().take(param_count) {
                             self.stack.push(arg.clone());
                         }
@@ -115,7 +113,7 @@ impl Interpreter {
                     }
 
                     let result = if let Some(module) = func_module {
-                        self.execute_from(&module, f_clone.bytecode_index)
+                        self.execute_from(&module, bytecode_index)
                     } else {
                         Ok(Value::Undefined)
                     };

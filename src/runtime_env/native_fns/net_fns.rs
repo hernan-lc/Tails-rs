@@ -5,6 +5,7 @@ use crate::vm::interpreter::{HeapValue, Interpreter, JsObject};
 
 use super::helpers::to_f64;
 use std::cell::RefCell;
+use rustc_hash::FxHashMap;
 use std::collections::HashMap;
 
 // ---------------------------------------------------------------------------
@@ -95,7 +96,7 @@ pub(super) fn native_net_create_connection(
     let stream_id = alloc_stream_id(stream);
 
     // Build the socket JS object.
-    let mut props = HashMap::new();
+    let mut props = FxHashMap::default();
     props.insert("__stream_id".into(), Value::Integer(stream_id));
     props.insert("readyState".into(), Value::String("open".into()));
     props.insert("write".into(), Value::NativeFunction(c::NET_SOCKET_WRITE));

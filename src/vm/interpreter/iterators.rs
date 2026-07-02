@@ -3,11 +3,10 @@ use crate::errors::{Error, Result};
 use crate::objects::js_promise::PromiseState;
 use crate::objects::Value;
 use crate::runtime_env::native_fns::constants as c;
-use std::collections::HashMap;
 
 impl Interpreter {
-    fn make_builtin_iter_props() -> HashMap<String, Value> {
-        let mut props = HashMap::new();
+    fn make_builtin_iter_props() -> FxHashMap<String, Value> {
+        let mut props = FxHashMap::default();
         props.insert("__type".to_string(), Value::String("array".to_string()));
         props.insert("__index".to_string(), Value::Integer(0));
         props.insert("map".to_string(), Value::NativeFunction(c::ITERATOR_MAP));

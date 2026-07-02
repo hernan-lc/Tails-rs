@@ -1,7 +1,7 @@
 use crate::errors::Result;
 use crate::objects::Value;
 use crate::vm::interpreter::Interpreter;
-use std::collections::HashMap;
+use rustc_hash::FxHashMap;
 
 /// native_require(specifier) — CommonJS require() function
 ///
@@ -54,7 +54,7 @@ pub(super) fn native_require(
                         interp.buffer_proto_idx = Some(*proto_idx);
                     }
                 }
-                let mut props = HashMap::new();
+                let mut props: FxHashMap<String, Value> = FxHashMap::default();
                 for (name, val) in &exports {
                     props.insert(name.clone(), val.clone());
                 }
@@ -163,7 +163,7 @@ pub(super) fn native_require(
     interp.current_module_path = Some(module_path.clone());
     interp
         .module_registry
-        .insert(module_path.clone(), HashMap::new());
+        .insert(module_path.clone(), FxHashMap::default());
 
     // 10. Compute __dirname
     let dirname = std::path::Path::new(&module_path)
@@ -224,9 +224,9 @@ pub(super) fn native_require(
     Ok(result)
 }
 
-/// Extract all properties from a JS object into a HashMap
-fn extract_object_properties(interp: &Interpreter, obj: &Value) -> HashMap<String, Value> {
-    let mut props = HashMap::new();
+/// Extract all properties from a JS object into a FxHashMap
+fn extract_object_properties(interp: &Interpreter, obj: &Value) -> FxHashMap<String, Value> {
+    let mut props = FxHashMap::default();
     if let Value::Object(idx) = obj {
         if let crate::vm::interpreter::HeapValue::Object(obj_data) = &interp.heap[*idx] {
             for (k, v) in &obj_data.properties {

@@ -1,3 +1,4 @@
+use rustc_hash::FxHashMap;
 use crate::objects::Value;
 use crate::vm::interpreter::Interpreter;
 
@@ -335,7 +336,7 @@ pub(super) fn from_json_value(interp: &mut Interpreter, val: serde_json::Value) 
         }
         serde_json::Value::Object(map) => {
             let len = map.len();
-            let mut props = std::collections::HashMap::with_capacity(len);
+            let mut props = FxHashMap::with_capacity_and_hasher(len, Default::default());
             for (k, v) in map {
                 props.insert(k, from_json_value(interp, v));
             }

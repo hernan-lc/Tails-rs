@@ -1,3 +1,4 @@
+use rustc_hash::FxHashMap;
 use crate::errors::{Error, Result};
 use crate::objects::Value;
 use crate::vm::interpreter::{HeapValue, Interpreter, JsObject};
@@ -123,7 +124,7 @@ pub(super) fn native_fs_stat_sync(
             path
         ))
     })?;
-    let mut props = std::collections::HashMap::new();
+    let mut props = FxHashMap::default();
     props.insert("size".into(), Value::Integer(stat.size as i64));
     props.insert("isFile".into(), Value::Boolean(stat.is_file));
     props.insert("isDirectory".into(), Value::Boolean(stat.is_directory));
@@ -285,7 +286,7 @@ pub(super) fn native_fs_readdir(
         }
         Err(e) => {
             let err_idx = interp.heap.len();
-            let mut props = std::collections::HashMap::new();
+            let mut props = FxHashMap::default();
             props.insert(
                 "message".into(),
                 Value::String(format!(
@@ -329,7 +330,7 @@ pub(super) fn native_fs_read_file(
         }
         Err(e) => {
             let err_idx = interp.heap.len();
-            let mut props = std::collections::HashMap::new();
+            let mut props = FxHashMap::default();
             props.insert(
                 "message".into(),
                 Value::String(format!(
@@ -377,7 +378,7 @@ pub(super) fn native_fs_write_file(
         }
         Err(e) => {
             let err_idx = interp.heap.len();
-            let mut props = std::collections::HashMap::new();
+            let mut props = FxHashMap::default();
             props.insert(
                 "message".into(),
                 Value::String(format!("EACCES: permission denied, open '{}': {}", path, e)),
@@ -410,7 +411,7 @@ pub(super) fn native_fs_stat(
 
     match tails_fs::stat(&path) {
         Ok(stat) => {
-            let mut props = std::collections::HashMap::new();
+            let mut props = FxHashMap::default();
             props.insert("size".into(), Value::Integer(stat.size as i64));
             props.insert("isFile".into(), Value::Boolean(stat.is_file));
             props.insert("isDirectory".into(), Value::Boolean(stat.is_directory));
@@ -440,7 +441,7 @@ pub(super) fn native_fs_stat(
         }
         Err(e) => {
             let err_idx = interp.heap.len();
-            let mut props = std::collections::HashMap::new();
+            let mut props = FxHashMap::default();
             props.insert(
                 "message".into(),
                 Value::String(format!(
@@ -498,7 +499,7 @@ pub(super) fn native_fs_mkdir(
         }
         Err(e) => {
             let err_idx = interp.heap.len();
-            let mut props = std::collections::HashMap::new();
+            let mut props = FxHashMap::default();
             props.insert(
                 "message".into(),
                 Value::String(format!(
@@ -542,7 +543,7 @@ pub(super) fn native_fs_unlink(
         }
         Err(e) => {
             let err_idx = interp.heap.len();
-            let mut props = std::collections::HashMap::new();
+            let mut props = FxHashMap::default();
             props.insert(
                 "message".into(),
                 Value::String(format!(
@@ -590,7 +591,7 @@ pub(super) fn native_fs_copy_file(
         }
         Err(e) => {
             let err_idx = interp.heap.len();
-            let mut props = std::collections::HashMap::new();
+            let mut props = FxHashMap::default();
             props.insert(
                 "message".into(),
                 Value::String(format!(
@@ -638,7 +639,7 @@ pub(super) fn native_fs_rename(
         }
         Err(e) => {
             let err_idx = interp.heap.len();
-            let mut props = std::collections::HashMap::new();
+            let mut props = FxHashMap::default();
             props.insert(
                 "message".into(),
                 Value::String(format!(

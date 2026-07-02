@@ -30,6 +30,7 @@ use crate::objects::js_promise::PromiseState;
 use crate::objects::Value;
 use crate::runtime_env::async_runtime::AsyncRuntime;
 use crate::vm::interpreter::control_flow::ControlFlowOutcome;
+use rustc_hash::FxHashMap;
 use std::collections::{HashMap, VecDeque};
 use std::rc::Rc;
 
@@ -72,7 +73,7 @@ pub(crate) struct SuspendedFrame {
 }
 
 pub struct Interpreter {
-    pub(crate) globals: HashMap<String, Value>,
+    pub(crate) globals: FxHashMap<String, Value>,
     pub(crate) stack: Vec<Value>,
     pub(crate) heap: Vec<HeapValue>,
     pub(crate) gc: crate::vm::gc::GarbageCollector,
@@ -83,12 +84,12 @@ pub struct Interpreter {
     pub(crate) async_runtime: AsyncRuntime,
     pub(crate) _promise_stack: Vec<usize>,
     _timer_id_counter: u32,
-    pub(crate) module_registry: HashMap<String, HashMap<String, Value>>,
-    pub(crate) module_exports: HashMap<String, Value>,
+    pub(crate) module_registry: HashMap<String, FxHashMap<String, Value>>,
+    pub(crate) module_exports: FxHashMap<String, Value>,
     pub(crate) current_module_path: Option<String>,
-    pub(crate) module_globals: Option<HashMap<String, Value>>,
-    pub(crate) module_globals_rc: Option<Rc<HashMap<String, Value>>>,
-    pub(crate) require_cache: HashMap<String, Value>,
+    pub(crate) module_globals: Option<FxHashMap<String, Value>>,
+    pub(crate) module_globals_rc: Option<Rc<FxHashMap<String, Value>>>,
+    pub(crate) require_cache: FxHashMap<String, Value>,
     pub(crate) block_scope_stack: Vec<usize>,
     pub(crate) next_symbol_id: u64,
     pub(crate) symbol_registry: HashMap<String, u64>,
@@ -101,8 +102,8 @@ pub struct Interpreter {
     pub(crate) suspended_frames: VecDeque<SuspendedFrame>,
     pub(crate) max_call_stack_depth: usize,
     pub(crate) dynamic_native_fns: Vec<usize>,
-    pub(crate) native_object_methods: HashMap<u32, HashMap<String, Value>>,
-    pub(crate) native_class_registry: HashMap<String, HashMap<String, Value>>,
+    pub(crate) native_object_methods: HashMap<u32, FxHashMap<String, Value>>,
+    pub(crate) native_class_registry: HashMap<String, FxHashMap<String, Value>>,
     /// Holds event sources registered by native modules (http, net, websocket, …)
     /// during their listen/connect calls. Drained by the event loop in
     /// [`TailsRuntime::run_event_loop`] after script execution finishes.
@@ -112,7 +113,7 @@ pub struct Interpreter {
 impl Interpreter {
     pub fn new() -> Result<Self> {
         let mut interp = Self {
-            globals: HashMap::new(),
+            globals: FxHashMap::default(),
             stack: Vec::new(),
             heap: Vec::new(),
             gc: crate::vm::gc::GarbageCollector::new(),
@@ -124,11 +125,11 @@ impl Interpreter {
             _promise_stack: Vec::new(),
             _timer_id_counter: 1,
             module_registry: HashMap::new(),
-            module_exports: HashMap::new(),
+            module_exports: FxHashMap::default(),
             module_globals: None,
             module_globals_rc: None,
             current_module_path: None,
-            require_cache: HashMap::new(),
+            require_cache: FxHashMap::default(),
             block_scope_stack: Vec::new(),
             next_symbol_id: crate::objects::USER_SYMBOL_START,
             symbol_registry: HashMap::new(),
@@ -270,7 +271,7 @@ impl Interpreter {
         result
     }
 
-    pub(crate) fn add_proto_roots(&self, map: &mut HashMap<String, Value>) {
+    pub(crate) fn add_proto_roots(&self, map: &mut FxHashMap<String, Value>) {
         if let Some(idx) = self.regexp_proto_idx {
             map.insert("__regexp_proto__".into(), Value::Object(idx));
         }

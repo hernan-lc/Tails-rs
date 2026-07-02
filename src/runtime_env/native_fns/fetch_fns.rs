@@ -1,3 +1,4 @@
+use rustc_hash::FxHashMap;
 use crate::errors::{Error, Result};
 use crate::objects::js_promise::JsPromise;
 use crate::objects::Value;
@@ -15,7 +16,7 @@ pub(super) fn native_headers_constructor(
     _this: &Value,
     args: &[Value],
 ) -> Result<Value> {
-    let mut props = std::collections::HashMap::new();
+    let mut props = FxHashMap::default();
     // Store headers as a flat string "key1\0value1\nkey2\0value2"
     // This preserves multiple values for the same key
     props.insert("__headers".into(), Value::String(String::new()));
@@ -363,7 +364,7 @@ pub(super) fn native_request_constructor(
                     }
                 }
 
-                let mut props = std::collections::HashMap::new();
+                let mut props = FxHashMap::default();
                 props.insert("url".into(), Value::String(cloned_url));
                 props.insert("method".into(), Value::String(method.to_uppercase()));
                 props.insert("__headers".into(), Value::String(headers_raw.clone()));
@@ -377,7 +378,7 @@ pub(super) fn native_request_constructor(
 
                 // Create headers object
                 let h_idx = interp.heap.len();
-                let mut h_props = std::collections::HashMap::new();
+                let mut h_props = FxHashMap::default();
                 h_props.insert("__headers".into(), Value::String(headers_raw));
                 h_props.insert("append".into(), Value::NativeFunction(c::HEADERS_APPEND));
                 h_props.insert("get".into(), Value::NativeFunction(c::HEADERS_GET));
@@ -434,7 +435,7 @@ pub(super) fn native_request_constructor(
         }
     }
 
-    let mut props = std::collections::HashMap::new();
+    let mut props = FxHashMap::default();
     props.insert("url".into(), Value::String(url));
     props.insert("method".into(), Value::String(method.to_uppercase()));
     props.insert("__headers".into(), Value::String(headers_raw.clone()));
@@ -447,7 +448,7 @@ pub(super) fn native_request_constructor(
 
     // Create headers object
     let h_idx = interp.heap.len();
-    let mut h_props = std::collections::HashMap::new();
+    let mut h_props = FxHashMap::default();
     h_props.insert("__headers".into(), Value::String(headers_raw));
     h_props.insert("append".into(), Value::NativeFunction(c::HEADERS_APPEND));
     h_props.insert("get".into(), Value::NativeFunction(c::HEADERS_GET));
@@ -541,7 +542,7 @@ fn build_response(
     status_text: &str,
     headers_raw: &str,
 ) -> Result<Value> {
-    let mut props = std::collections::HashMap::new();
+    let mut props = FxHashMap::default();
     props.insert("status".into(), Value::Integer(status as i64));
     props.insert("statusText".into(), Value::String(status_text.to_string()));
     props.insert("ok".into(), Value::Boolean((200..300).contains(&status)));
@@ -559,7 +560,7 @@ fn build_response(
 
     // Create headers object
     let h_idx = interp.heap.len();
-    let mut h_props = std::collections::HashMap::new();
+    let mut h_props = FxHashMap::default();
     h_props.insert("__headers".into(), Value::String(headers_raw.to_string()));
     h_props.insert("append".into(), Value::NativeFunction(c::HEADERS_APPEND));
     h_props.insert("get".into(), Value::NativeFunction(c::HEADERS_GET));

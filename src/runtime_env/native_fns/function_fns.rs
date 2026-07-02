@@ -1,3 +1,4 @@
+use rustc_hash::FxHashMap;
 use crate::errors::{Error, Result};
 use crate::objects::Value;
 use crate::vm::interpreter::Interpreter;
@@ -82,7 +83,7 @@ pub(super) fn native_function_bind(
                 closure,
                 prototype: None,
                 super_class: None,
-                properties: std::collections::HashMap::new(),
+                properties: FxHashMap::default(),
                 owner_module: None,
                 module_scope: None,
                 is_generator: false,

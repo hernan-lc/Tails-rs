@@ -1,6 +1,7 @@
 use crate::objects::Value;
 use crate::vm::interpreter::HeapValue;
-use std::collections::{HashMap, VecDeque};
+use rustc_hash::FxHashMap;
+use std::collections::VecDeque;
 
 pub struct GarbageCollector {
     free_list: VecDeque<usize>,
@@ -85,7 +86,7 @@ impl GarbageCollector {
     pub(crate) fn collect(
         &mut self,
         heap: &mut [HeapValue],
-        globals: &HashMap<String, Value>,
+        globals: &FxHashMap<String, Value>,
         stack: &[Value],
         call_stack: &[crate::vm::interpreter::CallFrame],
     ) -> usize {
@@ -96,7 +97,7 @@ impl GarbageCollector {
 
     pub(crate) fn mark_roots(
         &mut self,
-        globals: &HashMap<String, Value>,
+        globals: &FxHashMap<String, Value>,
         stack: &[Value],
         call_stack: &[crate::vm::interpreter::CallFrame],
         heap: &[HeapValue],
@@ -405,7 +406,7 @@ mod tests {
     fn test_gc_collect_preserves_reachable() {
         let mut gc = GarbageCollector::new();
         let mut heap = Vec::new();
-        let globals = HashMap::new();
+        let globals = FxHashMap::default();
 
         let idx0 = gc.allocate(&mut heap, make_obj());
         let idx1 = gc.allocate(&mut heap, make_obj());
@@ -431,7 +432,7 @@ mod tests {
     fn test_gc_collect_frees_unreachable() {
         let mut gc = GarbageCollector::new();
         let mut heap = Vec::new();
-        let globals = HashMap::new();
+        let globals = FxHashMap::default();
         let stack = vec![];
 
         gc.allocate(&mut heap, make_obj());
@@ -458,7 +459,7 @@ mod tests {
     fn test_gc_multiple_collections() {
         let mut gc = GarbageCollector::new();
         let mut heap = Vec::new();
-        let globals = HashMap::new();
+        let globals = FxHashMap::default();
         let stack = vec![];
 
         gc.allocate(&mut heap, make_obj());
@@ -476,7 +477,7 @@ mod tests {
     fn test_gc_chain_of_references() {
         let mut gc = GarbageCollector::new();
         let mut heap = Vec::new();
-        let globals = HashMap::new();
+        let globals = FxHashMap::default();
 
         let idx0 = gc.allocate(&mut heap, make_obj());
         let idx1 = gc.allocate(&mut heap, make_obj());
@@ -502,7 +503,7 @@ mod tests {
     fn test_gc_closure_references() {
         let mut gc = GarbageCollector::new();
         let mut heap = Vec::new();
-        let globals = HashMap::new();
+        let globals = FxHashMap::default();
 
         let inner_obj_idx = gc.allocate(&mut heap, make_obj());
         let func_idx = gc.allocate(
@@ -515,7 +516,7 @@ mod tests {
                 closure: vec![Value::Object(inner_obj_idx)],
                 prototype: None,
                 super_class: None,
-                properties: HashMap::new(),
+                properties: FxHashMap::default(),
                 owner_module: None,
                 module_scope: None,
                 is_generator: false,

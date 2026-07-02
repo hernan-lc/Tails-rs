@@ -1,3 +1,4 @@
+use rustc_hash::FxHashMap;
 use crate::errors::{Error, Result};
 use crate::objects::Value;
 use crate::vm::interpreter::Interpreter;
@@ -240,7 +241,7 @@ pub(super) fn native_reflect_get_own_property_descriptor(
         _ => return Ok(Value::Undefined),
     };
 
-    let mut descriptor = std::collections::HashMap::new();
+    let mut descriptor = FxHashMap::default();
     match &target {
         Value::Object(obj_idx) => {
             if let crate::vm::interpreter::HeapValue::Object(obj) = &interp.heap[*obj_idx] {

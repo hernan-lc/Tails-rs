@@ -4,6 +4,7 @@ use crate::runtime_env::native_fns::constants as c;
 use crate::vm::interpreter::{HeapValue, Interpreter, JsObject};
 
 use super::helpers::{to_f64, to_string_value};
+use rustc_hash::FxHashMap;
 use std::collections::HashMap;
 
 // ============================================================
@@ -16,7 +17,7 @@ pub(super) fn native_http_create_server(
 ) -> Result<Value> {
     let handler = args.first().cloned().unwrap_or(Value::Undefined);
 
-    let mut props = HashMap::new();
+    let mut props = FxHashMap::default();
     props.insert("__handler".into(), handler);
     props.insert("__closed".into(), Value::Boolean(false));
     props.insert("__port".into(), Value::Integer(0));
@@ -304,7 +305,7 @@ fn handle_one_request(
     };
 
     // --- req object ---
-    let mut hdr_props = HashMap::new();
+    let mut hdr_props = FxHashMap::default();
     for (k, v) in &req.headers {
         hdr_props.insert(k.clone(), Value::String(v.clone()));
     }
@@ -315,7 +316,7 @@ fn handle_one_request(
         extensible: true,
     }));
 
-    let mut req_props = HashMap::new();
+    let mut req_props = FxHashMap::default();
     req_props.insert("method".into(), Value::String(req.method));
     req_props.insert("url".into(), Value::String(req.path));
     req_props.insert("body".into(), Value::String(req.body.clone()));
@@ -331,7 +332,7 @@ fn handle_one_request(
     let req_val = Value::Object(req_idx);
 
     // --- res object ---
-    let mut res_props = HashMap::new();
+    let mut res_props = FxHashMap::default();
     res_props.insert("statusCode".into(), Value::Integer(200));
     res_props.insert("__status".into(), Value::Integer(200));
     res_props.insert("__body".into(), Value::String(String::new()));
