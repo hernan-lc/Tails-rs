@@ -2,28 +2,44 @@
 // Run: cargo run --release --bin tails -- run examples/http-server.ts
 //
 // Demonstrates the `http` native module: createServer + listen + close.
-// Because Tails uses a single-threaded cooperative event loop, `listen` runs a
-// bounded accept loop. Pass options { maxConnections, timeoutMs } to control it.
+// The server stays alive until explicitly closed or the process exits.
+//
+// Try:
+//   curl http://127.0.0.1:9877/
+//   curl -d hello http://127.0.0.1:9877/echo
+//   curl http://127.0.0.1:9877/json
 
 import http from "http";
 
 const PORT = 9877;
 
 const server = http.createServer((req, res) => {
-  // req.body is the full request body (collected synchronously).
-  // req.on('data'/'end') fire immediately for the same effect.
-  let body = "";
-  req.on("data", (chunk) => (body += chunk));
-  req.on("end", () => {
-    res.writeHead(200);
-    res.end("ok:" + body.length);
-  });
+  console.log(`${req.method} ${req.url}`);
+
+  if (req.url === "/json") {
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ message: "Hello from Tails!", timestamp: Date.now() }));
+    return;
+  }
+
+  if (req.url === "/echo") {
+    let body = "";
+    req.on("data", (chunk: string) => (body += chunk));
+    req.on("end", () => {
+      res.writeHead(200);
+      res.end("echo: " + body);
+    });
+    return;
+  }
+
+  // Default response
+  res.writeHead(200);
+  res.end("Hello from Tails-rs HTTP server!\nTry: /json, /echo");
 });
 
-console.log("Listening on http://127.0.0.1:" + PORT);
-
+// Listen without timeout — server stays alive until process exits
 server.listen(PORT, () => {
-  console.log("Server ready — send a request with: curl -d hello http://127.0.0.1:" + PORT + "/echo");
-}, { maxConnections: 5, timeoutMs: 8000 });
-
-console.log("Server closed after handling requests (or timeout).");
+  console.log(`Server listening on http://127.0.0.1:${PORT}`);
+  console.log("Endpoints: /, /json, /echo");
+  console.log("Press Ctrl+C to stop.");
+}, { timeoutMs: 86400000 }); // 24 hours
