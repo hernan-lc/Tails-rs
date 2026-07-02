@@ -6,15 +6,16 @@
 
 ### Must Fix
 - [ ] **Reflect API** — All 13 methods in `src/objects/js_proxy.rs` are stubs returning dummy values. Implement `get`, `set`, `has`, `deleteProperty`, `ownKeys`, `getOwnPropertyDescriptor`, `defineProperty`, `getPrototypeOf`, `setPrototypeOf`, `isExtensible`, `preventExtensions`, `apply`, `construct`
+- [ ] **EventEmitter prototype inheritance** — `new events.EventEmitter()` instances don't inherit `on`/`emit`/`off`/`listenerCount` from the prototype. The constructor in `events_fns.rs` doesn't link instances to the prototype object created in `create_events_module`
 - [ ] **CI Test Pipeline** — No `cargo test` runs on push/PR. Add GitHub Actions workflow for test + clippy
 - [ ] **Generators benchmark** — Returns 0.00ms (likely failing silently). Investigate and fix
 
 ### Missing Tests
-- [ ] WebSocket module — No Rust test harness
-- [ ] OS module — No dedicated `os_module.rs`
-- [ ] child_process — No tests for `execSync`, `exec`, `spawn`
-- [ ] crypto — No tests for `randomBytes`, `randomUUID`, `createHash`
-- [ ] events — No tests for `EventEmitter`
+- [x] OS module — `tests/os_module.rs` (11 tests)
+- [x] crypto — `tests/crypto_module.rs` (7 tests)
+- [x] events — `tests/events_module.rs` (3 tests, note: EventEmitter prototype inheritance is broken)
+- [x] child_process — `tests/child_process_module.rs` (5 tests)
+- [x] WebSocket module — `tests/websocket_module.rs` (6 tests)
 - [ ] CLI — No tests for `tails build`, `tails clean`, `--watch`, `--env-file`
 
 ### Missing Examples
