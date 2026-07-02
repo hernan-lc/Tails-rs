@@ -2,48 +2,55 @@
 
 ### Recently Completed
 - **http module** — HTTP/1.1 server via `http.createServer()`, `server.listen(port, readyCb, options)`, `req`/`res` objects with `req.on('data'/'end')`, `req.body`, `req.headers`, `req.method`, `req.url`, `res.writeHead()`, `res.write()`, `res.end()`, `server.close()`. Bounded accept loop with `maxConnections` and `timeoutMs` options for the cooperative event loop
-- **Modular Native Modules** — `fs`, `path`, `process`, `os` extracted to standalone crates under `modules/` with Cargo feature flags for selective inclusion
+- **websocket module** — WebSocket client via `new WebSocket(url)`, `ws.send()`, `ws.close()`, `ws.addEventListener('open'/'message'/'error'/'close', callback)`, `ws.removeEventListener()`
+- **fetch API** — `fetch(url, options)` with `Headers`, `Request`, `Response` types. `Headers.append()`, `get()`, `set()`, `has()`, `delete()`, `forEach()`, `keys()`, `values()`, `entries()`. `Response.text()`, `json()`, `arrayBuffer()`, static methods (`json()`, `error()`, `redirect()`, `clone()`)
+- **URL** — `new URL(url, base)`, `URLSearchParams` with full API, `URL.canParse()`, `URL.parse()`, `url.toJSON()`, `fileURLToPath()`
+- **child_process** — `execSync(command)`, `exec(command, callback)`, `spawn(command, args, options)`
+- **assert** — `assert(value, message)`, `assertStrictEqual(actual, expected, message)`
+- **Modular Native Modules** — `fs`, `path`, `process`, `os`, `websocket`, `http` extracted to standalone crates under `modules/` with Cargo feature flags for selective inclusion
 - **Bare-name Imports** — `import fs from "fs"` works alongside the legacy `import fs from "./fs.native"` syntax
 - **Light Runtime** — Moved process, Buffer, Intl from globals to import-only native modules
 - **Native Module System** — Import-only modules via `.native` extension, registry-based loader
+- **Native Module Proc Macros** — `#[tails_function]`, `#[tails_class]`, `#[tails_module]` macros for building native modules without FFI boilerplate
 - **events module** — EventEmitter class with `on()`, `emit()`, `off()`, `listenerCount()`
 - **os module** — OS info: `platform()`, `arch()`, `cpus()`, `totalmem()`, `freemem()`, `uptime()`, `hostname()`, `type()`, `release()`, `homedir()`, `tmpdir()`
 - **crypto module** — `randomBytes()`, `randomUUID()`, `createHash()` (SHA-224/256/384/512)
-- **process module** — `process.platform`, `process.arch`, `process.pid`, `process.cwd()`, `process.chdir()`, `process.env`, `process.argv`, `process.exit()`, `process.stdout.write()`, `process.hrtime()`, `process.nextTick()`
+- **process module** — `process.platform`, `process.arch`, `process.pid`, `process.cwd()`, `process.chdir()`, `process.env`, `process.argv`, `process.exit()`, `process.stdout.write()`, `process.hrtime()`, `process.hrtime.bigint()`, `process.nextTick()`
 - **buffer module** — `Buffer.alloc()`, `Buffer.from()`, `Buffer.concat()`, `Buffer.isBuffer()`, `Buffer.byteLength()`, `toString()`, `write()`, `slice()`, `copy()`, `fill()`, `compare()`, `equals()`, `indexOf()`
 - **intl module** — `Intl.DateTimeFormat` with `format()` and `formatToParts()`, `Intl.NumberFormat` with currency and percent styles
 - **Import-only fs/path** — `fs` and `path` removed from globals, now require explicit import
-- **Reflect API** — Native implementations for `get`, `set`, `apply`, `construct`, `isExtensible`, `preventExtensions`, etc.
-- **Generators** — Runtime support for `function*`, `yield`, and `.next()`
+- **Reflect API** — Native implementations for `get`, `set`, `has`, `deleteProperty`, `apply`, `construct`, `ownKeys`, `getOwnPropertyDescriptor`, `defineProperty`, `getPrototypeOf`, `setPrototypeOf`, `isExtensible`, `preventExtensions`
+- **Generators** — Runtime support for `function*`, `yield`, `.next()`, `.return()`, `.throw()`
 - **for...of loop** — Iterator protocol execution with `Symbol.iterator`
 - **Symbol** type and well-known symbols (`Symbol.iterator`, `Symbol.toStringTag`, `Symbol.hasInstance`, `Symbol.asyncIterator`, etc.)
 - **Function prototypes** — `Function.prototype.bind()`, `.call()`, `.apply()`
 - **Array enhancements** — `copyWithin`, `fill`, `findLast`, `findLastIndex`, `flatMap`, `lastIndexOf`, `Array.isArray()`, `Array.from()`, `Array.of()`
-- **Object methods** — `Object.is()`, `Object.seal()`, `Object.isSealed()`, `Object.freeze()`, `Object.isFrozen()`, `Object.isExtensible()`, `Object.preventExtensions()`
+- **Object methods** — `Object.is()`, `Object.seal()`, `Object.isSealed()`, `Object.freeze()`, `Object.isFrozen()`, `Object.isExtensible()`, `Object.preventExtensions()`, `Object.defineOwnProperty()`, `Object.getOwnPropertyDescriptor()`, `Object.hasOwnProperty()`
 - **Promise enhancements** — `Promise.any()`, `Promise.allSettled()`, `Promise.withResolvers()`
 - **BigInt** — Full primitive type with literals (`42n`), arithmetic, comparison, `BigInt()` constructor
 - **Date** — Full implementation with `new Date()`, getters/setters, ISO string parsing, `Date.now()`, `Date.parse()`, `Date.UTC()`
-- **RegExp** — Full implementation with `new RegExp()`, `test()`, `exec()`, flags support, `String.prototype.match/replace/search`
+- **RegExp** — Full implementation with `new RegExp()`, `test()`, `exec()`, flags support, `String.prototype.match/replace/search/matchAll`
 - **Iterator helpers** — `map()`, `filter()`, `take()`, `drop()`, `forEach()`, `toArray()` on array/string iterators, with chaining support
 - **for await...of** — Async iteration with `Symbol.asyncIterator` support, automatic promise resolution
 - **Error stack traces** — Real stack traces with function names for `Error`, `TypeError`, `ReferenceError`, `SyntaxError`, `RangeError`
 - **Encoding** — `atob()` and `btoa()` for base64 encoding/decoding
 - **path module** — `path.join()`, `path.resolve()`, `path.basename()`, `path.dirname()`, `path.extname()`, `path.relative()`, `path.isAbsolute()`, `path.normalize()`, `path.sep`, `path.delimiter`
-- **fs module** — `fs.readFileSync()`, `fs.writeFileSync()`, `fs.existsSync()`, `fs.mkdirSync()`, `fs.readdirSync()`, `fs.statSync()`, `fs.unlinkSync()`, `fs.rmSync()`, `fs.copyFileSync()`, `fs.renameSync()`, `fs.appendFileSync()`
+- **fs module** — Sync: `readFileSync()`, `writeFileSync()`, `existsSync()`, `mkdirSync()`, `readdirSync()`, `statSync()`, `unlinkSync()`, `rmSync()`, `copyFileSync()`, `renameSync()`, `appendFileSync()`. Async: `readdir()`, `readFile()`, `writeFile()`, `stat()`, `mkdir()`, `unlink()`, `copyFile()`, `rename()`
 - **CommonJS Support** — `require()` for CJS module loading with `module.exports`/`exports`, `__dirname`/`__filename` globals, module caching, circular dependency handling, `.cjs` extension support, native module resolution via `require("path")` etc.
 - **Dotenv Support** — Auto-loading `.env` files (`.env` → `.env.{NODE_ENV}` → `.env.local`), `$VAR` expansion, `--env-file` and `--no-env-file` CLI flags
+- **Number.prototype** — `toFixed()`, `toString()`, `valueOf()`, `toExponential()`, `toPrecision()`, `Number.isInteger()`, `Number.isSafeInteger()`
+- **Boolean.prototype** — `toString()`, `valueOf()`
+- **console** — `log()`, `warn()`, `error()`, `info()`, `table()`, `dir()`, `group()`, `groupEnd()`, `groupCollapsed()`, `time()`, `timeEnd()`, `assert()`, `clear()`
+- **NATIVE_TABLE constants** — Named constants for all 400+ native function indices with compile-time length assertion
 
 ### Future / Research
 - **More Native Modules**
-  - `url` — URL parsing and manipulation
   - `stream` — Stream processing
-  - `http` / `https` — HTTP client/server
-  - `child_process` — Process spawning
+  - `crypto` — Additional crypto primitives beyond hash/random
 - **Web APIs & FFI**
-  - `fetch` and `Response`/`Request` types
   - Enhanced FFI for Rust interop
 - **Performance**
   - JIT compilation tier
   - Optimized GC (generational, concurrent)
 - **Node.js Compatibility**
-  - Additional core modules (url, crypto, stream, etc.)
+  - Additional core modules (zlib, tls, etc.)

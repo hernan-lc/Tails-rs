@@ -13,10 +13,33 @@ Tails-rs is a JavaScript/TypeScript runtime built from scratch in Rust. It compi
 cargo build --release
 
 # Run a script
-./target/release/tails script.ts
+tails run script.ts
 
 # See all features in action
-cargo run --bin tails -- examples/all_features.ts
+tails run examples/test-builtins.ts
+```
+
+## CLI
+
+```
+tails <command> [OPTIONS]
+
+Commands:
+  run <script.ts>       Run a TypeScript script (default)
+  build [OPTIONS]       Build native module to dist/
+  clean                 Remove dist/ directory
+
+Run options:
+  --watch               Watch for file changes and re-run automatically
+  --env-file <path>     Load environment variables from a specific .env file
+  --no-env-file         Disable automatic .env file loading
+  --color / --no-color  Toggle colored output (default: on)
+  --timestamps          Show timestamps in console output
+
+Build options:
+  --package, -p <name>  Package to build (auto-detects cdylib if omitted)
+  --release             Build in release mode
+  --target-dir <path>   Custom target directory
 ```
 
 ## Documentation
@@ -28,4 +51,3 @@ cargo run --bin tails -- examples/all_features.ts
 - [Architecture](docs/architecture.md) — Source layout and design overview
 - [Testing](docs/testing.md) — Running the test suite
 - [Roadmap](docs/roadmap.md) — Completed work and planned features
-- [Unsafe Code Guide](docs/unsafe-code-guide.md) — Safe abstractions and safety invariants for unsafe code

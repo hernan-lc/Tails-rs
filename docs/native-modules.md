@@ -5,10 +5,16 @@ import fs from "fs";
 import path from "path";
 import process from "process";
 import os from "os";
+import http from "http";
+import WebSocket from "websocket";
 import Buffer from "./buffer.native";
 import Intl from "./intl.native";
 import events from "./events.native";
 import crypto from "./crypto.native";
+import fetch, { Headers, Request, Response } from "./fetch.native";
+import url, { URLSearchParams } from "./url.native";
+import assert from "./assert.native";
+import child_process from "./child_process.native";
 ```
 
 The `.native` extension still works for all modules:
@@ -27,10 +33,15 @@ import path from "./path.native";
 | `process` | `process` | `modules/process` | Process info and control (env, argv, exit, etc.) |
 | `os` | `os` | `modules/os` | OS information (platform, arch, cpus, memory, etc.) |
 | `http` | `http` | `modules/http` | HTTP/1.1 server (`createServer`, `listen`, `req`/`res` objects) |
+| `websocket` | `websocket` | `modules/websocket` | WebSocket client (`send`, `close`, event listeners) |
 | `buffer` | *(always)* | *(built-in)* | Node.js-compatible binary data handling |
 | `intl` | *(always)* | *(built-in)* | Internationalization (DateTimeFormat, NumberFormat) |
 | `events` | *(always)* | *(built-in)* | EventEmitter class with on/emit/off |
 | `crypto` | *(always)* | *(built-in)* | Cryptographic functions (randomBytes, randomUUID, createHash) |
+| `fetch` | *(always)* | *(built-in)* | Fetch API (fetch, Headers, Request, Response) |
+| `url` | *(always)* | *(built-in)* | URL parsing (URL, URLSearchParams, fileURLToPath) |
+| `assert` | *(always)* | *(built-in)* | Assertion functions (assert, assertStrictEqual) |
+| `child_process` | *(always)* | *(built-in)* | Process spawning (execSync, exec, spawn) |
 
 ## Module Architecture
 
