@@ -1,5 +1,7 @@
 # Tails-rs
 
+[![CI](https://github.com/nglmercer/Tails-rs/actions/workflows/ci.yml/badge.svg)](https://github.com/nglmercer/Tails-rs/actions/workflows/ci.yml)
+
 A TypeScript-first runtime implemented in Rust.
 
 ## Overview

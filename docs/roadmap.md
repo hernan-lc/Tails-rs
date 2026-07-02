@@ -7,7 +7,7 @@
 ### Must Fix
 - [x] **Reflect API** — Removed dead stub code from `js_proxy.rs`. All 13 methods were already fully implemented in `reflect_fns.rs` (get, set, has, deleteProperty, ownKeys, getOwnPropertyDescriptor, defineProperty, getPrototypeOf, setPrototypeOf, isExtensible, preventExtensions, apply, construct)
 - [x] **EventEmitter prototype inheritance** — Fixed constructor in `events_fns.rs` to use `this` (which has the correct prototype from the VM) instead of creating a new object with `prototype: None`. Added EventEmitter (index 312) to `find_native_prototype` in `calls.rs` to look up the prototype from the module registry
-- [ ] **CI Test Pipeline** — No `cargo test` runs on push/PR. Add GitHub Actions workflow for test + clippy
+- [x] **CI Test Pipeline** — `.github/workflows/ci.yml` runs on push to `master`, PRs, and manual dispatch. Five jobs: `build`, `test` (default features, `--test-threads=1`), `test-no-default-features`, `lint` (clippy, advisory), `fmt` (advisory). Cargo cache via `Swatinem/rust-cache@v2` with one shared anchor. Status badge in `README.md`.
 - [ ] **Generators benchmark** — Returns 0.00ms (likely failing silently). Investigate and fix
 
 ### Missing Tests

@@ -411,6 +411,7 @@ impl Interpreter {
                                     saved_block_scope_stack: Vec::new(),
                                     func_heap_idx: Some(*func_idx),
                                     generator_yielded: false,
+                                    yield_base_pointer: 0,
                                 }));
                                 self.stack.push(Value::Generator(gen_idx));
                                 pc += 1;

@@ -1,0 +1,171 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+  workflow_dispatch:
+
+# Cancel in-progress runs for the same branch / PR — saves CI minutes.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: short
+
+# Shared cargo-cache config — kept in one place so each job just
+# references it. Workspaces map each member crate to the same target
+# dir, which is how Cargo handles shared compilation artifacts.
+.x-cargo-cache: &cargo-cache
+  uses: Swatinem/rust-cache@v2
+  with:
+    workspaces: |
+      . -> target
+      modules/abi -> target
+      modules/native-macros -> target
+      modules/tails-validator -> target
+      modules/fs -> target
+      modules/path -> target
+      modules/process -> target
+      modules/os -> target
+      modules/websocket -> target
+      modules/http -> target
+      modules/net -> target
+
+jobs:
+  # ──────────────────────────────────────────────────────────────────────
+  # Build: cheapest fast-fail check. Catches compile errors across the
+  # whole workspace, including all default-enabled feature modules
+  # (fs, path, process, os, websocket, http, net).
+  # ──────────────────────────────────────────────────────────────────────
+  build:
+    name: Build (default features)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo registry & target
+        uses: *cargo-cache
+
+      - name: Build workspace
+        run: cargo build --locked --all-features --workspace
+
+  # ──────────────────────────────────────────────────────────────────────
+  # Test: the core of the pipeline. Runs the full test suite for the
+  # lib, integration tests, and module tests across all default features.
+  # Uses --test-threads=1 because some HTTP/TCP tests bind to ephemeral
+  # ports and are sensitive to parallel execution within a single job.
+  # ──────────────────────────────────────────────────────────────────────
+  test:
+    name: Test (default features)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    needs: build
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo registry & target
+        uses: *cargo-cache
+
+      - name: Build test binaries
+        # Building first gives a faster, more readable failure if anything
+        # in the workspace fails to compile under test config.
+        run: cargo build --locked --all-features --workspace --tests
+
+      - name: Run tests
+        run: cargo test --locked --all-features --workspace -- --test-threads=1
+
+  # ──────────────────────────────────────────────────────────────────────
+  # Test (no default features): ensures the runtime still works with all
+  # optional modules disabled. This catches "implicit dependency on a
+  # default feature" regressions — the native module stubs in
+  # src/runtime_env/native_fns/ must all be valid even when the
+  # matching crate isn't compiled in.
+  # ──────────────────────────────────────────────────────────────────────
+  test-no-default-features:
+    name: Test (no default features)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: build
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo registry & target
+        uses: *cargo-cache
+
+      - name: Run tests
+        run: cargo test --locked --no-default-features -- --test-threads=1
+
+  # ──────────────────────────────────────────────────────────────────────
+  # Lint (advisory): clippy without -D warnings so the suite surfaces
+  # suggestions but doesn't fail the build until the codebase is clean
+  # enough to flip the switch. As warnings are fixed, promote this to
+  # `cargo clippy -- -D warnings` and remove `continue-on-error`.
+  # ──────────────────────────────────────────────────────────────────────
+  lint:
+    name: Clippy
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: build
+    continue-on-error: true
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+
+      - name: Cache cargo registry & target
+        uses: *cargo-cache
+
+      - name: Clippy
+        run: cargo clippy --locked --all-features --workspace --all-targets
+
+  # ──────────────────────────────────────────────────────────────────────
+  # Format check (advisory): runs `cargo fmt --check`. Same rationale as
+  # the lint job — informational until promoted to required.
+  # ──────────────────────────────────────────────────────────────────────
+  fmt:
+    name: Format
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: build
+    continue-on-error: true
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+

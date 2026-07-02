@@ -73,6 +73,7 @@ fn test_require_circular_deps() {
 }
 
 #[test]
+#[cfg(feature = "path")]
 fn test_require_native_path() {
     let mut runtime = TailsRuntime::default();
     let source = r#"
