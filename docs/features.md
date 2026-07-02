@@ -171,7 +171,7 @@
 
 ## Proxy & Reflect
 - **Proxy** objects with handlers (get, set, has, deleteProperty, apply, construct)
-- **Reflect** API — declared but not yet implemented (all methods are stubs returning defaults)
+- **Reflect** API: `get()`, `set()`, `has()`, `deleteProperty()`, `apply()`, `construct()`, `ownKeys()`, `getOwnPropertyDescriptor()`, `defineProperty()`, `getPrototypeOf()`, `setPrototypeOf()`, `isExtensible()`, `preventExtensions()`
 
 ## Symbol
 - `Symbol()`, `Symbol.for()`, `Symbol.keyFor()`
