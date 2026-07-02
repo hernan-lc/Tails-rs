@@ -19,10 +19,10 @@
 - [ ] CLI — No tests for `tails build`, `tails clean`, `--watch`, `--env-file`
 
 ### Missing Examples
-- [ ] WebSocket client example
-- [ ] Async/await patterns example
-- [ ] CommonJS require() example
-- [ ] child_process usage example
+- [x] WebSocket client example — `examples/websocket-client.ts`
+- [x] Async/await patterns example — `examples/async-patterns.ts`
+- [x] CommonJS require() example — `examples/commonjs-require.ts` + `examples/cjs/`
+- [x] child_process usage example — `examples/child-process.ts`
 
 ## v0.3.0 — Native Module Polish
 
