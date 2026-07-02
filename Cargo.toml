@@ -50,6 +50,7 @@ anyhow = "1.0"
 log = "0.4"
 env_logger = "0.10"
 fancy-regex = "0.14"
+regex = "1"
 
 # File watching
 notify = "8"

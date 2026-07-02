@@ -132,6 +132,30 @@ impl Interpreter {
                     }
                 }
             }
+            Instruction::AddLocal(dst, src) => {
+                let base = self.call_stack.last().map(|f| f.base_pointer).unwrap_or(0);
+                let dst_idx = base + *dst as usize;
+                let src_idx = base + *src as usize;
+                if dst_idx < self.stack.len() && src_idx < self.stack.len() {
+                    let dst_val = self.stack[dst_idx].clone();
+                    let src_val = self.stack[src_idx].clone();
+                    match (&dst_val, &src_val) {
+                        (Value::Integer(a), Value::Integer(b)) => {
+                            if let Some(result) = a.checked_add(*b) {
+                                self.stack[dst_idx] = Value::Integer(result);
+                            } else {
+                                self.stack[dst_idx] = Value::Float(*a as f64 + *b as f64);
+                            }
+                        }
+                        (Value::Float(a), Value::Float(b)) => {
+                            self.stack[dst_idx] = Value::Float(a + b);
+                        }
+                        _ => {
+                            self.stack[dst_idx] = self.add(dst_val, src_val)?;
+                        }
+                    }
+                }
+            }
             Instruction::Pop => {
                 self.stack.pop();
             }

@@ -5,6 +5,13 @@ use crate::objects::Value;
 impl Interpreter {
     pub(super) fn add(&self, left: Value, right: Value) -> Result<Value> {
         match (&left, &right) {
+            (Value::Integer(a), Value::Integer(b)) => {
+                if let Some(result) = a.checked_add(*b) {
+                    Ok(Value::Integer(result))
+                } else {
+                    Ok(Value::Float(*a as f64 + *b as f64))
+                }
+            }
             (Value::String(a), r) => {
                 let coerced = self.to_string_coerce(r);
                 let mut result = String::with_capacity(a.len() + coerced.len());
@@ -66,6 +73,13 @@ impl Interpreter {
 
     pub(super) fn sub(&self, left: Value, right: Value) -> Result<Value> {
         match (&left, &right) {
+            (Value::Integer(a), Value::Integer(b)) => {
+                if let Some(result) = a.checked_sub(*b) {
+                    Ok(Value::Integer(result))
+                } else {
+                    Ok(Value::Float(*a as f64 - *b as f64))
+                }
+            }
             (Value::BigInt(a), Value::BigInt(b)) => Ok(Value::BigInt(a - b)),
             _ => {
                 let l = self.to_number(&left)?;
@@ -77,6 +91,13 @@ impl Interpreter {
 
     pub(super) fn mul(&self, left: Value, right: Value) -> Result<Value> {
         match (&left, &right) {
+            (Value::Integer(a), Value::Integer(b)) => {
+                if let Some(result) = a.checked_mul(*b) {
+                    Ok(Value::Integer(result))
+                } else {
+                    Ok(Value::Float(*a as f64 * *b as f64))
+                }
+            }
             (Value::BigInt(a), Value::BigInt(b)) => Ok(Value::BigInt(a * b)),
             _ => {
                 let l = self.to_number(&left)?;
@@ -197,6 +218,7 @@ impl Interpreter {
 
     pub(super) fn less_than(&self, left: &Value, right: &Value) -> Result<bool> {
         match (left, right) {
+            (Value::Integer(a), Value::Integer(b)) => Ok(a < b),
             (Value::String(a), Value::String(b)) => Ok(a < b),
             (Value::BigInt(a), Value::BigInt(b)) => Ok(a < b),
             _ => {
@@ -209,6 +231,7 @@ impl Interpreter {
 
     pub(super) fn greater_than(&self, left: &Value, right: &Value) -> Result<bool> {
         match (left, right) {
+            (Value::Integer(a), Value::Integer(b)) => Ok(a > b),
             (Value::String(a), Value::String(b)) => Ok(a > b),
             (Value::BigInt(a), Value::BigInt(b)) => Ok(a > b),
             _ => {
@@ -221,6 +244,7 @@ impl Interpreter {
 
     pub(super) fn less_than_or_equal(&self, left: &Value, right: &Value) -> Result<bool> {
         match (left, right) {
+            (Value::Integer(a), Value::Integer(b)) => Ok(a <= b),
             (Value::String(a), Value::String(b)) => Ok(a <= b),
             (Value::BigInt(a), Value::BigInt(b)) => Ok(a <= b),
             _ => {
@@ -233,6 +257,7 @@ impl Interpreter {
 
     pub(super) fn greater_than_or_equal(&self, left: &Value, right: &Value) -> Result<bool> {
         match (left, right) {
+            (Value::Integer(a), Value::Integer(b)) => Ok(a >= b),
             (Value::String(a), Value::String(b)) => Ok(a >= b),
             (Value::BigInt(a), Value::BigInt(b)) => Ok(a >= b),
             _ => {

@@ -70,6 +70,7 @@ impl CodeGenerator {
         let mut optimized = Vec::with_capacity(self.instructions.len());
         let mut i = 0;
         while i < self.instructions.len() {
+            // Pattern 1: LoadLocal(x) + LoadConst(n) + Add + StoreLocal(x) → IncLocal(x, n)
             if i + 3 < self.instructions.len() {
                 if let (
                     Instruction::LoadLocal(x),
@@ -85,7 +86,6 @@ impl CodeGenerator {
                     if x == y {
                         if let Value::Integer(n) = self.constants[*c as usize] {
                             optimized.push(Instruction::IncLocal(*x, n));
-                            // Also remove the LoadConst, Add, StoreLocal source mappings
                             self.source_lines.drain(i + 1..=i + 3);
                             self.source_cols.drain(i + 1..=i + 3);
                             i += 4;
@@ -94,6 +94,53 @@ impl CodeGenerator {
                     }
                 }
             }
+
+            // Pattern 2: LoadLocal(x) + LoadLocal(y) + Add + StoreLocal(x) → AddLocal(x, y)
+            if i + 3 < self.instructions.len() {
+                if let (
+                    Instruction::LoadLocal(x),
+                    Instruction::LoadLocal(y),
+                    Instruction::Add,
+                    Instruction::StoreLocal(z),
+                ) = (
+                    &self.instructions[i],
+                    &self.instructions[i + 1],
+                    &self.instructions[i + 2],
+                    &self.instructions[i + 3],
+                ) {
+                    if x == z && x != y {
+                        optimized.push(Instruction::AddLocal(*x, *y));
+                        self.source_lines.drain(i + 1..=i + 3);
+                        self.source_cols.drain(i + 1..=i + 3);
+                        i += 4;
+                        continue;
+                    }
+                }
+            }
+
+            // Pattern 3: Pop after side-effect-free instruction → remove both
+            if i + 1 < self.instructions.len() {
+                if let Instruction::Pop = &self.instructions[i + 1] {
+                    match &self.instructions[i] {
+                        Instruction::LoadConst(_)
+                        | Instruction::LoadLocal(_)
+                        | Instruction::LoadNull
+                        | Instruction::LoadUndefined
+                        | Instruction::LoadTrue
+                        | Instruction::LoadFalse
+                        | Instruction::LoadGlobal(_)
+                        | Instruction::LoadGlobalOrUndefined(_) => {
+                            // Skip both the side-effect-free instruction and the Pop
+                            self.source_lines.drain(i..=i + 1);
+                            self.source_cols.drain(i..=i + 1);
+                            i += 2;
+                            continue;
+                        }
+                        _ => {}
+                    }
+                }
+            }
+
             optimized.push(self.instructions[i].clone());
             i += 1;
         }

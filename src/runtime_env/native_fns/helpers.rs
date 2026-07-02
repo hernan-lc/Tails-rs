@@ -313,10 +313,10 @@ pub(super) fn from_json_value(interp: &mut Interpreter, val: serde_json::Value) 
         serde_json::Value::Number(n) => Value::Float(n.as_f64().unwrap_or(f64::NAN)),
         serde_json::Value::String(s) => Value::String(s),
         serde_json::Value::Array(arr) => {
-            let elems: Vec<Value> = arr
-                .into_iter()
-                .map(|v| from_json_value(interp, v))
-                .collect();
+            let len = arr.len();
+            let elems: Vec<Value> = Vec::with_capacity(len);
+            let mut elems = elems;
+            elems.extend(arr.into_iter().map(|v| from_json_value(interp, v)));
             let heap_idx = interp.heap.len();
             interp.heap.push(crate::vm::interpreter::HeapValue::Array(
                 crate::vm::interpreter::JsArray { elements: elems },
@@ -324,7 +324,8 @@ pub(super) fn from_json_value(interp: &mut Interpreter, val: serde_json::Value) 
             Value::Array(heap_idx)
         }
         serde_json::Value::Object(map) => {
-            let mut props = std::collections::HashMap::new();
+            let len = map.len();
+            let mut props = std::collections::HashMap::with_capacity(len);
             for (k, v) in map {
                 props.insert(k, from_json_value(interp, v));
             }

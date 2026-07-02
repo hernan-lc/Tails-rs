@@ -76,15 +76,19 @@ impl Interpreter {
                     if frame.closure_var_count > 0 {
                         if let Some(heap_idx) = frame.func_heap_idx {
                             if let HeapValue::Function(f) = &mut self.heap[heap_idx] {
-                                f.closure.clear();
                                 for i in 0..frame.closure_var_count {
                                     let val = self
                                         .stack
                                         .get(frame.base_pointer + i)
                                         .cloned()
                                         .unwrap_or(Value::Undefined);
-                                    f.closure.push(val);
+                                    if i < f.closure.len() {
+                                        f.closure[i] = val;
+                                    } else {
+                                        f.closure.push(val);
+                                    }
                                 }
+                                f.closure.truncate(frame.closure_var_count);
                             }
                         }
                     }

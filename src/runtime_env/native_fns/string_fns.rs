@@ -285,10 +285,14 @@ pub(super) fn native_string_match_all(
         Value::RegExp(idx) => {
             if let HeapValue::RegExp(re) = &interp.heap[*idx] {
                 if let Some(ref compiled) = re.compiled {
-                    let matches: Vec<String> = compiled.pattern.find_iter(&s)
-                        .flatten()
-                        .map(|m| m.as_str().to_string())
-                        .collect();
+                    let matches: Vec<String> = match compiled {
+                        crate::vm::interpreter::JsCompiledRegex::Simple(r) => {
+                            r.find_iter(&s).map(|m| m.as_str().to_string()).collect()
+                        }
+                        crate::vm::interpreter::JsCompiledRegex::Advanced(r) => {
+                            r.find_iter(&s).filter_map(|m| m.ok()).map(|m| m.as_str().to_string()).collect()
+                        }
+                    };
                     let mut results = Vec::with_capacity(matches.len());
                     for match_str in matches {
                         let arr_idx = interp.gc.allocate(
