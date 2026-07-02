@@ -5,8 +5,8 @@
 ## v0.2.0 — Correctness & Quality
 
 ### Must Fix
-- [ ] **Reflect API** — All 13 methods in `src/objects/js_proxy.rs` are stubs returning dummy values. Implement `get`, `set`, `has`, `deleteProperty`, `ownKeys`, `getOwnPropertyDescriptor`, `defineProperty`, `getPrototypeOf`, `setPrototypeOf`, `isExtensible`, `preventExtensions`, `apply`, `construct`
-- [ ] **EventEmitter prototype inheritance** — `new events.EventEmitter()` instances don't inherit `on`/`emit`/`off`/`listenerCount` from the prototype. The constructor in `events_fns.rs` doesn't link instances to the prototype object created in `create_events_module`
+- [x] **Reflect API** — Removed dead stub code from `js_proxy.rs`. All 13 methods were already fully implemented in `reflect_fns.rs` (get, set, has, deleteProperty, ownKeys, getOwnPropertyDescriptor, defineProperty, getPrototypeOf, setPrototypeOf, isExtensible, preventExtensions, apply, construct)
+- [x] **EventEmitter prototype inheritance** — Fixed constructor in `events_fns.rs` to use `this` (which has the correct prototype from the VM) instead of creating a new object with `prototype: None`. Added EventEmitter (index 312) to `find_native_prototype` in `calls.rs` to look up the prototype from the module registry
 - [ ] **CI Test Pipeline** — No `cargo test` runs on push/PR. Add GitHub Actions workflow for test + clippy
 - [ ] **Generators benchmark** — Returns 0.00ms (likely failing silently). Investigate and fix
 

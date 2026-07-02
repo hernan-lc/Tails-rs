@@ -284,6 +284,15 @@ impl Interpreter {
             76 => "RangeError",
             170 => return self.date_proto_idx,
             214 => return self.regexp_proto_idx,
+            312 => {
+                // EventEmitter - search module registry for events module prototype
+                if let Some(events_props) = self.module_registry.get("events") {
+                    if let Some(Value::Object(proto_idx)) = events_props.get("prototype") {
+                        return Some(*proto_idx);
+                    }
+                }
+                return None;
+            }
             _ => return None,
         };
         for (i, hv) in self.heap.iter().enumerate() {

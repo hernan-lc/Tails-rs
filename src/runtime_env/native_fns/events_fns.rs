@@ -6,21 +6,26 @@ use super::helpers::to_string_value;
 
 pub(super) fn native_event_emitter_constructor(
     interp: &mut Interpreter,
-    _this: &Value,
+    this: &Value,
     _args: &[Value],
 ) -> Result<Value> {
+    // The VM already creates an object with the correct prototype and passes it as `this`.
+    // We just need to add the _listeners property to it.
+    let obj_idx = match this {
+        Value::Object(idx) => *idx,
+        _ => return Ok(this.clone()),
+    };
+
     let listeners_idx = interp
         .gc
         .allocate(&mut interp.heap, HeapValue::Object(JsObject::new()));
-    let mut props = std::collections::HashMap::new();
-    props.insert("_listeners".into(), Value::Object(listeners_idx));
-    let idx = interp.heap.len();
-    interp.heap.push(HeapValue::Object(JsObject {
-        properties: props,
-        prototype: None,
-        extensible: true,
-    }));
-    Ok(Value::Object(idx))
+
+    if let HeapValue::Object(obj) = &mut interp.heap[obj_idx] {
+        obj.properties
+            .insert("_listeners".into(), Value::Object(listeners_idx));
+    }
+
+    Ok(this.clone())
 }
 
 pub(super) fn native_event_emitter_on(
