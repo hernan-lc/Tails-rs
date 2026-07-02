@@ -42,4 +42,4 @@ server.listen(PORT, () => {
   console.log(`Server listening on http://127.0.0.1:${PORT}`);
   console.log("Endpoints: /, /json, /echo");
   console.log("Press Ctrl+C to stop.");
-}, { timeoutMs: 86400000 }); // 24 hours
+});

@@ -3,7 +3,7 @@ use crate::objects::Value;
 use crate::runtime_env::native_fns::constants as c;
 use crate::vm::interpreter::{HeapValue, Interpreter, JsObject};
 
-use super::helpers::{to_f64, to_i64, to_string_value};
+use super::helpers::{to_f64, to_string_value};
 use std::collections::HashMap;
 
 // ============================================================
@@ -102,6 +102,14 @@ pub(super) fn native_http_res_write_head(
             obj.properties
                 .insert("__status".into(), Value::Integer(status));
         }
+        // Store response headers when provided as the second argument.
+        if let Some(Value::Object(hdr_idx)) = args.get(1) {
+            if let HeapValue::Object(res_obj) = &mut interp.heap[*obj_idx] {
+                res_obj
+                    .properties
+                    .insert("__headers".into(), Value::Object(*hdr_idx));
+            }
+        }
     }
     Ok(Value::Undefined)
 }
@@ -170,13 +178,10 @@ pub(super) fn native_http_res_end(
 // ============================================================
 // server.listen(port[, readyCallback[, options]])
 //
-// Binds a TCP listener, invokes `readyCallback`, then runs a bounded accept
-// loop. Each connection is handled synchronously: parse request -> build
-// req/res -> call the request handler -> write response.
-//
-// options (3rd arg):
-//   maxConnections: number — stop after handling this many (default: unlimited)
-//   timeoutMs:      number — stop after this many ms wall-clock (default: 30000)
+// Non-blocking: binds a TCP listener, fires `readyCallback`,
+// registers an HttpEventSource, and returns immediately.
+// The event loop (TailsRuntime::run_event_loop) will poll the
+// listener and dispatch requests to the handler callback.
 // ============================================================
 pub(super) fn native_http_server_listen(
     interp: &mut Interpreter,
@@ -191,15 +196,12 @@ pub(super) fn native_http_server_listen(
     let port = args.first().map(to_f64).unwrap_or(0.0) as u16;
     let ready_cb = args.get(1).cloned();
 
-    let mut max_conn: i64 = -1; // -1 = unlimited
-    let mut timeout_ms: u64 = 30_000;
+    // Parse optional 3rd-arg options.
+    let mut max_connections: i64 = -1; // -1 = unlimited
     if let Some(Value::Object(opt_idx)) = args.get(2) {
         if let HeapValue::Object(opt) = &interp.heap[*opt_idx] {
             if let Some(v) = opt.properties.get("maxConnections") {
-                max_conn = to_i64(v);
-            }
-            if let Some(v) = opt.properties.get("timeoutMs") {
-                timeout_ms = to_f64(v) as u64;
+                max_connections = to_f64(v) as i64;
             }
         }
     }
@@ -213,47 +215,76 @@ pub(super) fn native_http_server_listen(
             .insert("__port".into(), Value::Integer(local_port as i64));
     }
 
+    // Register the listener as an event source so the event loop will poll it.
+    interp
+        .pending_event_sources
+        .push(Box::new(HttpEventSource {
+            server_idx,
+            listener,
+            max_connections,
+            handled: 0,
+        }));
+
     // Invoke the "listening" callback synchronously.
     if let Some(cb) = ready_cb {
         let _ = interp.call_value(&cb, &Value::Undefined, &[]);
     }
 
-    let start = std::time::Instant::now();
-    let poll = std::time::Duration::from_millis(10);
-    let mut handled: i64 = 0;
+    Ok(Value::Undefined)
+}
 
-    loop {
-        let closed = if let HeapValue::Object(obj) = &interp.heap[server_idx] {
-            matches!(obj.properties.get("__closed"), Some(Value::Boolean(true)))
-        } else {
-            true
-        };
-        if closed {
-            break;
-        }
-        if start.elapsed().as_millis() as u64 > timeout_ms {
-            break;
-        }
-        if max_conn >= 0 && handled >= max_conn {
-            break;
-        }
+// ── EventSource implementation for HTTP servers ──────────────────────────
 
-        match listener.accept() {
-            Ok((mut stream, _)) => {
-                match tails_http::read_request(&mut stream) {
-                    Ok(req) => handle_one_request(interp, server_idx, req, &mut stream)?,
-                    Err(_) => { /* ignore malformed requests */ }
-                }
-                handled += 1;
-            }
-            Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {
-                std::thread::sleep(poll);
-            }
-            Err(_) => break,
+/// Wraps a non-blocking TCP listener bound to an HTTP server object.
+/// Registered during `server.listen()` and polled by the event loop.
+struct HttpEventSource {
+    server_idx: usize,
+    listener: std::net::TcpListener,
+    max_connections: i64, // -1 = unlimited
+    handled: i64,
+}
+
+impl crate::vm::EventSource for HttpEventSource {
+    fn is_active(&self) -> bool {
+        if self.max_connections >= 0 && self.handled >= self.max_connections {
+            return false;
         }
+        true
     }
 
-    Ok(Value::Undefined)
+    fn poll(&mut self, interp: &mut Interpreter) -> Result<()> {
+        // Check if the JS server object has been closed.
+        let closed = match interp.heap.get(self.server_idx) {
+            Some(HeapValue::Object(obj)) => {
+                matches!(obj.properties.get("__closed"), Some(Value::Boolean(true)))
+            }
+            _ => true,
+        };
+        if closed {
+            return Ok(());
+        }
+
+        match self.listener.accept() {
+            Ok((mut stream, _)) => {
+                match tails_http::read_request(&mut stream) {
+                    Ok(req) => {
+                        handle_one_request(interp, self.server_idx, req, &mut stream)?;
+                        self.handled += 1;
+                    }
+                    Err(_) => { /* ignore malformed requests */ }
+                }
+            }
+            Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {
+                // No pending connections — normal for non-blocking listener.
+            }
+            Err(_) => {
+                // Permanent error on this listener. Nothing to do; next
+                // is_active() could return false if we tracked it, but
+                // keeping it simple: the server object can be closed from JS.
+            }
+        }
+        Ok(())
+    }
 }
 
 /// Build req/res JS objects, invoke the request handler, then write the
@@ -327,7 +358,7 @@ fn handle_one_request(
     }
 
     // --- read the response out of `res` (no allocation between call & read) ---
-    let (status, body) = if let HeapValue::Object(obj) = &interp.heap[res_idx] {
+    let (status, headers, body) = if let HeapValue::Object(obj) = &interp.heap[res_idx] {
         let st = obj
             .properties
             .get("__status")
@@ -348,17 +379,35 @@ fn handle_one_request(
                 }
             })
             .unwrap_or_default();
-        (st, bd)
+        // Read response headers set by writeHead().
+        let hdrs = if let Some(Value::Object(hidx)) = obj.properties.get("__headers") {
+            if let HeapValue::Object(hobj) = &interp.heap[*hidx] {
+                hobj.properties
+                    .iter()
+                    .filter_map(|(k, v)| {
+                        if let Value::String(s) = v {
+                            Some((k.clone(), s.clone()))
+                        } else {
+                            None
+                        }
+                    })
+                    .collect()
+            } else {
+                HashMap::new()
+            }
+        } else {
+            HashMap::new()
+        };
+        (st, hdrs, bd)
     } else {
-        (200u16, String::new())
+        (200u16, HashMap::new(), String::new())
     };
 
-    let empty_headers = HashMap::new();
     tails_http::write_response(
         stream,
         status,
         tails_http::status_text(status),
-        &empty_headers,
+        &headers,
         &body,
     )
     .map_err(|e| Error::RuntimeError(format!("http write_response failed: {}", e)))?;

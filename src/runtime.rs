@@ -2,7 +2,7 @@ use crate::compiler::type_checker::Type;
 use crate::compiler::Compiler;
 use crate::errors::Result;
 use crate::objects::Value;
-use crate::vm::Interpreter;
+use crate::vm::{EventSource, Interpreter};
 use std::collections::HashMap;
 use std::path::Path;
 
@@ -25,6 +25,9 @@ impl Default for RuntimeConfig {
 pub struct TailsRuntime {
     interpreter: Interpreter,
     config: RuntimeConfig,
+    /// Long-lived event sources registered by native modules (http, net, …).
+    /// Polled by [`run_event_loop`] after the top-level script finishes.
+    event_sources: Vec<Box<dyn EventSource>>,
 }
 
 impl TailsRuntime {
@@ -36,6 +39,7 @@ impl TailsRuntime {
         Ok(Self {
             interpreter,
             config,
+            event_sources: Vec::new(),
         })
     }
 
@@ -156,6 +160,64 @@ impl TailsRuntime {
             crate::errors::Error::RuntimeError(format!("Function '{}' not found in globals", name))
         })?;
         self.call_function(&func, &Value::Undefined, args)
+    }
+
+    /// Returns `true` when the runtime still has work that keeps the process
+    /// alive: registered event sources, pending timers, or queued microtasks.
+    pub fn has_pending_work(&self) -> bool {
+        self.event_sources.iter().any(|s| s.is_active())
+            || !self.interpreter.pending_event_sources.is_empty()
+            || self.interpreter.async_runtime.has_pending_timers()
+            || !self.interpreter.async_runtime.is_idle()
+    }
+
+    /// Run the event loop until all registered event sources are idle and
+    /// there are no more pending timers or microtasks.
+    ///
+    /// This is called after the top-level script/module finishes to keep the
+    /// process alive for long-running services (HTTP servers, TCP connections,
+    /// scheduled timers, …).
+    pub fn run_event_loop(&mut self) -> Result<()> {
+        // Drain any sources registered during script execution.
+        self.drain_pending_sources();
+
+        while self.has_pending_work() {
+            // Drain sources that may have been added during this tick.
+            self.drain_pending_sources();
+
+            // Poll every registered event source.
+            for source in self.event_sources.iter_mut() {
+                if source.is_active() {
+                    source.poll(&mut self.interpreter)?;
+                }
+            }
+
+            // Drain microtasks (Promise continuations, queueMicrotask, …).
+            self.interpreter.drain_microtasks();
+
+            // Fire any ready macrotasks (setTimeout callbacks).
+            let macrotasks = self.interpreter.async_runtime.run_macrotasks();
+            for task in macrotasks {
+                let _ = self
+                    .interpreter
+                    .call_value(&task.callback, &Value::Undefined, &[]);
+            }
+
+            // Remove inactive sources so they are not polled again.
+            self.event_sources.retain(|s| s.is_active());
+
+            // Brief sleep to avoid busy-spinning when all sources are waiting.
+            std::thread::sleep(std::time::Duration::from_millis(1));
+        }
+
+        Ok(())
+    }
+
+    /// Move event sources from the interpreter's pending queue into the
+    /// runtime's active source list.
+    fn drain_pending_sources(&mut self) {
+        let pending = std::mem::take(&mut self.interpreter.pending_event_sources);
+        self.event_sources.extend(pending);
     }
 }
 

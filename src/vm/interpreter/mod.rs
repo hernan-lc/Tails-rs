@@ -33,6 +33,32 @@ use crate::vm::interpreter::control_flow::ControlFlowOutcome;
 use std::collections::{HashMap, VecDeque};
 use std::rc::Rc;
 
+// ── Event-loop integration trait ──────────────────────────────────────────
+//
+// Native modules that produce long-lived async work (HTTP servers, TCP
+// connections, WebSocket clients, …) implement this trait and register an
+// instance via `interp.pending_event_sources.push(Box::new(…))` during
+// their `listen` / `connect` calls.
+//
+// After the top-level script finishes, `TailsRuntime::run_event_loop`
+// drains the pending queue and polls every registered source until none
+// report pending work.
+
+/// A source of async I/O that keeps the event loop alive.
+///
+/// Implementors are owned by [`TailsRuntime`] and polled each tick with a
+/// mutable reference to the interpreter so they can invoke JS callbacks.
+pub trait EventSource: 'static {
+    /// Returns `true` if this source still has open handles / pending work.
+    fn is_active(&self) -> bool;
+
+    /// Process one non-blocking poll cycle.
+    ///
+    /// Implementations may call into the interpreter (e.g. to fire JS request
+    /// handlers or event callbacks).
+    fn poll(&mut self, interp: &mut Interpreter) -> Result<()>;
+}
+
 #[derive(Clone)]
 pub(crate) struct SuspendedFrame {
     pub(crate) promise_idx: usize,
@@ -77,6 +103,10 @@ pub struct Interpreter {
     pub(crate) dynamic_native_fns: Vec<usize>,
     pub(crate) native_object_methods: HashMap<u32, HashMap<String, Value>>,
     pub(crate) native_class_registry: HashMap<String, HashMap<String, Value>>,
+    /// Holds event sources registered by native modules (http, net, websocket, …)
+    /// during their listen/connect calls. Drained by the event loop in
+    /// [`TailsRuntime::run_event_loop`] after script execution finishes.
+    pub(crate) pending_event_sources: Vec<Box<dyn EventSource>>,
 }
 
 impl Interpreter {
@@ -113,6 +143,7 @@ impl Interpreter {
             dynamic_native_fns: Vec::new(),
             native_object_methods: HashMap::new(),
             native_class_registry: HashMap::new(),
+            pending_event_sources: Vec::new(),
         };
         interp.init_builtins();
         Ok(interp)

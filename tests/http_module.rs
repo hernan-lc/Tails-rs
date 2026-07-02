@@ -60,13 +60,14 @@ where
 
     let mut rt = TailsRuntime::default();
     let result = rt.eval_module(&source, Path::new("/tmp/test_http_module.ts"));
-    // The server should exit cleanly after handling max_connections requests
-    // or the timeout fires.
     assert!(
         result.is_ok(),
         "Tails script failed: {:?}",
         result.err().map(|e| e.to_string())
     );
+
+    // Run the event loop — it will exit once maxConnections is reached.
+    rt.run_event_loop().expect("event loop failed");
 
     let resp = client_handle.join().expect("client thread panicked");
     let _ = resp; // assertions are done inside the closure via returns
@@ -246,6 +247,9 @@ fn test_http_server_multiple_requests() {
     let mut rt = TailsRuntime::default();
     let result = rt.eval_module(&source, Path::new("/tmp/test_http_module.ts"));
     assert!(result.is_ok(), "server failed: {:?}", result.err());
+
+    // Run the event loop — it will exit once maxConnections is reached.
+    rt.run_event_loop().expect("event loop failed");
 
     let responses: Vec<String> = handles.into_iter().map(|h| h.join().unwrap()).collect();
     assert_eq!(responses.len(), 3);

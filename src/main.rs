@@ -116,7 +116,17 @@ fn run_script(script_path: &Path) -> Result<()> {
             if !matches!(value, tails::Value::Undefined) {
                 println!("{:?}", value);
             }
-            eprintln!("[tails] Finished in {}ms.", elapsed.as_millis());
+            eprintln!("[tails] Script finished in {}ms.", elapsed.as_millis());
+
+            // If the script registered long-lived event sources (HTTP servers,
+            // TCP connections, timers, …) keep the process alive by running
+            // the cooperative event loop — just like Node.js or Bun.
+            if runtime.has_pending_work() {
+                eprintln!("[tails] Event loop running (Ctrl+C to exit).");
+                if let Err(e) = runtime.run_event_loop() {
+                    eprintln!("[tails] Event loop error: {}", e);
+                }
+            }
         }
         Err(e) => {
             let file_str = script_path.to_string_lossy().to_string();

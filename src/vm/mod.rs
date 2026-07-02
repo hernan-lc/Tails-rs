@@ -1,4 +1,4 @@
 pub mod gc;
 pub mod interpreter;
 
-pub use interpreter::Interpreter;
+pub use interpreter::{EventSource, Interpreter};
