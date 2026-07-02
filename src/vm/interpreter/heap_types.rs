@@ -7,6 +7,24 @@ use crate::objects::Value;
 use rustc_hash::FxHashMap;
 use std::rc::Rc;
 
+/// Creates an `FxHashMap<String, Value>` from key-value pairs.
+///
+/// # Example
+/// ```ignore
+/// let props = props! {
+///     "href" => Value::String(url),
+///     "toString" => Value::NativeFunction(c::URL_TO_STRING),
+/// };
+/// ```
+#[macro_export]
+macro_rules! props {
+    ($($key:expr => $value:expr),* $(,)?) => {{
+        let mut map = ::rustc_hash::FxHashMap::default();
+        $(map.insert($key.to_string(), $value);)*
+        map
+    }};
+}
+
 #[derive(Debug, Clone)]
 pub struct JsObject {
     pub properties: FxHashMap<String, Value>,

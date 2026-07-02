@@ -214,6 +214,10 @@ mod process_fns {
     process_stub!(native_process_hrtime);
     process_stub!(native_process_hrtime_bigint);
     process_stub!(native_process_next_tick);
+    process_stub!(native_process_kill);
+    process_stub!(native_process_uptime);
+    process_stub!(native_process_memory_usage);
+    process_stub!(native_process_on);
 }
 mod promise_fns;
 mod proxy_fns;
@@ -689,6 +693,15 @@ pub static NATIVE_TABLE: &[NativeFn] = &[
     net_fns::native_net_socket_write,
     net_fns::native_net_socket_end,
     net_fns::native_net_socket_on,
+    // Process API completeness (406-409) — appended to avoid
+    // renumbering every existing entry.
+    process_fns::native_process_kill,
+    process_fns::native_process_uptime,
+    process_fns::native_process_memory_usage,
+    process_fns::native_process_on,
+    // Buffer API completeness (410-411) — appended.
+    buffer_fns::native_buffer_is_encoding,
+    buffer_fns::native_buffer_transcode,
 ];
 
 const _: () = assert!(

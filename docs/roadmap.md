@@ -131,10 +131,33 @@ Critical hotspots after Pass 1 (vs Node.js, current state):
 - [ ] `querystring` — `parse`, `stringify`, `encode`, `decode`
 
 ### API Completeness
-- [ ] `Buffer` — Add `isEncoding`, `byteLength` overloads, `transcode`
-- [ ] `process` — Add `kill()`, `on('exit')`, `memoryUsage()`, `uptime()`
+- [x] `Buffer` — Added `isEncoding(enc)`, `transcode(src, fromEnc, toEnc)`, and the `byteLength(string, encoding)` encoding overload. `transcode` supports `utf8` ⇄ `latin1` / `ascii` / `hex` / `base64` / `base64url`; `utf16le` is recognised as a valid encoding name but the actual transcoding returns `null` (queued for a follow-up). Unknown encodings also return `null`. See `src/runtime_env/native_fns/buffer_fns.rs` (`is_supported_encoding`, `native_buffer_is_encoding`, `native_buffer_transcode`).
+- [x] `process` — Added `kill(pid, signal)`, `on('exit', handler)`, `memoryUsage()`, `uptime()`. `kill` accepts both POSIX signal names (`"SIGTERM"`, `"SIGKILL"`, …) and raw integers (e.g. `9`); signal 0 is the standard "existence check". Exit handlers are stored in a process-global `Mutex<Vec<Value>>` and invoked in LIFO order (matching Node) before the process actually terminates. `memoryUsage` returns `{rss, heapTotal, heapUsed, external, arrayBuffers}` with `rss` read from `/proc/self/status` on Linux and `ps -o rss=` on macOS. `uptime` returns wall-clock seconds since first call. The `process` module gains a `libc = "0.2"` dependency to call `kill(2)`.
 - [ ] `fs` — Add `promises` API, `createReadStream`, `watch`
-- [ ] `path` — Add `parse()`, `format()` (currently missing)
+- [x] `path` — `parse()` and `format()` are already shipped in `modules/path/src/lib.rs`; the roadmap entry was stale. `tests/api_completeness_v050.rs` now has regression tests covering the full `parse()` round-trip and `format()` → `parse()` round-trip for `/home/user/file.txt`.
+
+### Implemented (v0.5.0 Pass 1)
+
+First round of `Buffer` / `process` / path work toward Node.js
+compatibility. 15 new integration tests in
+`tests/api_completeness_v050.rs` cover every new public function
+(skipping gracefully when the corresponding `tails-*` cdylib is not in
+`dist/`). Six new entries in `src/runtime_env/native_fns/constants.rs`
+(406–411) and `NATIVE_TABLE_LEN` bumped 406 → 412.
+
+- [x] **Buffer globals** — `Buffer` is now a Node-style bare global (no import needed) in `src/vm/interpreter/builtins.rs:921-941`. The same property map that the native-module factory builds is hoisted into `Interpreter.globals`; `modules.rs` adds `Buffer` to the set of globals that survive `eval_module`'s `saved_globals` restoration.
+- [x] **process global** — Same treatment as `Buffer`: when the `process` feature is enabled, `process` is exposed as a bare global in addition to the `import process from "./process.native"` route. `src/vm/interpreter/builtins.rs:946-961` and `src/vm/interpreter/modules.rs:135-136`.
+- [x] **`props!` macro** — New `macro_rules! props` in `src/vm/interpreter/heap_types.rs:10-22` builds an `FxHashMap<String, Value>` from `key => value` pairs. Used to collapse the 12 manual `props.insert(...)` calls in `url_fns.rs` into a single block. Available as `crate::props!`.
+- [x] **`process.kill` FFI** — `modules/process/src/lib.rs` gains a `kill(pid, signal)` Rust helper (calls `libc::kill(2)`) plus a `parse_signal` table covering all POSIX signal names. The cdylib FFI export accepts a `tails_abi::NativeValue` for the signal so that both string and numeric JS arguments reach the libc call with the right conversion (the macro's `FromNativeValue` impl would otherwise collapse numbers to `""` and dispatch a default `SIGTERM`).
+- [x] **`process.uptime` / `process.memoryUsage` FFI** — New `process_uptime_secs()` and `memory_usage()` Rust helpers plus their FFI exports (`uptime` returns a `f64`; `memory_usage` returns a `serde_json` object string parsed by the FFI wrapper).
+- [x] **Buffer `transcode` round-trips** — Verified by `test_buffer_transcode_utf8_to_hex_to_utf8_roundtrip`, `test_buffer_transcode_base64_roundtrip`, and `test_buffer_transcode_unknown_encoding_returns_null` in `tests/api_completeness_v050.rs`.
+- [x] **Buffer `byteLength` encoding overload** — `Buffer.byteLength("Hi", "hex")` and 6 other encodings all return `2`; `Buffer.byteLength("ñ")` correctly returns `2` (UTF-8 multi-byte). Covered by `test_buffer_byte_length_*`.
+
+### Strategy (remaining)
+- [ ] `Buffer.transcode` — actually implement `utf16le` ⇄ `utf8` (currently returns `null`)
+- [ ] `process.kill` — Windows support (`GenerateConsoleCtrlEvent` / `OpenProcess` + `TerminateProcess`)
+- [ ] `fs.promises` / `fs.createReadStream` / `fs.watch` — see above
+- [ ] Refactor remaining `props.insert(...)` sites in the codebase to use `crate::props!` (currently only `url_fns.rs` was migrated)
 
 ## v1.0.0 — Stability
 

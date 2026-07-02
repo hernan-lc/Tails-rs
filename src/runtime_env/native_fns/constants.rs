@@ -408,6 +408,15 @@ pub const NET_CREATE_CONNECTION: usize = 402;
 pub const NET_SOCKET_WRITE: usize = 403;
 pub const NET_SOCKET_END: usize = 404;
 pub const NET_SOCKET_ON: usize = 405;
+// Process API completeness (406-409) — appended to avoid renumbering
+// every existing entry.
+pub const PROCESS_KILL: usize = 406;
+pub const PROCESS_UPTIME: usize = 407;
+pub const PROCESS_MEMORY_USAGE: usize = 408;
+pub const PROCESS_ON: usize = 409;
+// Buffer API completeness (410-411) — appended.
+pub const BUFFER_IS_ENCODING: usize = 410;
+pub const BUFFER_TRANSCODE: usize = 411;
 
 #[cfg(test)]
 mod tests {
@@ -425,4 +434,4 @@ mod tests {
     }
 }
 
-pub const NATIVE_TABLE_LEN: usize = 406;
+pub const NATIVE_TABLE_LEN: usize = 412;

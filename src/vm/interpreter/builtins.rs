@@ -918,6 +918,60 @@ impl Interpreter {
             "WebSocket".into(),
             Value::NativeFunction(c::WEBSOCKET_CONSTRUCTOR),
         );
+
+        // -------------------------------------------------------------------
+        // Buffer (Node-compatible global).
+        // -------------------------------------------------------------------
+        //
+        // `Buffer` is reachable two ways in this runtime:
+        //   1. As a native module via `import Buffer from "./buffer.native"`
+        //      (see `discover_module` / `create_buffer_module`).
+        //   2. As a plain global identifier, matching Node.js and the
+        //      v0.5.0 API-completeness tests.
+        //
+        // The native-module registry already builds a property map for the
+        // `buffer` module; we just hoist that map into the global scope so
+        // scripts can call `Buffer.from(...)`, `Buffer.byteLength(...)`, etc.
+        // without an import.
+        {
+            use super::native_loader::create_buffer_module;
+            let buffer_props = create_buffer_module(&mut self.heap, &mut self.gc);
+            let buffer_idx = self.gc.allocate(
+                &mut self.heap,
+                HeapValue::Object(JsObject {
+                    properties: buffer_props,
+                    prototype: None,
+                    extensible: true,
+                }),
+            );
+            self.globals
+                .insert("Buffer".into(), Value::Object(buffer_idx));
+        }
+
+        // -------------------------------------------------------------------
+        // process (Node-compatible global, when the `process` feature is on).
+        // -------------------------------------------------------------------
+        //
+        // Mirrors the Buffer registration above. With the `process` feature
+        // enabled, the built-in `process` module is exposed as a global so
+        // scripts that follow Node's conventions (e.g. `process.pid()`,
+        // `process.kill(...)`, `process.uptime()`) work without an
+        // explicit import.
+        #[cfg(feature = "process")]
+        {
+            use super::native_loader::create_process_module;
+            let process_props = create_process_module(&mut self.heap, &mut self.gc);
+            let process_idx = self.gc.allocate(
+                &mut self.heap,
+                HeapValue::Object(JsObject {
+                    properties: process_props,
+                    prototype: None,
+                    extensible: true,
+                }),
+            );
+            self.globals
+                .insert("process".into(), Value::Object(process_idx));
+        }
     }
 }
 

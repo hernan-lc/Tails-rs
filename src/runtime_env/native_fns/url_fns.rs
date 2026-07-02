@@ -3,6 +3,7 @@ use crate::errors::{Error, Result};
 use crate::objects::Value;
 use crate::runtime_env::native_fns::constants as c;
 use crate::vm::interpreter::{HeapValue, Interpreter, JsObject};
+use crate::props;
 
 use super::helpers::to_string_value;
 
@@ -25,57 +26,31 @@ pub(super) fn native_url_constructor(
     let search_params_idx = create_search_params(interp, &query_str);
 
     // Build all properties
-    let mut props = FxHashMap::default();
-    props.insert(
-        "href".to_string(),
-        Value::String(parsed.as_str().to_string()),
-    );
-    props.insert(
-        "origin".to_string(),
-        Value::String(parsed.origin().ascii_serialization()),
-    );
-    props.insert(
-        "protocol".to_string(),
-        Value::String(parsed.scheme().to_string() + ":"),
-    );
-    props.insert(
-        "host".to_string(),
-        Value::String(parsed.host_str().unwrap_or("").to_string()),
-    );
-    props.insert(
-        "hostname".to_string(),
-        Value::String(parsed.host_str().unwrap_or("").to_string()),
-    );
-    props.insert(
-        "port".to_string(),
-        Value::String(parsed.port().map(|p| p.to_string()).unwrap_or_default()),
-    );
-    props.insert(
-        "pathname".to_string(),
-        Value::String(parsed.path().to_string()),
-    );
-    props.insert(
-        "search".to_string(),
-        Value::String(if !query_str.is_empty() {
-            format!("?{}", query_str)
-        } else {
-            String::new()
-        }),
-    );
-    props.insert(
-        "hash".to_string(),
-        Value::String(if parsed.fragment().is_some() {
-            format!("#{}", parsed.fragment().unwrap_or(""))
-        } else {
-            String::new()
-        }),
-    );
-    props.insert("searchParams".to_string(), Value::Object(search_params_idx));
-    props.insert(
-        "toString".to_string(),
-        Value::NativeFunction(c::URL_TO_STRING),
-    );
-    props.insert("toJSON".to_string(), Value::NativeFunction(c::URL_TO_JSON));
+    let search = if !query_str.is_empty() {
+        format!("?{}", query_str)
+    } else {
+        String::new()
+    };
+    let hash = if parsed.fragment().is_some() {
+        format!("#{}", parsed.fragment().unwrap_or(""))
+    } else {
+        String::new()
+    };
+
+    let props = props! {
+        "href" => Value::String(parsed.as_str().to_string()),
+        "origin" => Value::String(parsed.origin().ascii_serialization()),
+        "protocol" => Value::String(parsed.scheme().to_string() + ":"),
+        "host" => Value::String(parsed.host_str().unwrap_or("").to_string()),
+        "hostname" => Value::String(parsed.host_str().unwrap_or("").to_string()),
+        "port" => Value::String(parsed.port().map(|p| p.to_string()).unwrap_or_default()),
+        "pathname" => Value::String(parsed.path().to_string()),
+        "search" => Value::String(search),
+        "hash" => Value::String(hash),
+        "searchParams" => Value::Object(search_params_idx),
+        "toString" => Value::NativeFunction(c::URL_TO_STRING),
+        "toJSON" => Value::NativeFunction(c::URL_TO_JSON),
+    };
 
     // Always create a new object
     let obj_idx = interp.heap.len();

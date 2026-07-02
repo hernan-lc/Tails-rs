@@ -133,6 +133,8 @@ impl Interpreter {
                 || key == "fetch"
                 || key == "WebSocket"
                 || key == "require"
+                || key == "Buffer"
+                || key == "process"
             {
                 self.globals.insert(key.clone(), saved_globals[key].clone());
             }

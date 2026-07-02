@@ -281,6 +281,15 @@ pub fn create_process_module(
         Value::NativeFunction(c::PROCESS_NEXT_TICK),
     );
 
+    // API completeness additions (v0.5.0+).
+    props.insert("kill".into(), Value::NativeFunction(c::PROCESS_KILL));
+    props.insert("uptime".into(), Value::NativeFunction(c::PROCESS_UPTIME));
+    props.insert(
+        "memoryUsage".into(),
+        Value::NativeFunction(c::PROCESS_MEMORY_USAGE),
+    );
+    props.insert("on".into(), Value::NativeFunction(c::PROCESS_ON));
+
     props
 }
 
@@ -299,8 +308,16 @@ pub fn create_buffer_module(
         Value::NativeFunction(c::BUFFER_IS_BUFFER),
     );
     props.insert(
+        "isEncoding".into(),
+        Value::NativeFunction(c::BUFFER_IS_ENCODING),
+    );
+    props.insert(
         "byteLength".into(),
         Value::NativeFunction(c::BUFFER_BYTE_LENGTH),
+    );
+    props.insert(
+        "transcode".into(),
+        Value::NativeFunction(c::BUFFER_TRANSCODE),
     );
 
     // Prototype methods
