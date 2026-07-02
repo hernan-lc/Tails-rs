@@ -6,6 +6,12 @@ use crate::objects::Value;
 use std::collections::HashMap;
 
 impl Interpreter {
+    fn module_globals_rc(&self) -> std::rc::Rc<HashMap<String, Value>> {
+        self.module_globals_rc
+            .clone()
+            .unwrap_or_else(|| std::rc::Rc::new(self.globals.clone()))
+    }
+
     pub(crate) fn exec_make_function(
         &mut self,
         instruction: &Instruction,
@@ -19,7 +25,7 @@ impl Interpreter {
                     .gc
                     .allocate(&mut self.heap, HeapValue::Object(JsObject::new()));
                 let owner = self.current_module.clone();
-                let scope = std::rc::Rc::new(self.globals.clone());
+                let scope = self.module_globals_rc();
                 let src_file = self.current_module_path.clone();
                 let src_line = func_info.source_line;
                 let heap_idx = self.gc.allocate(
@@ -65,7 +71,7 @@ impl Interpreter {
                     .gc
                     .allocate(&mut self.heap, HeapValue::Object(JsObject::new()));
                 let owner = self.current_module.clone();
-                let scope = std::rc::Rc::new(self.globals.clone());
+                let scope = self.module_globals_rc();
                 let src_file = self.current_module_path.clone();
                 let src_line = func_info.source_line;
                 let heap_idx = self.gc.allocate(

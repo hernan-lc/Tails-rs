@@ -61,6 +61,7 @@ pub struct Interpreter {
     pub(crate) module_exports: HashMap<String, Value>,
     pub(crate) current_module_path: Option<String>,
     pub(crate) module_globals: Option<HashMap<String, Value>>,
+    pub(crate) module_globals_rc: Option<Rc<HashMap<String, Value>>>,
     pub(crate) require_cache: HashMap<String, Value>,
     pub(crate) block_scope_stack: Vec<usize>,
     pub(crate) next_symbol_id: u64,
@@ -95,6 +96,7 @@ impl Interpreter {
             module_registry: HashMap::new(),
             module_exports: HashMap::new(),
             module_globals: None,
+            module_globals_rc: None,
             current_module_path: None,
             require_cache: HashMap::new(),
             block_scope_stack: Vec::new(),
@@ -233,22 +235,27 @@ impl Interpreter {
         result
     }
 
-    pub(crate) fn collect_garbage(&mut self) {
-        let mut globals_snapshot = self.globals.clone();
-        // Include proto objects that are stored as Interpreter fields (not in globals)
-        // so the GC doesn't sweep them
+    pub(crate) fn add_proto_roots(&self, map: &mut HashMap<String, Value>) {
         if let Some(idx) = self.regexp_proto_idx {
-            globals_snapshot.insert("__regexp_proto__".into(), Value::Object(idx));
+            map.insert("__regexp_proto__".into(), Value::Object(idx));
         }
         if let Some(idx) = self.date_proto_idx {
-            globals_snapshot.insert("__date_proto__".into(), Value::Object(idx));
+            map.insert("__date_proto__".into(), Value::Object(idx));
         }
         if let Some(idx) = self.buffer_proto_idx {
-            globals_snapshot.insert("__buffer_proto__".into(), Value::Object(idx));
+            map.insert("__buffer_proto__".into(), Value::Object(idx));
         }
         if let Some(idx) = self.generator_proto_idx {
-            globals_snapshot.insert("__generator_proto__".into(), Value::Object(idx));
+            map.insert("__generator_proto__".into(), Value::Object(idx));
         }
+    }
+
+    pub(crate) fn collect_garbage(&mut self) {
+        let globals_snapshot = self.module_globals_rc.clone().unwrap_or_else(|| {
+            let mut map = self.globals.clone();
+            self.add_proto_roots(&mut map);
+            std::rc::Rc::new(map)
+        });
         let stack_snapshot = self.stack.clone();
         let call_stack_snapshot = self.call_stack.clone();
         self.gc.collect(

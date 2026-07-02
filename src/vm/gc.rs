@@ -17,7 +17,7 @@ impl GarbageCollector {
             free_list: VecDeque::new(),
             marked: Vec::new(),
             allocation_count: 0,
-            threshold: 256,
+            threshold: 8192,
             collections_performed: 0,
             bytes_freed: 0,
         }
@@ -73,6 +73,12 @@ impl GarbageCollector {
         self.allocation_count = 0;
         self.bytes_freed += freed;
         self.collections_performed += 1;
+
+        const MAX_THRESHOLD: usize = 1_000_000;
+        if self.threshold < MAX_THRESHOLD {
+            self.threshold = (self.threshold * 3 / 2).min(MAX_THRESHOLD);
+        }
+
         freed
     }
 

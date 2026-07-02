@@ -184,7 +184,11 @@ impl Interpreter {
             self.globals.insert("exports".to_string(), exports_obj);
         }
 
-        let result = self.execute(module);
+        let result = {
+            self.module_globals_rc = Some(std::rc::Rc::new(self.globals.clone()));
+            self.execute(module)
+        };
+        self.module_globals_rc = Some(std::rc::Rc::new(self.globals.clone()));
         let module_globals = std::mem::replace(&mut self.globals, saved_globals.clone());
         let exec_exports = std::mem::replace(&mut self.module_exports, prev_exports);
         for (k, v) in &exec_exports {
