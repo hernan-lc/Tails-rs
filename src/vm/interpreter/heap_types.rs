@@ -123,9 +123,7 @@ fn has_advanced_features(pattern: &str) -> bool {
     let len = bytes.len();
     let mut i = 0;
     while i < len {
-        if bytes[i] == b'(' && i + 1 < len && bytes[i + 1] == b'?'
-            && i + 2 < len
-        {
+        if bytes[i] == b'(' && i + 1 < len && bytes[i + 1] == b'?' && i + 2 < len {
             match bytes[i + 2] {
                 b'=' | b'!' | b'<' => return true, // lookahead/lookbehind
                 _ => {}

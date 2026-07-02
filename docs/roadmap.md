@@ -1,6 +1,7 @@
 > Based on current implementation status. Contributions welcome!
 
 ### Recently Completed
+- **http module** — HTTP/1.1 server via `http.createServer()`, `server.listen(port, readyCb, options)`, `req`/`res` objects with `req.on('data'/'end')`, `req.body`, `req.headers`, `req.method`, `req.url`, `res.writeHead()`, `res.write()`, `res.end()`, `server.close()`. Bounded accept loop with `maxConnections` and `timeoutMs` options for the cooperative event loop
 - **Modular Native Modules** — `fs`, `path`, `process`, `os` extracted to standalone crates under `modules/` with Cargo feature flags for selective inclusion
 - **Bare-name Imports** — `import fs from "fs"` works alongside the legacy `import fs from "./fs.native"` syntax
 - **Light Runtime** — Moved process, Buffer, Intl from globals to import-only native modules

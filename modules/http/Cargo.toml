@@ -1,0 +1,10 @@
+[package]
+name = "tails-http"
+version = "0.1.0"
+edition = "2021"
+description = "Tails native http module (pure HTTP/1.1 server primitives)"
+
+[lib]
+crate-type = ["rlib"]
+
+[dependencies]

@@ -2,8 +2,22 @@
 // Benchmark: http_server
 // Spawns an internal HTTP server and measures round-trip latency over TCP.
 
-const http = require('http');
-const net = require('net');
+// Gracefully SKIP runtimes that lack the required native modules so the
+// suite records a skip rather than a hard failure (see benchmarks/README.md).
+let http;
+let net;
+try {
+  http = require('http');
+  net = require('net');
+} catch (e) {
+  console.log('SKIP');
+  process.exit(0);
+}
+
+if (!http || !net || !http.createServer || !net.createConnection) {
+  console.log('SKIP');
+  process.exit(0);
+}
 
 const PORT = 9877;
 const ITER = 1000;
@@ -23,7 +37,9 @@ server.listen(PORT, () => {
   run();
 });
 
-function run() {
+// NOTE: must be `async` so `await` is valid (previously a non-async function,
+// which is a SyntaxError in every runtime).
+async function run() {
   if (!serverReady) return;
   const t0 = Date.now();
   let done = 0;

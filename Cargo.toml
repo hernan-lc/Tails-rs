@@ -1,5 +1,5 @@
 [workspace]
-members = [".", "modules/abi", "modules/native-macros", "modules/tails-validator", "modules/fs", "modules/path", "modules/process", "modules/os", "modules/websocket"]
+members = [".", "modules/abi", "modules/native-macros", "modules/tails-validator", "modules/fs", "modules/path", "modules/process", "modules/os", "modules/websocket", "modules/http"]
 
 [package]
 name = "tails-rs"
@@ -9,12 +9,13 @@ description = "A TypeScript-first runtime in Rust"
 license = "MIT"
 
 [features]
-default = ["fs", "path", "process", "os", "websocket"]
+default = ["fs", "path", "process", "os", "websocket", "http"]
 fs = ["dep:tails-fs"]
 path = ["dep:tails-path"]
 process = ["dep:tails-process"]
 os = ["dep:tails-os"]
 websocket = ["dep:tails-websocket"]
+http = ["dep:tails-http"]
 
 [lib]
 name = "tails"
@@ -31,6 +32,7 @@ tails-path = { path = "modules/path", optional = true }
 tails-process = { path = "modules/process", optional = true }
 tails-os = { path = "modules/os", optional = true }
 tails-websocket = { path = "modules/websocket", optional = true }
+tails-http = { path = "modules/http", optional = true }
 
 # Async Runtime
 tokio = { version = "1", features = ["full"] }

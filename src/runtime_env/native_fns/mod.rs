@@ -55,6 +55,36 @@ mod fs_fns {
 }
 mod function_fns;
 mod generator_fns;
+#[cfg(feature = "http")]
+mod http_fns;
+#[cfg(not(feature = "http"))]
+mod http_fns {
+    use crate::errors::{Error, Result};
+    use crate::objects::Value;
+    use crate::vm::interpreter::Interpreter;
+
+    macro_rules! http_stub {
+        ($name:ident) => {
+            pub(super) fn $name(
+                _interp: &mut Interpreter,
+                _this: &Value,
+                _args: &[Value],
+            ) -> Result<Value> {
+                Err(Error::RuntimeError(
+                    "http module is not enabled. Rebuild with --features http".into(),
+                ))
+            }
+        };
+    }
+
+    http_stub!(native_http_create_server);
+    http_stub!(native_http_server_listen);
+    http_stub!(native_http_server_close);
+    http_stub!(native_http_req_on);
+    http_stub!(native_http_res_write_head);
+    http_stub!(native_http_res_write);
+    http_stub!(native_http_res_end);
+}
 mod global_fns;
 mod helpers;
 mod intl_fns;
@@ -619,6 +649,14 @@ pub static NATIVE_TABLE: &[NativeFn] = &[
     string_fns::native_string_match_all,
     // Generator[Symbol.iterator] (394)
     generator_fns::native_generator_symbol_iterator,
+    // HTTP server (395-401)
+    http_fns::native_http_create_server,
+    http_fns::native_http_server_listen,
+    http_fns::native_http_server_close,
+    http_fns::native_http_req_on,
+    http_fns::native_http_res_write_head,
+    http_fns::native_http_res_write,
+    http_fns::native_http_res_end,
 ];
 
 const _: () = assert!(

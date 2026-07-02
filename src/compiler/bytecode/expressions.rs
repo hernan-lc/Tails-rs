@@ -639,37 +639,38 @@ impl CodeGenerator {
                 prefix,
             } => {
                 if let Expression::Identifier(name) = operand.as_ref() {
-                    if *prefix {
-                        self.generate_expression(operand)?;
-                        let one = self.add_constant(Value::Float(1.0));
-                        self.emit(Instruction::LoadConst(one));
-                        match op {
-                            UpdateOperator::Increment => self.emit(Instruction::Add),
-                            UpdateOperator::Decrement => self.emit(Instruction::Sub),
-                        }
-                        if let Some(local_idx) = self.resolve_local(name) {
-                            self.emit(Instruction::StoreLocal(local_idx));
-                        } else {
-                            self.emit(Instruction::StoreGlobal(name.clone()));
-                        }
-                    } else {
-                        self.generate_expression(operand)?;
-                        if let Some(local_idx) = self.resolve_local(name) {
+                    // Optimize: ++i / i++ for local variables -> IncLocal (fuses 4 instructions into 2)
+                    if let Some(local_idx) = self.resolve_local(name) {
+                        let delta = match op {
+                            UpdateOperator::Increment => 1i64,
+                            UpdateOperator::Decrement => -1i64,
+                        };
+                        if *prefix {
+                            self.emit(Instruction::IncLocal(local_idx, delta));
                             self.emit(Instruction::LoadLocal(local_idx));
                         } else {
-                            self.emit(Instruction::LoadGlobal(name.clone()));
+                            self.emit(Instruction::LoadLocal(local_idx));
+                            self.emit(Instruction::IncLocal(local_idx, delta));
                         }
+                    } else if *prefix {
+                        self.generate_expression(operand)?;
                         let one = self.add_constant(Value::Float(1.0));
                         self.emit(Instruction::LoadConst(one));
                         match op {
                             UpdateOperator::Increment => self.emit(Instruction::Add),
                             UpdateOperator::Decrement => self.emit(Instruction::Sub),
                         }
-                        if let Some(local_idx) = self.resolve_local(name) {
-                            self.emit(Instruction::StoreLocal(local_idx));
-                        } else {
-                            self.emit(Instruction::StoreGlobal(name.clone()));
+                        self.emit(Instruction::StoreGlobal(name.clone()));
+                    } else {
+                        self.generate_expression(operand)?;
+                        self.emit(Instruction::LoadGlobal(name.clone()));
+                        let one = self.add_constant(Value::Float(1.0));
+                        self.emit(Instruction::LoadConst(one));
+                        match op {
+                            UpdateOperator::Increment => self.emit(Instruction::Add),
+                            UpdateOperator::Decrement => self.emit(Instruction::Sub),
                         }
+                        self.emit(Instruction::StoreGlobal(name.clone()));
                     }
                 } else if let Expression::Member {
                     object,

@@ -62,6 +62,25 @@ Override warmup and run counts via environment variables:
 WARMUP=3 RUNS=10 bash benchmarks/runner.sh
 ```
 
+### Per-run timeout
+
+Each individual benchmark invocation is wrapped in a wall-clock timeout so a
+single hung script can never block the whole suite. The default is **2 minutes**
+(120s); set `TIMEOUT=60` for a stricter **1 minute** cap:
+
+```bash
+# 1-minute cap per run
+TIMEOUT=60 bash benchmarks/runner.sh
+
+# 2-minute cap per run (default)
+TIMEOUT=120 bash benchmarks/runner.sh
+```
+
+A run that exceeds the timeout is killed (exit code 124) and recorded as a
+failed run with `error: "timeout after <N>s"` in `latest.json` rather than
+hanging the runner indefinitely. This keeps the suite usable while you iterate
+on an optimization plan.
+
 ## CI
 
 Nightly GitHub Actions workflow publishes `REPORT.md` as an artifact. Versions pinned in `benchmarks/baselines/REFERENCE.md`.

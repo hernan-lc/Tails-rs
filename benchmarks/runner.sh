@@ -4,6 +4,11 @@ set -euo pipefail
 RUNTIMES=(node bun deno tails)
 WARMUP="${WARMUP:-2}"
 RUNS="${RUNS:-5}"
+# Per-run wall-clock timeout in seconds. Default 2m; set TIMEOUT=60 for 1m.
+# A run exceeding this is killed (exit 124) and recorded as a failed "timeout"
+# rather than blocking the whole suite — so an optimization plan can start even
+# if one benchmark hangs.
+TIMEOUT="${TIMEOUT:-120}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 OUT="$SCRIPT_DIR/results/latest.json"
@@ -51,25 +56,36 @@ for script in "$ROOT"/benchmarks/suites/*/*.js; do
 
     for i in $(seq 1 $((WARMUP + RUNS))); do
       out=""
+      rc=0
       set +e
       if [[ "$runtime" == "tails" ]]; then
-        out=$($TAILS_BIN run "$script" 2>/dev/null || echo "FAIL")
+        out=$(timeout "$TIMEOUT" $TAILS_BIN run "$script" 2>/dev/null)
+        rc=$?
       elif [[ "$runtime" == "deno" ]]; then
-        out=$(deno run --allow-read --allow-net "$script" 2>/dev/null || echo "FAIL")
+        out=$(timeout "$TIMEOUT" deno run --allow-read --allow-net "$script" 2>/dev/null)
+        rc=$?
       elif [[ "$runtime" == "bun" ]]; then
-        out=$(bun run "$script" 2>/dev/null || echo "FAIL")
+        out=$(timeout "$TIMEOUT" bun run "$script" 2>/dev/null)
+        rc=$?
       else
-        out=$("$runtime" "$script" 2>/dev/null || echo "FAIL")
+        out=$(timeout "$TIMEOUT" "$runtime" "$script" 2>/dev/null)
+        rc=$?
       fi
       set -e
 
+      # 124 = `timeout` killed the process for exceeding TIMEOUT seconds
+      if [[ $rc -eq 124 ]]; then
+        failed=$((failed + 1))
+        last_error="timeout after ${TIMEOUT}s"
+        continue
+      fi
       if [[ "$out" == "SKIP"* ]]; then
         skipped=true
         break
       fi
-      if [[ "$out" == "FAIL"* ]] || [[ -z "$out" ]]; then
+      if [[ $rc -ne 0 ]] || [[ -z "$out" ]]; then
         failed=$((failed + 1))
-        last_error="runtime exited non-zero"
+        last_error="runtime exited non-zero (rc=$rc)"
         continue
       fi
       first_line="${out%%$'\n'*}"

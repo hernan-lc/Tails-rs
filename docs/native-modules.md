@@ -26,6 +26,7 @@ import path from "./path.native";
 | `path` | `path` | `modules/path` | Path manipulation (join, resolve, basename, etc.) |
 | `process` | `process` | `modules/process` | Process info and control (env, argv, exit, etc.) |
 | `os` | `os` | `modules/os` | OS information (platform, arch, cpus, memory, etc.) |
+| `http` | `http` | `modules/http` | HTTP/1.1 server (`createServer`, `listen`, `req`/`res` objects) |
 | `buffer` | *(always)* | *(built-in)* | Node.js-compatible binary data handling |
 | `intl` | *(always)* | *(built-in)* | Internationalization (DateTimeFormat, NumberFormat) |
 | `events` | *(always)* | *(built-in)* | EventEmitter class with on/emit/off |

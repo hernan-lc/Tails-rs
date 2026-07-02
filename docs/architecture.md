@@ -15,5 +15,7 @@ modules/
 ├── fs/            # Pure Rust fs operations (feature-gated)
 ├── path/          # Pure Rust path operations (feature-gated)
 ├── process/       # Pure Rust process operations (feature-gated)
-└── os/            # Pure Rust os operations (feature-gated)
+├── os/            # Pure Rust os operations (feature-gated)
+├── websocket/     # Pure Rust WebSocket client operations (feature-gated)
+└── http/          # Pure Rust HTTP/1.1 server primitives (feature-gated)
 ```

@@ -395,6 +395,14 @@ pub const BOOLEAN_TO_STRING: usize = 391;
 pub const BOOLEAN_VALUE_OF: usize = 392;
 pub const STRING_MATCH_ALL: usize = 393;
 pub const GENERATOR_SYMBOL_ITERATOR: usize = 394;
+// HTTP server (395-401)
+pub const HTTP_CREATE_SERVER: usize = 395;
+pub const HTTP_SERVER_LISTEN: usize = 396;
+pub const HTTP_SERVER_CLOSE: usize = 397;
+pub const HTTP_REQ_ON: usize = 398;
+pub const HTTP_RES_WRITE_HEAD: usize = 399;
+pub const HTTP_RES_WRITE: usize = 400;
+pub const HTTP_RES_END: usize = 401;
 
 #[cfg(test)]
 mod tests {
@@ -412,4 +420,4 @@ mod tests {
     }
 }
 
-pub const NATIVE_TABLE_LEN: usize = 395;
+pub const NATIVE_TABLE_LEN: usize = 402;

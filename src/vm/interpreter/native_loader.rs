@@ -135,6 +135,8 @@ pub fn discover_module(name: &str, registry: &mut NativeModuleRegistry) {
         "assert" => registry.register("assert", create_assert_module),
         "child_process" => registry.register("child_process", create_child_process_module),
         "url" => registry.register("url", create_url_module),
+        #[cfg(feature = "http")]
+        "http" => registry.register("http", create_http_module),
         _ => {}
     }
 }
@@ -563,6 +565,19 @@ pub fn create_url_module(
     props.insert(
         "fileURLToPath".into(),
         Value::NativeFunction(c::URL_FILE_URL_TO_PATH),
+    );
+    props
+}
+
+#[cfg(feature = "http")]
+pub fn create_http_module(
+    _heap: &mut Vec<HeapValue>,
+    _gc: &mut GarbageCollector,
+) -> HashMap<String, Value> {
+    let mut props = HashMap::new();
+    props.insert(
+        "createServer".into(),
+        Value::NativeFunction(c::HTTP_CREATE_SERVER),
     );
     props
 }
