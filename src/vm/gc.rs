@@ -352,14 +352,49 @@ impl GarbageCollector {
     }
 }
 
+/// Extract the heap index from any `Value` variant that points into the
+/// heap. Returns `Some(idx)` for every variant whose `usize` payload is
+/// a `HeapValue` index.
+///
+/// **Important:** this list must be kept in lockstep with
+/// [`mark_value`](Self::mark_value), the `HeapValue::X` arms in
+/// [`mark_roots`](Self::mark_roots), and the inverse `Value` enum in
+/// `src/objects/mod.rs`. When a new `Value::X(idx)` variant is added
+/// that wraps a `HeapValue::X` slot, it must be added here **and** in
+/// `mark_value`, otherwise the GC will collect live objects held only
+/// inside collections (Maps, Sets, Arrays, Object properties, …).
 fn heap_value_to_index(value: &Value) -> Option<usize> {
     match value {
         Value::Object(idx)
         | Value::Array(idx)
         | Value::Function(idx)
         | Value::Promise(idx)
-        | Value::Proxy(idx) => Some(*idx),
-        _ => None,
+        | Value::Proxy(idx)
+        | Value::Generator(idx)
+        | Value::TypedArray(idx)
+        | Value::Map(idx)
+        | Value::Set(idx)
+        | Value::WeakMap(idx)
+        | Value::WeakSet(idx)
+        | Value::Date(idx)
+        | Value::RegExp(idx)
+        | Value::Buffer(idx) => Some(*idx),
+        // These do not index into `Interpreter.heap` and have no
+        // heap-traceable payload:
+        //   - Undefined, Null, Boolean, Integer, Float, BigInt, Symbol:
+        //     immediate values
+        //   - NativeFunction: index into `NATIVE_TABLE`, not `heap`
+        //   - NativeObject: handle into the FFI `tails_abi` registry
+        Value::Undefined
+        | Value::Null
+        | Value::Boolean(_)
+        | Value::Integer(_)
+        | Value::Float(_)
+        | Value::BigInt(_)
+        | Value::Symbol(_)
+        | Value::String(_)
+        | Value::NativeFunction(_)
+        | Value::NativeObject(_) => None,
     }
 }
 

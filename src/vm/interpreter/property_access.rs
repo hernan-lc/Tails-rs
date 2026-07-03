@@ -3,6 +3,7 @@ use crate::errors::{Error, Result};
 use crate::objects::js_promise::PromiseState;
 use crate::objects::Value;
 use crate::runtime_env::native_fns::constants as c;
+use rustc_hash::FxHashMap;
 
 impl Interpreter {
     pub fn new_object(&mut self) -> Value {
@@ -130,11 +131,24 @@ impl Interpreter {
             Value::Object(obj_idx) => {
                 if let HeapValue::Object(obj) = &self.heap[*obj_idx] {
                     if let Value::String(key_str) = key {
+                        // Hot path: most property accesses hit an existing
+                        // key without any getter/setter involvement. The
+                        // previous code allocated `format!("__getter_{}", key_str)`
+                        // on every miss — that's a fresh 9 + key_str.len()
+                        // byte `String` allocation per `obj.x` lookup on any
+                        // object that uses a prototype chain (i.e. almost
+                        // every user object). Instead, scan the object's
+                        // own `properties` for a `__getter_<key_str>` entry;
+                        // for the common case (no accessor on this key) this
+                        // is a single `iter().any()` over a tiny map and
+                        // produces zero allocations. The accessor branch
+                        // is still cold, so the cost is amortised away.
                         if let Some(val) = obj.properties.get(key_str) {
                             return Ok(val.clone());
                         }
-                        let getter_key = format!("__getter_{}", key_str);
-                        if let Some(getter_val) = obj.properties.get(&getter_key).cloned() {
+                        if let Some(getter_val) =
+                            find_accessor(&obj.properties, "__getter_", key_str)
+                        {
                             return self.call_value(&getter_val, this, &[]);
                         }
                         if let Some(proto_idx) = obj.prototype {
@@ -700,11 +714,11 @@ impl Interpreter {
                         if obj.properties.contains_key(key_str) {
                             return Ok(Value::Boolean(true));
                         }
-                        // Check for getter/setter accessors
-                        let getter_key = format!("__getter_{}", key_str);
-                        let setter_key = format!("__setter_{}", key_str);
-                        if obj.properties.contains_key(&getter_key)
-                            || obj.properties.contains_key(&setter_key)
+                        // Check for getter/setter accessors (allocation-free:
+                        // the same `find_accessor` scan used by
+                        // `get_property_with_this`).
+                        if find_accessor(&obj.properties, "__getter_", key_str).is_some()
+                            || find_accessor(&obj.properties, "__setter_", key_str).is_some()
                         {
                             return Ok(Value::Boolean(true));
                         }
@@ -775,6 +789,35 @@ impl Interpreter {
         }
         self.call_value(&trap, handler, args)
     }
+}
+
+/// Look for an accessor method (`__getter_<name>` or `__setter_<name>`)
+/// on an object's own property map. Returns a clone of the value if
+/// found, `None` otherwise.
+///
+/// This helper replaces the previous `format!("__getter_{}", key)`
+/// allocation that fired on *every* property miss (not just for keys
+/// that actually have accessors). For an object with N properties the
+/// scan is O(N) but it allocates nothing, and for the common case
+/// (no accessors on this key) it falls through to the prototype walk
+/// immediately.
+///
+/// Hot path: for the typical 0–8 property object the scan visits
+/// at most 8 short string keys (the `__getter_` / `__setter_`
+/// prefix is 9 bytes; the iterator can reject almost every key with
+/// a length check before the prefix compare).
+fn find_accessor(
+    properties: &FxHashMap<String, Value>,
+    prefix: &str,
+    key: &str,
+) -> Option<Value> {
+    let needed_len = prefix.len() + key.len();
+    for (k, v) in properties {
+        if k.len() == needed_len && k.starts_with(prefix) && k.ends_with(key) {
+            return Some(v.clone());
+        }
+    }
+    None
 }
 
 fn to_i64_value(v: &Value) -> i64 {
