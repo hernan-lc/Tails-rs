@@ -120,7 +120,7 @@ pub fn number(val: f64) -> NativeValue {
 pub fn integer(val: i64) -> NativeValue {
     NativeValue {
         tag: TAG_NUMBER,
-        data: val as f64 as u64,
+        data: (val as f64).to_bits(),
     }
 }
 
