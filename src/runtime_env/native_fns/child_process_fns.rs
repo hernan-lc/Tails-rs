@@ -1,4 +1,3 @@
-use rustc_hash::FxHashMap;
 use crate::errors::{Error, Result};
 use crate::objects::Value;
 use crate::vm::interpreter::{HeapValue, Interpreter, JsObject};
@@ -306,40 +305,33 @@ pub(super) fn native_child_process_spawn(
     let stdout_str = String::from_utf8_lossy(&output.stdout).to_string();
     let stderr_str = String::from_utf8_lossy(&output.stderr).to_string();
 
-    // Build ChildProcess-like object
-    let mut child_props = FxHashMap::default();
-    child_props.insert("pid".into(), Value::Integer(pid as i64));
-
-    // stdout object
-    let stdout_props = props! {
-        "data" => Value::String(stdout_str),
-    };
     let stdout_idx = interp.heap.len();
     interp.heap.push(HeapValue::Object(JsObject {
-        properties: stdout_props,
+        properties: props! {
+            "data" => Value::String(stdout_str),
+        },
         prototype: None,
         extensible: true,
     }));
-    child_props.insert("stdout".into(), Value::Object(stdout_idx));
 
-    // stderr object
-    let stderr_props = props! {
-        "data" => Value::String(stderr_str),
-    };
     let stderr_idx = interp.heap.len();
     interp.heap.push(HeapValue::Object(JsObject {
-        properties: stderr_props,
+        properties: props! {
+            "data" => Value::String(stderr_str),
+        },
         prototype: None,
         extensible: true,
     }));
-    child_props.insert("stderr".into(), Value::Object(stderr_idx));
-
-    child_props.insert("exitCode".into(), Value::Integer(exit_code as i64));
-    child_props.insert("signalCode".into(), Value::Null);
 
     let child_idx = interp.heap.len();
     interp.heap.push(HeapValue::Object(JsObject {
-        properties: child_props,
+        properties: props! {
+            "pid" => Value::Integer(pid as i64),
+            "stdout" => Value::Object(stdout_idx),
+            "stderr" => Value::Object(stderr_idx),
+            "exitCode" => Value::Integer(exit_code as i64),
+            "signalCode" => Value::Null,
+        },
         prototype: None,
         extensible: true,
     }));

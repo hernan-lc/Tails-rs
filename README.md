@@ -62,7 +62,14 @@ Build options:
 | `child_process` | exec, execSync, spawn | `import cp from "child_process"` |
 | `assert` | Assertions (strictEqual, deepEqual, ...) | `import assert from "assert"` |
 | `intl` | Intl.DateTimeFormat, Intl.NumberFormat | Available as global `Intl` |
+| `util` | format, inspect, promisify, callbackify | `import util from "util"` |
+| `timers` | setImmediate, clearImmediate | `import timers from "timers"` |
+| `querystring` | parse, stringify, encode, decode | `import qs from "querystring"` |
+| `stream` | Readable/Writable/Transform/PassThrough | `import stream from "stream"` |
+| `zlib` | gzip, deflate, inflate (sync + async) | `import zlib from "zlib"` |
+| `tls` | TLS/SSL support | `import tls from "tls"` |
+| `dns` | DNS resolution (resolve, lookup, ...) | `import dns from "dns"` |
 
-Global objects (no import needed): `console`, `Math`, `JSON`, `Promise`, `Map`, `Set`, `Date`, `RegExp`, `URL`, `fetch`, `Headers`, `Request`, `Response`, `Buffer`, `process`, `Proxy`, `Reflect`, `Symbol`, `Error` family, `TypedArray` family, `WeakMap`, `WeakSet`, `Generator`, `WebSocket`.
+Global objects (no import needed): `console`, `Math`, `JSON`, `Promise`, `Map`, `Set`, `Date`, `RegExp`, `URL`, `fetch`, `Headers`, `Request`, `Response`, `Buffer`, `process`, `Proxy`, `Reflect`, `Symbol`, `Error` family, `TypedArray` family, `WeakMap`, `WeakSet`, `Generator`, `WebSocket`, `setImmediate`, `clearImmediate`.
 
 ## Documentation

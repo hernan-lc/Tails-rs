@@ -9,7 +9,7 @@ description = "A TypeScript-first runtime in Rust"
 license = "MIT"
 
 [features]
-default = ["fs", "fs-promises", "path", "process", "os", "websocket", "http", "net"]
+default = ["fs", "fs-promises", "path", "process", "os", "websocket", "http", "net", "zlib", "tls", "dns"]
 fs = ["dep:tails-fs"]
 fs-promises = ["dep:tails-fs-promises", "dep:tails-fs"]
 path = ["dep:tails-path"]
@@ -18,6 +18,9 @@ os = ["dep:tails-os"]
 websocket = ["dep:tails-websocket"]
 http = ["dep:tails-http"]
 net = ["dep:tails-net"]
+zlib = ["dep:flate2", "dep:base64"]
+tls = ["dep:native-tls"]
+dns = ["dep:hickory-resolver"]
 
 [lib]
 name = "tails"
@@ -80,6 +83,16 @@ urlencoding = "2"
 # Crypto
 getrandom = "0.2"
 sha2 = "0.10"
+
+# Compression (zlib)
+flate2 = { version = "1", optional = true }
+base64 = { version = "0.22", optional = true }
+
+# TLS
+native-tls = { version = "0.2", optional = true }
+
+# DNS
+hickory-resolver = { version = "0.24", optional = true }
 
 # Terminal colors
 colored = "2"

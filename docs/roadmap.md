@@ -156,15 +156,15 @@ Critical hotspots after Pass 1 (vs Node.js, current state):
 - [x] `TypedArray` family (Int8Array through BigUint64Array)
 - [x] `Generator`, `WebSocket`, `Buffer`, `process`
 
-#### Planned (not yet implemented)
-- [ ] `util` — `format`, `inspect`, `promisify`, `callbackify`
-- [ ] `events` — Expand EventEmitter (prependListener, once, MaxListeners)
-- [ ] `timers` — `setImmediate`, `clearImmediate`
-- [ ] `querystring` — `parse`, `stringify`, `encode`, `decode`
-- [ ] `stream` — Readable/Writable/Transform streams
-- [ ] `zlib` — Compression/decompression
-- [ ] `tls` — TLS/SSL support
-- [ ] `dns` — DNS resolution
+#### Implemented
+- [x] `util` — `format`, `inspect`, `promisify`, `callbackify`
+- [x] `events` — Expand EventEmitter (prependListener, once, MaxListeners, removeAllListeners, eventNames, setMaxListeners, getMaxListeners, prependOnceListener)
+- [x] `timers` — `setImmediate`, `clearImmediate`
+- [x] `querystring` — `parse`, `stringify`, `encode`, `decode`
+- [x] `stream` — Readable/Writable/Transform/PassThrough streams
+- [x] `zlib` — Compression/decompression (gzip, deflate, inflate + sync variants)
+- [x] `tls` — TLS/SSL support (connect, createSecureContext, createServer)
+- [x] `dns` — DNS resolution (resolve, lookup, resolve4, resolve6, resolveMx)
 
 ### API Completeness
 - [x] `Buffer` — Added `isEncoding(enc)`, `transcode(src, fromEnc, toEnc)`, and the `byteLength(string, encoding)` encoding overload. `transcode` supports `utf8` ⇄ `latin1` / `ascii` / `hex` / `base64` / `base64url`; `utf16le` is recognised as a valid encoding name but the actual transcoding returns `null` (queued for a follow-up). Unknown encodings also return `null`. See `src/runtime_env/native_fns/buffer_fns.rs` (`is_supported_encoding`, `native_buffer_is_encoding`, `native_buffer_transcode`).

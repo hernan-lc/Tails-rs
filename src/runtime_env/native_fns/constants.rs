@@ -417,6 +417,65 @@ pub const PROCESS_ON: usize = 409;
 // Buffer API completeness (410-411) — appended.
 pub const BUFFER_IS_ENCODING: usize = 410;
 pub const BUFFER_TRANSCODE: usize = 411;
+// util module (412-415)
+pub const UTIL_FORMAT: usize = 412;
+pub const UTIL_INSPECT: usize = 413;
+pub const UTIL_PROMISIFY: usize = 414;
+pub const UTIL_CALLBACKIFY: usize = 415;
+// events expansion (416-422)
+pub const EVENT_EMITTER_PREPEND_LISTENER: usize = 416;
+pub const EVENT_EMITTER_ONCE: usize = 417;
+pub const EVENT_EMITTER_REMOVE_ALL_LISTENERS: usize = 418;
+pub const EVENT_EMITTER_EVENT_NAMES: usize = 419;
+pub const EVENT_EMITTER_GET_MAX_LISTENERS: usize = 420;
+pub const EVENT_EMITTER_SET_MAX_LISTENERS: usize = 421;
+pub const EVENT_EMITTER_PREPEND_ONCE_LISTENER: usize = 422;
+// timers module (423-424)
+pub const SET_IMMEDIATE: usize = 423;
+pub const CLEAR_IMMEDIATE: usize = 424;
+// querystring module (425-428)
+pub const QUERYSTRING_PARSE: usize = 425;
+pub const QUERYSTRING_STRINGIFY: usize = 426;
+pub const QUERYSTRING_ENCODE: usize = 427;
+pub const QUERYSTRING_DECODE: usize = 428;
+// stream module (429-442)
+pub const STREAM_READABLE_READ: usize = 429;
+pub const STREAM_READABLE_PIPE: usize = 430;
+pub const STREAM_READABLE_UNPIPE: usize = 431;
+pub const STREAM_READABLE_PUSH: usize = 432;
+pub const STREAM_READABLE_DESTROY: usize = 433;
+pub const STREAM_WRITABLE_WRITE: usize = 434;
+pub const STREAM_WRITABLE_END: usize = 435;
+pub const STREAM_WRITABLE_DESTROY: usize = 436;
+pub const STREAM_WRITABLE_CORK: usize = 437;
+pub const STREAM_WRITABLE_UNCORK: usize = 438;
+pub const STREAM_CONSTRUCTOR: usize = 439;
+pub const STREAM_PASSTHROUGH_CONSTRUCTOR: usize = 440;
+pub const STREAM_PIPELINE: usize = 441;
+pub const STREAM_FINISHED: usize = 442;
+// zlib module (443-452)
+pub const ZLIB_GZIP_SYNC: usize = 443;
+pub const ZLIB_GUNZIP_SYNC: usize = 444;
+pub const ZLIB_DEFLATE_SYNC: usize = 445;
+pub const ZLIB_INFLATE_SYNC: usize = 446;
+pub const ZLIB_DEFLATE_RAW_SYNC: usize = 447;
+pub const ZLIB_INFLATE_RAW_SYNC: usize = 448;
+pub const ZLIB_GZIP: usize = 449;
+pub const ZLIB_GUNZIP: usize = 450;
+pub const ZLIB_DEFLATE: usize = 451;
+pub const ZLIB_INFLATE: usize = 452;
+// tls module (453-457)
+pub const TLS_CONNECT: usize = 453;
+pub const TLS_CREATE_SECURE_CONTEXT: usize = 454;
+pub const TLS_SOCKET_WRITE: usize = 455;
+pub const TLS_SOCKET_END: usize = 456;
+pub const TLS_CREATE_SERVER: usize = 457;
+// dns module (458-462)
+pub const DNS_RESOLVE: usize = 458;
+pub const DNS_LOOKUP: usize = 459;
+pub const DNS_RESOLVE4: usize = 460;
+pub const DNS_RESOLVE6: usize = 461;
+pub const DNS_RESOLVE_MX: usize = 462;
 
 #[cfg(test)]
 mod tests {
@@ -434,4 +493,4 @@ mod tests {
     }
 }
 
-pub const NATIVE_TABLE_LEN: usize = 412;
+pub const NATIVE_TABLE_LEN: usize = 463;

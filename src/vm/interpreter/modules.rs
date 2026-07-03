@@ -114,6 +114,8 @@ impl Interpreter {
                 || key == "setInterval"
                 || key == "clearTimeout"
                 || key == "clearInterval"
+                || key == "setImmediate"
+                || key == "clearImmediate"
                 || key == "Map"
                 || key == "Set"
                 || key == "WeakMap"

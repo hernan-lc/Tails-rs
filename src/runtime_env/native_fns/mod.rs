@@ -229,6 +229,99 @@ mod symbol_fns;
 mod typed_array_fns;
 mod url_fns;
 mod websocket_fns;
+mod util_fns;
+mod timers_fns;
+mod querystring_fns;
+mod stream_fns;
+#[cfg(feature = "zlib")]
+mod zlib_fns;
+#[cfg(not(feature = "zlib"))]
+mod zlib_fns {
+    use crate::errors::{Error, Result};
+    use crate::objects::Value;
+    use crate::vm::interpreter::Interpreter;
+
+    macro_rules! zlib_stub {
+        ($name:ident) => {
+            pub(super) fn $name(
+                _interp: &mut Interpreter,
+                _this: &Value,
+                _args: &[Value],
+            ) -> Result<Value> {
+                Err(Error::RuntimeError(
+                    "zlib module is not enabled. Rebuild with --features zlib".into(),
+                ))
+            }
+        };
+    }
+
+    zlib_stub!(native_zlib_gzip_sync);
+    zlib_stub!(native_zlib_gunzip_sync);
+    zlib_stub!(native_zlib_deflate_sync);
+    zlib_stub!(native_zlib_inflate_sync);
+    zlib_stub!(native_zlib_deflate_raw_sync);
+    zlib_stub!(native_zlib_inflate_raw_sync);
+    zlib_stub!(native_zlib_gzip);
+    zlib_stub!(native_zlib_gunzip);
+    zlib_stub!(native_zlib_deflate);
+    zlib_stub!(native_zlib_inflate);
+}
+#[cfg(feature = "tls")]
+mod tls_fns;
+#[cfg(not(feature = "tls"))]
+mod tls_fns {
+    use crate::errors::{Error, Result};
+    use crate::objects::Value;
+    use crate::vm::interpreter::Interpreter;
+
+    macro_rules! tls_stub {
+        ($name:ident) => {
+            pub(super) fn $name(
+                _interp: &mut Interpreter,
+                _this: &Value,
+                _args: &[Value],
+            ) -> Result<Value> {
+                Err(Error::RuntimeError(
+                    "tls module is not enabled. Rebuild with --features tls".into(),
+                ))
+            }
+        };
+    }
+
+    tls_stub!(native_tls_connect);
+    tls_stub!(native_tls_create_secure_context);
+    tls_stub!(native_tls_socket_write);
+    tls_stub!(native_tls_socket_end);
+    tls_stub!(native_tls_create_server);
+}
+#[cfg(feature = "dns")]
+mod dns_fns;
+#[cfg(not(feature = "dns"))]
+mod dns_fns {
+    use crate::errors::{Error, Result};
+    use crate::objects::Value;
+    use crate::vm::interpreter::Interpreter;
+
+    macro_rules! dns_stub {
+        ($name:ident) => {
+            pub(super) fn $name(
+                _interp: &mut Interpreter,
+                _this: &Value,
+                _args: &[Value],
+            ) -> Result<Value> {
+                Err(Error::RuntimeError(
+                    "dns module is not enabled. Rebuild with --features dns".into(),
+                ))
+            }
+        };
+    }
+
+    dns_stub!(native_dns_resolve);
+    dns_stub!(native_dns_lookup);
+    dns_stub!(native_dns_resolve4);
+    dns_stub!(native_dns_resolve6);
+    dns_stub!(native_dns_resolve_mx);
+}
 
 pub use constants::*;
 
@@ -702,6 +795,65 @@ pub static NATIVE_TABLE: &[NativeFn] = &[
     // Buffer API completeness (410-411) — appended.
     buffer_fns::native_buffer_is_encoding,
     buffer_fns::native_buffer_transcode,
+    // util module (412-415)
+    util_fns::native_util_format,
+    util_fns::native_util_inspect,
+    util_fns::native_util_promisify,
+    util_fns::native_util_callbackify,
+    // events expansion (416-422)
+    events_fns::native_event_emitter_prepend_listener,
+    events_fns::native_event_emitter_once,
+    events_fns::native_event_emitter_remove_all_listeners,
+    events_fns::native_event_emitter_event_names,
+    events_fns::native_event_emitter_get_max_listeners,
+    events_fns::native_event_emitter_set_max_listeners,
+    events_fns::native_event_emitter_prepend_once_listener,
+    // timers module (423-424)
+    timers_fns::native_set_immediate,
+    timers_fns::native_clear_immediate,
+    // querystring module (425-428)
+    querystring_fns::native_querystring_parse,
+    querystring_fns::native_querystring_stringify,
+    querystring_fns::native_querystring_encode,
+    querystring_fns::native_querystring_decode,
+    // stream module (429-442)
+    stream_fns::native_readable_stream_read,
+    stream_fns::native_readable_stream_pipe,
+    stream_fns::native_readable_stream_unpipe,
+    stream_fns::native_readable_stream_push,
+    stream_fns::native_readable_stream_destroy,
+    stream_fns::native_writable_stream_write,
+    stream_fns::native_writable_stream_end,
+    stream_fns::native_writable_stream_destroy,
+    stream_fns::native_writable_stream_cork,
+    stream_fns::native_writable_stream_uncork,
+    stream_fns::native_stream_constructor,
+    stream_fns::native_passthrough_constructor,
+    stream_fns::native_stream_pipeline,
+    stream_fns::native_stream_finished,
+    // zlib module (443-452)
+    zlib_fns::native_zlib_gzip_sync,
+    zlib_fns::native_zlib_gunzip_sync,
+    zlib_fns::native_zlib_deflate_sync,
+    zlib_fns::native_zlib_inflate_sync,
+    zlib_fns::native_zlib_deflate_raw_sync,
+    zlib_fns::native_zlib_inflate_raw_sync,
+    zlib_fns::native_zlib_gzip,
+    zlib_fns::native_zlib_gunzip,
+    zlib_fns::native_zlib_deflate,
+    zlib_fns::native_zlib_inflate,
+    // tls module (453-457)
+    tls_fns::native_tls_connect,
+    tls_fns::native_tls_create_secure_context,
+    tls_fns::native_tls_socket_write,
+    tls_fns::native_tls_socket_end,
+    tls_fns::native_tls_create_server,
+    // dns module (458-462)
+    dns_fns::native_dns_resolve,
+    dns_fns::native_dns_lookup,
+    dns_fns::native_dns_resolve4,
+    dns_fns::native_dns_resolve6,
+    dns_fns::native_dns_resolve_mx,
 ];
 
 const _: () = assert!(

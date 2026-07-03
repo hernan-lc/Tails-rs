@@ -72,6 +72,16 @@ pub fn discover_module(name: &str, registry: &mut NativeModuleRegistry) {
         "assert" => registry.register("assert", create_assert_module),
         "child_process" => registry.register("child_process", create_child_process_module),
         "url" => registry.register("url", create_url_module),
+        "util" => registry.register("util", create_util_module),
+        "timers" => registry.register("timers", create_timers_module),
+        "querystring" => registry.register("querystring", create_querystring_module),
+        "stream" => registry.register("stream", create_stream_module),
+        #[cfg(feature = "zlib")]
+        "zlib" => registry.register("zlib", create_zlib_module),
+        #[cfg(feature = "tls")]
+        "tls" => registry.register("tls", create_tls_module),
+        #[cfg(feature = "dns")]
+        "dns" => registry.register("dns", create_dns_module),
         #[cfg(feature = "http")]
         "http" => registry.register("http", create_http_module),
         #[cfg(feature = "net")]
@@ -107,12 +117,12 @@ pub fn create_fs_promises_module(
 ) -> FxHashMap<String, Value> {
     props! {
         "readdir" => Value::NativeFunction(c::FS_READDIR),
-        "readFile" => Value::NativeFunction(c::FS_READ_FILE),
-        "writeFile" => Value::NativeFunction(c::FS_WRITE_FILE),
+        "read_file" => Value::NativeFunction(c::FS_READ_FILE),
+        "write_file" => Value::NativeFunction(c::FS_WRITE_FILE),
         "stat" => Value::NativeFunction(c::FS_STAT),
         "mkdir" => Value::NativeFunction(c::FS_MKDIR),
         "unlink" => Value::NativeFunction(c::FS_UNLINK),
-        "copyFile" => Value::NativeFunction(c::FS_COPY_FILE),
+        "copy_file" => Value::NativeFunction(c::FS_COPY_FILE),
         "rename" => Value::NativeFunction(c::FS_RENAME),
     }
 }
@@ -419,6 +429,130 @@ pub fn create_url_module(
     }
 }
 
+pub fn create_util_module(
+    _heap: &mut Vec<HeapValue>,
+    _gc: &mut GarbageCollector,
+) -> FxHashMap<String, Value> {
+    props! {
+        "format" => Value::NativeFunction(c::UTIL_FORMAT),
+        "inspect" => Value::NativeFunction(c::UTIL_INSPECT),
+        "promisify" => Value::NativeFunction(c::UTIL_PROMISIFY),
+        "callbackify" => Value::NativeFunction(c::UTIL_CALLBACKIFY),
+    }
+}
+
+pub fn create_timers_module(
+    _heap: &mut Vec<HeapValue>,
+    _gc: &mut GarbageCollector,
+) -> FxHashMap<String, Value> {
+    props! {
+        "setImmediate" => Value::NativeFunction(c::SET_IMMEDIATE),
+        "clearImmediate" => Value::NativeFunction(c::CLEAR_IMMEDIATE),
+    }
+}
+
+pub fn create_querystring_module(
+    _heap: &mut Vec<HeapValue>,
+    _gc: &mut GarbageCollector,
+) -> FxHashMap<String, Value> {
+    props! {
+        "parse" => Value::NativeFunction(c::QUERYSTRING_PARSE),
+        "stringify" => Value::NativeFunction(c::QUERYSTRING_STRINGIFY),
+        "encode" => Value::NativeFunction(c::QUERYSTRING_ENCODE),
+        "decode" => Value::NativeFunction(c::QUERYSTRING_DECODE),
+    }
+}
+
+pub fn create_stream_module(
+    heap: &mut Vec<HeapValue>,
+    gc: &mut GarbageCollector,
+) -> FxHashMap<String, Value> {
+    let readable_proto_idx = gc.allocate(
+        heap,
+        HeapValue::Object(JsObject {
+            properties: props! {
+                "read" => Value::NativeFunction(c::STREAM_READABLE_READ),
+                "pipe" => Value::NativeFunction(c::STREAM_READABLE_PIPE),
+                "unpipe" => Value::NativeFunction(c::STREAM_READABLE_UNPIPE),
+                "push" => Value::NativeFunction(c::STREAM_READABLE_PUSH),
+                "destroy" => Value::NativeFunction(c::STREAM_READABLE_DESTROY),
+            },
+            prototype: None,
+            extensible: true,
+        }),
+    );
+    let writable_proto_idx = gc.allocate(
+        heap,
+        HeapValue::Object(JsObject {
+            properties: props! {
+                "write" => Value::NativeFunction(c::STREAM_WRITABLE_WRITE),
+                "end" => Value::NativeFunction(c::STREAM_WRITABLE_END),
+                "destroy" => Value::NativeFunction(c::STREAM_WRITABLE_DESTROY),
+                "cork" => Value::NativeFunction(c::STREAM_WRITABLE_CORK),
+                "uncork" => Value::NativeFunction(c::STREAM_WRITABLE_UNCORK),
+            },
+            prototype: None,
+            extensible: true,
+        }),
+    );
+    props! {
+        "Readable" => Value::NativeFunction(c::STREAM_CONSTRUCTOR),
+        "Writable" => Value::NativeFunction(c::STREAM_CONSTRUCTOR),
+        "Transform" => Value::NativeFunction(c::STREAM_CONSTRUCTOR),
+        "PassThrough" => Value::NativeFunction(c::STREAM_PASSTHROUGH_CONSTRUCTOR),
+        "pipeline" => Value::NativeFunction(c::STREAM_PIPELINE),
+        "finished" => Value::NativeFunction(c::STREAM_FINISHED),
+        "readablePrototype" => Value::Object(readable_proto_idx),
+        "writablePrototype" => Value::Object(writable_proto_idx),
+    }
+}
+
+#[cfg(feature = "zlib")]
+pub fn create_zlib_module(
+    _heap: &mut Vec<HeapValue>,
+    _gc: &mut GarbageCollector,
+) -> FxHashMap<String, Value> {
+    props! {
+        "gzipSync" => Value::NativeFunction(c::ZLIB_GZIP_SYNC),
+        "gunzipSync" => Value::NativeFunction(c::ZLIB_GUNZIP_SYNC),
+        "deflateSync" => Value::NativeFunction(c::ZLIB_DEFLATE_SYNC),
+        "inflateSync" => Value::NativeFunction(c::ZLIB_INFLATE_SYNC),
+        "deflateRawSync" => Value::NativeFunction(c::ZLIB_DEFLATE_RAW_SYNC),
+        "inflateRawSync" => Value::NativeFunction(c::ZLIB_INFLATE_RAW_SYNC),
+        "gzip" => Value::NativeFunction(c::ZLIB_GZIP),
+        "gunzip" => Value::NativeFunction(c::ZLIB_GUNZIP),
+        "deflate" => Value::NativeFunction(c::ZLIB_DEFLATE),
+        "inflate" => Value::NativeFunction(c::ZLIB_INFLATE),
+    }
+}
+
+#[cfg(feature = "tls")]
+pub fn create_tls_module(
+    _heap: &mut Vec<HeapValue>,
+    _gc: &mut GarbageCollector,
+) -> FxHashMap<String, Value> {
+    props! {
+        "connect" => Value::NativeFunction(c::TLS_CONNECT),
+        "createSecureContext" => Value::NativeFunction(c::TLS_CREATE_SECURE_CONTEXT),
+        "TLSSocket" => Value::NativeFunction(c::TLS_SOCKET_WRITE),
+        "createServer" => Value::NativeFunction(c::TLS_CREATE_SERVER),
+    }
+}
+
+#[cfg(feature = "dns")]
+pub fn create_dns_module(
+    _heap: &mut Vec<HeapValue>,
+    _gc: &mut GarbageCollector,
+) -> FxHashMap<String, Value> {
+    props! {
+        "resolve" => Value::NativeFunction(c::DNS_RESOLVE),
+        "lookup" => Value::NativeFunction(c::DNS_LOOKUP),
+        "resolve4" => Value::NativeFunction(c::DNS_RESOLVE4),
+        "resolve6" => Value::NativeFunction(c::DNS_RESOLVE6),
+        "resolveMx" => Value::NativeFunction(c::DNS_RESOLVE_MX),
+    }
+}
+
 #[cfg(feature = "http")]
 pub fn create_http_module(
     _heap: &mut Vec<HeapValue>,
@@ -450,9 +584,11 @@ pub fn find_library_in_dir(dir: &std::path::Path, name: &str) -> Option<std::pat
 
     // Convert hyphens to underscores for the file name (Rust crate naming convention)
     let name_underscore = name.replace('-', "_");
+    // Also try replacing "/" with "-" for scoped names like "fs/promises" -> "fs-promises"
+    let name_hyphen = name.replace('/', "-");
 
     // Try all combinations of name variants and extensions
-    let name_variants = vec![name, &name_underscore];
+    let name_variants = vec![name, &name_underscore, &name_hyphen];
 
     for ext in &extensions {
         for name_variant in &name_variants {

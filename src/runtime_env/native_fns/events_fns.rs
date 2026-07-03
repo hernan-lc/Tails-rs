@@ -211,6 +211,252 @@ pub(super) fn native_event_emitter_listener_count(
     }
 }
 
+pub(super) fn native_event_emitter_prepend_listener(
+    interp: &mut Interpreter,
+    this: &Value,
+    args: &[Value],
+) -> Result<Value> {
+    let event = args
+        .first()
+        .map(|v| to_string_value(interp, v))
+        .unwrap_or_default();
+    let callback = args.get(1).cloned().unwrap_or(Value::Undefined);
+
+    let obj_idx = match this {
+        Value::Object(idx) => *idx,
+        _ => return Ok(this.clone()),
+    };
+
+    let listeners_idx = match &interp.heap[obj_idx] {
+        HeapValue::Object(obj) => match obj.properties.get("_listeners") {
+            Some(Value::Object(idx)) => *idx,
+            _ => return Ok(this.clone()),
+        },
+        _ => return Ok(this.clone()),
+    };
+
+    let arr_idx = match &interp.heap[listeners_idx] {
+        HeapValue::Object(listeners_obj) => match listeners_obj.properties.get(&event) {
+            Some(Value::Array(idx)) => *idx,
+            _ => {
+                let new_idx = interp.heap.len();
+                interp.heap.push(HeapValue::Array(JsArray {
+                    elements: Vec::new(),
+                }));
+                new_idx
+            }
+        },
+        _ => return Ok(this.clone()),
+    };
+
+    if let HeapValue::Array(arr_obj) = &mut interp.heap[arr_idx] {
+        arr_obj.elements.insert(0, callback);
+    }
+
+    if let HeapValue::Object(listeners_obj) = &mut interp.heap[listeners_idx] {
+        listeners_obj
+            .properties
+            .insert(event, Value::Array(arr_idx));
+    }
+
+    Ok(this.clone())
+}
+
+pub(super) fn native_event_emitter_once(
+    interp: &mut Interpreter,
+    this: &Value,
+    args: &[Value],
+) -> Result<Value> {
+    let event = args
+        .first()
+        .map(|v| to_string_value(interp, v))
+        .unwrap_or_default();
+    let callback = args.get(1).cloned().unwrap_or(Value::Undefined);
+
+    let wrapper_idx = interp.gc.allocate(
+        &mut interp.heap,
+        HeapValue::Object(JsObject {
+            properties: crate::props! {
+                "_callback" => callback,
+                "_event" => Value::String(event.clone()),
+                "_once" => Value::Boolean(true),
+            },
+            prototype: None,
+            extensible: true,
+        }),
+    );
+
+    let _ = native_event_emitter_on(interp, this, &[Value::String(event), Value::Object(wrapper_idx)]);
+    Ok(this.clone())
+}
+
+pub(super) fn native_event_emitter_remove_all_listeners(
+    interp: &mut Interpreter,
+    this: &Value,
+    args: &[Value],
+) -> Result<Value> {
+    let event = args.first().map(|v| to_string_value(interp, v));
+
+    let obj_idx = match this {
+        Value::Object(idx) => *idx,
+        _ => return Ok(this.clone()),
+    };
+
+    let listeners_idx = match &interp.heap[obj_idx] {
+        HeapValue::Object(obj) => match obj.properties.get("_listeners") {
+            Some(Value::Object(idx)) => *idx,
+            _ => return Ok(this.clone()),
+        },
+        _ => return Ok(this.clone()),
+    };
+
+    if let Some(evt) = event {
+        if let HeapValue::Object(listeners_obj) = &mut interp.heap[listeners_idx] {
+            listeners_obj.properties.remove(&evt);
+        }
+    } else {
+        if let HeapValue::Object(listeners_obj) = &mut interp.heap[listeners_idx] {
+            listeners_obj.properties.clear();
+        }
+    }
+
+    Ok(this.clone())
+}
+
+pub(super) fn native_event_emitter_event_names(
+    interp: &mut Interpreter,
+    this: &Value,
+    _args: &[Value],
+) -> Result<Value> {
+    let obj_idx = match this {
+        Value::Object(idx) => *idx,
+        _ => {
+            let arr_idx = interp.heap.len();
+            interp.heap.push(HeapValue::Array(JsArray {
+                elements: Vec::new(),
+            }));
+            return Ok(Value::Array(arr_idx));
+        }
+    };
+
+    let listeners_idx = match &interp.heap[obj_idx] {
+        HeapValue::Object(obj) => match obj.properties.get("_listeners") {
+            Some(Value::Object(idx)) => *idx,
+            _ => {
+                let arr_idx = interp.heap.len();
+                interp.heap.push(HeapValue::Array(JsArray {
+                    elements: Vec::new(),
+                }));
+                return Ok(Value::Array(arr_idx));
+            }
+        },
+        _ => {
+            let arr_idx = interp.heap.len();
+            interp.heap.push(HeapValue::Array(JsArray {
+                elements: Vec::new(),
+            }));
+            return Ok(Value::Array(arr_idx));
+        }
+    };
+
+    let mut names = Vec::new();
+    if let HeapValue::Object(listeners_obj) = &interp.heap[listeners_idx] {
+        for (key, val) in &listeners_obj.properties {
+            if let Value::Array(arr_idx) = val {
+                if let HeapValue::Array(arr) = &interp.heap[*arr_idx] {
+                    if !arr.elements.is_empty() {
+                        names.push(Value::String(key.clone()));
+                    }
+                }
+            }
+        }
+    }
+
+    let arr_idx = interp.heap.len();
+    interp
+        .heap
+        .push(HeapValue::Array(JsArray { elements: names }));
+    Ok(Value::Array(arr_idx))
+}
+
+pub(super) fn native_event_emitter_get_max_listeners(
+    interp: &mut Interpreter,
+    this: &Value,
+    _args: &[Value],
+) -> Result<Value> {
+    let obj_idx = match this {
+        Value::Object(idx) => *idx,
+        _ => return Ok(Value::Integer(10)),
+    };
+
+    match &interp.heap[obj_idx] {
+        HeapValue::Object(obj) => match obj.properties.get("_maxListeners") {
+            Some(val) => Ok(val.clone()),
+            _ => Ok(Value::Integer(10)),
+        },
+        _ => Ok(Value::Integer(10)),
+    }
+}
+
+pub(super) fn native_event_emitter_set_max_listeners(
+    interp: &mut Interpreter,
+    this: &Value,
+    args: &[Value],
+) -> Result<Value> {
+    let n = args
+        .first()
+        .map(|v| match v {
+            Value::Integer(i) => *i,
+            Value::Float(f) => *f as i64,
+            _ => 10,
+        })
+        .unwrap_or(10);
+
+    let obj_idx = match this {
+        Value::Object(idx) => *idx,
+        _ => return Ok(this.clone()),
+    };
+
+    if let HeapValue::Object(obj) = &mut interp.heap[obj_idx] {
+        obj.properties
+            .insert("_maxListeners".into(), Value::Integer(n));
+    }
+
+    Ok(this.clone())
+}
+
+pub(super) fn native_event_emitter_prepend_once_listener(
+    interp: &mut Interpreter,
+    this: &Value,
+    args: &[Value],
+) -> Result<Value> {
+    let event = args
+        .first()
+        .map(|v| to_string_value(interp, v))
+        .unwrap_or_default();
+    let callback = args.get(1).cloned().unwrap_or(Value::Undefined);
+
+    let wrapper_idx = interp.gc.allocate(
+        &mut interp.heap,
+        HeapValue::Object(JsObject {
+            properties: crate::props! {
+                "_callback" => callback,
+                "_event" => Value::String(event.clone()),
+                "_once" => Value::Boolean(true),
+            },
+            prototype: None,
+            extensible: true,
+        }),
+    );
+
+    let _ = native_event_emitter_prepend_listener(
+        interp,
+        this,
+        &[Value::String(event), Value::Object(wrapper_idx)],
+    );
+    Ok(this.clone())
+}
+
 fn value_eq(a: &Value, b: &Value) -> bool {
     match (a, b) {
         (Value::Integer(x), Value::Integer(y)) => x == y,

@@ -42,6 +42,14 @@ impl Interpreter {
             "clearInterval".into(),
             Value::NativeFunction(c::CLEAR_INTERVAL),
         );
+        self.globals.insert(
+            "setImmediate".into(),
+            Value::NativeFunction(c::SET_IMMEDIATE),
+        );
+        self.globals.insert(
+            "clearImmediate".into(),
+            Value::NativeFunction(c::CLEAR_IMMEDIATE),
+        );
 
         // CommonJS require() — NativeFunction(c::REQUIRE)
         self.globals
