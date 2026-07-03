@@ -317,4 +317,27 @@ impl JsRegExp {
             vec![input.to_string()]
         }
     }
+
+    /// Phase 3.4 - Fast-path: detect simple literal patterns (no regex
+    /// metacharacters) and indicate they can use str::find directly,
+    /// bypassing the regex crate entirely.
+    pub fn is_literal_pattern(&self) -> bool {
+        if self.compiled.is_some() {
+            return false;
+        }
+        self.source.find(".").is_none()
+            && self.source.find("^").is_none()
+            && self.source.find("$").is_none()
+            && !self.source.contains("*")
+            && !self.source.contains("+")
+            && !self.source.contains("?")
+            && !self.source.contains("(")
+            && !self.source.contains(")")
+            && !self.source.contains("[")
+            && !self.source.contains("]")
+            && !self.source.contains("{")
+            && !self.source.contains("}")
+            && self.source.find("\\").is_none()
+            && !self.source.contains("|")
+    }
 }
