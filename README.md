@@ -44,12 +44,25 @@ Build options:
   --target-dir <path>   Custom target directory
 ```
 
-## Documentation
+## Modules
 
-- [Installation](docs/installation.md) — Build instructions and feature flags
-- [Usage](docs/usage.md) — CLI and library usage
-- [Native Modules](docs/native-modules.md) — Module system, imports, and architecture
-- [Features](docs/features.md) — Complete list of supported JavaScript/TypeScript features
-- [Architecture](docs/architecture.md) — Source layout and design overview
-- [Testing](docs/testing.md) — Running the test suite
-- [Roadmap](docs/roadmap.md) — Completed work and planned features
+| Module | Description | Import |
+|--------|-------------|--------|
+| `fs` | Filesystem (sync + async + streaming + watch) | `import fs from "fs"` |
+| `fs/promises` | Promise-style filesystem API | `import { readFile } from "fs/promises"` |
+| `path` | Path manipulation (join, resolve, parse, format, ...) | `import path from "path"` |
+| `process` | Process control (exit, cwd, env, kill, ...) | `import process from "process"` |
+| `os` | OS info (platform, arch, cpus, mem, ...) | `import os from "os"` |
+| `http` | HTTP server | `import http from "http"` |
+| `net` | TCP client (createConnection) | `import net from "net"` |
+| `url` | URL parsing + URLSearchParams | `import { URL } from "url"` |
+| `events` | EventEmitter | `import { EventEmitter } from "events"` |
+| `crypto` | Random bytes/UUID, hashing | `import crypto from "crypto"` |
+| `buffer` | Binary data (also available as global `Buffer`) | `import { Buffer } from "buffer"` |
+| `child_process` | exec, execSync, spawn | `import cp from "child_process"` |
+| `assert` | Assertions (strictEqual, deepEqual, ...) | `import assert from "assert"` |
+| `intl` | Intl.DateTimeFormat, Intl.NumberFormat | Available as global `Intl` |
+
+Global objects (no import needed): `console`, `Math`, `JSON`, `Promise`, `Map`, `Set`, `Date`, `RegExp`, `URL`, `fetch`, `Headers`, `Request`, `Response`, `Buffer`, `process`, `Proxy`, `Reflect`, `Symbol`, `Error` family, `TypedArray` family, `WeakMap`, `WeakSet`, `Generator`, `WebSocket`.
+
+## Documentation

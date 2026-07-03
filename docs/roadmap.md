@@ -35,13 +35,6 @@
 - [x] **websocket module** (`modules/websocket`) — same treatment: cdylib + rlib, `#[tails_module(name = "tails-websocket")]` with `create`, `url`, `connect`, `send`, `receive`, `close`, `destroy`. Bridges the existing async `WebSocket` struct onto a synchronous FFI surface using a shared tokio runtime. `dist/tails-websocket.d.ts` is generated automatically.
 - [x] **macro improvements** — `#[tails_function]` now accepts `module = "<name>"` so per-function FFI / DTS symbols are namespaced (`__tails_<module>_ffi_<fn>` / `__TAILS_<MODULE>_DTS_<FN>`), letting multiple `tails-*` modules link into the same binary without `#[no_mangle]` collisions. `src/cli/build.rs` was updated to recognise both legacy and namespaced DTS symbols.
 
-### New Modules (Lower Priority)
-- [ ] `stream` — Readable/Writable/Transform streams
-- [ ] `zlib` — Compression/decompression
-- [ ] `tls` — TLS/SSL support
-- [ ] `dns` — DNS resolution
-- [ ] `net` — TCP/UDP sockets
-
 ## v0.3.5 — VM Performance Pass 1 ✅
 
 A first round of cross-cutting VM optimizations was applied. **Mean
@@ -124,11 +117,54 @@ Critical hotspots after Pass 1 (vs Node.js, current state):
 
 ## v0.5.0 — Node.js Compatibility
 
-### Core Modules 
+### Core Modules
+
+#### Built-in (compiled into the binary)
+- [x] `console` — log, warn, error, info, table, dir, group, groupEnd, groupCollapsed, time, timeEnd, assert, clear
+- [x] `events` — EventEmitter with on, emit, off, listenerCount
+- [x] `assert` — strictEqual, ok, equal, deepEqual
+- [x] `buffer` — alloc, from, concat, isBuffer, isEncoding, byteLength, transcode, toString, write, slice, copy, fill, compare, equals, indexOf
+- [x] `crypto` — randomBytes, randomUUID, createHash, hashUpdate, hashDigest
+- [x] `child_process` — execSync, exec, spawn
+- [x] `intl` — DateTimeFormat, NumberFormat
+
+#### Feature-gated (enabled by default)
+- [x] `fs` — readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync, statSync, unlinkSync, rmSync, copyFileSync, renameSync, appendFileSync, createReadStream, watch
+- [x] `fs/promises` — readFile, writeFile, readdir, stat, mkdir, unlink, copyFile, rename, appendFile, exists (promise-style)
+- [x] `path` — join, resolve, basename, dirname, extname, relative, isAbsolute, normalize, parse, format, sep, delimiter
+- [x] `process` — exit, cwd, chdir, platform, arch, pid, env, argv, hrtime, nextTick, kill, uptime, memoryUsage, on
+- [x] `os` — platform, arch, cpus, totalmem, freemem, uptime, hostname, type, release, homedir, tmpdir, endianness, loadavg
+- [x] `http` — createServer
+- [x] `net` — createConnection (TCP client)
+- [x] `url` — URL constructor, URLSearchParams, canParse, parse, toJSON, fileURLToPath
+
+#### cdylib modules (loadable via `import x from "./x.native"`)
+- [x] `tails-fs` — filesystem operations (sync + async + streaming)
+- [x] `tails-fs-promises` — promise-style filesystem API
+- [x] `tails-path` — path utilities
+- [x] `tails-process` — process control
+- [x] `tails-os` — OS info
+- [x] `tails-websocket` — WebSocket client (async via tokio)
+- [x] `tails-validator` — Zod-like validation library
+
+#### Global objects (no import needed)
+- [x] `Object`, `Array`, `Map`, `Set`, `WeakMap`, `WeakSet`
+- [x] `Promise`, `Proxy`, `Reflect`, `Symbol`
+- [x] `Date`, `RegExp`, `Math`, `Number`, `BigInt`, `String`, `Boolean`
+- [x] `Error`, `TypeError`, `ReferenceError`, `SyntaxError`, `RangeError`
+- [x] `JSON`, `URL`, `URLSearchParams`, `Headers`, `Request`, `Response`, `fetch`
+- [x] `TypedArray` family (Int8Array through BigUint64Array)
+- [x] `Generator`, `WebSocket`, `Buffer`, `process`
+
+#### Planned (not yet implemented)
 - [ ] `util` — `format`, `inspect`, `promisify`, `callbackify`
 - [ ] `events` — Expand EventEmitter (prependListener, once, MaxListeners)
 - [ ] `timers` — `setImmediate`, `clearImmediate`
 - [ ] `querystring` — `parse`, `stringify`, `encode`, `decode`
+- [ ] `stream` — Readable/Writable/Transform streams
+- [ ] `zlib` — Compression/decompression
+- [ ] `tls` — TLS/SSL support
+- [ ] `dns` — DNS resolution
 
 ### API Completeness
 - [x] `Buffer` — Added `isEncoding(enc)`, `transcode(src, fromEnc, toEnc)`, and the `byteLength(string, encoding)` encoding overload. `transcode` supports `utf8` ⇄ `latin1` / `ascii` / `hex` / `base64` / `base64url`; `utf16le` is recognised as a valid encoding name but the actual transcoding returns `null` (queued for a follow-up). Unknown encodings also return `null`. See `src/runtime_env/native_fns/buffer_fns.rs` (`is_supported_encoding`, `native_buffer_is_encoding`, `native_buffer_transcode`).
