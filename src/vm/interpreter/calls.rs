@@ -10,13 +10,19 @@ impl Interpreter {
             Value::Function(func_idx) => {
                 if let HeapValue::Function(f) = &self.heap[*func_idx] {
                     // Quick path: resolve/reject promise callbacks
-                    if f.bytecode_index == usize::MAX {
-                        if let Some(Value::Promise(promise_idx)) = f.closure.first() {
+                     if f.bytecode_index == usize::MAX {
+                        let promise_idx = {
+                            let closure = f.closure.borrow();
+                            closure.first().and_then(|v| {
+                                if let Value::Promise(idx) = v { Some(*idx) } else { None }
+                            })
+                        };
+                        if let Some(promise_idx) = promise_idx {
                             let value = args.first().cloned().unwrap_or(Value::Undefined);
                             if f.name.as_deref() == Some("resolve") {
-                                self.resolve_promise(*promise_idx, value);
+                                self.resolve_promise(promise_idx, value);
                             } else if f.name.as_deref() == Some("reject") {
-                                self.reject_promise(*promise_idx, value);
+                                self.reject_promise(promise_idx, value);
                             }
                             return Ok(Value::Undefined);
                         }
@@ -24,12 +30,8 @@ impl Interpreter {
 
                     // Extract only the fields we need (avoids cloning entire JsFunction)
                     let bytecode_index = f.bytecode_index;
-                    // Phase 2F: Skip the `Vec::clone()` for the common case
-                    // of functions with no captured variables (most top-level
-                    // functions and methods). Reuse a fresh empty Vec — this
-                    // is cheaper than a non-trivial `Vec::clone`.
-                    let closure = if f.closure.is_empty() {
-                        Vec::new()
+                    let closure = if f.closure.borrow().is_empty() {
+                        Rc::new(RefCell::new(Vec::new()))
                     } else {
                         f.closure.clone()
                     };
@@ -53,7 +55,7 @@ impl Interpreter {
                         .map(|m| m.instructions.len())
                         .unwrap_or(0);
                     let base_pointer = self.stack.len();
-                    let closure_count = closure.len();
+                    let closure_count = closure.borrow().len();
 
                     let saved_mg = self.module_globals.take();
                     if let Some(ref scope) = module_scope {
@@ -101,7 +103,7 @@ impl Interpreter {
                         exception_handlers_snapshot,
                     });
 
-                    for closure_var in closure {
+                    for closure_var in closure.borrow().iter().cloned() {
                         self.stack.push(closure_var);
                     }
                     if rest_param {

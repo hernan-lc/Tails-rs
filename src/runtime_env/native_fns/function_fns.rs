@@ -2,6 +2,8 @@ use crate::errors::{Error, Result};
 use crate::objects::Value;
 use crate::vm::interpreter::Interpreter;
 use rustc_hash::FxHashMap;
+use std::cell::RefCell;
+use std::rc::Rc;
 
 /// Function.prototype.call(thisArg, ...args)
 /// Calls a function with a given this value and arguments provided individually.
@@ -70,6 +72,7 @@ pub(super) fn native_function_bind(
     // - name = "bound " + original name
     let mut closure = vec![original_fn, bound_this];
     closure.extend(bound_args);
+    let closure_rc = Rc::new(RefCell::new(closure));
 
     let fn_idx = interp.heap.len();
     interp
@@ -80,7 +83,7 @@ pub(super) fn native_function_bind(
                 params: vec![],
                 rest_param: None,
                 bytecode_index: usize::MAX,
-                closure,
+                closure: closure_rc,
                 prototype: None,
                 super_class: None,
                 properties: FxHashMap::default(),

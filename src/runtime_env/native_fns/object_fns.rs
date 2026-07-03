@@ -101,7 +101,7 @@ pub(super) fn native_object_entries(
         }
         _ => Vec::new(),
     };
-    let mut entries = Vec::new();
+    let mut entries = Vec::with_capacity(pairs.len());
     for (k, v) in pairs {
         let heap_idx = interp.heap.len();
         interp.heap.push(crate::vm::interpreter::HeapValue::Array(

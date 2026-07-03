@@ -290,7 +290,7 @@ pub(super) fn native_headers_entries(
 ) -> Result<Value> {
     let raw = get_headers_string(interp, _this);
     let entries = parse_headers(&raw);
-    let mut result = Vec::new();
+    let mut result = Vec::with_capacity(entries.len());
     for (k, v) in entries {
         let pair_idx = interp.heap.len();
         interp.heap.push(HeapValue::Array(JsArray {

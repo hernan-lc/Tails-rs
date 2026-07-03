@@ -35,7 +35,7 @@ impl Interpreter {
                         params: func_info.params,
                         rest_param: func_info.rest_param,
                         bytecode_index: func_info.bytecode_index,
-                        closure: Vec::new(),
+                        closure: Rc::new(RefCell::new(Vec::new())),
                         prototype: Some(proto_obj_idx),
                         super_class: None,
                         properties: FxHashMap::default(),
@@ -56,19 +56,20 @@ impl Interpreter {
             }
             Instruction::MakeClosure(func_idx, _capture_slots) => {
                 let func_info = module.functions[*func_idx as usize].clone();
-                let mut closure_vars = Vec::new();
-                let base = self.call_stack.last().map(|f| f.base_pointer).unwrap_or(0);
-                // `_capture_slots` is `Box<Vec<u16>>` (Phase 1D); iterate
-                // by reference through the box to avoid the extra clone.
-                for slot in _capture_slots.iter() {
-                    let abs_slot = base + *slot as usize;
-                    let value = self
-                        .stack
-                        .get(abs_slot)
-                        .cloned()
-                        .unwrap_or(Value::Undefined);
-                    closure_vars.push(value);
-                }
+                let closure_vars: Vec<Value> = {
+                    let base = self.call_stack.last().map(|f| f.base_pointer).unwrap_or(0);
+                    let mut vars = Vec::with_capacity(_capture_slots.len());
+                    for slot in _capture_slots.iter() {
+                        let abs_slot = base + *slot as usize;
+                        let value = self
+                            .stack
+                            .get(abs_slot)
+                            .cloned()
+                            .unwrap_or(Value::Undefined);
+                        vars.push(value);
+                    }
+                    vars
+                };
                 let proto_obj_idx = self
                     .gc
                     .allocate(&mut self.heap, HeapValue::Object(JsObject::new()));
@@ -83,7 +84,7 @@ impl Interpreter {
                         params: func_info.params,
                         rest_param: func_info.rest_param,
                         bytecode_index: func_info.bytecode_index,
-                        closure: closure_vars,
+                        closure: Rc::new(RefCell::new(closure_vars)),
                         prototype: Some(proto_obj_idx),
                         super_class: None,
                         properties: FxHashMap::default(),

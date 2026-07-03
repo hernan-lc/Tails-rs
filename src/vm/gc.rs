@@ -121,7 +121,7 @@ impl GarbageCollector {
             if let Some(func_idx) = frame.func_heap_idx {
                 self.mark(func_idx, heap.len());
                 if let Some(HeapValue::Function(f)) = heap.get(func_idx) {
-                    for closure_val in &f.closure {
+                    for closure_val in f.closure.borrow().iter() {
                         self.mark_value(closure_val);
                     }
                     if let Some(ref super_class) = f.super_class {
@@ -172,7 +172,7 @@ impl GarbageCollector {
                         }
                     }
                     HeapValue::Function(f) => {
-                        for val in &f.closure {
+                        for val in f.closure.borrow().iter() {
                             if let Some(child_idx) = heap_value_to_index(val) {
                                 if !self.is_marked(child_idx, heap.len()) {
                                     self.mark(child_idx, heap.len());
@@ -304,6 +304,24 @@ impl GarbageCollector {
                         // JsRegExp holds Strings and flags (value types) — nothing to trace.
                     }
                     HeapValue::Buffer(_) => {}
+                    HeapValue::Iterator(iter) => {
+                        if let Some(ref target) = iter.target {
+                            if let Some(child_idx) = heap_value_to_index(target) {
+                                if !self.is_marked(child_idx, heap.len()) {
+                                    self.mark(child_idx, heap.len());
+                                    worklist.push(child_idx);
+                                }
+                            }
+                        }
+                        if let Some(ref data) = iter.data {
+                            if let Some(child_idx) = heap_value_to_index(data) {
+                                if !self.is_marked(child_idx, heap.len()) {
+                                    self.mark(child_idx, heap.len());
+                                    worklist.push(child_idx);
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -561,7 +579,7 @@ mod tests {
                 params: vec![],
                 rest_param: None,
                 bytecode_index: 0,
-                closure: vec![Value::Object(inner_obj_idx)],
+                closure: std::rc::Rc::new(std::cell::RefCell::new(vec![Value::Object(inner_obj_idx)])),
                 prototype: None,
                 super_class: None,
                 properties: FxHashMap::default(),

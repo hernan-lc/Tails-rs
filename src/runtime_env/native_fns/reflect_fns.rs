@@ -131,7 +131,7 @@ pub(super) fn native_reflect_construct(
                 .map(|m| m.instructions.len())
                 .unwrap_or(0);
             let base_pointer = interp.stack.len();
-            let closure_count = f.closure.len();
+            let closure_count = f.closure.borrow().len();
 
             interp.call_stack.push(crate::vm::interpreter::CallFrame {
                 return_address,
@@ -147,8 +147,8 @@ pub(super) fn native_reflect_construct(
                 exception_handlers_snapshot: interp.exception_handlers.clone(),
             });
 
-            for closure_var in &f.closure {
-                interp.stack.push(closure_var.clone());
+            for closure_var in f.closure.borrow().iter().cloned() {
+                interp.stack.push(closure_var);
             }
             for arg in arguments_list {
                 interp.stack.push(arg);

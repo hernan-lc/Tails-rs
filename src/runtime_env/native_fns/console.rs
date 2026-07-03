@@ -118,7 +118,7 @@ fn pretty_format(
             let pad = INDENT.repeat(depth + 1);
             let closing_pad = INDENT.repeat(depth);
 
-            let mut lines: Vec<String> = Vec::new();
+            let mut lines: Vec<String> = Vec::with_capacity(props.len());
             for (key, val) in &props {
                 let getter_key = format!("__getter_{}", key);
                 let setter_key = format!("__setter_{}", key);
@@ -165,7 +165,7 @@ fn pretty_format(
                 let pad = INDENT.repeat(depth + 1);
                 let closing_pad = INDENT.repeat(depth);
 
-                let mut lines: Vec<String> = Vec::new();
+                let mut lines: Vec<String> = Vec::with_capacity(arr.elements.len());
                 for elem in &arr.elements {
                     let val_str =
                         pretty_format(interp, elem, depth + 1, use_colors, include_quotes);
@@ -263,7 +263,7 @@ fn pretty_format(
                 }
                 let pad = INDENT.repeat(depth + 1);
                 let closing_pad = INDENT.repeat(depth);
-                let mut lines: Vec<String> = Vec::new();
+                let mut lines: Vec<String> = Vec::with_capacity(map.keys.len());
                 for (k, val) in map.keys.iter().zip(map.values.iter()) {
                     let k_str = pretty_format(interp, k, depth + 1, use_colors, include_quotes);
                     let v_str = pretty_format(interp, val, depth + 1, use_colors, include_quotes);
@@ -286,7 +286,7 @@ fn pretty_format(
                 }
                 let pad = INDENT.repeat(depth + 1);
                 let closing_pad = INDENT.repeat(depth);
-                let mut lines: Vec<String> = Vec::new();
+                let mut lines: Vec<String> = Vec::with_capacity(set.values.len());
                 for val in &set.values {
                     let val_str = pretty_format(interp, val, depth + 1, use_colors, include_quotes);
                     lines.push(format!("{}{}", pad, val_str));

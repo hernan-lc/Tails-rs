@@ -6,6 +6,7 @@ use crate::objects::js_promise::JsPromise;
 use crate::objects::Value;
 use rustc_hash::FxHashMap;
 use std::rc::Rc;
+use std::cell::RefCell;
 
 /// Creates an `FxHashMap<String, Value>` from key-value pairs.
 ///
@@ -67,7 +68,7 @@ pub struct JsFunction {
     pub params: Vec<String>,
     pub rest_param: Option<String>,
     pub bytecode_index: usize,
-    pub closure: Vec<Value>,
+    pub closure: Rc<RefCell<Vec<Value>>>,
     pub prototype: Option<usize>,
     pub super_class: Option<Value>,
     pub properties: FxHashMap<String, Value>,
@@ -78,6 +79,14 @@ pub struct JsFunction {
     pub source_line: Option<usize>,
     pub is_arrow: bool,
     pub captured_this: Option<Value>,
+}
+
+#[derive(Debug, Clone)]
+pub struct JsIterator {
+    pub kind: String,
+    pub index: usize,
+    pub target: Option<Value>,
+    pub data: Option<Value>,
 }
 
 #[derive(Debug, Clone)]
@@ -97,6 +106,7 @@ pub enum HeapValue {
     Date(JsDate),
     RegExp(JsRegExp),
     Buffer(Vec<u8>),
+    Iterator(JsIterator),
 }
 
 #[derive(Debug, Clone)]

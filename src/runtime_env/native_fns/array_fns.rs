@@ -205,7 +205,7 @@ pub(super) fn native_array_map(
 ) -> Result<Value> {
     let elements = get_array_elements(interp, this)?;
     let callback = args.first().cloned().unwrap_or(Value::Undefined);
-    let mut results = Vec::new();
+    let mut results = Vec::with_capacity(elements.len());
     for (i, elem) in elements.iter().enumerate() {
         let call_args = vec![elem.clone(), Value::Integer(i as i64), this.clone()];
         let result = interp.call_value(&callback, &Value::Undefined, &call_args)?;
@@ -225,7 +225,7 @@ pub(super) fn native_array_filter(
 ) -> Result<Value> {
     let elements = get_array_elements(interp, this)?;
     let callback = args.first().cloned().unwrap_or(Value::Undefined);
-    let mut results = Vec::new();
+    let mut results = Vec::with_capacity(elements.len());
     for (i, elem) in elements.iter().enumerate() {
         let call_args = vec![elem.clone(), Value::Integer(i as i64), this.clone()];
         let result = interp.call_value(&callback, &Value::Undefined, &call_args)?;

@@ -2,6 +2,8 @@ use super::{HeapValue, Interpreter, JsFunction, JsObject};
 use crate::objects::js_promise::PromiseState;
 use crate::objects::Value;
 use rustc_hash::FxHashMap;
+use std::cell::RefCell;
+use std::rc::Rc;
 
 impl Interpreter {
     pub(crate) fn drain_microtasks(&mut self) {
@@ -24,7 +26,7 @@ impl Interpreter {
                 params: vec!["value".into()],
                 rest_param: None,
                 bytecode_index: usize::MAX,
-                closure: vec![Value::Promise(promise_idx)],
+                closure: Rc::new(RefCell::new(vec![Value::Promise(promise_idx)])),
                 prototype: Some(proto_idx),
                 super_class: None,
                 properties: FxHashMap::default(),
@@ -51,7 +53,7 @@ impl Interpreter {
                 params: vec!["reason".into()],
                 rest_param: None,
                 bytecode_index: usize::MAX,
-                closure: vec![Value::Promise(promise_idx)],
+                closure: Rc::new(RefCell::new(vec![Value::Promise(promise_idx)])),
                 prototype: Some(proto_idx),
                 super_class: None,
                 properties: FxHashMap::default(),

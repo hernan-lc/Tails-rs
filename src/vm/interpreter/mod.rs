@@ -20,7 +20,7 @@ mod value_ops;
 
 pub(crate) use call_frame::{CallFrame, ExceptionHandler};
 pub use heap_types::{
-    HeapValue, JsArray, JsCompiledRegex, JsFunction, JsGenerator, JsObject, JsProxyData, JsRegExp,
+    HeapValue, JsArray, JsCompiledRegex, JsFunction, JsGenerator, JsIterator, JsObject, JsProxyData, JsRegExp,
 };
 
 use crate::compiler::{CompiledModule, Instruction};
@@ -33,6 +33,7 @@ use crate::vm::interpreter::control_flow::ControlFlowOutcome;
 use rustc_hash::FxHashMap;
 use std::collections::{HashMap, VecDeque};
 use std::rc::Rc;
+use std::cell::RefCell;
 
 // ── Event-loop integration trait ──────────────────────────────────────────
 //
@@ -641,16 +642,17 @@ impl Interpreter {
                     match &callee {
                         Value::Function(func_idx) => {
                             // Clone needed values before any heap mutation
-                            let (is_generator, bytecode_index, has_promise_resolve) =
-                                if let HeapValue::Function(f) = &self.heap[*func_idx] {
-                                    let has_promise = f.bytecode_index == usize::MAX
-                                        && f.closure
-                                            .first()
-                                            .is_some_and(|v| matches!(v, Value::Promise(_)));
-                                    (f.is_generator, f.bytecode_index, has_promise)
-                                } else {
-                                    (false, 0, false)
-                                };
+                                let (is_generator, bytecode_index, has_promise_resolve) =
+                                    if let HeapValue::Function(f) = &self.heap[*func_idx] {
+                                        let has_promise = f.bytecode_index == usize::MAX
+                                            && f.closure
+                                                .borrow()
+                                                .first()
+                                                .is_some_and(|v| matches!(v, Value::Promise(_)));
+                                        (f.is_generator, f.bytecode_index, has_promise)
+                                    } else {
+                                        (false, 0, false)
+                                    };
 
                             if is_generator {
                                 if cfg!(debug_assertions) && std::env::var("GEN_TRACE").is_ok() {
@@ -670,14 +672,20 @@ impl Interpreter {
                                 continue;
                             } else if has_promise_resolve {
                                 if let HeapValue::Function(f) = &self.heap[*func_idx] {
-                                    if let Some(Value::Promise(promise_idx)) = f.closure.first() {
+                                    let promise_idx = {
+                                        let closure = f.closure.borrow();
+                                        closure.first().and_then(|v| {
+                                            if let Value::Promise(idx) = v { Some(*idx) } else { None }
+                                        })
+                                    };
+                                    if let Some(promise_idx) = promise_idx {
                                         match f.name.as_deref() {
                                             Some("resolve") => {
                                                 let val = args
                                                     .first()
                                                     .cloned()
                                                     .unwrap_or(Value::Undefined);
-                                                self.resolve_promise(*promise_idx, val);
+                                                self.resolve_promise(promise_idx, val);
                                                 self.stack.push(Value::Undefined);
                                             }
                                             Some("reject") => {
@@ -685,7 +693,7 @@ impl Interpreter {
                                                     .first()
                                                     .cloned()
                                                     .unwrap_or(Value::Undefined);
-                                                self.reject_promise(*promise_idx, reason);
+                                                self.reject_promise(promise_idx, reason);
                                                 self.stack.push(Value::Undefined);
                                             }
                                             _ => {
@@ -699,12 +707,16 @@ impl Interpreter {
                             } else if bytecode_index == usize::MAX {
                                 // Check if this is a bound function
                                 if let HeapValue::Function(f) = &self.heap[*func_idx] {
-                                    if f.name.as_deref() == Some("bound") && f.closure.len() >= 2 {
-                                        // Bound function: closure[0] = original fn, closure[1] = bound this, closure[2..] = bound args
-                                        let original_fn = f.closure[0].clone();
-                                        let bound_this = f.closure[1].clone();
-                                        let bound_args = f.closure[2..].to_vec();
-                                        // Combine bound args with call args
+                                    let len = f.closure.borrow().len();
+                                    if f.name.as_deref() == Some("bound") && len >= 2 {
+                                        let (original_fn, bound_this, bound_args) = {
+                                            let closure = f.closure.borrow();
+                                            (
+                                                closure[0].clone(),
+                                                closure[1].clone(),
+                                                closure[2..].to_vec(),
+                                            )
+                                        };
                                         let mut combined_args = bound_args;
                                         combined_args.extend(args);
                                         let result = self.call_value(
@@ -730,45 +742,30 @@ impl Interpreter {
                                         false
                                     };
                                 if same_module {
-                                    let func_info = {
-                                        if let HeapValue::Function(f) = &self.heap[*func_idx] {
-                                            // Phase 2F (inline Call fast path): skip
-                                            // the `Vec::clone()` of `f.closure`
-                                            // when the function has no captured
-                                            // variables (the common case for
-                                            // top-level functions and methods).
-                                            // Reuse a fresh empty Vec — this is
-                                            // cheaper than a non-trivial
-                                            // `Vec::clone`.
-                                            let closure_vars = if f.closure.is_empty() {
-                                                Vec::new()
-                                            } else {
-                                                f.closure.clone()
-                                            };
-                                            // Phase 2F (inline Call fast path): skip
-                                            // the `Option::clone()` of
-                                            // `f.captured_this` for non-arrow
-                                            // functions. The arrow case still
-                                            // needs to clone (the captured
-                                            // `this` is the outer scope's
-                                            // `this`).
-                                            let captured_this = if f.is_arrow {
-                                                f.captured_this.clone()
+                                        let func_info = {
+                                            if let HeapValue::Function(f) = &self.heap[*func_idx] {
+                                                let closure_rc = if f.closure.borrow().is_empty() {
+                                                    Rc::new(RefCell::new(Vec::new()))
+                                                } else {
+                                                    f.closure.clone()
+                                                };
+                                                let captured_this = if f.is_arrow {
+                                                    f.captured_this.clone()
+                                                } else {
+                                                    None
+                                                };
+                                                Some((
+                                                    closure_rc,
+                                                    f.bytecode_index,
+                                                    f.is_arrow,
+                                                    captured_this,
+                                                    f.rest_param.is_some(),
+                                                    f.params.len(),
+                                                ))
                                             } else {
                                                 None
-                                            };
-                                            Some((
-                                                closure_vars,
-                                                f.bytecode_index,
-                                                f.is_arrow,
-                                                captured_this,
-                                                f.rest_param.is_some(),
-                                                f.params.len(),
-                                            ))
-                                        } else {
-                                            None
-                                        }
-                                    };
+                                            }
+                                        };
                                     if let Some((
                                         closure_vars,
                                         bytecode_index,
@@ -780,7 +777,7 @@ impl Interpreter {
                                     {
                                         let return_address = pc + 1;
                                         let base_pointer = self.stack.len();
-                                        let closure_count = closure_vars.len();
+                                        let closure_count = closure_vars.borrow().len();
                                         let this_for_frame = if is_arrow {
                                             captured_this.unwrap_or(Value::Undefined)
                                         } else {
@@ -815,7 +812,7 @@ impl Interpreter {
                                                 self.exception_handlers.clone()
                                             },
                                         });
-                                        for closure_var in closure_vars {
+                                        for closure_var in closure_vars.borrow().iter().cloned() {
                                             self.stack.push(closure_var);
                                         }
                                         if has_rest {
@@ -908,12 +905,8 @@ impl Interpreter {
                     match method {
                         Value::Function(func_idx) => {
                             if let HeapValue::Function(f) = &self.heap[func_idx] {
-                                // Phase 2F (inline CallMethod fast path): skip
-                                // the `Vec::clone()` of `f.closure` and the
-                                // `Option::clone()` of `f.captured_this` for
-                                // the common case (no closure, non-arrow).
-                                let closure_vars = if f.closure.is_empty() {
-                                    Vec::new()
+                                let closure_rc = if f.closure.borrow().is_empty() {
+                                    Rc::new(RefCell::new(Vec::new()))
                                 } else {
                                     f.closure.clone()
                                 };
@@ -923,7 +916,7 @@ impl Interpreter {
                                     None
                                 };
                                 let func_info = Some((
-                                    closure_vars,
+                                    closure_rc,
                                     f.bytecode_index,
                                     f.is_arrow,
                                     captured_this,
@@ -947,7 +940,7 @@ impl Interpreter {
                                     {
                                         let return_address = pc + 1;
                                         let base_pointer = self.stack.len();
-                                        let closure_count = closure_vars.len();
+                                        let closure_count = closure_vars.borrow().len();
                                         let this_for_frame = if is_arrow {
                                             captured_this.unwrap_or_else(|| object.clone())
                                         } else {
@@ -982,7 +975,7 @@ impl Interpreter {
                                                 self.exception_handlers.clone()
                                             },
                                         });
-                                        for closure_var in closure_vars {
+                                        for closure_var in closure_vars.borrow().iter().cloned() {
                                             self.stack.push(closure_var);
                                         }
                                         if has_rest {
@@ -1146,7 +1139,7 @@ impl Interpreter {
                                         if same_module {
                                             let return_address = pc + 1;
                                             let base_pointer = self.stack.len();
-                                            let closure_count = closure_vars.len();
+                                            let closure_count = closure_vars.borrow().len();
                                             if self.call_stack.len() >= self.max_call_stack_depth {
                                                 self.throw_stack_overflow(&mut pc)?;
                                                 continue;
@@ -1166,7 +1159,7 @@ impl Interpreter {
                                                     .exception_handlers
                                                     .clone(),
                                             });
-                                            for closure_var in closure_vars {
+                                            for closure_var in closure_vars.borrow().iter().cloned() {
                                                 self.stack.push(closure_var);
                                             }
                                             for arg in args {

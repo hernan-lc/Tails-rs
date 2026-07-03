@@ -74,14 +74,17 @@ pub(super) fn native_querystring_stringify(
         _ => return Ok(Value::String(String::new())),
     };
 
-    let mut pairs = Vec::new();
+    let mut pairs;
     if let HeapValue::Object(obj) = &interp.heap[idx] {
+        pairs = Vec::with_capacity(obj.properties.len());
         for (key, value) in &obj.properties {
             let val_str = to_string_value(interp, value);
             let encoded_key = urlencoding::encode(key);
             let encoded_val = urlencoding::encode(&val_str);
             pairs.push(format!("{}{}{}", encoded_key, eq, encoded_val));
         }
+    } else {
+        pairs = Vec::new();
     }
 
     Ok(Value::String(pairs.join(&sep)))

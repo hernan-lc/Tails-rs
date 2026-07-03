@@ -50,7 +50,7 @@ impl Interpreter {
                     params: func_info.params,
                     rest_param: func_info.rest_param,
                     bytecode_index: func_info.bytecode_index,
-                    closure: Vec::new(),
+                    closure: Rc::new(RefCell::new(Vec::new())),
                     prototype: Some(proto_obj_idx),
                     super_class: Some(super_val.clone()),
                     properties: FxHashMap::default(),
@@ -73,7 +73,7 @@ impl Interpreter {
                     params: Vec::new(),
                     rest_param: None,
                     bytecode_index: usize::MAX,
-                    closure: Vec::new(),
+                    closure: Rc::new(RefCell::new(Vec::new())),
                     prototype: Some(proto_obj_idx),
                     super_class: Some(super_val.clone()),
                     properties: FxHashMap::default(),
@@ -107,7 +107,7 @@ impl Interpreter {
                     params: method_func_info.params,
                     rest_param: method_func_info.rest_param,
                     bytecode_index: method_func_info.bytecode_index,
-                    closure: Vec::new(),
+                    closure: Rc::new(RefCell::new(Vec::new())),
                     prototype: Some(method_proto_idx),
                     super_class: None,
                     properties: FxHashMap::default(),
@@ -217,7 +217,7 @@ impl Interpreter {
                             let _constructed = Value::Object(new_obj_heap_idx);
                             let return_address = *pc + 1;
                             let base_pointer = self.stack.len();
-                            let closure_count = f_clone.closure.len();
+                            let closure_count = f_clone.closure.borrow().len();
                             self.call_stack.push(CallFrame {
                                 return_address,
                                 base_pointer,
@@ -235,8 +235,8 @@ impl Interpreter {
                                     self.exception_handlers.clone()
                                 },
                             });
-                            for closure_var in &f_clone.closure {
-                                self.stack.push(closure_var.clone());
+                            for closure_var in f_clone.closure.borrow().iter().cloned() {
+                                self.stack.push(closure_var);
                             }
                             for arg in args {
                                 self.stack.push(arg);

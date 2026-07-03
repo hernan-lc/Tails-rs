@@ -270,7 +270,7 @@ pub(super) fn native_search_params_entries(
     _args: &[Value],
 ) -> Result<Value> {
     let entries_data: Vec<(String, String)> = parse_entries(interp, _this);
-    let mut entries = Vec::new();
+    let mut entries = Vec::with_capacity(entries_data.len());
     for (key, value) in entries_data {
         let entry_idx = interp.heap.len();
         interp

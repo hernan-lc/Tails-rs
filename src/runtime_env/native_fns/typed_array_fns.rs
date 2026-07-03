@@ -293,6 +293,7 @@ pub(super) fn native_typed_array_from(
             } else {
                 Vec::new()
             };
+        elements.reserve(arr_elements.len());
 
         for elem in arr_elements {
             let val = if let Some(map_fn) = &map_fn {
