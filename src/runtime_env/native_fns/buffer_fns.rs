@@ -446,6 +446,14 @@ pub(super) fn native_buffer_transcode(
     // byte-per-byte encodings (utf8, latin1, ascii) the intermediate
     // is identical to the source. For hex and base64, the source
     // bytes represent encoded data that we decode here.
+    //
+    // `intermediate` represents the raw byte stream in the *target*
+    // semantic of each source encoding: for `utf8`/`latin1`/`ascii`/
+    // `hex`/`base64` it is the same byte sequence that lives in the
+    // source Buffer. For `utf16le` the intermediate is the decoded
+    // UTF-8 form of the code units (matching Node's behaviour where
+    // `transcode(src, "utf16le", "utf8")` returns the UTF-8 bytes of
+    // the decoded string).
     let intermediate: Vec<u8> = match from_enc.to_ascii_lowercase().as_str() {
         "utf8" | "utf-8" => src_bytes.clone(),
         "latin1" | "binary" => src_bytes.clone(),
@@ -475,11 +483,16 @@ pub(super) fn native_buffer_transcode(
                 None => return Ok(Value::Null),
             }
         }
-        "utf16le" | "utf-16le" | "ucs2" | "ucs-2" => return Ok(Value::Null),
+        "utf16le" | "utf-16le" | "ucs2" | "ucs-2" => match decode_utf16le_to_utf8(&src_bytes) {
+            Some(b) => b,
+            None => return Ok(Value::Null),
+        },
         _ => return Ok(Value::Null),
     };
 
     // Step 2: encode intermediate → destination.
+    // For `utf16le` the intermediate is the UTF-8 byte stream of the
+    // decoded string, so we re-encode it as UTF-16LE code units.
     let encoded: Vec<u8> = match to_enc.to_ascii_lowercase().as_str() {
         "utf8" | "utf-8" => intermediate.clone(),
         "latin1" | "binary" => intermediate.clone(),
@@ -500,7 +513,10 @@ pub(super) fn native_buffer_transcode(
             let trimmed = s.trim_end_matches('=');
             trimmed.as_bytes().to_vec()
         }
-        "utf16le" | "utf-16le" | "ucs2" | "ucs-2" => return Ok(Value::Null),
+        "utf16le" | "utf-16le" | "ucs2" | "ucs-2" => match encode_utf8_to_utf16le(&intermediate) {
+            Some(b) => b,
+            None => return Ok(Value::Null),
+        },
         _ => return Ok(Value::Null),
     };
 
@@ -658,4 +674,159 @@ fn base64_decode_simple(bytes: &[u8]) -> Option<Vec<u8>> {
         i += 4;
     }
     Some(out)
+}
+
+// ===========================================================================
+// UTF-16LE transcoding helpers used by `Buffer.transcode`.
+//
+// The `intermediate` byte stream in `native_buffer_transcode` is the
+// UTF-8 form of the decoded string, so for `utf16le → utf8` we decode
+// the source bytes as little-endian UTF-16 code units into Unicode
+// scalar values and re-encode as UTF-8, and for `utf8 → utf16le` we
+// reverse that. Both helpers return `None` on malformed input so the
+// caller can produce the Node-equivalent `null` return value.
+// ===========================================================================
+
+/// Decode `src` as a stream of little-endian UTF-16 code units and
+/// re-encode the resulting scalar values as UTF-8 bytes.
+///
+/// Invalid byte sequences follow Node's behaviour of substituting the
+/// Unicode replacement character `U+FFFD` rather than failing — Node's
+/// `Buffer.transcode` only returns `null` when the encoding *names*
+/// are unrecognised, not when the bytes themselves are malformed. We
+/// mirror that policy so the round-trip behaves like Node's
+/// `Buffer.transcode(Buffer.from('Hi', 'utf16le'), 'utf16le', 'utf8')`
+/// → `Buffer.from('Hi', 'utf8')`.
+fn decode_utf16le_to_utf8(src: &[u8]) -> Option<Vec<u8>> {
+    if src.len() % 2 != 0 {
+        // Trailing single byte: treat as malformed, drop it (Node
+        // trims the source by length and the remaining pairs are
+        // still well-formed).
+    }
+    let mut out = Vec::with_capacity(src.len());
+    let mut i = 0;
+    let pairs = src.len() / 2;
+    while i < pairs {
+        let lo = src[i * 2];
+        let hi = src[i * 2 + 1];
+        let unit = u16::from_le_bytes([lo, hi]);
+        if (0xD800..=0xDBFF).contains(&unit) {
+            // High surrogate — must be followed by a low surrogate.
+            if i + 1 < pairs {
+                let lo2 = src[(i + 1) * 2];
+                let hi2 = src[(i + 1) * 2 + 1];
+                let next = u16::from_le_bytes([lo2, hi2]);
+                if (0xDC00..=0xDFFF).contains(&next) {
+                    let codepoint =
+                        0x10000 + (((unit - 0xD800) as u32) << 10) + ((next - 0xDC00) as u32);
+                    encode_utf8_codepoint(&mut out, codepoint);
+                    i += 2;
+                    continue;
+                }
+            }
+            // Unpaired high surrogate → replacement char.
+            encode_utf8_codepoint(&mut out, 0xFFFD);
+        } else if (0xDC00..=0xDFFF).contains(&unit) {
+            // Unpaired low surrogate → replacement char.
+            encode_utf8_codepoint(&mut out, 0xFFFD);
+        } else {
+            encode_utf8_codepoint(&mut out, unit as u32);
+        }
+        i += 1;
+    }
+    Some(out)
+}
+
+/// Encode the UTF-8 byte stream `src` as a sequence of little-endian
+/// UTF-16 code units. Any UTF-8 sequence that decodes to a codepoint
+/// above `U+FFFF` is split into a high/low surrogate pair (matching
+/// Node's behaviour).
+fn encode_utf8_to_utf16le(src: &[u8]) -> Option<Vec<u8>> {
+    let mut codepoints: Vec<u32> = Vec::with_capacity(src.len());
+    let mut i = 0;
+    while i < src.len() {
+        let b = src[i];
+        let (cp, consumed) = if b < 0x80 {
+            (b as u32, 1)
+        } else if b < 0xC0 {
+            // Continuation byte at the start of a sequence — invalid.
+            (0xFFFD, 1)
+        } else if b < 0xE0 {
+            if i + 1 < src.len() && (src[i + 1] & 0xC0) == 0x80 {
+                let cp = ((b as u32 & 0x1F) << 6) | (src[i + 1] as u32 & 0x3F);
+                (cp, 2)
+            } else {
+                (0xFFFD, 1)
+            }
+        } else if b < 0xF0 {
+            if i + 2 < src.len()
+                && (src[i + 1] & 0xC0) == 0x80
+                && (src[i + 2] & 0xC0) == 0x80
+            {
+                let cp = ((b as u32 & 0x0F) << 12)
+                    | ((src[i + 1] as u32 & 0x3F) << 6)
+                    | (src[i + 2] as u32 & 0x3F);
+                (cp, 3)
+            } else {
+                (0xFFFD, 1)
+            }
+        } else {
+            // 4-byte sequence
+            if i + 3 < src.len()
+                && (src[i + 1] & 0xC0) == 0x80
+                && (src[i + 2] & 0xC0) == 0x80
+                && (src[i + 3] & 0xC0) == 0x80
+            {
+                let cp = ((b as u32 & 0x07) << 18)
+                    | ((src[i + 1] as u32 & 0x3F) << 12)
+                    | ((src[i + 2] as u32 & 0x3F) << 6)
+                    | (src[i + 3] as u32 & 0x3F);
+                (cp, 4)
+            } else {
+                (0xFFFD, 1)
+            }
+        };
+        codepoints.push(cp);
+        i += consumed;
+    }
+    let mut out = Vec::with_capacity(codepoints.len() * 2);
+    for cp in codepoints {
+        if cp <= 0xFFFF {
+            let bytes = (cp as u16).to_le_bytes();
+            out.push(bytes[0]);
+            out.push(bytes[1]);
+        } else {
+            let cp = cp - 0x10000;
+            let high = 0xD800 + ((cp >> 10) as u16);
+            let low = 0xDC00 + ((cp & 0x3FF) as u16);
+            let bytes = high.to_le_bytes();
+            out.push(bytes[0]);
+            out.push(bytes[1]);
+            let bytes = low.to_le_bytes();
+            out.push(bytes[0]);
+            out.push(bytes[1]);
+        }
+    }
+    Some(out)
+}
+
+/// Append the UTF-8 encoding of `cp` to `out`. Caller must ensure
+/// `cp <= 0x10FFFF` (the standard Unicode range). Used by
+/// `decode_utf16le_to_utf8`.
+fn encode_utf8_codepoint(out: &mut Vec<u8>, cp: u32) {
+    if cp < 0x80 {
+        out.push(cp as u8);
+    } else if cp < 0x800 {
+        out.push(0xC0 | (cp >> 6) as u8);
+        out.push(0x80 | (cp & 0x3F) as u8);
+    } else if cp < 0x10000 {
+        out.push(0xE0 | (cp >> 12) as u8);
+        out.push(0x80 | ((cp >> 6) & 0x3F) as u8);
+        out.push(0x80 | (cp & 0x3F) as u8);
+    } else {
+        out.push(0xF0 | (cp >> 18) as u8);
+        out.push(0x80 | ((cp >> 12) & 0x3F) as u8);
+        out.push(0x80 | ((cp >> 6) & 0x3F) as u8);
+        out.push(0x80 | (cp & 0x3F) as u8);
+    }
 }

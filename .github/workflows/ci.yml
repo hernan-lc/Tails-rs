@@ -42,12 +42,17 @@ jobs:
   # ──────────────────────────────────────────────────────────────────────
   # Build: cheapest fast-fail check. Catches compile errors across the
   # whole workspace, including all default-enabled feature modules
-  # (fs, path, process, os, websocket, http, net).
+  # (fs, path, process, os, websocket, http, net). Runs on Linux,
+  # Windows, and macOS to keep the runtime portable as we approach v1.0.
   # ──────────────────────────────────────────────────────────────────────
   build:
-    name: Build (default features)
-    runs-on: ubuntu-latest
+    name: Build (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
 
     steps:
       - name: Checkout
@@ -67,12 +72,18 @@ jobs:
   # lib, integration tests, and module tests across all default features.
   # Uses --test-threads=1 because some HTTP/TCP tests bind to ephemeral
   # ports and are sensitive to parallel execution within a single job.
+  # Same OS matrix as `build` so test failures are tied to the same
+  # build artefact.
   # ──────────────────────────────────────────────────────────────────────
   test:
-    name: Test (default features)
-    runs-on: ubuntu-latest
+    name: Test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 45
     needs: build
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
 
     steps:
       - name: Checkout

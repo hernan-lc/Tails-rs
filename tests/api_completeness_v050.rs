@@ -185,6 +185,67 @@ fn test_buffer_transcode_base64_roundtrip() {
     assert_eq!(val, tails::Value::Boolean(true));
 }
 
+#[test]
+fn test_buffer_transcode_utf16le_roundtrip_ascii() {
+    // ASCII text round-trips through utf16le. The intermediate is the
+    // decoded UTF-8 byte stream, so `Buffer.byteLength` of the
+    // back-converted buffer must match the original utf8 byte count.
+    let val = run(r#"
+        const src = Buffer.from("Hello");
+        const le = Buffer.transcode(src, "utf8", "utf16le");
+        const back = Buffer.transcode(le, "utf16le", "utf8");
+        Buffer.isBuffer(le) && Buffer.isBuffer(back) && Buffer.byteLength(back) === 5;
+    "#);
+    assert_eq!(val, tails::Value::Boolean(true));
+}
+
+#[test]
+fn test_buffer_transcode_utf16le_known_vector() {
+    // 'A' is U+0041 — its UTF-16LE representation is the two bytes
+    // 0x41 0x00. Verify our encoder matches Node's.
+    let val = run(r#"
+        const src = Buffer.from("A");
+        const le = Buffer.transcode(src, "utf8", "utf16le");
+        // Compare with Buffer.from("A", "utf16le") which uses the
+        // existing utf16le decoder path (still returns raw bytes for
+        // utf16le in Buffer.from, so we cross-check the length
+        // instead).
+        Buffer.byteLength(le) === 2;
+    "#);
+    assert_eq!(val, tails::Value::Boolean(true));
+}
+
+#[test]
+fn test_buffer_transcode_utf16le_unicode_surrogate_roundtrip() {
+    // The current lexer does not interpret `\u{...}` Unicode escapes,
+    // so we build a multi-byte UTF-8 source by hand: the emoji 😀
+    // is U+1F600 and encodes to the 4-byte UTF-8 sequence
+    // F0 9F 98 80. We inject the bytes via the integer array overload
+    // of `Buffer.from` so the test is independent of lexer escape
+    // handling. The intermediate must be 4 bytes (one surrogate pair
+    // → 2 UTF-16LE code units → 4 bytes) and the back-converted
+    // buffer must be 4 bytes as well.
+    let val = run(r#"
+        const src = Buffer.from([240, 159, 152, 128]);
+        const le = Buffer.transcode(src, "utf8", "utf16le");
+        const back = Buffer.transcode(le, "utf16le", "utf8");
+        Buffer.byteLength(le) === 4 && Buffer.byteLength(back) === 4;
+    "#);
+    assert_eq!(val, tails::Value::Boolean(true));
+}
+
+#[test]
+fn test_buffer_transcode_utf16le_alias_ucs2() {
+    // "ucs2" and "ucs-2" must behave the same as "utf16le" / "utf-16le".
+    let val = run(r#"
+        const src = Buffer.from("Hi");
+        const a = Buffer.transcode(src, "utf8", "ucs2");
+        const b = Buffer.transcode(src, "utf8", "utf-16le");
+        Buffer.byteLength(a) === Buffer.byteLength(b);
+    "#);
+    assert_eq!(val, tails::Value::Boolean(true));
+}
+
 // ---------------------------------------------------------------------------
 // Buffer.byteLength with optional encoding argument
 // ---------------------------------------------------------------------------

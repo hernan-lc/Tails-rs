@@ -58,7 +58,9 @@ impl Interpreter {
                 let func_info = module.functions[*func_idx as usize].clone();
                 let mut closure_vars = Vec::new();
                 let base = self.call_stack.last().map(|f| f.base_pointer).unwrap_or(0);
-                for slot in _capture_slots {
+                // `_capture_slots` is `Box<Vec<u16>>` (Phase 1D); iterate
+                // by reference through the box to avoid the extra clone.
+                for slot in _capture_slots.iter() {
                     let abs_slot = base + *slot as usize;
                     let value = self
                         .stack

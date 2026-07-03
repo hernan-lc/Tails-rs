@@ -64,15 +64,20 @@ pub(super) fn native_headers_constructor(
         }
     }
 
-    props.insert("append".into(), Value::NativeFunction(c::HEADERS_APPEND));
-    props.insert("get".into(), Value::NativeFunction(c::HEADERS_GET));
-    props.insert("set".into(), Value::NativeFunction(c::HEADERS_SET));
-    props.insert("has".into(), Value::NativeFunction(c::HEADERS_HAS));
-    props.insert("delete".into(), Value::NativeFunction(c::HEADERS_DELETE));
-    props.insert("forEach".into(), Value::NativeFunction(c::HEADERS_FOR_EACH));
-    props.insert("keys".into(), Value::NativeFunction(c::HEADERS_KEYS));
-    props.insert("values".into(), Value::NativeFunction(c::HEADERS_VALUES));
-    props.insert("entries".into(), Value::NativeFunction(c::HEADERS_ENTRIES));
+    let static_props = props! {
+        "append" => Value::NativeFunction(c::HEADERS_APPEND),
+        "get" => Value::NativeFunction(c::HEADERS_GET),
+        "set" => Value::NativeFunction(c::HEADERS_SET),
+        "has" => Value::NativeFunction(c::HEADERS_HAS),
+        "delete" => Value::NativeFunction(c::HEADERS_DELETE),
+        "forEach" => Value::NativeFunction(c::HEADERS_FOR_EACH),
+        "keys" => Value::NativeFunction(c::HEADERS_KEYS),
+        "values" => Value::NativeFunction(c::HEADERS_VALUES),
+        "entries" => Value::NativeFunction(c::HEADERS_ENTRIES),
+    };
+    for (k, v) in static_props {
+        props.insert(k, v);
+    }
 
     let idx = interp.heap.len();
     interp.heap.push(HeapValue::Object(JsObject {

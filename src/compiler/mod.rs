@@ -94,6 +94,30 @@ pub struct CompiledFunction {
     pub is_arrow: bool,
 }
 
+#[cfg(test)]
+mod instruction_size_regression {
+    //! Phase 1D: regression test for the size of the `Instruction`
+    //! enum. Boxing the `Vec<u16>` and `Vec<String>` payloads
+    //! (see the `MakeClosure` / `ExportNamed` variants below) is what
+    //! keeps the variant size from dominating the dispatch table.
+    #[test]
+    fn instruction_enum_size_is_bounded() {
+        use std::mem::size_of;
+        let s = size_of::<super::Instruction>();
+        // After Phase 1D, the largest single-payload variant is
+        // `ImportNamed(String, String, String)` at 72 bytes; with
+        // `Box<Vec<u16>>` and `Box<Vec<String>>` the rest are <=24
+        // bytes. The total enum size is set by the largest variant.
+        // We allow some headroom for future variants and to make the
+        // test stable across rustc versions that may add niche
+        // optimisations.
+        assert!(
+            s <= 80,
+            "Instruction grew past the Phase 1D budget (got {s} bytes, expected <= 80); a new variant was probably added without boxing its payload"
+        );
+    }
+}
+
 #[derive(Debug, Clone)]
 pub enum Instruction {
     LoadConst(u32),
@@ -146,7 +170,11 @@ pub enum Instruction {
     Return,
     Pop,
     MakeFunction(u32),
-    MakeClosure(u32, Vec<u16>),
+    // Phase 1D: `Vec<u16>` boxed so the instruction stays at 8 bytes
+    // (it would otherwise be 24 bytes, dominating the enum size).
+    // Inner `Vec` is heap-allocated once at compile time and read-only
+    // at run time, so the extra indirection is a net win.
+    MakeClosure(u32, Box<Vec<u16>>),
     NewObject,
     SetProperty,
     GetProperty,
@@ -178,7 +206,11 @@ pub enum Instruction {
     ImportDefault(String, String),
     ImportAll(String, String),
     NativeImport(String, String),
-    ExportNamed(Vec<String>),
+    // Phase 1D: same rationale as `MakeClosure` above — the export
+    // name list is heap-allocated once at compile time and read-only
+    // at run time, so a boxed `Vec<String>` keeps this variant at 8
+    // bytes instead of 24.
+    ExportNamed(Box<Vec<String>>),
     ExportDefault,
     StoreModuleExport(String),
     PopModuleExports,

@@ -42,10 +42,17 @@ pub(super) fn native_datetime_format_constructor(
     let minute = options.get("minute").cloned();
     let second = options.get("second").cloned();
 
-    let mut formatter_props = FxHashMap::default();
-    formatter_props.insert("type".into(), Value::String("datetime".into()));
-    formatter_props.insert("dateStyle".into(), Value::String(date_style));
-    formatter_props.insert("timeStyle".into(), Value::String(time_style));
+    // Start from the static set of formatter properties: the type tag,
+    // the two style names, and the two always-on method pointers.
+    // Dynamic per-part options (weekday / year / ... / second) are
+    // merged in below when the user actually provided them.
+    let mut formatter_props: FxHashMap<String, Value> = props! {
+        "type" => Value::String("datetime".into()),
+        "dateStyle" => Value::String(date_style),
+        "timeStyle" => Value::String(time_style),
+        "format" => Value::NativeFunction(c::DATETIME_FORMAT_FORMAT),
+        "formatToParts" => Value::NativeFunction(c::DATETIME_FORMAT_FORMAT_TO_PARTS),
+    };
     if let Some(w) = weekday {
         formatter_props.insert("weekday".into(), Value::String(w));
     }
@@ -67,15 +74,6 @@ pub(super) fn native_datetime_format_constructor(
     if let Some(s) = second {
         formatter_props.insert("second".into(), Value::String(s));
     }
-
-    formatter_props.insert(
-        "format".into(),
-        Value::NativeFunction(c::DATETIME_FORMAT_FORMAT),
-    );
-    formatter_props.insert(
-        "formatToParts".into(),
-        Value::NativeFunction(c::DATETIME_FORMAT_FORMAT_TO_PARTS),
-    );
 
     let formatter_idx = interp.gc.allocate(
         &mut interp.heap,
@@ -434,25 +432,19 @@ pub(super) fn native_number_format_constructor(
         .and_then(|v| v.parse::<usize>().ok())
         .unwrap_or(3);
 
-    let mut formatter_props = FxHashMap::default();
-    formatter_props.insert("type".into(), Value::String("number".into()));
-    formatter_props.insert("style".into(), Value::String(style));
+    // Static baseline (type tag, style, fraction digit defaults, the
+    // `format` method). The dynamic `currency` is inserted below only
+    // when the user actually supplied one.
+    let mut formatter_props: FxHashMap<String, Value> = props! {
+        "type" => Value::String("number".into()),
+        "style" => Value::String(style),
+        "minimumFractionDigits" => Value::Integer(minimum_fraction_digits as i64),
+        "maximumFractionDigits" => Value::Integer(maximum_fraction_digits as i64),
+        "format" => Value::NativeFunction(c::NUMBER_FORMAT_FORMAT),
+    };
     if let Some(c) = currency {
         formatter_props.insert("currency".into(), Value::String(c));
     }
-    formatter_props.insert(
-        "minimumFractionDigits".into(),
-        Value::Integer(minimum_fraction_digits as i64),
-    );
-    formatter_props.insert(
-        "maximumFractionDigits".into(),
-        Value::Integer(maximum_fraction_digits as i64),
-    );
-
-    formatter_props.insert(
-        "format".into(),
-        Value::NativeFunction(c::NUMBER_FORMAT_FORMAT),
-    );
 
     let formatter_idx = interp.gc.allocate(
         &mut interp.heap,

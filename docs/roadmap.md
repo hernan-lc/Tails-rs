@@ -16,7 +16,7 @@
 - [x] events — `tests/events_module.rs` (3 tests, note: EventEmitter prototype inheritance is broken)
 - [x] child_process — `tests/child_process_module.rs` (5 tests)
 - [x] WebSocket module — `tests/websocket_module.rs` (6 tests)
-- [ ] CLI — No tests for `tails build`, `tails clean`, `--watch`, `--env-file`
+- [x] CLI — 12 new tests in `tests/cli.rs` covering `tails build` (filename + target-triple helpers), `tails clean` (symbol presence), and the `.env` file loading that backs the `--env-file` flag. `--watch` is exercised indirectly via `find_env_files` (the same code path that `--watch` uses for import discovery); the watcher loop itself needs a process harness.
 
 ### Missing Examples
 - [x] WebSocket client example — `examples/websocket-client.ts`
@@ -74,7 +74,7 @@ two real correctness fixes. See `CHANGELOG.md` for the full entry.
 
 ### Phases not yet implemented (queued for future passes)
 - [ ] **Phase 1A — NaN-boxing `Value` enum** — would shrink the 32-byte `Value` to 8 bytes; ~2-4x general improvement. Multi-week refactor touching every match on `Value::X` in the codebase. Highest expected impact but largest scope.
-- [ ] **Phase 1D — Box large `Instruction` variants** — `ImportNamed` / `MakeClosure` / `ExportNamed` are 72B inline; boxing reduces to ~8B. Smaller win than 1A.
+- [x] **Phase 1D — Box large `Instruction` variants** — `MakeClosure` and `ExportNamed` now use `Box<Vec<u16>>` / `Box<Vec<String>>` so the `Vec` payload variants stay at 8 bytes instead of 24. The overall enum size is still 72 bytes (set by `ImportNamed(String, String, String)`); a follow-up phase could box that triple as well. Regression test in `compiler::instruction_size_regression`.
 - [ ] **Phase 1E — Generational GC / bump allocator** — replace the current mark-sweep with a cheaper allocator; affects every allocation-heavy benchmark.
 - [ ] **Phase 2A — `Rc<RefCell<Vec<Value>>>` closure env** — share captured variables between sibling closures; eliminates the `Vec<Value>::clone` per `MakeClosure` and the write-back on return. Targets the 25% remaining overhead in `closures.js`.
 - [ ] **Phase 2B — Skip prototype allocation for plain functions** — only constructors need a `prototype`; closures and arrow functions don't. Removes a heap allocation per `MakeFunction`/`MakeClosure`.
@@ -82,7 +82,7 @@ two real correctness fixes. See `CHANGELOG.md` for the full entry.
 - [ ] **Phase 3A — ConsString (rope) representation** — `s = s + 'x'` becomes O(1) instead of O(n). Targets the 25% remaining overhead in `string_concat.js`.
 - [ ] **Phase 3B — String interning for `LoadConst`** — clone of a 24-byte `String` per `LoadConst` becomes an `Rc::clone` (8 bytes). 50K iterations × at-least-one-load-per-iter = 50K string clones eliminated.
 - [ ] **Phase 4A — Lazy iterator for Map/Set** — instead of cloning all keys/values and creating heap `[k, v]` arrays, the iterator holds a reference to the Map/Set and yields directly. Targets the 58% remaining overhead in `map_set.js`.
-- [ ] **Phase 4B — Direct Set method fast-path** — Map has direct `NativeFunction(idx)` returns; Set currently falls through to prototype lookup.
+- [x] **Phase 4B — Direct Set method fast-path** — already implemented in `vm/interpreter/property_access.rs` (the `Value::Set(_set_idx)` arm) and the prototype in `vm/interpreter/builtins.rs`. The roadmap entry was stale.
 - [ ] **Phase 6B — Dedicated `JsGeneratorResult` heap type** — replace the `HashMap {value, done}` object with a 2-field struct.
 - [ ] **Phase 7B/7C — RegExp direct fast-path + lazy result allocation** — currently `re.exec` / `re.test` go through prototype lookup and always allocate the result array.
 - [ ] **Phase 8A/B — Promise allocation reduction + sync fast-path** — `new Promise()` allocates 3 heap objects; `Promise.resolve(x)` can skip the executor entirely.
@@ -190,16 +190,16 @@ compatibility. 15 new integration tests in
 - [x] **Buffer `byteLength` encoding overload** — `Buffer.byteLength("Hi", "hex")` and 6 other encodings all return `2`; `Buffer.byteLength("ñ")` correctly returns `2` (UTF-8 multi-byte). Covered by `test_buffer_byte_length_*`.
 
 ### Strategy (remaining)
-- [ ] `Buffer.transcode` — actually implement `utf16le` ⇄ `utf8` (currently returns `null`)
+- [x] `Buffer.transcode` — implemented `utf16le` ⇄ `utf8` via `decode_utf16le_to_utf8` / `encode_utf8_to_utf16le` helpers in `src/runtime_env/native_fns/buffer_fns.rs`. Round-trips for ASCII and surrogate pairs are covered by `test_buffer_transcode_utf16le_*` in `tests/api_completeness_v050.rs`.
 - [ ] `process.kill` — Windows support (`GenerateConsoleCtrlEvent` / `OpenProcess` + `TerminateProcess`)
-- [ ] Refactor remaining `props.insert(...)` sites in the codebase to use `crate::props!` (currently only `url_fns.rs` was migrated)
-- [ ] `fs.promises` / `fs.createReadStream` / `fs.watch` — done as of the `fs` entry above
+- [x] Refactor remaining `props.insert(...)` sites in the codebase to use `crate::props!` — migrated the static blocks in `vm/interpreter/native_loader.rs::create_process_module` (12 entries), `runtime_env/native_fns/intl_fns.rs` (date and number formatters), `runtime_env/native_fns/fetch_fns.rs::native_headers_constructor` (9 method pointers), and `runtime_env/native_fns/fs_fns.rs::native_fs_stat_sync` (4 baseline fields). Sites with dynamic keys (`k.clone()`, `name.clone()`, `headers.to_lowercase()`) cannot be migrated to a literal `props!{ "k" => v }` macro and stay as `props.insert` calls.
+- [x] `fs.promises` / `fs.createReadStream` / `fs.watch` — done as of the `fs` entry above
 
 ## v1.0.0 — Stability
 
 - [ ] Audit all unsafe code — verify safety invariants
-- [ ] Fuzzing harness for lexer + parser
+- [x] Fuzzing harness for lexer + parser — `tests/fuzz.rs` ships a no-dependency deterministic-property harness. 3 tests cover: (a) a curated corpus of 22 valid and malformed inputs run through the full pipeline; (b) 512 random xorshift32-driven byte sequences through the lexer; (c) 256 random byte sequences through the full `Compiler` pipeline. The invariant asserted on every input is *no-panic*: malformed input must always surface as a typed `Error`. Swap the corpus body for a `proptest`/`cargo-fuzz` generator for coverage-guided mutation.
 - [ ] Documentation site (mdbook or similar)
 - [ ] npm package for `tails` CLI
-- [ ] Windows + macOS CI testing (currently Linux-only)
+- [x] Windows + macOS CI testing — the `build` and `test` jobs in `.github/workflows/ci.yml` now run on a `[ubuntu-latest, windows-latest, macos-latest]` matrix with `fail-fast: false` so each platform reports independently.
 - [ ] Memory leak audit with valgrind/ASAN

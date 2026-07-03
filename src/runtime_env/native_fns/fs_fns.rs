@@ -125,14 +125,15 @@ pub(super) fn native_fs_stat_sync(
             path
         ))
     })?;
-    let mut props = FxHashMap::default();
-    props.insert("size".into(), Value::Integer(stat.size as i64));
-    props.insert("isFile".into(), Value::Boolean(stat.is_file));
-    props.insert("isDirectory".into(), Value::Boolean(stat.is_directory));
-    props.insert(
-        "isSymbolicLink".into(),
-        Value::Boolean(stat.is_symbolic_link),
-    );
+    // Static baseline of the stat result. The platform-specific
+    // `mode`, `mtimeMs`, and `birthtimeMs` are merged in below when
+    // the underlying `tails_fs::stat` call reported them.
+    let mut props: FxHashMap<String, Value> = props! {
+        "size" => Value::Integer(stat.size as i64),
+        "isFile" => Value::Boolean(stat.is_file),
+        "isDirectory" => Value::Boolean(stat.is_directory),
+        "isSymbolicLink" => Value::Boolean(stat.is_symbolic_link),
+    };
     if let Some(mode) = stat.mode {
         props.insert("mode".into(), Value::Integer(mode as i64));
     }

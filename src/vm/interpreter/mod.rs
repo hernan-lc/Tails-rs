@@ -1061,7 +1061,7 @@ impl Interpreter {
                     self.exec_native_import(source, local_name)?;
                 }
                 Instruction::ExportNamed(names) => {
-                    self.exec_export_named(names)?;
+                    self.exec_export_named(names.as_slice())?;
                 }
                 Instruction::ExportDefault => {
                     self.exec_export_default()?;

@@ -158,15 +158,15 @@ pub fn create_process_module(
     heap: &mut Vec<HeapValue>,
     gc: &mut GarbageCollector,
 ) -> FxHashMap<String, Value> {
-    let mut props = FxHashMap::default();
-
-    // Scalar properties
-    props.insert("exit".into(), Value::NativeFunction(c::PROCESS_EXIT));
-    props.insert("cwd".into(), Value::NativeFunction(c::PROCESS_CWD));
-    props.insert("chdir".into(), Value::NativeFunction(c::PROCESS_CHDIR));
-    props.insert(
-        "platform".into(),
-        Value::String(
+    // Start with the static set of `process.<name>` properties (function
+    // pointers, scalar compile-time constants, and the `pid`). The
+    // dynamic sub-objects (env / argv / stdout / stderr) are merged in
+    // after the heap allocations below.
+    let mut props: FxHashMap<String, Value> = props! {
+        "exit" => Value::NativeFunction(c::PROCESS_EXIT),
+        "cwd" => Value::NativeFunction(c::PROCESS_CWD),
+        "chdir" => Value::NativeFunction(c::PROCESS_CHDIR),
+        "platform" => Value::String(
             if cfg!(target_os = "linux") {
                 "linux"
             } else if cfg!(target_os = "macos") {
@@ -178,10 +178,7 @@ pub fn create_process_module(
             }
             .into(),
         ),
-    );
-    props.insert(
-        "arch".into(),
-        Value::String(
+        "arch" => Value::String(
             if cfg!(target_arch = "x86_64") {
                 "x64"
             } else if cfg!(target_arch = "aarch64") {
@@ -191,8 +188,16 @@ pub fn create_process_module(
             }
             .into(),
         ),
-    );
-    props.insert("pid".into(), Value::Integer(std::process::id() as i64));
+        "pid" => Value::Integer(std::process::id() as i64),
+        "hrtime" => Value::NativeFunction(c::PROCESS_HRTIME),
+        "hrtime.bigint" => Value::NativeFunction(c::PROCESS_HRTIME_BIGINT),
+        "nextTick" => Value::NativeFunction(c::PROCESS_NEXT_TICK),
+        // API completeness additions (v0.5.0+).
+        "kill" => Value::NativeFunction(c::PROCESS_KILL),
+        "uptime" => Value::NativeFunction(c::PROCESS_UPTIME),
+        "memoryUsage" => Value::NativeFunction(c::PROCESS_MEMORY_USAGE),
+        "on" => Value::NativeFunction(c::PROCESS_ON),
+    };
 
     // process.env
     let mut env_props = FxHashMap::default();
@@ -244,25 +249,6 @@ pub fn create_process_module(
         }),
     );
     props.insert("stderr".into(), Value::Object(stderr_idx));
-
-    props.insert("hrtime".into(), Value::NativeFunction(c::PROCESS_HRTIME));
-    props.insert(
-        "hrtime.bigint".into(),
-        Value::NativeFunction(c::PROCESS_HRTIME_BIGINT),
-    );
-    props.insert(
-        "nextTick".into(),
-        Value::NativeFunction(c::PROCESS_NEXT_TICK),
-    );
-
-    // API completeness additions (v0.5.0+).
-    props.insert("kill".into(), Value::NativeFunction(c::PROCESS_KILL));
-    props.insert("uptime".into(), Value::NativeFunction(c::PROCESS_UPTIME));
-    props.insert(
-        "memoryUsage".into(),
-        Value::NativeFunction(c::PROCESS_MEMORY_USAGE),
-    );
-    props.insert("on".into(), Value::NativeFunction(c::PROCESS_ON));
 
     props
 }

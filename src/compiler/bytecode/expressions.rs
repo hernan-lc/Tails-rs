@@ -509,7 +509,10 @@ impl CodeGenerator {
 
                 if num_captures > 0 {
                     let capture_slots: Vec<u16> = outer_refs.iter().map(|(_, s)| *s).collect();
-                    self.emit(Instruction::MakeClosure(func_idx, capture_slots));
+                    self.emit(Instruction::MakeClosure(
+                        func_idx,
+                        Box::new(capture_slots),
+                    ));
                 } else {
                     self.emit(Instruction::MakeFunction(func_idx));
                 }
@@ -603,7 +606,10 @@ impl CodeGenerator {
 
                 if num_captures > 0 {
                     let capture_slots: Vec<u16> = outer_refs.iter().map(|(_, s)| *s).collect();
-                    self.emit(Instruction::MakeClosure(func_idx, capture_slots));
+                    self.emit(Instruction::MakeClosure(
+                        func_idx,
+                        Box::new(capture_slots),
+                    ));
                 } else {
                     self.emit(Instruction::MakeFunction(func_idx));
                 }
