@@ -182,6 +182,49 @@ impl Interpreter {
                         (Value::Float(a), Value::Integer(b)) => {
                             self.stack[dst_idx] = Value::Float(*a + *b as f64);
                         }
+                        // Phase 5F (String concat hot path): avoid cloning the
+                        // 32-byte `Value::String` wrapper and the 24-byte
+                        // `String` payload for the common `s = s + "x"` pattern
+                        // where both operands are `Value::String`. We can move
+                        // out of `self.stack[dst_idx]` (replacing with
+                        // Undefined) and clone the small `src` String, building
+                        // the result with a single `String::with_capacity` +
+                        // two `push_str` calls. Skips the `add()` helper
+                        // entirely (which would also clone both operands).
+                        (Value::String(dst_str), Value::String(src_str)) => {
+                            let total_len = dst_str.len() + src_str.len();
+                            let mut result = String::with_capacity(total_len);
+                            result.push_str(dst_str);
+                            result.push_str(src_str);
+                            self.stack[dst_idx] = Value::String(result);
+                        }
+                        // Phase 5F (String + Number): `"answer: " + 42` is
+                        // extremely common. Avoid the `to_string_coerce`
+                        // round-trip and the clone of the source `Value::String`
+                        // by formatting the small primitive directly into the
+                        // pre-allocated buffer.
+                        (Value::String(dst_str), Value::Integer(b)) => {
+                            let b_str = b.to_string();
+                            let total_len = dst_str.len() + b_str.len();
+                            let mut result = String::with_capacity(total_len);
+                            result.push_str(dst_str);
+                            result.push_str(&b_str);
+                            self.stack[dst_idx] = Value::String(result);
+                        }
+                        (Value::String(dst_str), Value::Float(b)) => {
+                            // Match `to_string_coerce` for finite integers:
+                            // "5" instead of "5.0" reads better.
+                            let b_str = if b.is_finite() && *b == (*b as i64) as f64 {
+                                (*b as i64).to_string()
+                            } else {
+                                b.to_string()
+                            };
+                            let total_len = dst_str.len() + b_str.len();
+                            let mut result = String::with_capacity(total_len);
+                            result.push_str(dst_str);
+                            result.push_str(&b_str);
+                            self.stack[dst_idx] = Value::String(result);
+                        }
                         _ => {
                             // Fallback: clone is required for self.add(left, right)
                             // which takes by-value. This is the cold path.

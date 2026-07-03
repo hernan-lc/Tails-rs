@@ -24,11 +24,23 @@ impl Interpreter {
 
                     // Extract only the fields we need (avoids cloning entire JsFunction)
                     let bytecode_index = f.bytecode_index;
-                    let closure = f.closure.clone();
+                    // Phase 2F: Skip the `Vec::clone()` for the common case
+                    // of functions with no captured variables (most top-level
+                    // functions and methods). Reuse a fresh empty Vec — this
+                    // is cheaper than a non-trivial `Vec::clone`.
+                    let closure = if f.closure.is_empty() {
+                        Vec::new()
+                    } else {
+                        f.closure.clone()
+                    };
                     let owner_module = f.owner_module.clone();
                     let module_scope = f.module_scope.clone();
                     let is_arrow = f.is_arrow;
-                    let captured_this = f.captured_this.clone();
+                    let captured_this = if is_arrow {
+                        f.captured_this.clone()
+                    } else {
+                        None
+                    };
                     let source_file = f.source_file.clone();
                     let source_line = f.source_line;
                     let rest_param = f.rest_param.is_some();
@@ -50,16 +62,15 @@ impl Interpreter {
 
                     let saved_module = self.current_module.clone();
                     let saved_path = self.current_module_path.clone();
+                    // Phase 2C (de-duplicated): the saved state and the
+                    // per-frame snapshot are identical, so compute once and
+                    // share the (possibly empty) Vec between the two.
                     let saved_exception_handlers = if self.exception_handlers.is_empty() {
                         Vec::new()
                     } else {
                         self.exception_handlers.clone()
                     };
-                    let exception_handlers_snapshot = if self.exception_handlers.is_empty() {
-                        Vec::new()
-                    } else {
-                        self.exception_handlers.clone()
-                    };
+                    let exception_handlers_snapshot = saved_exception_handlers.clone();
                     if let Some(ref mod_ref) = func_module {
                         self.current_module = Some(mod_ref.clone());
                     }
@@ -121,6 +132,11 @@ impl Interpreter {
                     self.current_module = saved_module;
                     self.current_module_path = saved_path;
                     self.module_globals = saved_mg;
+                    // Restore any exception handlers pushed during the call
+                    // back to what they were at entry. (The per-frame
+                    // snapshot goes into the CallFrame; this is the post-call
+                    // restore so subsequent sibling calls don't see the
+                    // callee's try/catch handlers.)
                     self.exception_handlers = saved_exception_handlers;
                     result
                 } else {

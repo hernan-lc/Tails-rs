@@ -442,11 +442,130 @@ impl Interpreter {
                                 pc += 1;
                                 continue;
                             }
+                            // Phase 5E: String + String — same-module string
+                            // concatenations. Avoids a `to_string_coerce`
+                            // round-trip + 24-byte String clone.
+                            (Value::String(a), Value::String(b)) => {
+                                let mut result =
+                                    String::with_capacity(a.len() + b.len());
+                                result.push_str(a);
+                                result.push_str(b);
+                                self.stack[dst_idx] = Value::String(result);
+                                pc += 1;
+                                continue;
+                            }
                             _ => {
                                 // Cold path: fall through to exec_load_store.
                             }
                         }
                     }
+                }
+                // OPTIMIZATION (Phase 1G): Inline the most common `LoadConst`
+                // pattern (Integer / Float / small String / Null / Undefined /
+                // Boolean) directly in the dispatch so the cascading
+                // `_ => exec_load_store()` branch is skipped. The cold path
+                // (Object / Array / BigInt / Symbol / Function) delegates to
+                // `exec_load_store` explicitly so the value is actually pushed
+                // — a fall-through would skip the push and cause a Stack
+                // underflow on the next consumer (this was a real bug in an
+                // earlier version of this optimisation).
+                Instruction::LoadConst(idx) => {
+                    let cidx = *idx as usize;
+                    if let Some(value) = module.constants.get(cidx) {
+                        match value {
+                            Value::Integer(_)
+                            | Value::Float(_)
+                            | Value::String(_)
+                            | Value::Null
+                            | Value::Undefined
+                            | Value::Boolean(_) => {
+                                self.stack.push(value.clone());
+                                pc += 1;
+                                continue;
+                            }
+                            _ => {
+                                // BigInt, Object, Array, Function, Symbol, etc.
+                                // — fall through to `exec_load_store` below.
+                            }
+                        }
+                    }
+                    // Cold path: explicitly call `exec_load_store` so the
+                    // value (a BigInt / Object / …) is actually pushed.
+                    if self.exec_load_store(instruction, module)? {
+                        // exec_load_store returned true — it handled the
+                        // instruction. Fall through to `pc += 1` below.
+                    }
+                }
+                // OPTIMIZATION (Phase 1G): `Pop` is one of the most frequent
+                // instructions after every expression statement. Inline it
+                // so the dispatch is one branch + one pop.
+                Instruction::Pop => {
+                    self.stack.pop();
+                    pc += 1;
+                    continue;
+                }
+                // OPTIMIZATION (Phase 1H): `Dup` (duplicate the top of the
+                // stack) is emitted for every `i++` / `++i` and for compound
+                // assignments like `x += y` after the right-hand side is
+                // pushed. Inlining avoids the cascading `_ =>
+                // exec_load_store()` dispatch (one branch per iter).
+                Instruction::Dup => {
+                    let val = self.stack.last().cloned().unwrap_or(Value::Undefined);
+                    self.stack.push(val);
+                    pc += 1;
+                    continue;
+                }
+                // OPTIMIZATION (Phase 1H): `LoadThis` is emitted at the start
+                // of every non-arrow function body and on `super.X` accesses.
+                // Inlining skips the call to `exec_load_store` and avoids the
+                // `Option::clone()` of `f.this_value` (which the existing
+                // path in `exec_load_store` does unconditionally even when
+                // it's `None`).
+                Instruction::LoadThis => {
+                    let this = self
+                        .call_stack
+                        .last()
+                        .and_then(|f| f.this_value.clone())
+                        .unwrap_or(Value::Undefined);
+                    self.stack.push(this);
+                    pc += 1;
+                    continue;
+                }
+                // OPTIMIZATION (Phase 1H): `Rot3Right` rotates the top three
+                // stack values (used by short-circuit boolean and ternary
+                // operators). Inlining avoids the function-call round-trip
+                // and the 3 × 32-byte clones the old `exec_load_store`
+                // arm did. The rotation is `(a, b, c) → (b, c, a)`:
+                //   - stack[len-3] should hold b (the second)
+                //   - stack[len-2] should hold c (the third)
+                //   - stack[len-1] should hold a (the first)
+                // We achieve this with three `std::mem::replace` moves
+                // (no clones) plus one direct write. The order matters
+                // because each replace must read its slot BEFORE it is
+                // overwritten by the next step.
+                Instruction::Rot3Right => {
+                    let len = self.stack.len();
+                    if len >= 3 {
+                        // Step 1: read `a` out of stack[len-3] (replacing
+                        //         it with Undefined), put `a` into
+                        //         stack[len-1] (replacing the original
+                        //         `c` and reading it out as `c`).
+                        let a = std::mem::replace(
+                            &mut self.stack[len - 3],
+                            Value::Undefined,
+                        );
+                        let c = std::mem::replace(&mut self.stack[len - 1], a);
+                        // Step 2: read `b` out of stack[len-2] (replacing
+                        //         it with the original `c`).
+                        let b = std::mem::replace(&mut self.stack[len - 2], c);
+                        // Step 3: write `b` into stack[len-3] (the slot
+                        //         that currently holds Undefined).
+                        self.stack[len - 3] = b;
+                        // Final: stack[len-3] = b, stack[len-2] = c,
+                        //        stack[len-1] = a  →  (b, c, a) ✓
+                    }
+                    pc += 1;
+                    continue;
                 }
                 Instruction::Jump(_)
                 | Instruction::JumpIf(_)
@@ -577,11 +696,37 @@ impl Interpreter {
                                 if same_module {
                                     let func_info = {
                                         if let HeapValue::Function(f) = &self.heap[*func_idx] {
+                                            // Phase 2F (inline Call fast path): skip
+                                            // the `Vec::clone()` of `f.closure`
+                                            // when the function has no captured
+                                            // variables (the common case for
+                                            // top-level functions and methods).
+                                            // Reuse a fresh empty Vec — this is
+                                            // cheaper than a non-trivial
+                                            // `Vec::clone`.
+                                            let closure_vars =
+                                                if f.closure.is_empty() {
+                                                    Vec::new()
+                                                } else {
+                                                    f.closure.clone()
+                                                };
+                                            // Phase 2F (inline Call fast path): skip
+                                            // the `Option::clone()` of
+                                            // `f.captured_this` for non-arrow
+                                            // functions. The arrow case still
+                                            // needs to clone (the captured
+                                            // `this` is the outer scope's
+                                            // `this`).
+                                            let captured_this = if f.is_arrow {
+                                                f.captured_this.clone()
+                                            } else {
+                                                None
+                                            };
                                             Some((
-                                                f.closure.clone(),
+                                                closure_vars,
                                                 f.bytecode_index,
                                                 f.is_arrow,
-                                                f.captured_this.clone(),
+                                                captured_this,
                                                 f.rest_param.is_some(),
                                                 f.params.len(),
                                             ))
@@ -621,9 +766,19 @@ impl Interpreter {
                                             generator_heap_idx: None,
                                             source_line: self.current_source_line(pc),
                                             source_col: self.current_source_col(pc),
-                                            exception_handlers_snapshot: self
+                                            // Phase 2C (inline Call fast path):
+                                            // skip the `Vec::clone()` of
+                                            // `self.exception_handlers` when
+                                            // empty (the common case for code
+                                            // without try/catch).
+                                            exception_handlers_snapshot: if self
                                                 .exception_handlers
-                                                .clone(),
+                                                .is_empty()
+                                            {
+                                                Vec::new()
+                                            } else {
+                                                self.exception_handlers.clone()
+                                            },
                                         });
                                         for closure_var in closure_vars {
                                             self.stack.push(closure_var);
@@ -691,7 +846,13 @@ impl Interpreter {
                     }
                 }
                 Instruction::CallMethod(argc) => {
-                    let mut args = Vec::new();
+                    // Phase 7D: pre-allocate the args Vec with the exact
+                    // capacity so the first `push` does not reallocate from
+                    // 0 → 1 → 2 → 4. Matters for hot method calls like
+                    // `arr.push(...)` and `m.set(...)` in the `map_set` and
+                    // `array_push` benchmarks. `*argc` is `u16` so cast to
+                    // `usize` for `Vec::with_capacity`.
+                    let mut args = Vec::with_capacity(usize::from(*argc));
                     for _ in 0..*argc {
                         args.push(
                             self.stack
@@ -712,11 +873,25 @@ impl Interpreter {
                     match method {
                         Value::Function(func_idx) => {
                             if let HeapValue::Function(f) = &self.heap[func_idx] {
+                                // Phase 2F (inline CallMethod fast path): skip
+                                // the `Vec::clone()` of `f.closure` and the
+                                // `Option::clone()` of `f.captured_this` for
+                                // the common case (no closure, non-arrow).
+                                let closure_vars = if f.closure.is_empty() {
+                                    Vec::new()
+                                } else {
+                                    f.closure.clone()
+                                };
+                                let captured_this = if f.is_arrow {
+                                    f.captured_this.clone()
+                                } else {
+                                    None
+                                };
                                 let func_info = Some((
-                                    f.closure.clone(),
+                                    closure_vars,
                                     f.bytecode_index,
                                     f.is_arrow,
-                                    f.captured_this.clone(),
+                                    captured_this,
                                     f.rest_param.is_some(),
                                     f.params.len(),
                                 ));
@@ -758,9 +933,19 @@ impl Interpreter {
                                             generator_heap_idx: None,
                                             source_line: self.current_source_line(pc),
                                             source_col: self.current_source_col(pc),
-                                            exception_handlers_snapshot: self
+                                            // Phase 2C (inline CallMethod fast
+                                            // path): skip the `Vec::clone()` of
+                                            // `self.exception_handlers` when
+                                            // empty (the common case for code
+                                            // without try/catch).
+                                            exception_handlers_snapshot: if self
                                                 .exception_handlers
-                                                .clone(),
+                                                .is_empty()
+                                            {
+                                                Vec::new()
+                                            } else {
+                                                self.exception_handlers.clone()
+                                            },
                                         });
                                         for closure_var in closure_vars {
                                             self.stack.push(closure_var);

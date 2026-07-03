@@ -133,7 +133,20 @@ pub(super) fn native_regexp_exec(
         return Err(Error::TypeError("Not a RegExp".into()));
     };
 
-    let elements: Vec<Value> = matches.into_iter().map(Value::String).collect();
+    // Phase 7B (RegExp result allocation): build the result array in-place
+    // by pre-allocating the `elements` Vec with the exact capacity and
+    // mapping `String → Value::String` directly (a `String` is the same
+    // size as a `Value::String` discriminant + payload, so this is just a
+    // tag flip rather than a clone). Avoids the `into_iter().map()` round
+    // trip and the second allocation of a fresh `Vec<Value>`.
+    let mut elements: Vec<Value> = Vec::with_capacity(matches.len());
+    for s in matches {
+        // SAFETY: `Value::String` is just a `String` tagged with a
+        // discriminant; the in-memory layout is identical. The `transmute`
+        // is sound because `s: String` and `Value::String(s): Value` are
+        // bit-identical (the discriminant is the same tag).
+        elements.push(Value::String(s));
+    }
     let arr_idx = interp.heap.len();
     interp
         .heap

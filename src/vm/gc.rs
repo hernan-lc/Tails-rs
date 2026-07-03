@@ -18,7 +18,14 @@ impl GarbageCollector {
             free_list: VecDeque::new(),
             marked: Vec::new(),
             allocation_count: 0,
-            threshold: 8192,
+            // Initial threshold raised from 8192 → 16384 to reduce the number
+            // of early-GC pauses on small/medium programs (the per-iteration
+            // `pc & 127 == 0 && should_collect()` check fires the same
+            // `Vec::clone` of the heap, which dominates the tail of micro
+            // benchmarks). The threshold still auto-scales up to 1M via the
+            // `* 3 / 2` heuristic in `sweep`, so long-running programs are
+            // unaffected.
+            threshold: 16384,
             collections_performed: 0,
             bytes_freed: 0,
         }

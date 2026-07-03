@@ -81,7 +81,7 @@ two real correctness fixes. See `CHANGELOG.md` for the full entry.
 - [ ] **Phase 2D — Avoid full `JsFunction` clone in `call_value`** — only `bytecode_index`, `closure`, `is_arrow`, `captured_this` are needed for the call.
 - [ ] **Phase 3A — ConsString (rope) representation** — `s = s + 'x'` becomes O(1) instead of O(n). Targets the 25% remaining overhead in `string_concat.js`.
 - [ ] **Phase 3B — String interning for `LoadConst`** — clone of a 24-byte `String` per `LoadConst` becomes an `Rc::clone` (8 bytes). 50K iterations × at-least-one-load-per-iter = 50K string clones eliminated.
-- [ ] **Phase 4A — Lazy iterator for Map/Set** — instead of cloning all keys/values and creating heap `[k, v]` arrays, the iterator holds a reference to the Map/Set and yields directly. Targets the 58% remaining overhead in `map_set.js`.
+- [x] **Phase 4A — Lazy iterator for Map/Set** — the iterator now stores `__target = Value::Map(map_idx)` (or `Value::Set(set_idx)`) plus `__index = 0` instead of cloning `keys` + `values` and pre-allocating N `[k, v]` pair arrays. The iterator reads directly from the Map/Set's `keys`/`values` vecs on each `next()`, building the pair array on the stack with a single `heap.push`. The Map/Set stays alive through the GC because the iterator's `__target` holds a heap index. Applied in `vm/interpreter/iterators.rs` (`exec_get_iterator` + `exec_iterator_next`). Targets the 58% remaining overhead in `map_set.js`.
 - [x] **Phase 4B — Direct Set method fast-path** — already implemented in `vm/interpreter/property_access.rs` (the `Value::Set(_set_idx)` arm) and the prototype in `vm/interpreter/builtins.rs`. The roadmap entry was stale.
 - [ ] **Phase 6B — Dedicated `JsGeneratorResult` heap type** — replace the `HashMap {value, done}` object with a 2-field struct.
 - [ ] **Phase 7B/7C — RegExp direct fast-path + lazy result allocation** — currently `re.exec` / `re.test` go through prototype lookup and always allocate the result array.
@@ -112,7 +112,12 @@ Critical hotspots after Pass 1 (vs Node.js, current state):
 - [ ] **Phase 1A — NaN-boxing** (foundational; unblocks 2-4x across all benchmarks)
 - [ ] **Phase 2A — Closure env sharing** (Rc<RefCell<Vec<Value>>>)
 - [ ] **Phase 3A — ConsString rope** for string concat
-- [ ] **Phase 4A — Lazy Map/Set iterator**
+- [x] **Phase 4A — Lazy Map/Set iterator** — see top of this file
+- [x] **Phase 5F — String+String / String+Integer / String+Float AddLocal hot path** — `AddLocal` no longer clones the 32-byte `Value::String` for the common `s = s + "x"` pattern and skips the `to_string_coerce` round-trip for `s + 42` / `s + 3.14`. Applied in `src/vm/interpreter/instructions.rs:185-225`.
+- [x] **Phase 7D — `Vec::with_capacity` for Call/CallMethod args** — both `Instruction::Call` and `Instruction::CallMethod` now pre-allocate the args Vec with the exact capacity, avoiding the 0→1→2→4 reallocation chain on `arr.push(...)`, `m.set(...)`, and `fib(n-1) + fib(n-2)`. Applied in `src/vm/interpreter/mod.rs` (CallMethod arm).
+- [x] **Phase 1H — Inline `Dup` / `LoadThis` / `Rot3Right` in the dispatch** — these three very common instructions are now matched directly in the top-level `execute_from` match in `src/vm/interpreter/mod.rs` so the cascading `_ => exec_load_store()` branch is skipped.
+- [x] **Phase 2C-inline — exception_handlers snapshot skip on Call/CallMethod** — the inline same-module fast path in `Instruction::Call` and `Instruction::CallMethod` now skips the `Vec::clone()` of `self.exception_handlers` when empty (the common case for code without try/catch). Mirrors the existing optimization in `calls.rs`.
+- [x] **Phase 2F-inline — Empty closure / captured_this skip on Call/CallMethod** — the inline same-module fast path now skips the `Vec::clone()` of `f.closure` for the common case (no captured variables) and skips the `Option::clone()` of `f.captured_this` for non-arrow functions. Mirrors the existing optimization in `calls.rs`.
 - [ ] Profile remaining hot loops and address whatever dominates after Pass 1
 
 ## v0.5.0 — Node.js Compatibility

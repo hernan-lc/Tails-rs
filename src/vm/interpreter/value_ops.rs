@@ -12,6 +12,18 @@ impl Interpreter {
                     Ok(Value::Float(*a as f64 + *b as f64))
                 }
             }
+            // Hot path: String + String — skip the `to_string_coerce`
+            // round-trip and the 24-byte String clone that the general
+            // `(Value::String(a), r)` arm would do, since the right
+            // operand is already a `String`. This is the single most
+            // common `+` pattern in benchmark `eval_string_concat_*`
+            // (`s = s + "x"` loops, where `"x"` is a LoadConst).
+            (Value::String(a), Value::String(b)) => {
+                let mut result = String::with_capacity(a.len() + b.len());
+                result.push_str(a);
+                result.push_str(b);
+                Ok(Value::String(result))
+            }
             (Value::String(a), r) => {
                 let coerced = self.to_string_coerce(r);
                 let mut result = String::with_capacity(a.len() + coerced.len());
