@@ -24,6 +24,49 @@ impl Interpreter {
                 result.push_str(b);
                 Ok(Value::String(result))
             }
+            // Phase 2.3 (mirrors the Phase 5F `add_local` arm): inline the
+            // String + Integer case to avoid a `to_string_coerce` round-trip
+            // + intermediate `String` allocation for the numeric operand.
+            // `"answer: " + 42` builds the result with a single
+            // `String::with_capacity` + two `push_str` calls.
+            (Value::String(a), Value::Integer(b)) => {
+                let b_str = b.to_string();
+                let mut result = String::with_capacity(a.len() + b_str.len());
+                result.push_str(a);
+                result.push_str(&b_str);
+                Ok(Value::String(result))
+            }
+            (Value::Integer(a), Value::String(b)) => {
+                let a_str = a.to_string();
+                let mut result = String::with_capacity(a_str.len() + b.len());
+                result.push_str(&a_str);
+                result.push_str(b);
+                Ok(Value::String(result))
+            }
+            (Value::String(a), Value::Float(b)) => {
+                // Match `to_string_coerce` for finite integers:
+                // "5" instead of "5.0" reads better.
+                let b_str = if b.is_finite() && *b == (*b as i64) as f64 {
+                    (*b as i64).to_string()
+                } else {
+                    b.to_string()
+                };
+                let mut result = String::with_capacity(a.len() + b_str.len());
+                result.push_str(a);
+                result.push_str(&b_str);
+                Ok(Value::String(result))
+            }
+            (Value::Float(a), Value::String(b)) => {
+                let a_str = if a.is_finite() && *a == (*a as i64) as f64 {
+                    (*a as i64).to_string()
+                } else {
+                    a.to_string()
+                };
+                let mut result = String::with_capacity(a_str.len() + b.len());
+                result.push_str(&a_str);
+                result.push_str(b);
+                Ok(Value::String(result))
+            }
             (Value::String(a), r) => {
                 let coerced = self.to_string_coerce(r);
                 let mut result = String::with_capacity(a.len() + coerced.len());

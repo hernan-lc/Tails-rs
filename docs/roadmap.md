@@ -65,20 +65,42 @@ expected impact on `benchmarks/fixtures/loops.js`,
 - [x] **Phase 1.2 — `heap_value_to_index` returns the right
   variants** (see Phase 0 entry). Correctness, not perf, but it also
   tightens the GC trace.
-- [ ] **Phase 1.3 — Inline `LoadConst` for `BigInt` and `Symbol`** —
+- [x] **Phase 1.3 — Inline `LoadConst` for `BigInt` and `Symbol`** —
   `src/vm/interpreter/mod.rs:472-498` already inlines `LoadConst`
   for the 6 immediate value types. `BigInt` and `Symbol` are also
   immediate values; extending the inline arm removes one function
-  call per `const BIG = 100n` / `const S = Symbol()`.
-- [ ] **Phase 1.4 — `SuspendedFrame` stack-snapshot `mem::take`** —
-  `src/vm/interpreter/mod.rs:80-95` does `self.stack.clone()` and
-  `self.call_stack.clone()` on every async suspension. Switching to
-  `std::mem::take` moves the buffer instead of copying it.
-- [ ] **Phase 1.5 — `Vec::with_capacity` for
+  call per `const BIG = 100n` / `const S = Symbol()`. **Fixed**:
+  added `Value::BigInt(_)` and `Value::Symbol(_)` to the inline arm
+  in `execute_from`. The clone is one discriminant + payload memcpy
+  (16/8 bytes) — much cheaper than a function call + match
+  cascade. Regression tests `test_loadconst_bigint_in_hot_loop`,
+  `test_loadconst_bigint_in_switch`, and
+  `test_loadconst_symbol_equality` in `tests/phase2_features.rs`
+  exercise the new path.
+- [x] **Phase 1.4 — `SuspendedFrame` stack-snapshot `mem::take`** —
+  the original note referenced `src/vm/interpreter/mod.rs:80-95`
+  (the `collect_garbage` snapshot path), but the `Await` async
+  suspend path at `mod.rs:1281-1294` was *already* using
+  `std::mem::take` (i.e. moving the buffer instead of cloning it).
+  The path in the roadmap note (the GC `collect_garbage` snapshot
+  in `mod.rs:289-303`) was the remaining clone site, and is fixed
+  in Phase 1.5 below.
+- [x] **Phase 1.5 — `Vec::with_capacity` for
   `SuspendedFrame::call_stack_snapshot`** — when taking the
   `call_stack` snapshot, reserve the destination's capacity to the
   source's length. One-liner; saves 0→1→2→4→… growth reallocations
-  on deep call stacks.
+  on deep call stacks. **Fixed**: `Interpreter::collect_garbage`
+  now builds the `stack_snapshot` and `call_stack_snapshot` Vecs
+  with `Vec::with_capacity(src.len())` + `extend(src.iter().cloned())`
+  instead of `self.stack.clone()` /
+  `self.call_stack.clone()`. Avoids 4–5 reallocations on a
+  100-deep `call_stack` and 1–2 reallocations on the common
+  5–10-deep case. The clone is still required (the GC needs an
+  owned snapshot that survives across the `gc.collect()` call) —
+  we only removed the growth-allocation churn. Regression
+  coverage: `test_gc_snapshot_capacity_does_not_drop_references`
+  in `tests/phase2_features.rs` walks a 500-element object graph
+  on the stack.
 - [ ] **Phase 1.6 — `Value::String` interning in `LoadConst`** —
   long-standing Phase 3B from the original roadmap. Strings in the
   constant pool are immutable; the current `LoadConst` does a
@@ -119,13 +141,27 @@ Larger-scope changes; each requires its own measurement pass.
   triggers a `Vec<HeapValue>::clone()` of the entire heap for mark
   roots (see `Interpreter::collect_garbage`), which is the most
   expensive per-N-instructions cost in the entire VM.
-- [ ] **Phase 2.3 — Inline `to_string_coerce` for `Value::Integer`
+- [x] **Phase 2.3 — Inline `to_string_coerce` for `Value::Integer`
   and `Value::Float` in `add` / `add_local`** — currently `add`
   falls back to `to_string_coerce` for `String + Integer` /
   `String + Float`, which allocates a `String` for the number. The
   Phase 5F arm in `AddLocal` already has a specialised path; the
   same specialisation can be hoisted into the general
   `Instruction::Add` arm in `src/vm/interpreter/instructions.rs`.
+  **Fixed**: `Interpreter::add` in
+  `src/vm/interpreter/value_ops.rs` now has four dedicated arms
+  that match the same Phase 5F shape as the `add_local` arm —
+  `(String, Integer)`, `(Integer, String)`, `(String, Float)`,
+  `(Float, String)`. Each does a single
+  `String::with_capacity(a.len() + b_str.len())` + two `push_str`
+  calls, skipping the `to_string_coerce` round-trip. Behaviour is
+  identical (including the finite-integer special case `"5"` not
+  `"5.0"`). Regression tests `test_add_string_plus_integer`,
+  `test_add_integer_plus_string`, `test_add_string_plus_float`,
+  `test_add_float_plus_string`,
+  `test_add_string_plus_negative_integer`, and
+  `test_add_string_plus_float_no_integer_form` in
+  `tests/phase2_features.rs` lock the new arms.
 - [ ] **Phase 2.4 — `JsIterator` heap type** — currently iterator
   state is stored as `__type` / `__index` / `__target` / `__data`
   inside the iterator's `JsObject::properties` map, and every

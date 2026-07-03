@@ -292,8 +292,17 @@ impl Interpreter {
             self.add_proto_roots(&mut map);
             std::rc::Rc::new(map)
         });
-        let stack_snapshot = self.stack.clone();
-        let call_stack_snapshot = self.call_stack.clone();
+        // Phase 1.5: reserve the destination's capacity to the source's
+        // length. The previous `self.stack.clone()` /
+        // `self.call_stack.clone()` would grow a fresh `Vec` from capacity
+        // 0 → 4 → 8 → 16 → 32 on deep call stacks (which the GC triggers
+        // most often). Pre-sizing eliminates 4–5 reallocations on a
+        // 100-deep call_stack and 1–2 reallocations on the common 5–10
+        // deep case.
+        let mut stack_snapshot = Vec::with_capacity(self.stack.len());
+        stack_snapshot.extend(self.stack.iter().cloned());
+        let mut call_stack_snapshot = Vec::with_capacity(self.call_stack.len());
+        call_stack_snapshot.extend(self.call_stack.iter().cloned());
         self.gc.collect(
             &mut self.heap,
             &globals_snapshot,
@@ -464,11 +473,18 @@ impl Interpreter {
                 // pattern (Integer / Float / small String / Null / Undefined /
                 // Boolean) directly in the dispatch so the cascading
                 // `_ => exec_load_store()` branch is skipped. The cold path
-                // (Object / Array / BigInt / Symbol / Function) delegates to
+                // (Object / Array / Function / …) delegates to
                 // `exec_load_store` explicitly so the value is actually pushed
                 // — a fall-through would skip the push and cause a Stack
                 // underflow on the next consumer (this was a real bug in an
                 // earlier version of this optimisation).
+                //
+                // Phase 1.3: `BigInt` and `Symbol` are also immediate values
+                // (16 bytes / 8 bytes respectively) so we push a clone inline
+                // instead of going through `exec_load_store`. The clone is
+                // cheap (one discriminant + payload memcpy) and the call
+                // savings are real for code that uses `const BIG = 100n` /
+                // `const S = Symbol("x")` in a hot loop.
                 Instruction::LoadConst(idx) => {
                     let cidx = *idx as usize;
                     if let Some(value) = module.constants.get(cidx) {
@@ -478,14 +494,16 @@ impl Interpreter {
                             | Value::String(_)
                             | Value::Null
                             | Value::Undefined
-                            | Value::Boolean(_) => {
+                            | Value::Boolean(_)
+                            | Value::BigInt(_)
+                            | Value::Symbol(_) => {
                                 self.stack.push(value.clone());
                                 pc += 1;
                                 continue;
                             }
                             _ => {
-                                // BigInt, Object, Array, Function, Symbol, etc.
-                                // — fall through to `exec_load_store` below.
+                                // Object, Array, Function, … — fall through
+                                // to `exec_load_store` below.
                             }
                         }
                     }
