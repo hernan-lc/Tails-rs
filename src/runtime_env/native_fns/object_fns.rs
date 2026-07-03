@@ -10,12 +10,11 @@ pub(super) fn native_object_keys(
     args: &[Value],
 ) -> Result<Value> {
     let obj_val = args.first().cloned().unwrap_or(Value::Undefined);
-    let mut keys = Vec::new();
-    match &obj_val {
+    let keys = match &obj_val {
         Value::Object(obj_idx) => {
             if let crate::vm::interpreter::HeapValue::Object(obj) = &interp.heap[*obj_idx] {
+                let mut keys = Vec::with_capacity(obj.properties.len());
                 for k in obj.properties.keys() {
-                    // Skip internal getter/setter/method keys
                     if k.starts_with("__getter_")
                         || k.starts_with("__setter_")
                         || k.starts_with("__method_")
@@ -24,17 +23,24 @@ pub(super) fn native_object_keys(
                     }
                     keys.push(Value::String(k.clone()));
                 }
+                keys
+            } else {
+                Vec::new()
             }
         }
         Value::Array(arr_idx) => {
             if let crate::vm::interpreter::HeapValue::Array(arr) = &interp.heap[*arr_idx] {
+                let mut keys = Vec::with_capacity(arr.elements.len());
                 for i in 0..arr.elements.len() {
                     keys.push(Value::String(i.to_string()));
                 }
+                keys
+            } else {
+                Vec::new()
             }
         }
-        _ => {}
-    }
+        _ => Vec::new(),
+    };
     let heap_idx = interp.heap.len();
     interp.heap.push(crate::vm::interpreter::HeapValue::Array(
         crate::vm::interpreter::JsArray { elements: keys },
@@ -48,22 +54,29 @@ pub(super) fn native_object_values(
     args: &[Value],
 ) -> Result<Value> {
     let obj_val = args.first().cloned().unwrap_or(Value::Undefined);
-    let mut vals = Vec::new();
-    match &obj_val {
+    let vals = match &obj_val {
         Value::Object(obj_idx) => {
             if let crate::vm::interpreter::HeapValue::Object(obj) = &interp.heap[*obj_idx] {
+                let mut vals = Vec::with_capacity(obj.properties.len());
                 for v in obj.properties.values() {
                     vals.push(v.clone());
                 }
+                vals
+            } else {
+                Vec::new()
             }
         }
         Value::Array(arr_idx) => {
             if let crate::vm::interpreter::HeapValue::Array(arr) = &interp.heap[*arr_idx] {
+                let mut vals = Vec::with_capacity(arr.elements.len());
                 vals.extend(arr.elements.iter().cloned());
+                vals
+            } else {
+                Vec::new()
             }
         }
-        _ => {}
-    }
+        _ => Vec::new(),
+    };
     let heap_idx = interp.heap.len();
     interp.heap.push(crate::vm::interpreter::HeapValue::Array(
         crate::vm::interpreter::JsArray { elements: vals },
@@ -80,21 +93,22 @@ pub(super) fn native_object_entries(
     let pairs: Vec<(String, Value)> = match &obj_val {
         Value::Object(obj_idx) => {
             if let crate::vm::interpreter::HeapValue::Object(obj) = &interp.heap[*obj_idx] {
-                obj.properties
-                    .iter()
-                    .map(|(k, v)| (k.clone(), v.clone()))
-                    .collect()
+                let mut pairs = Vec::with_capacity(obj.properties.len());
+                for (k, v) in obj.properties.iter() {
+                    pairs.push((k.clone(), v.clone()));
+                }
+                pairs
             } else {
                 Vec::new()
             }
         }
         Value::Array(arr_idx) => {
             if let crate::vm::interpreter::HeapValue::Array(arr) = &interp.heap[*arr_idx] {
-                arr.elements
-                    .iter()
-                    .enumerate()
-                    .map(|(i, v)| (i.to_string(), v.clone()))
-                    .collect()
+                let mut pairs = Vec::with_capacity(arr.elements.len());
+                for (i, v) in arr.elements.iter().enumerate() {
+                    pairs.push((i.to_string(), v.clone()));
+                }
+                pairs
             } else {
                 Vec::new()
             }
@@ -134,11 +148,11 @@ pub(super) fn native_object_assign(
                     if let crate::vm::interpreter::HeapValue::Object(src_obj) =
                         &interp.heap[*src_idx]
                     {
-                        src_obj
-                            .properties
-                            .iter()
-                            .map(|(k, v)| (k.clone(), v.clone()))
-                            .collect()
+                        let mut cloned = Vec::with_capacity(src_obj.properties.len());
+                        for (k, v) in src_obj.properties.iter() {
+                            cloned.push((k.clone(), v.clone()));
+                        }
+                        cloned
                     } else {
                         Vec::new()
                     };

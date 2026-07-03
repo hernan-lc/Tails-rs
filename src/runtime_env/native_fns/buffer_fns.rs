@@ -124,7 +124,28 @@ pub(super) fn native_buffer_concat(
     _this: &Value,
     args: &[Value],
 ) -> Result<Value> {
-    let mut result = Vec::new();
+    let total_len = if let Some(Value::Array(arr_idx)) = args.first() {
+        if let HeapValue::Array(arr) = &interp.heap[*arr_idx] {
+            arr.elements
+                .iter()
+                .filter_map(|elem| match elem {
+                    Value::Buffer(buf_idx) => {
+                        if let HeapValue::Buffer(buf) = &interp.heap[*buf_idx] {
+                            Some(buf.len())
+                        } else {
+                            None
+                        }
+                    }
+                    _ => None,
+                })
+                .sum()
+        } else {
+            0
+        }
+    } else {
+        0
+    };
+    let mut result = Vec::with_capacity(total_len);
     if let Some(Value::Array(arr_idx)) = args.first() {
         if let HeapValue::Array(arr) = &interp.heap[*arr_idx] {
             for elem in &arr.elements {

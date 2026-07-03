@@ -111,18 +111,25 @@ expected impact on `benchmarks/fixtures/loops.js`,
   `Arc::make_mut`. All 57 modified files across `src/vm/`,
   `src/objects/`, `src/runtime_env/native_fns/`, `src/compiler/`,
   and `src/ffi/` were migrated. 928 tests pass, 0 failures.
-- [ ] **Phase 1.7 — `ConsString` rope for `add(String, _)`** —
-  long-standing Phase 3A. `s = s + "x"` currently allocates a
-  fresh `String` of `s.len() + 1` bytes per iter. A rope
-  representation makes the concat O(1) and flattens lazily.
-  Expected impact: 3–5x on `builtins/string_concat.js`.
+- [x] **Phase 1.7 — `ConsString` rope for `add(String, _)`** —
+   long-standing Phase 3A. `s = s + "x"` currently allocates a
+   fresh `String` of `s.len() + 1` bytes per iter. A rope
+   representation makes the concat O(1) and flattens lazily.
+   **Fixed** (commit `86a5368`): `Value` gained a `Cons` variant;
+   `Interpreter::add` and the `Instruction::Add` arm in
+   `src/vm/interpreter/instructions.rs` now create `ConsString::new`
+   nodes for `String + String`, `String + Cons`, `Cons + String`,
+   and `Cons + Cons` combinations. `flatten_value` in
+   `src/vm/interpreter/value_ops.rs` lazily reduces the rope to a
+   flat `String` on first read. Expected impact: 3–5x on
+   `builtins/string_concat.js`.
 - [ ] **Phase 1.8 — Closure env `Rc<RefCell<Vec<Value>>>`** —
-  long-standing Phase 2A. Currently, sibling closures each clone
-  the entire captured-var vector. For a function with 3 captures
-  and 3 sibling closures, that's 288 bytes copied per
-  `MakeClosure`. Sharing an `Rc<RefCell<Vec<Value>>>` eliminates
-  all of it. Expected impact: 5–10x on `core/closures.js`
-  (currently 5204ms).
+   long-standing Phase 2A. Currently, sibling closures each clone
+   the entire captured-var vector. For a function with 3 captures
+   and 3 sibling closures, that's 288 bytes copied per
+   `MakeClosure`. Sharing an `Rc<RefCell<Vec<Value>>>` eliminates
+   all of it. Expected impact: 5–10x on `core/closures.js`
+   (currently 5204ms).
 ## Phase 2 — Dispatch and GC
 
 Larger-scope changes; each requires its own measurement pass.
@@ -150,7 +157,7 @@ Larger-scope changes; each requires its own measurement pass.
   Phase 5F arm in `AddLocal` already has a specialised path; the
   same specialisation can be hoisted into the general
   `Instruction::Add` arm in `src/vm/interpreter/instructions.rs`.
-  **Fixed**: `Interpreter::add` in
+  **Fixed** (commit `d5ba08d`): `Interpreter::add` in
   `src/vm/interpreter/value_ops.rs` now has four dedicated arms
   that match the same Phase 5F shape as the `add_local` arm —
   `(String, Integer)`, `(Integer, String)`, `(String, Float)`,
@@ -164,46 +171,56 @@ Larger-scope changes; each requires its own measurement pass.
   `test_add_string_plus_negative_integer`, and
   `test_add_string_plus_float_no_integer_form` in
   `tests/phase2_features.rs` lock the new arms.
-- [ ] **Phase 2.4 — `JsIterator` heap type** — currently iterator
+- [x] **Phase 2.4 — `JsIterator` heap type** — currently iterator
   state is stored as `__type` / `__index` / `__target` / `__data`
   inside the iterator's `JsObject::properties` map, and every
-  `next()` does a `properties.insert("__index", …)`. Replacing
-  this with a `HeapValue::Iterator { kind, index, target, data }`
-  variant removes the per-step hashmap insert (the dominant cost
-  in `core/generators.js` after Pass 2a).
-- [ ] **Phase 2.5 — `Vec::with_capacity` for `Value` vecs in native
-  fns** — `runtime_env/native_fns/` has ~30 modules; a grep finds
-  dozens of `Vec::new()` followed by `push(...)` loops. A focused
-  pass to add `Vec::with_capacity(n)` where `n` is statically
-  known (array length, object property count, …) saves a handful
-  of reallocations per native call. Low impact individually, but
-  composes.
+  `next()` does a `properties.insert("__index", …)`. **Fixed**:
+  replaced with a `HeapValue::Iterator { kind, index, target, data }`
+  variant in `src/vm/objects.rs`, implemented in
+  `src/vm/interpreter/iterators.rs`. The per-step `properties.insert`
+  is gone; iteration state is now a single heap slot write. The GC
+  mark phase in `src/vm/gc.rs` was updated to trace the four inner
+  `Value` fields. This was originally called out as Phase 4A in the
+  legacy roadmap and as Phase 3.3 below; the work is complete.
+- [x] **Phase 2.5 — `Vec::with_capacity` for `Value` vecs in native
+  fns** — `runtime_env/native_fns/` has ~30 modules; a focused pass
+  added `Vec::with_capacity(n)` at every site where `n` is statically
+  known. Applied in `native_object_keys` (capacity = object property
+  count / array length), `native_object_values`, `native_object_entries`
+  (capacity from `properties.len()` / `elements.len()`), and
+  `native_object_assign` (capacity from source `properties.len()`).
+  `native_buffer_concat` uses a two-pass strategy: first pass sums
+  buffer lengths, second pass fills a `Vec::with_capacity(total_len)`.
+  Zero behaviour change; eliminates growth reallocations on every
+  `Object.keys()`, `Object.values()`, `Object.entries()`,
+  `Object.assign()`, and `Buffer.concat()` call. Composes with all
+  other Phase 1/2 work.
 
 ## Phase 3 — Profile-guided follow-ups
 
 After Phase 1 + 2 land, re-run `benchmarks/runner.sh` and pick the
-top-3 remaining hotspots. The original roadmap entries that are
-still relevant are kept here verbatim as a starting point.
+top-3 remaining hotspots. Items not yet addressed are listed here.
 
+- [x] **Phase 3.2 — `ConsString` rope** (the long-standing Phase 3A).
+   Currently the single largest gap on `builtins/string_concat.js`.
+   **Fixed** in Phase 1.7 above (commit `86a5368`).
+- [x] **Phase 3.3 — Lazy Map / Set iterator → dedicated
+   `HeapValue::Iterator`** (Phase 2.4 above; called out here because
+   the original Phase 4A used the same `__target` property trick and
+   is on the hot path). **Fixed** in Phase 2.4 above.
 - [ ] **Phase 3.1 — `Rc<RefCell<Vec<Value>>>` closure env** (the
   long-standing Phase 2A). Currently the single largest gap on
   `core/closures.js`.
-- [ ] **Phase 3.2 — `ConsString` rope** (the long-standing Phase 3A).
-  Currently the single largest gap on `builtins/string_concat.js`.
-- [ ] **Phase 3.3 — Lazy Map / Set iterator → dedicated
-  `HeapValue::Iterator`** (Phase 2.4 above; called out here because
-  the original Phase 4A used the same `__target` property trick and
-  is on the hot path).
 - [ ] **Phase 3.4 — RegExp direct fast-path + lazy result**
-  (Phase 7B/7C from the original roadmap). After Phase 2.4, the
-  iterator fast-path becomes the next-largest gap on
-  `builtins/regexp.js`.
+   (Phase 7B/7C from the original roadmap). After Phase 2.4, the
+   iterator fast-path becomes the next-largest gap on
+   `builtins/regexp.js`.
 - [ ] **Phase 3.5 — Inline property storage for small objects**
-  (Phase 10A from the original roadmap). The current
-  `JsObject::properties: FxHashMap<String, Value>` has a hash +
-  collision-resolution cost on every `obj.x`; replacing it with a
-  `[Option<(Rc<str>, Value)>; 8]` array for the 99% case of
-  ≤8-property objects would be a 5–10x win on `core/oo.js`.
+   (Phase 10A from the original roadmap). The current
+   `JsObject::properties: FxHashMap<String, Value>` has a hash +
+   collision-resolution cost on every `obj.x`; replacing it with a
+   `[Option<(Rc<str>, Value)>; 8]` array for the 99% case of
+   ≤8-property objects would be a 5–10x win on `core/oo.js`.
 
 ## Out of scope for this roadmap
 
