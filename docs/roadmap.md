@@ -123,13 +123,19 @@ expected impact on `benchmarks/fixtures/loops.js`,
    `src/vm/interpreter/value_ops.rs` lazily reduces the rope to a
    flat `String` on first read. Expected impact: 3–5x on
    `builtins/string_concat.js`.
-- [ ] **Phase 1.8 — Closure env `Rc<RefCell<Vec<Value>>>`** —
-   long-standing Phase 2A. Currently, sibling closures each clone
-   the entire captured-var vector. For a function with 3 captures
-   and 3 sibling closures, that's 288 bytes copied per
-   `MakeClosure`. Sharing an `Rc<RefCell<Vec<Value>>>` eliminates
-   all of it. Expected impact: 5–10x on `core/closures.js`
-   (currently 5204ms).
+- [x] **Phase 1.8 — Closure env cache eliminated per-sibling clone** —
+   long-standing Phase 2A. `CallFrame` gained a
+   `shared_closure_env: HashMap<u32, Rc<RefCell<Vec<Value>>>>` field.
+   Inside a single invocation of an outer function, the first
+   `MakeClosure(func_idx, …)` populates the closure vec and caches the
+   `Rc` keyed by `func_idx`; subsequent sibling closures (same
+   `func_idx`, same frame) clone the cached `Rc` (cheap atomic
+   increment) instead of re-allocating and memcpy-ing the captured
+   values. The cache lives on `CallFrame`, so each invocation gets its
+   own environment — correct semantics for loop-created closures and
+   for separate invocations of the outer function. Expected impact:
+   5–10x on `core/closures.js` (currently 5204ms) where multiple
+   sibling closures are created.
 ## Phase 2 — Dispatch and GC
 
 Larger-scope changes; each requires its own measurement pass.
@@ -208,9 +214,11 @@ top-3 remaining hotspots. Items not yet addressed are listed here.
    `HeapValue::Iterator`** (Phase 2.4 above; called out here because
    the original Phase 4A used the same `__target` property trick and
    is on the hot path). **Fixed** in Phase 2.4 above.
-- [ ] **Phase 3.1 — `Rc<RefCell<Vec<Value>>>` closure env** (the
-  long-standing Phase 2A). Currently the single largest gap on
-  `core/closures.js`.
+- [x] **Phase 3.1 — `Rc<RefCell<Vec<Value>>>` closure env** (the
+   long-standing Phase 2A). **Fixed** in Phase 1.8 above (commit
+   `1df63f7`): `MakeClosure` now caches the shared closure env in
+   `CallFrame::shared_closure_env`; sibling closures in the same
+   invocation clone the cached `Rc` instead of re-allocating.
 - [ ] **Phase 3.4 — RegExp direct fast-path + lazy result**
    (Phase 7B/7C from the original roadmap). After Phase 2.4, the
    iterator fast-path becomes the next-largest gap on
