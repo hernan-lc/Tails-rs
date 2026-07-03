@@ -95,6 +95,7 @@ fn test_require_dirname_filename() {
         .unwrap();
     let s = match result {
         tails::Value::String(s) => s,
+        tails::Value::Cons(c) => c.flatten(),
         other => panic!("Expected string, got {:?}", other),
     };
     assert!(s.contains("/tmp"), "Expected /tmp in result: {}", s);
