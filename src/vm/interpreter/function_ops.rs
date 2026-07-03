@@ -56,19 +56,40 @@ impl Interpreter {
             }
             Instruction::MakeClosure(func_idx, _capture_slots) => {
                 let func_info = module.functions[*func_idx as usize].clone();
-                let closure_vars: Vec<Value> = {
-                    let base = self.call_stack.last().map(|f| f.base_pointer).unwrap_or(0);
-                    let mut vars = Vec::with_capacity(_capture_slots.len());
-                    for slot in _capture_slots.iter() {
-                        let abs_slot = base + *slot as usize;
-                        let value = self
-                            .stack
+                let base_pointer: usize = self
+                    .call_stack
+                    .last()
+                    .map(|f| f.base_pointer)
+                    .unwrap_or(0);
+                let snapshot: Vec<Value> = _capture_slots
+                    .iter()
+                    .map(|slot| {
+                        let abs_slot = base_pointer + *slot as usize;
+                        self.stack
                             .get(abs_slot)
                             .cloned()
-                            .unwrap_or(Value::Undefined);
-                        vars.push(value);
+                            .unwrap_or(Value::Undefined)
+                    })
+                    .collect();
+                let closure_vars: Rc<RefCell<Vec<Value>>> = {
+                    let cached: Option<Rc<RefCell<Vec<Value>>>> =
+                        if let Some(frame) = self.call_stack.last() {
+                            frame.shared_closure_env.get(func_idx).cloned()
+                        } else {
+                            None
+                        };
+                    match cached {
+                        Some(shared) => shared,
+                        None => {
+                            let rc = Rc::new(RefCell::new(snapshot));
+                            if let Some(frame) = self.call_stack.last_mut() {
+                                frame
+                                    .shared_closure_env
+                                    .insert(*func_idx, rc.clone());
+                            }
+                            rc
+                        }
                     }
-                    vars
                 };
                 let proto_obj_idx = self
                     .gc
@@ -84,7 +105,7 @@ impl Interpreter {
                         params: func_info.params,
                         rest_param: func_info.rest_param,
                         bytecode_index: func_info.bytecode_index,
-                        closure: Rc::new(RefCell::new(closure_vars)),
+                        closure: closure_vars,
                         prototype: Some(proto_obj_idx),
                         super_class: None,
                         properties: FxHashMap::default(),

@@ -2,6 +2,7 @@ use crate::errors::{Error, Result};
 use crate::objects::Value;
 use crate::props;
 use crate::vm::interpreter::Interpreter;
+use std::collections::HashMap;
 
 pub(super) fn native_generator_next(
     interp: &mut Interpreter,
@@ -75,6 +76,7 @@ pub(super) fn native_generator_next(
                 } else {
                     interp.exception_handlers.clone()
                 },
+                shared_closure_env: HashMap::new(),
             });
 
             let result = interp.execute_from(&module, resume_pc);

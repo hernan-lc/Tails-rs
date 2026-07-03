@@ -2,6 +2,7 @@ use crate::errors::{Error, Result};
 use crate::objects::Value;
 use crate::props;
 use crate::vm::interpreter::Interpreter;
+use std::collections::HashMap;
 
 pub(super) fn native_reflect_get(
     interp: &mut Interpreter,
@@ -145,6 +146,7 @@ pub(super) fn native_reflect_construct(
                 source_line: None,
                 source_col: None,
                 exception_handlers_snapshot: interp.exception_handlers.clone(),
+                shared_closure_env: HashMap::new(),
             });
 
             for closure_var in f.closure.borrow().iter().cloned() {

@@ -1,4 +1,7 @@
 use crate::objects::Value;
+use std::cell::RefCell;
+use std::collections::HashMap;
+use std::rc::Rc;
 
 #[derive(Debug, Clone)]
 pub(crate) struct CallFrame {
@@ -13,6 +16,7 @@ pub(crate) struct CallFrame {
     pub(crate) source_line: Option<usize>,
     pub(crate) source_col: Option<usize>,
     pub(crate) exception_handlers_snapshot: Vec<ExceptionHandler>,
+    pub(crate) shared_closure_env: HashMap<u32, Rc<RefCell<Vec<Value>>>>,
 }
 
 #[derive(Debug, Clone)]
