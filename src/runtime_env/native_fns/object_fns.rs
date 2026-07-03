@@ -163,6 +163,7 @@ pub(super) fn native_object_define_property(
     let target = args.first().cloned().unwrap_or(Value::Undefined);
     let property = match args.get(1) {
         Some(Value::String(s)) => s.clone(),
+        Some(Value::Cons(c)) => c.flatten(),
         _ => return Ok(target),
     };
     let descriptor = args.get(2).cloned().unwrap_or(Value::Undefined);
@@ -235,6 +236,9 @@ fn value_strict_equal(a: &Value, b: &Value) -> bool {
         (Value::Null, Value::Null) => true,
         (Value::Boolean(a), Value::Boolean(b)) => a == b,
         (Value::String(a), Value::String(b)) => a == b,
+        (Value::Cons(a), Value::String(b)) => a.flatten() == *b,
+        (Value::String(a), Value::Cons(b)) => *a == b.flatten(),
+        (Value::Cons(a), Value::Cons(b)) => a.flatten() == b.flatten(),
         (Value::Integer(a), Value::Integer(b)) => a == b,
         (Value::Float(a), Value::Float(b)) => {
             if a.is_nan() && b.is_nan() {
@@ -364,6 +368,7 @@ pub(super) fn native_object_has_own_property(
 ) -> Result<Value> {
     let prop = match args.first() {
         Some(Value::String(s)) => s.clone(),
+        Some(Value::Cons(c)) => c.flatten(),
         Some(v) => format!("{:?}", v),
         None => return Ok(Value::Boolean(false)),
     };

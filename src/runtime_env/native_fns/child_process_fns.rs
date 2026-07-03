@@ -25,6 +25,7 @@ pub(super) fn native_child_process_exec_sync(
             if let Some(v) = obj.properties.get("encoding") {
                 encoding = match v {
                     Value::String(s) if s == "buffer" => "buffer",
+                    Value::Cons(c) if c.flatten() == "buffer" => "buffer",
                     _ => "utf8",
                 };
             }

@@ -155,6 +155,7 @@ fn inspect_value(interp: &Interpreter, value: &Value, depth: usize, indent: usiz
             }
         }
         Value::String(s) => format!("'{}'", s),
+        Value::Cons(c) => format!("'{}'", c.flatten()),
         Value::BigInt(n) => format!("{}n", n),
         Value::Symbol(id) => format!("Symbol({})", id),
         Value::Array(idx) => {

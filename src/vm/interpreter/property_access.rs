@@ -68,39 +68,37 @@ impl Interpreter {
     }
 
     pub fn set_property(&mut self, object: &Value, key: &Value, value: Value) -> Result<()> {
+        let key_flat;
+        let key_str = match key {
+            Value::String(s) => s.as_str(),
+            Value::Cons(c) => { key_flat = c.flatten(); &*key_flat }
+            _ => return Ok(()),
+        };
         match object {
             Value::Object(obj_idx) => {
                 if let HeapValue::Object(obj) = &mut self.heap[*obj_idx] {
-                    if let Value::String(key_str) = key {
-                        obj.properties.insert(key_str.clone(), value);
-                    }
+                    obj.properties.insert(key_str.to_string(), value);
                 }
             }
             Value::Array(arr_idx) => {
                 if let HeapValue::Array(arr) = &mut self.heap[*arr_idx] {
-                    if let Value::String(key_str) = key {
-                        if let Ok(index) = key_str.parse::<usize>() {
-                            if index < arr.elements.len() {
-                                arr.elements[index] = value;
-                            }
+                    if let Ok(index) = key_str.parse::<usize>() {
+                        if index < arr.elements.len() {
+                            arr.elements[index] = value;
                         }
                     }
                 }
             }
             Value::Function(func_idx) => {
                 if let HeapValue::Function(f) = &mut self.heap[*func_idx] {
-                    if let Value::String(key_str) = key {
-                        f.properties.insert(key_str.clone(), value);
-                    }
+                    f.properties.insert(key_str.to_string(), value);
                 }
             }
             Value::Buffer(buf_idx) => {
                 if let HeapValue::Buffer(buf) = &mut self.heap[*buf_idx] {
-                    if let Value::String(key_str) = key {
-                        if let Ok(index) = key_str.parse::<usize>() {
-                            if index < buf.len() {
-                                buf[index] = to_i64_value(&value) as u8;
-                            }
+                    if let Ok(index) = key_str.parse::<usize>() {
+                        if index < buf.len() {
+                            buf[index] = to_i64_value(&value) as u8;
                         }
                     }
                 }
@@ -130,31 +128,23 @@ impl Interpreter {
             }
             Value::Object(obj_idx) => {
                 if let HeapValue::Object(obj) = &self.heap[*obj_idx] {
-                    if let Value::String(key_str) = key {
-                        // Hot path: most property accesses hit an existing
-                        // key without any getter/setter involvement. The
-                        // previous code allocated `format!("__getter_{}", key_str)`
-                        // on every miss — that's a fresh 9 + key_str.len()
-                        // byte `String` allocation per `obj.x` lookup on any
-                        // object that uses a prototype chain (i.e. almost
-                        // every user object). Instead, scan the object's
-                        // own `properties` for a `__getter_<key_str>` entry;
-                        // for the common case (no accessor on this key) this
-                        // is a single `iter().any()` over a tiny map and
-                        // produces zero allocations. The accessor branch
-                        // is still cold, so the cost is amortised away.
-                        if let Some(val) = obj.properties.get(key_str) {
-                            return Ok(val.clone());
-                        }
-                        if let Some(getter_val) =
-                            find_accessor(&obj.properties, "__getter_", key_str)
-                        {
-                            return self.call_value(&getter_val, this, &[]);
-                        }
-                        if let Some(proto_idx) = obj.prototype {
-                            let proto_val = Value::Object(proto_idx);
-                            return self.get_property_with_this(&proto_val, key, this);
-                        }
+                    let key_flat;
+                    let key_str = match key {
+                        Value::String(s) => s.as_str(),
+                        Value::Cons(c) => { key_flat = c.flatten(); &*key_flat }
+                        _ => return Ok(Value::Undefined),
+                    };
+                    if let Some(val) = obj.properties.get(key_str) {
+                        return Ok(val.clone());
+                    }
+                    if let Some(getter_val) =
+                        find_accessor(&obj.properties, "__getter_", key_str)
+                    {
+                        return self.call_value(&getter_val, this, &[]);
+                    }
+                    if let Some(proto_idx) = obj.prototype {
+                        let proto_val = Value::Object(proto_idx);
+                        return self.get_property_with_this(&proto_val, key, this);
                     }
                 }
             }
@@ -174,6 +164,20 @@ impl Interpreter {
                             }
                             return self.get_array_method(key_str);
                         }
+                        Value::Cons(c) => {
+                            let s = c.flatten();
+                            if s == "length" {
+                                return Ok(Value::Float(arr.elements.len() as f64));
+                            }
+                            if let Ok(index) = s.parse::<usize>() {
+                                return Ok(arr
+                                    .elements
+                                    .get(index)
+                                    .cloned()
+                                    .unwrap_or(Value::Undefined));
+                            }
+                            return self.get_array_method(&s);
+                        }
                         Value::Integer(index) => {
                             let idx = *index as usize;
                             return Ok(arr.elements.get(idx).cloned().unwrap_or(Value::Undefined));
@@ -183,9 +187,7 @@ impl Interpreter {
                             return Ok(arr.elements.get(idx).cloned().unwrap_or(Value::Undefined));
                         }
                         Value::Symbol(sym_id) if *sym_id == crate::objects::SYMBOL_ITERATOR => {
-                            // Return a function that creates an array iterator
                             return Ok(Value::NativeFunction(c::ARRAY_ITERATOR));
-                            // array_iterator_fn
                         }
                         _ => {}
                     }
@@ -194,6 +196,10 @@ impl Interpreter {
             Value::String(s) => {
                 return self.get_property_from_primitive_string(s, key);
             }
+            Value::Cons(c) => {
+                let flat = c.flatten();
+                return self.get_property_from_primitive_string(&flat, key);
+            }
             Value::Integer(_) | Value::Float(_) => {
                 return self.get_property_from_primitive_number(object, key);
             }
@@ -201,133 +207,140 @@ impl Interpreter {
                 return self.get_property_from_primitive_boolean(object, key);
             }
             Value::Function(func_idx) => {
-                if let Value::String(key_str) = key {
-                    // Function.prototype methods
-                    match key_str.as_str() {
-                        "call" => return Ok(Value::NativeFunction(c::FUNCTION_CALL)),
-                        "apply" => return Ok(Value::NativeFunction(c::FUNCTION_APPLY)),
-                        "bind" => return Ok(Value::NativeFunction(c::FUNCTION_BIND)),
-                        _ => {}
-                    }
-                    if key_str == "prototype" {
-                        if let HeapValue::Function(f) = &self.heap[*func_idx] {
-                            if let Some(proto_idx) = f.prototype {
-                                return Ok(Value::Object(proto_idx));
-                            }
-                        }
-                    }
+                let key_flat;
+                let key_str = match key {
+                    Value::String(s) => s.as_str(),
+                    Value::Cons(c) => { key_flat = c.flatten(); &*key_flat }
+                    _ => return Ok(Value::Undefined),
+                };
+                match key_str {
+                    "call" => return Ok(Value::NativeFunction(c::FUNCTION_CALL)),
+                    "apply" => return Ok(Value::NativeFunction(c::FUNCTION_APPLY)),
+                    "bind" => return Ok(Value::NativeFunction(c::FUNCTION_BIND)),
+                    _ => {}
+                }
+                if key_str == "prototype" {
                     if let HeapValue::Function(f) = &self.heap[*func_idx] {
-                        if let Some(val) = f.properties.get(key_str) {
-                            return Ok(val.clone());
+                        if let Some(proto_idx) = f.prototype {
+                            return Ok(Value::Object(proto_idx));
                         }
+                    }
+                }
+                if let HeapValue::Function(f) = &self.heap[*func_idx] {
+                    if let Some(val) = f.properties.get(key_str) {
+                        return Ok(val.clone());
                     }
                 }
             }
             Value::Promise(promise_idx) => {
-                if let Value::String(key_str) = key {
-                    match key_str.as_str() {
-                        "then" => return Ok(Value::NativeFunction(c::PROMISE_THEN)),
-                        "catch" => return Ok(Value::NativeFunction(c::PROMISE_CATCH)),
-                        "finally" => return Ok(Value::NativeFunction(c::PROMISE_FINALLY)),
-                        "state" => {
-                            if let HeapValue::Promise(p) = &self.heap[*promise_idx] {
-                                return Ok(Value::String(format!("{:?}", p.state)));
+                let key_flat;
+                let key_str = match key {
+                    Value::String(s) => s.as_str(),
+                    Value::Cons(c) => { key_flat = c.flatten(); &*key_flat }
+                    _ => return Ok(Value::Undefined),
+                };
+                match key_str {
+                    "then" => return Ok(Value::NativeFunction(c::PROMISE_THEN)),
+                    "catch" => return Ok(Value::NativeFunction(c::PROMISE_CATCH)),
+                    "finally" => return Ok(Value::NativeFunction(c::PROMISE_FINALLY)),
+                    "state" => {
+                        if let HeapValue::Promise(p) = &self.heap[*promise_idx] {
+                            return Ok(Value::String(format!("{:?}", p.state)));
+                        }
+                    }
+                    "value" => {
+                        if let HeapValue::Promise(p) = &self.heap[*promise_idx] {
+                            if let PromiseState::Fulfilled(v) = &p.state {
+                                return Ok(v.clone());
                             }
                         }
-                        "value" => {
-                            if let HeapValue::Promise(p) = &self.heap[*promise_idx] {
-                                if let PromiseState::Fulfilled(v) = &p.state {
-                                    return Ok(v.clone());
-                                }
+                    }
+                    "reason" => {
+                        if let HeapValue::Promise(p) = &self.heap[*promise_idx] {
+                            if let PromiseState::Rejected(r) = &p.state {
+                                return Ok(r.clone());
                             }
                         }
-                        "reason" => {
-                            if let HeapValue::Promise(p) = &self.heap[*promise_idx] {
-                                if let PromiseState::Rejected(r) = &p.state {
-                                    return Ok(r.clone());
-                                }
-                            }
+                    }
+                    _ => {}
+                }
+            }
+            Value::NativeFunction(idx) => {
+                let key_flat;
+                let key_str = match key {
+                    Value::String(s) => s.as_str(),
+                    Value::Cons(c) => { key_flat = c.flatten(); &*key_flat }
+                    _ => return Ok(Value::Undefined),
+                };
+                match key_str {
+                    "call" => return Ok(Value::NativeFunction(c::FUNCTION_CALL)),
+                    "apply" => return Ok(Value::NativeFunction(c::FUNCTION_APPLY)),
+                    "bind" => return Ok(Value::NativeFunction(c::FUNCTION_BIND)),
+                    _ => {}
+                }
+                if *idx == c::PROMISE_CONSTRUCTOR {
+                    match key_str {
+                        "resolve" => return Ok(Value::NativeFunction(c::PROMISE_RESOLVE)),
+                        "reject" => return Ok(Value::NativeFunction(c::PROMISE_REJECT)),
+                        "all" => return Ok(Value::NativeFunction(c::PROMISE_ALL)),
+                        "race" => return Ok(Value::NativeFunction(c::PROMISE_RACE)),
+                        "allSettled" => {
+                            return Ok(Value::NativeFunction(c::PROMISE_ALL_SETTLED))
+                        }
+                        "any" => return Ok(Value::NativeFunction(c::PROMISE_ANY)),
+                        "withResolvers" => {
+                            return Ok(Value::NativeFunction(c::PROMISE_WITH_RESOLVERS))
                         }
                         _ => {}
                     }
                 }
-            }
-            Value::NativeFunction(idx) => {
-                if let Value::String(key_str) = key {
-                    // Function.prototype methods available on all native functions
-                    match key_str.as_str() {
-                        "call" => return Ok(Value::NativeFunction(c::FUNCTION_CALL)),
-                        "apply" => return Ok(Value::NativeFunction(c::FUNCTION_APPLY)),
-                        "bind" => return Ok(Value::NativeFunction(c::FUNCTION_BIND)),
+                if *idx == c::SYMBOL_CONSTRUCTOR {
+                    match key_str {
+                        "for" => return Ok(Value::NativeFunction(c::SYMBOL_FOR)),
+                        "keyFor" => return Ok(Value::NativeFunction(c::SYMBOL_KEY_FOR)),
+                        "iterator" => {
+                            return Ok(Value::Symbol(crate::objects::SYMBOL_ITERATOR))
+                        }
+                        "toStringTag" => {
+                            return Ok(Value::Symbol(crate::objects::SYMBOL_TO_STRING_TAG))
+                        }
+                        "hasInstance" => {
+                            return Ok(Value::Symbol(crate::objects::SYMBOL_HAS_INSTANCE))
+                        }
+                        "toPrimitive" => {
+                            return Ok(Value::Symbol(crate::objects::SYMBOL_TO_PRIMITIVE))
+                        }
+                        "species" => return Ok(Value::Symbol(crate::objects::SYMBOL_SPECIES)),
+                        "unscopables" => {
+                            return Ok(Value::Symbol(crate::objects::SYMBOL_UNSCOPABLES))
+                        }
+                        "asyncIterator" => {
+                            return Ok(Value::Symbol(crate::objects::SYMBOL_ASYNC_ITERATOR))
+                        }
                         _ => {}
                     }
-                    if *idx == c::PROMISE_CONSTRUCTOR {
-                        match key_str.as_str() {
-                            "resolve" => return Ok(Value::NativeFunction(c::PROMISE_RESOLVE)),
-                            "reject" => return Ok(Value::NativeFunction(c::PROMISE_REJECT)),
-                            "all" => return Ok(Value::NativeFunction(c::PROMISE_ALL)),
-                            "race" => return Ok(Value::NativeFunction(c::PROMISE_RACE)),
-                            "allSettled" => {
-                                return Ok(Value::NativeFunction(c::PROMISE_ALL_SETTLED))
-                            }
-                            "any" => return Ok(Value::NativeFunction(c::PROMISE_ANY)),
-                            "withResolvers" => {
-                                return Ok(Value::NativeFunction(c::PROMISE_WITH_RESOLVERS))
-                            }
-                            _ => {}
-                        }
+                }
+                if *idx == c::DATE_CONSTRUCTOR {
+                    match key_str {
+                        "now" => return Ok(Value::NativeFunction(c::DATE_NOW)),
+                        "parse" => return Ok(Value::NativeFunction(c::DATE_PARSE)),
+                        "UTC" => return Ok(Value::NativeFunction(c::DATE_UTC)),
+                        _ => {}
                     }
-                    if *idx == c::SYMBOL_CONSTRUCTOR {
-                        match key_str.as_str() {
-                            "for" => return Ok(Value::NativeFunction(c::SYMBOL_FOR)),
-                            "keyFor" => return Ok(Value::NativeFunction(c::SYMBOL_KEY_FOR)),
-                            "iterator" => {
-                                return Ok(Value::Symbol(crate::objects::SYMBOL_ITERATOR))
-                            }
-                            "toStringTag" => {
-                                return Ok(Value::Symbol(crate::objects::SYMBOL_TO_STRING_TAG))
-                            }
-                            "hasInstance" => {
-                                return Ok(Value::Symbol(crate::objects::SYMBOL_HAS_INSTANCE))
-                            }
-                            "toPrimitive" => {
-                                return Ok(Value::Symbol(crate::objects::SYMBOL_TO_PRIMITIVE))
-                            }
-                            "species" => return Ok(Value::Symbol(crate::objects::SYMBOL_SPECIES)),
-                            "unscopables" => {
-                                return Ok(Value::Symbol(crate::objects::SYMBOL_UNSCOPABLES))
-                            }
-                            "asyncIterator" => {
-                                return Ok(Value::Symbol(crate::objects::SYMBOL_ASYNC_ITERATOR))
-                            }
-                            _ => {}
-                        }
+                }
+                if *idx == c::URL_CONSTRUCTOR {
+                    match key_str {
+                        "canParse" => return Ok(Value::NativeFunction(c::URL_CAN_PARSE)),
+                        "parse" => return Ok(Value::NativeFunction(c::URL_PARSE)),
+                        _ => {}
                     }
-                    // Date static methods
-                    if *idx == c::DATE_CONSTRUCTOR {
-                        match key_str.as_str() {
-                            "now" => return Ok(Value::NativeFunction(c::DATE_NOW)),
-                            "parse" => return Ok(Value::NativeFunction(c::DATE_PARSE)),
-                            "UTC" => return Ok(Value::NativeFunction(c::DATE_UTC)),
-                            _ => {}
-                        }
-                    }
-                    // URL static methods
-                    if *idx == c::URL_CONSTRUCTOR {
-                        match key_str.as_str() {
-                            "canParse" => return Ok(Value::NativeFunction(c::URL_CAN_PARSE)),
-                            "parse" => return Ok(Value::NativeFunction(c::URL_PARSE)),
-                            _ => {}
-                        }
-                    }
-                    // Response static methods
-                    if *idx == c::RESPONSE_CONSTRUCTOR {
-                        match key_str.as_str() {
-                            "json" => return Ok(Value::NativeFunction(c::RESPONSE_JSON_STATIC)),
-                            "error" => return Ok(Value::NativeFunction(c::RESPONSE_ERROR)),
-                            "redirect" => return Ok(Value::NativeFunction(c::RESPONSE_REDIRECT)),
-                            _ => {}
-                        }
+                }
+                if *idx == c::RESPONSE_CONSTRUCTOR {
+                    match key_str {
+                        "json" => return Ok(Value::NativeFunction(c::RESPONSE_JSON_STATIC)),
+                        "error" => return Ok(Value::NativeFunction(c::RESPONSE_ERROR)),
+                        "redirect" => return Ok(Value::NativeFunction(c::RESPONSE_REDIRECT)),
+                        _ => {}
                     }
                 }
             }
@@ -355,143 +368,172 @@ impl Interpreter {
                 }
             }
             Value::Date(_date_idx) => {
-                if let Value::String(_key_str) = key {
-                    // Look up method on Date prototype
-                    let proto_idx = self.date_proto_idx;
-                    if let Some(proto_idx) = proto_idx {
-                        let proto_val = Value::Object(proto_idx);
-                        return self.get_property_with_this(&proto_val, key, this);
-                    }
+                let key_flat;
+                let key_str = match key {
+                    Value::String(s) => s.as_str(),
+                    Value::Cons(c) => { key_flat = c.flatten(); &*key_flat }
+                    _ => return Ok(Value::Undefined),
+                };
+                let _ = key_str;
+                let proto_idx = self.date_proto_idx;
+                if let Some(proto_idx) = proto_idx {
+                    let proto_val = Value::Object(proto_idx);
+                    return self.get_property_with_this(&proto_val, key, this);
                 }
             }
             Value::RegExp(_re_idx) => {
-                if let Value::String(_key_str) = key {
-                    // Look up method on RegExp prototype
-                    let proto_idx = self.regexp_proto_idx;
-                    if let Some(proto_idx) = proto_idx {
-                        let proto_val = Value::Object(proto_idx);
-                        return self.get_property_with_this(&proto_val, key, this);
-                    }
+                let key_flat;
+                let key_str = match key {
+                    Value::String(s) => s.as_str(),
+                    Value::Cons(c) => { key_flat = c.flatten(); &*key_flat }
+                    _ => return Ok(Value::Undefined),
+                };
+                let _ = key_str;
+                let proto_idx = self.regexp_proto_idx;
+                if let Some(proto_idx) = proto_idx {
+                    let proto_val = Value::Object(proto_idx);
+                    return self.get_property_with_this(&proto_val, key, this);
                 }
             }
             Value::Buffer(_buf_idx) => {
-                if let Value::String(key_str) = key {
-                    if key_str.as_str() == "length" {
-                        if let Value::Buffer(bidx) = this {
-                            if let HeapValue::Buffer(buf) = &self.heap[*bidx] {
-                                return Ok(Value::Integer(buf.len() as i64));
-                            }
+                let key_flat;
+                let key_str = match key {
+                    Value::String(s) => s.as_str(),
+                    Value::Cons(c) => { key_flat = c.flatten(); &*key_flat }
+                    _ => return Ok(Value::Undefined),
+                };
+                if key_str == "length" {
+                    if let Value::Buffer(bidx) = this {
+                        if let HeapValue::Buffer(buf) = &self.heap[*bidx] {
+                            return Ok(Value::Integer(buf.len() as i64));
                         }
                     }
                 }
-                // Look up method on Buffer prototype
                 if let Some(proto_idx) = self.buffer_proto_idx {
                     let proto_val = Value::Object(proto_idx);
                     return self.get_property_with_this(&proto_val, key, this);
                 }
             }
             Value::Map(_map_idx) => {
-                if let Value::String(key_str) = key {
-                    match key_str.as_str() {
-                        "size" => {
-                            // Return the size directly (getter)
-                            if let Value::Map(map_idx) = this {
-                                if let HeapValue::Map(map) = &self.heap[*map_idx] {
-                                    return Ok(Value::Float(map.size() as f64));
-                                }
+                let key_flat;
+                let key_str = match key {
+                    Value::String(s) => s.as_str(),
+                    Value::Cons(c) => { key_flat = c.flatten(); &*key_flat }
+                    _ => return Ok(Value::Undefined),
+                };
+                match key_str {
+                    "size" => {
+                        if let Value::Map(map_idx) = this {
+                            if let HeapValue::Map(map) = &self.heap[*map_idx] {
+                                return Ok(Value::Float(map.size() as f64));
                             }
                         }
-                        "get" => return Ok(Value::NativeFunction(c::MAP_GET)),
-                        "set" => return Ok(Value::NativeFunction(c::MAP_SET)),
-                        "has" => return Ok(Value::NativeFunction(c::MAP_HAS)),
-                        "delete" => return Ok(Value::NativeFunction(c::MAP_DELETE)),
-                        "clear" => return Ok(Value::NativeFunction(c::MAP_CLEAR)),
-                        "forEach" => return Ok(Value::NativeFunction(c::MAP_FOR_EACH)),
-                        "keys" => return Ok(Value::NativeFunction(c::MAP_KEYS)),
-                        "values" => return Ok(Value::NativeFunction(c::MAP_VALUES)),
-                        "entries" => return Ok(Value::NativeFunction(c::MAP_ENTRIES)),
-                        _ => {}
                     }
+                    "get" => return Ok(Value::NativeFunction(c::MAP_GET)),
+                    "set" => return Ok(Value::NativeFunction(c::MAP_SET)),
+                    "has" => return Ok(Value::NativeFunction(c::MAP_HAS)),
+                    "delete" => return Ok(Value::NativeFunction(c::MAP_DELETE)),
+                    "clear" => return Ok(Value::NativeFunction(c::MAP_CLEAR)),
+                    "forEach" => return Ok(Value::NativeFunction(c::MAP_FOR_EACH)),
+                    "keys" => return Ok(Value::NativeFunction(c::MAP_KEYS)),
+                    "values" => return Ok(Value::NativeFunction(c::MAP_VALUES)),
+                    "entries" => return Ok(Value::NativeFunction(c::MAP_ENTRIES)),
+                    _ => {}
                 }
             }
             Value::Set(_set_idx) => {
-                if let Value::String(key_str) = key {
-                    match key_str.as_str() {
-                        "size" => {
-                            // Return the size directly (getter)
-                            if let Value::Set(set_idx) = this {
-                                if let HeapValue::Set(set) = &self.heap[*set_idx] {
-                                    return Ok(Value::Float(set.size() as f64));
-                                }
+                let key_flat;
+                let key_str = match key {
+                    Value::String(s) => s.as_str(),
+                    Value::Cons(c) => { key_flat = c.flatten(); &*key_flat }
+                    _ => return Ok(Value::Undefined),
+                };
+                match key_str {
+                    "size" => {
+                        if let Value::Set(set_idx) = this {
+                            if let HeapValue::Set(set) = &self.heap[*set_idx] {
+                                return Ok(Value::Float(set.size() as f64));
                             }
                         }
-                        "add" => return Ok(Value::NativeFunction(c::SET_ADD)),
-                        "has" => return Ok(Value::NativeFunction(c::SET_HAS)),
-                        "delete" => return Ok(Value::NativeFunction(c::SET_DELETE)),
-                        "clear" => return Ok(Value::NativeFunction(c::SET_CLEAR)),
-                        "forEach" => return Ok(Value::NativeFunction(c::SET_FOR_EACH)),
-                        "values" => return Ok(Value::NativeFunction(c::SET_VALUES)),
-                        "keys" => return Ok(Value::NativeFunction(c::SET_KEYS)),
-                        "entries" => return Ok(Value::NativeFunction(c::SET_ENTRIES)),
-                        _ => {}
                     }
+                    "add" => return Ok(Value::NativeFunction(c::SET_ADD)),
+                    "has" => return Ok(Value::NativeFunction(c::SET_HAS)),
+                    "delete" => return Ok(Value::NativeFunction(c::SET_DELETE)),
+                    "clear" => return Ok(Value::NativeFunction(c::SET_CLEAR)),
+                    "forEach" => return Ok(Value::NativeFunction(c::SET_FOR_EACH)),
+                    "values" => return Ok(Value::NativeFunction(c::SET_VALUES)),
+                    "keys" => return Ok(Value::NativeFunction(c::SET_KEYS)),
+                    "entries" => return Ok(Value::NativeFunction(c::SET_ENTRIES)),
+                    _ => {}
                 }
             }
             Value::WeakMap(_weakmap_idx) => {
-                if let Value::String(key_str) = key {
-                    match key_str.as_str() {
-                        "get" => return Ok(Value::NativeFunction(c::WEAKMAP_GET)),
-                        "set" => return Ok(Value::NativeFunction(c::WEAKMAP_SET)),
-                        "has" => return Ok(Value::NativeFunction(c::WEAKMAP_HAS)),
-                        "delete" => return Ok(Value::NativeFunction(c::WEAKMAP_DELETE)),
-                        _ => {}
-                    }
+                let key_flat;
+                let key_str = match key {
+                    Value::String(s) => s.as_str(),
+                    Value::Cons(c) => { key_flat = c.flatten(); &*key_flat }
+                    _ => return Ok(Value::Undefined),
+                };
+                match key_str {
+                    "get" => return Ok(Value::NativeFunction(c::WEAKMAP_GET)),
+                    "set" => return Ok(Value::NativeFunction(c::WEAKMAP_SET)),
+                    "has" => return Ok(Value::NativeFunction(c::WEAKMAP_HAS)),
+                    "delete" => return Ok(Value::NativeFunction(c::WEAKMAP_DELETE)),
+                    _ => {}
                 }
             }
             Value::WeakSet(_weakset_idx) => {
-                if let Value::String(key_str) = key {
-                    match key_str.as_str() {
-                        "add" => return Ok(Value::NativeFunction(c::WEAKSET_ADD)),
-                        "has" => return Ok(Value::NativeFunction(c::WEAKSET_HAS)),
-                        "delete" => return Ok(Value::NativeFunction(c::WEAKSET_DELETE)),
-                        _ => {}
-                    }
+                let key_flat;
+                let key_str = match key {
+                    Value::String(s) => s.as_str(),
+                    Value::Cons(c) => { key_flat = c.flatten(); &*key_flat }
+                    _ => return Ok(Value::Undefined),
+                };
+                match key_str {
+                    "add" => return Ok(Value::NativeFunction(c::WEAKSET_ADD)),
+                    "has" => return Ok(Value::NativeFunction(c::WEAKSET_HAS)),
+                    "delete" => return Ok(Value::NativeFunction(c::WEAKSET_DELETE)),
+                    _ => {}
                 }
             }
             Value::TypedArray(_ta_idx) => {
-                if let Value::String(key_str) = key {
-                    match key_str.as_str() {
-                        "length" => {
-                            if let Value::TypedArray(ta_idx) = this {
-                                if let HeapValue::TypedArray(ta) = &self.heap[*ta_idx] {
-                                    let elem_size =
-                                        crate::objects::js_array::TypedArray::element_size(
-                                            &ta.kind,
-                                        );
-                                    return Ok(Value::Float((ta.byte_length / elem_size) as f64));
-                                }
+                let key_flat;
+                let key_str = match key {
+                    Value::String(s) => s.as_str(),
+                    Value::Cons(c) => { key_flat = c.flatten(); &*key_flat }
+                    _ => return Ok(Value::Undefined),
+                };
+                match key_str {
+                    "length" => {
+                        if let Value::TypedArray(ta_idx) = this {
+                            if let HeapValue::TypedArray(ta) = &self.heap[*ta_idx] {
+                                let elem_size =
+                                    crate::objects::js_array::TypedArray::element_size(
+                                        &ta.kind,
+                                    );
+                                return Ok(Value::Float((ta.byte_length / elem_size) as f64));
                             }
                         }
-                        "byteLength" => {
-                            if let Value::TypedArray(ta_idx) = this {
-                                if let HeapValue::TypedArray(ta) = &self.heap[*ta_idx] {
-                                    return Ok(Value::Float(ta.byte_length as f64));
-                                }
-                            }
-                        }
-                        "byteOffset" => {
-                            if let Value::TypedArray(ta_idx) = this {
-                                if let HeapValue::TypedArray(ta) = &self.heap[*ta_idx] {
-                                    return Ok(Value::Float(ta.byte_offset as f64));
-                                }
-                            }
-                        }
-                        "get" => return Ok(Value::NativeFunction(c::TYPED_ARRAY_GET)),
-                        "set" => return Ok(Value::NativeFunction(c::TYPED_ARRAY_SET)),
-                        "subarray" => return Ok(Value::NativeFunction(c::TYPED_ARRAY_SUBARRAY)),
-                        "slice" => return Ok(Value::NativeFunction(c::TYPED_ARRAY_SLICE)),
-                        _ => {}
                     }
+                    "byteLength" => {
+                        if let Value::TypedArray(ta_idx) = this {
+                            if let HeapValue::TypedArray(ta) = &self.heap[*ta_idx] {
+                                return Ok(Value::Float(ta.byte_length as f64));
+                            }
+                        }
+                    }
+                    "byteOffset" => {
+                        if let Value::TypedArray(ta_idx) = this {
+                            if let HeapValue::TypedArray(ta) = &self.heap[*ta_idx] {
+                                return Ok(Value::Float(ta.byte_offset as f64));
+                            }
+                        }
+                    }
+                    "get" => return Ok(Value::NativeFunction(c::TYPED_ARRAY_GET)),
+                    "set" => return Ok(Value::NativeFunction(c::TYPED_ARRAY_SET)),
+                    "subarray" => return Ok(Value::NativeFunction(c::TYPED_ARRAY_SUBARRAY)),
+                    "slice" => return Ok(Value::NativeFunction(c::TYPED_ARRAY_SLICE)),
+                    _ => {}
                 }
             }
             Value::Generator(_gen_idx) => {
@@ -506,11 +548,15 @@ impl Interpreter {
                 }
             }
             Value::NativeObject(obj_id) => {
-                if let Value::String(key_str) = key {
-                    if let Some(methods) = self.native_object_methods.get(&obj_id.0) {
-                        if let Some(method) = methods.get(key_str) {
-                            return Ok(method.clone());
-                        }
+                let key_flat;
+                let key_str = match key {
+                    Value::String(s) => s.as_str(),
+                    Value::Cons(c) => { key_flat = c.flatten(); &*key_flat }
+                    _ => return Ok(Value::Undefined),
+                };
+                if let Some(methods) = self.native_object_methods.get(&obj_id.0) {
+                    if let Some(method) = methods.get(key_str) {
+                        return Ok(method.clone());
                     }
                 }
             }
@@ -554,13 +600,16 @@ impl Interpreter {
     }
 
     pub(super) fn get_property_from_primitive_string(&self, s: &str, key: &Value) -> Result<Value> {
-        if let Value::String(key_str) = key {
-            if key_str.as_str() == "length" {
-                return Ok(Value::Float(s.len() as f64));
-            }
-            return self.get_string_method(key_str);
+        let key_flat;
+        let key_str = match key {
+            Value::String(ks) => ks.as_str(),
+            Value::Cons(c) => { key_flat = c.flatten(); &*key_flat }
+            _ => return Ok(Value::Undefined),
+        };
+        if key_str == "length" {
+            return Ok(Value::Float(s.len() as f64));
         }
-        Ok(Value::Undefined)
+        return self.get_string_method(key_str);
     }
 
     pub(super) fn get_string_method(&self, name: &str) -> Result<Value> {
@@ -592,14 +641,18 @@ impl Interpreter {
         _n: &Value,
         key: &Value,
     ) -> Result<Value> {
-        if let Value::String(key_str) = key {
-            match key_str.as_str() {
-                "toString" | "toFixed" | "valueOf" | "toExponential" | "toPrecision"
-                | "toLocaleString" => {
-                    return Ok(self.make_native_number_method(key_str));
-                }
-                _ => {}
+        let key_flat;
+        let key_str = match key {
+            Value::String(s) => s.as_str(),
+            Value::Cons(c) => { key_flat = c.flatten(); &*key_flat }
+            _ => return Ok(Value::Undefined),
+        };
+        match key_str {
+            "toString" | "toFixed" | "valueOf" | "toExponential" | "toPrecision"
+            | "toLocaleString" => {
+                return Ok(self.make_native_number_method(key_str));
             }
+            _ => {}
         }
         Ok(Value::Undefined)
     }
@@ -609,13 +662,17 @@ impl Interpreter {
         _b: &Value,
         key: &Value,
     ) -> Result<Value> {
-        if let Value::String(key_str) = key {
-            match key_str.as_str() {
-                "toString" | "valueOf" => {
-                    return Ok(self.make_native_boolean_method(key_str));
-                }
-                _ => {}
+        let key_flat;
+        let key_str = match key {
+            Value::String(s) => s.as_str(),
+            Value::Cons(c) => { key_flat = c.flatten(); &*key_flat }
+            _ => return Ok(Value::Undefined),
+        };
+        match key_str {
+            "toString" | "valueOf" => {
+                return Ok(self.make_native_boolean_method(key_str));
             }
+            _ => {}
         }
         Ok(Value::Undefined)
     }
@@ -640,25 +697,27 @@ impl Interpreter {
     }
 
     pub(crate) fn delete_property(&mut self, object: &Value, key: &Value) -> Value {
+        let key_flat;
+        let key_str = match key {
+            Value::String(s) => s.as_str(),
+            Value::Cons(c) => { key_flat = c.flatten(); &*key_flat }
+            _ => return Value::Boolean(true),
+        };
         match object {
             Value::Object(obj_idx) => {
                 if let HeapValue::Object(obj) = &mut self.heap[*obj_idx] {
-                    if let Value::String(key_str) = key {
-                        if obj.properties.remove(key_str).is_some() {
-                            return Value::Boolean(true);
-                        }
+                    if obj.properties.remove(key_str).is_some() {
+                        return Value::Boolean(true);
                     }
                 }
                 Value::Boolean(false)
             }
             Value::Array(arr_idx) => {
-                if let Value::String(key_str) = key {
-                    if let Ok(index) = key_str.parse::<usize>() {
-                        if let HeapValue::Array(arr) = &mut self.heap[*arr_idx] {
-                            if index < arr.elements.len() {
-                                arr.elements[index] = Value::Undefined;
-                                return Value::Boolean(true);
-                            }
+                if let Ok(index) = key_str.parse::<usize>() {
+                    if let HeapValue::Array(arr) = &mut self.heap[*arr_idx] {
+                        if index < arr.elements.len() {
+                            arr.elements[index] = Value::Undefined;
+                            return Value::Boolean(true);
                         }
                     }
                 }
@@ -707,50 +766,47 @@ impl Interpreter {
     }
 
     pub(crate) fn in_check_mut(&mut self, key: &Value, object: &Value) -> Result<Value> {
+        let key_flat;
+        let key_str = match key {
+            Value::String(s) => s.as_str(),
+            Value::Cons(c) => { key_flat = c.flatten(); &*key_flat }
+            _ => return Ok(Value::Boolean(false)),
+        };
         match object {
             Value::Object(obj_idx) => {
                 if let HeapValue::Object(obj) = &self.heap[*obj_idx] {
-                    if let Value::String(key_str) = key {
-                        if obj.properties.contains_key(key_str) {
-                            return Ok(Value::Boolean(true));
-                        }
-                        // Check for getter/setter accessors (allocation-free:
-                        // the same `find_accessor` scan used by
-                        // `get_property_with_this`).
-                        if find_accessor(&obj.properties, "__getter_", key_str).is_some()
-                            || find_accessor(&obj.properties, "__setter_", key_str).is_some()
-                        {
-                            return Ok(Value::Boolean(true));
-                        }
-                        if let Some(proto_idx) = obj.prototype {
-                            let proto_val = Value::Object(proto_idx);
-                            return self.in_check_mut(key, &proto_val);
-                        }
+                    if obj.properties.contains_key(key_str) {
+                        return Ok(Value::Boolean(true));
+                    }
+                    if find_accessor(&obj.properties, "__getter_", key_str).is_some()
+                        || find_accessor(&obj.properties, "__setter_", key_str).is_some()
+                    {
+                        return Ok(Value::Boolean(true));
+                    }
+                    if let Some(proto_idx) = obj.prototype {
+                        let proto_val = Value::Object(proto_idx);
+                        return self.in_check_mut(key, &proto_val);
                     }
                 }
                 Ok(Value::Boolean(false))
             }
             Value::Array(arr_idx) => {
                 if let HeapValue::Array(arr) = &self.heap[*arr_idx] {
-                    if let Value::String(key_str) = key {
-                        if key_str == "length" {
-                            return Ok(Value::Boolean(true));
-                        }
-                        if let Ok(index) = key_str.parse::<usize>() {
-                            return Ok(Value::Boolean(index < arr.elements.len()));
-                        }
+                    if key_str == "length" {
+                        return Ok(Value::Boolean(true));
+                    }
+                    if let Ok(index) = key_str.parse::<usize>() {
+                        return Ok(Value::Boolean(index < arr.elements.len()));
                     }
                 }
                 Ok(Value::Boolean(false))
             }
             Value::String(s) => {
-                if let Value::String(key_str) = key {
-                    if key_str == "length" {
-                        return Ok(Value::Boolean(true));
-                    }
-                    if let Ok(index) = key_str.parse::<usize>() {
-                        return Ok(Value::Boolean(index < s.len()));
-                    }
+                if key_str == "length" {
+                    return Ok(Value::Boolean(true));
+                }
+                if let Ok(index) = key_str.parse::<usize>() {
+                    return Ok(Value::Boolean(index < s.len()));
                 }
                 Ok(Value::Boolean(false))
             }
@@ -832,6 +888,7 @@ fn to_i64_value(v: &Value) -> i64 {
             }
         }
         Value::String(s) => s.parse::<i64>().unwrap_or(0),
+        Value::Cons(c) => c.flatten().parse::<i64>().unwrap_or(0),
         Value::Null => 0,
         _ => 0,
     }

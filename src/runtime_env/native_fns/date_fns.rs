@@ -38,6 +38,10 @@ pub(super) fn native_date_constructor(
         let arg = &args[0];
         match arg {
             Value::String(s) => JsDate::from_string(s).unwrap_or(JsDate { utc_ms: f64::NAN }),
+            Value::Cons(c) => {
+                let s = c.flatten();
+                JsDate::from_string(&s).unwrap_or(JsDate { utc_ms: f64::NAN })
+            }
             Value::Float(f) => JsDate::from_millis(*f),
             Value::Integer(n) => JsDate::from_millis(*n as f64),
             _ => JsDate::now(),
@@ -77,6 +81,7 @@ pub(super) fn native_date_parse(
 ) -> Result<Value> {
     let s = match args.first() {
         Some(Value::String(s)) => s.clone(),
+        Some(Value::Cons(c)) => c.flatten(),
         Some(v) => interp.to_string_coerce(v),
         None => return Ok(Value::Float(f64::NAN)),
     };
@@ -558,6 +563,7 @@ fn to_f64(v: &Value) -> f64 {
         Value::Null => 0.0,
         Value::Undefined => f64::NAN,
         Value::String(s) => s.parse::<f64>().unwrap_or(f64::NAN),
+        Value::Cons(c) => c.flatten().parse::<f64>().unwrap_or(f64::NAN),
         _ => f64::NAN,
     }
 }

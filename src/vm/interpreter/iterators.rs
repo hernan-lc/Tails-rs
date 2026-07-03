@@ -61,6 +61,26 @@ impl Interpreter {
                 );
                 Ok(Value::Object(iter_idx))
             }
+            Value::Cons(c) => {
+                let flat = c.flatten();
+                let chars: Vec<Value> = flat.chars().map(|ch| Value::String(ch.to_string())).collect();
+                let data_idx = self.gc.allocate(
+                    &mut self.heap,
+                    HeapValue::Array(JsArray { elements: chars }),
+                );
+                let mut props = Self::make_builtin_iter_props();
+                props.insert("__data".to_string(), Value::Array(data_idx));
+                props.insert("__type".to_string(), Value::String("string".to_string()));
+                let iter_idx = self.gc.allocate(
+                    &mut self.heap,
+                    HeapValue::Object(JsObject {
+                        properties: props,
+                        prototype: None,
+                        extensible: true,
+                    }),
+                );
+                Ok(Value::Object(iter_idx))
+            }
             // Phase 4A — Lazy Map iterator: store a reference to the Map heap
             // entry instead of cloning `keys.clone()` + `values.clone()` and
             // allocating an `[k, v]` pair array for every entry. With 50K
@@ -141,6 +161,26 @@ impl Interpreter {
             }
             Value::String(s) => {
                 let chars: Vec<Value> = s.chars().map(|c| Value::String(c.to_string())).collect();
+                let data_idx = self.gc.allocate(
+                    &mut self.heap,
+                    HeapValue::Array(JsArray { elements: chars }),
+                );
+                let mut props = Self::make_builtin_iter_props();
+                props.insert("__data".to_string(), Value::Array(data_idx));
+                props.insert("__type".to_string(), Value::String("string".to_string()));
+                let iter_idx = self.gc.allocate(
+                    &mut self.heap,
+                    HeapValue::Object(JsObject {
+                        properties: props,
+                        prototype: None,
+                        extensible: true,
+                    }),
+                );
+                Ok(Value::Object(iter_idx))
+            }
+            Value::Cons(c) => {
+                let flat = c.flatten();
+                let chars: Vec<Value> = flat.chars().map(|ch| Value::String(ch.to_string())).collect();
                 let data_idx = self.gc.allocate(
                     &mut self.heap,
                     HeapValue::Array(JsArray { elements: chars }),

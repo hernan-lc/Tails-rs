@@ -195,7 +195,7 @@ impl Interpreter {
                     Value::Null => "object",
                     Value::Boolean(_) => "boolean",
                     Value::Integer(_) | Value::Float(_) => "number",
-                    Value::String(_) => "string",
+                    Value::String(_) | Value::Cons(_) => "string",
                     Value::BigInt(_) => "bigint",
                     Value::Symbol(_) => "symbol",
                     Value::Function(_) | Value::NativeFunction(_) => "function",
@@ -411,53 +411,58 @@ impl Interpreter {
                     .pop()
                     .ok_or_else(|| Error::RuntimeError("Stack underflow".into()))?;
 
-                match &object {
-                    Value::Proxy(proxy_idx) => {
-                        if let HeapValue::Proxy(proxy) = &self.heap[*proxy_idx] {
-                            let handler = proxy.handler.clone();
-                            let target = proxy.target.clone();
-                            let trap =
-                                self.get_property(&handler, &Value::String("set".to_string()));
-                            if let Ok(Value::Function(_)) | Ok(Value::NativeFunction(_)) = &trap {
-                                let trap_result = self.call_value(
-                                    &trap?,
-                                    &handler,
-                                    &[target, key.clone(), value, object.clone()],
-                                );
-                                trap_result?;
-                            } else {
-                                if let Value::Object(target_obj_idx) = &target {
-                                    if let HeapValue::Object(obj) = &mut self.heap[*target_obj_idx]
-                                    {
-                                        if let Value::String(key_str) = &key {
-                                            obj.properties.insert(key_str.clone(), value);
+                // Phase 1.7: flatten ConsString keys before property insertion.
+                let key_owned;
+                let key_str: &str = match &key {
+                    Value::String(s) => s.as_str(),
+                    Value::Cons(c) => { key_owned = c.flatten(); &*key_owned }
+                    _ => "",
+                };
+                if key_str.is_empty() && !matches!(&key, Value::String(_)) {
+                    // Non-string key — skip property set
+                } else {
+                    match &object {
+                        Value::Proxy(proxy_idx) => {
+                            if let HeapValue::Proxy(proxy) = &self.heap[*proxy_idx] {
+                                let handler = proxy.handler.clone();
+                                let target = proxy.target.clone();
+                                let trap =
+                                    self.get_property(&handler, &Value::String("set".to_string()));
+                                if let Ok(Value::Function(_)) | Ok(Value::NativeFunction(_)) = &trap {
+                                    let trap_result = self.call_value(
+                                        &trap?,
+                                        &handler,
+                                        &[target, key.clone(), value, object.clone()],
+                                    );
+                                    trap_result?;
+                                } else {
+                                    if let Value::Object(target_obj_idx) = &target {
+                                        if let HeapValue::Object(obj) = &mut self.heap[*target_obj_idx]
+                                        {
+                                            obj.properties.insert(key_str.to_string(), value);
                                         }
                                     }
                                 }
                             }
                         }
-                    }
-                    Value::Object(obj_idx) => {
-                        if let HeapValue::Object(obj) = &mut self.heap[*obj_idx] {
-                            if let Value::String(key_str) = &key {
+                        Value::Object(obj_idx) => {
+                            if let HeapValue::Object(obj) = &mut self.heap[*obj_idx] {
                                 let setter_key = format!("__setter_{}", key_str);
                                 if let Some(setter_val) = obj.properties.get(&setter_key).cloned() {
                                     let _ = obj;
                                     self.call_value(&setter_val, &object, &[value])?;
                                 } else {
-                                    obj.properties.insert(key_str.clone(), value);
+                                    obj.properties.insert(key_str.to_string(), value);
                                 }
                             }
                         }
-                    }
-                    Value::Function(func_idx) => {
-                        if let HeapValue::Function(f) = &mut self.heap[*func_idx] {
-                            if let Value::String(key_str) = &key {
-                                f.properties.insert(key_str.clone(), value);
+                        Value::Function(func_idx) => {
+                            if let HeapValue::Function(f) = &mut self.heap[*func_idx] {
+                                f.properties.insert(key_str.to_string(), value);
                             }
                         }
+                        _ => {}
                     }
-                    _ => {}
                 }
                 self.stack.push(object);
             }

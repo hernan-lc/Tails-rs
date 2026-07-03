@@ -46,37 +46,36 @@ impl Interpreter {
                 let name = obj
                     .properties
                     .get("name")
-                    .and_then(|v| {
-                        if let Value::String(s) = v {
-                            Some(s.as_str())
-                        } else {
-                            None
-                        }
+                    .map(|v| match v {
+                        Value::String(s) => s.clone(),
+                        Value::Cons(c) => c.flatten(),
+                        _ => "Error".to_string(),
                     })
-                    .unwrap_or("Error");
+                    .unwrap_or_else(|| "Error".to_string());
                 let message = obj
                     .properties
                     .get("message")
-                    .and_then(|v| {
-                        if let Value::String(s) = v {
-                            Some(s.as_str())
-                        } else {
-                            None
-                        }
+                    .map(|v| match v {
+                        Value::String(s) => s.clone(),
+                        Value::Cons(c) => c.flatten(),
+                        _ => String::new(),
                     })
-                    .unwrap_or("");
-                let stack = obj.properties.get("stack").and_then(|v| {
-                    if let Value::String(s) = v {
-                        Some(s.as_str())
-                    } else {
-                        None
-                    }
-                });
+                    .unwrap_or_default();
+                let stack = obj
+                    .properties
+                    .get("stack")
+                    .map(|v| match v {
+                        Value::String(s) => s.clone(),
+                        Value::Cons(c) => c.flatten(),
+                        _ => String::new(),
+                    });
                 if let Some(stack) = stack {
-                    return stack.to_string();
+                    if !stack.is_empty() {
+                        return stack;
+                    }
                 }
                 if message.is_empty() {
-                    return name.to_string();
+                    return name;
                 }
                 return format!("{}: {}", name, message);
             }

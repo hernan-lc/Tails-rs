@@ -123,17 +123,11 @@ pub(super) fn native_crypto_hash_digest(
         // Get algorithm and data
         let (algorithm, data) = match &interp.heap[*obj_idx] {
             HeapValue::Object(obj) => {
-                let alg = obj
-                    .properties
-                    .get("_algorithm")
-                    .and_then(|v| {
-                        if let Value::String(s) = v {
-                            Some(s.as_str())
-                        } else {
-                            None
-                        }
-                    })
-                    .unwrap_or("sha256");
+                let alg = match obj.properties.get("_algorithm") {
+                    Some(Value::String(s)) => s.clone(),
+                    Some(Value::Cons(c)) => c.flatten(),
+                    _ => "sha256".to_string(),
+                };
                 let buf_idx = match obj.properties.get("_data") {
                     Some(Value::Object(idx)) => *idx,
                     _ => return Ok(Value::String("".to_string())),
@@ -147,7 +141,7 @@ pub(super) fn native_crypto_hash_digest(
             _ => return Ok(Value::String("".to_string())),
         };
 
-        let hash_hex = match algorithm {
+        let hash_hex = match algorithm.as_str() {
             "sha224" => {
                 use sha2::{Digest, Sha224};
                 let mut hasher = Sha224::new();

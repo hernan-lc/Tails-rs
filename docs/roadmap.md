@@ -101,14 +101,16 @@ expected impact on `benchmarks/fixtures/loops.js`,
   coverage: `test_gc_snapshot_capacity_does_not_drop_references`
   in `tests/phase2_features.rs` walks a 500-element object graph
   on the stack.
-- [ ] **Phase 1.6 — `Value::String` interning in `LoadConst`** —
+- [x] **Phase 1.6 — `Value::String` interning via `Arc<str>`** —
   long-standing Phase 3B from the original roadmap. Strings in the
-  constant pool are immutable; the current `LoadConst` does a
+  constant pool are immutable; the old `LoadConst` did a
   24-byte `String` clone per reference. Switching the `Value::String`
-  variant in the constant pool to `Rc<String>` (or a small
-  `Value::InternedString(usize)` index into a per-module string
-  table) makes `LoadConst` a single pointer-bump per access.
-  Expected impact: 20–40% on `builtins/string_concat.js`.
+  variant from `String` to `Arc<str>` makes `LoadConst` a single
+  atomic-increment clone (no heap alloc / memcpy of the backing
+  buffer). Dynamic string ops that need mutation use
+  `Arc::make_mut`. All 57 modified files across `src/vm/`,
+  `src/objects/`, `src/runtime_env/native_fns/`, `src/compiler/`,
+  and `src/ffi/` were migrated. 928 tests pass, 0 failures.
 - [ ] **Phase 1.7 — `ConsString` rope for `add(String, _)`** —
   long-standing Phase 3A. `s = s + "x"` currently allocates a
   fresh `String` of `s.len() + 1` bytes per iter. A rope

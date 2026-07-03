@@ -207,6 +207,10 @@ impl Interpreter {
                     },
                     Value::Object(_) => tails_abi::NativeValue { tag: 5, data: 0 },
                     Value::String(s) => tails_abi::string(s),
+                    Value::Cons(c) => {
+                        let flat = c.flatten();
+                        tails_abi::string(&flat)
+                    }
                     Value::Integer(n) => tails_abi::integer(*n),
                     Value::Float(n) => tails_abi::number(*n),
                     Value::Boolean(b) => tails_abi::boolean(*b),
@@ -220,6 +224,10 @@ impl Interpreter {
                     .iter()
                     .map(|v| match v {
                         Value::String(s) => tails_abi::string(s),
+                        Value::Cons(c) => {
+                            let flat = c.flatten();
+                            tails_abi::string(&flat)
+                        }
                         Value::Integer(n) => tails_abi::integer(*n),
                         Value::Float(n) => tails_abi::number(*n),
                         Value::Boolean(b) => tails_abi::boolean(*b),
@@ -355,6 +363,7 @@ impl Interpreter {
     fn value_to_json(&self, value: &Value) -> simd_json::OwnedValue {
         match value {
             Value::String(s) => simd_json::OwnedValue::String(s.clone()),
+            Value::Cons(c) => simd_json::OwnedValue::String(c.flatten()),
             Value::Integer(n) => simd_json::OwnedValue::Static(simd_json::StaticNode::I64(*n)),
             Value::Float(n) => simd_json::OwnedValue::Static(simd_json::StaticNode::F64(*n)),
             Value::Boolean(b) => simd_json::OwnedValue::Static(simd_json::StaticNode::Bool(*b)),

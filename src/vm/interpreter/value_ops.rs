@@ -1,6 +1,6 @@
 use super::Interpreter;
 use crate::errors::{Error, Result};
-use crate::objects::Value;
+use crate::objects::{flatten_value, ConsString, Value};
 
 impl Interpreter {
     pub(super) fn add(&self, left: Value, right: Value) -> Result<Value> {
@@ -12,74 +12,118 @@ impl Interpreter {
                     Ok(Value::Float(*a as f64 + *b as f64))
                 }
             }
-            // Hot path: String + String — skip the `to_string_coerce`
-            // round-trip and the 24-byte String clone that the general
-            // `(Value::String(a), r)` arm would do, since the right
-            // operand is already a `String`. This is the single most
-            // common `+` pattern in benchmark `eval_string_concat_*`
-            // (`s = s + "x"` loops, where `"x"` is a LoadConst).
+            // Phase 1.7: String + String — O(1) ConsString rope node.
+            // Avoids allocating a fresh `String` of `a.len() + b.len()` bytes.
+            // The actual flat string is only produced when consumed by an
+            // operation that needs contiguous bytes (comparisons, display, etc.).
             (Value::String(a), Value::String(b)) => {
-                let mut result = String::with_capacity(a.len() + b.len());
-                result.push_str(a);
-                result.push_str(b);
-                Ok(Value::String(result))
+                Ok(Value::Cons(ConsString::new(
+                    Value::String(a.clone()),
+                    Value::String(b.clone()),
+                )))
             }
-            // Phase 2.3 (mirrors the Phase 5F `add_local` arm): inline the
-            // String + Integer case to avoid a `to_string_coerce` round-trip
-            // + intermediate `String` allocation for the numeric operand.
-            // `"answer: " + 42` builds the result with a single
-            // `String::with_capacity` + two `push_str` calls.
+            (Value::String(a), Value::Cons(c)) => {
+                Ok(Value::Cons(ConsString::new(
+                    Value::String(a.clone()),
+                    Value::Cons(c.clone()),
+                )))
+            }
+            (Value::Cons(c), Value::String(b)) => {
+                Ok(Value::Cons(ConsString::new(
+                    Value::Cons(c.clone()),
+                    Value::String(b.clone()),
+                )))
+            }
+            (Value::Cons(a), Value::Cons(b)) => {
+                Ok(Value::Cons(ConsString::new(
+                    Value::Cons(a.clone()),
+                    Value::Cons(b.clone()),
+                )))
+            }
+            // Phase 1.7: String + Number — coerce number to string, then
+            // build a Cons node. The number-to-string conversion is cheap
+            // (format! on a small primitive) and avoids the larger
+            // `String::with_capacity` + two `push_str` allocation.
             (Value::String(a), Value::Integer(b)) => {
-                let b_str = b.to_string();
-                let mut result = String::with_capacity(a.len() + b_str.len());
-                result.push_str(a);
-                result.push_str(&b_str);
-                Ok(Value::String(result))
+                let b_str = Value::String(b.to_string());
+                Ok(Value::Cons(ConsString::new(Value::String(a.clone()), b_str)))
             }
             (Value::Integer(a), Value::String(b)) => {
-                let a_str = a.to_string();
-                let mut result = String::with_capacity(a_str.len() + b.len());
-                result.push_str(&a_str);
-                result.push_str(b);
-                Ok(Value::String(result))
+                let a_str = Value::String(a.to_string());
+                Ok(Value::Cons(ConsString::new(a_str, Value::String(b.clone()))))
             }
             (Value::String(a), Value::Float(b)) => {
-                // Match `to_string_coerce` for finite integers:
-                // "5" instead of "5.0" reads better.
                 let b_str = if b.is_finite() && *b == (*b as i64) as f64 {
-                    (*b as i64).to_string()
+                    Value::String((*b as i64).to_string())
                 } else {
-                    b.to_string()
+                    Value::String(b.to_string())
                 };
-                let mut result = String::with_capacity(a.len() + b_str.len());
-                result.push_str(a);
-                result.push_str(&b_str);
-                Ok(Value::String(result))
+                Ok(Value::Cons(ConsString::new(Value::String(a.clone()), b_str)))
             }
             (Value::Float(a), Value::String(b)) => {
                 let a_str = if a.is_finite() && *a == (*a as i64) as f64 {
-                    (*a as i64).to_string()
+                    Value::String((*a as i64).to_string())
                 } else {
-                    a.to_string()
+                    Value::String(a.to_string())
                 };
-                let mut result = String::with_capacity(a_str.len() + b.len());
-                result.push_str(&a_str);
-                result.push_str(b);
-                Ok(Value::String(result))
+                Ok(Value::Cons(ConsString::new(a_str, Value::String(b.clone()))))
             }
+            // Cons + Number: flatten the Cons first, then build a new Cons
+            (Value::Cons(c), Value::Integer(b)) => {
+                let left = Value::Cons(c.clone());
+                let right = Value::String(b.to_string());
+                Ok(Value::Cons(ConsString::new(left, right)))
+            }
+            (Value::Integer(a), Value::Cons(c)) => {
+                let left = Value::String(a.to_string());
+                let right = Value::Cons(c.clone());
+                Ok(Value::Cons(ConsString::new(left, right)))
+            }
+            (Value::Cons(c), Value::Float(b)) => {
+                let right = if b.is_finite() && *b == (*b as i64) as f64 {
+                    Value::String((*b as i64).to_string())
+                } else {
+                    Value::String(b.to_string())
+                };
+                Ok(Value::Cons(ConsString::new(Value::Cons(c.clone()), right)))
+            }
+            (Value::Float(a), Value::Cons(c)) => {
+                let left = if a.is_finite() && *a == (*a as i64) as f64 {
+                    Value::String((*a as i64).to_string())
+                } else {
+                    Value::String(a.to_string())
+                };
+                Ok(Value::Cons(ConsString::new(left, Value::Cons(c.clone()))))
+            }
+            // Cold path: coerce left operand to string if needed, then
+            // build a Cons node.
             (Value::String(a), r) => {
-                let coerced = self.to_string_coerce(r);
-                let mut result = String::with_capacity(a.len() + coerced.len());
-                result.push_str(a);
-                result.push_str(&coerced);
-                Ok(Value::String(result))
+                let coerced = flatten_value(&self.to_string_coerce_value(r));
+                Ok(Value::Cons(ConsString::new(
+                    Value::String(a.clone()),
+                    Value::String(coerced),
+                )))
             }
             (l, Value::String(b)) => {
-                let coerced = self.to_string_coerce(l);
-                let mut result = String::with_capacity(coerced.len() + b.len());
-                result.push_str(&coerced);
-                result.push_str(b);
-                Ok(Value::String(result))
+                let coerced = flatten_value(&self.to_string_coerce_value(l));
+                Ok(Value::Cons(ConsString::new(
+                    Value::String(coerced),
+                    Value::String(b.clone()),
+                )))
+            }
+            (Value::Cons(c), r) => {
+                let coerced = flatten_value(&self.to_string_coerce_value(r));
+                Ok(Value::Cons(ConsString::new(
+                    Value::Cons(c.clone()),
+                    Value::String(coerced),
+                )))
+            }
+            (l, Value::Cons(c)) => {
+                let coerced = flatten_value(&self.to_string_coerce_value(l));
+                Ok(Value::Cons(ConsString::new(
+                    Value::String(coerced),
+                    Value::Cons(c.clone()),
+                )))
             }
             (Value::BigInt(a), Value::BigInt(b)) => Ok(Value::BigInt(a + b)),
             _ => {
@@ -104,6 +148,7 @@ impl Interpreter {
                 }
             }
             Value::String(s) => s.clone(),
+            Value::Cons(c) => c.flatten(),
             Value::BigInt(n) => format!("{}", n),
             Value::Function(idx) => {
                 if let crate::vm::interpreter::HeapValue::Function(f) = &self.heap[*idx] {
@@ -123,6 +168,15 @@ impl Interpreter {
             Value::Object(_) => "[object Object]".to_string(),
             Value::Array(_) => "[object Array]".to_string(),
             _ => value.to_string(),
+        }
+    }
+
+    /// Phase 1.7: like `to_string_coerce` but returns a `Value::String`
+    /// directly, avoiding an extra clone for ConsString construction.
+    pub(crate) fn to_string_coerce_value(&self, value: &Value) -> Value {
+        match value {
+            Value::String(_) | Value::Cons(_) => value.clone(),
+            _ => Value::String(self.to_string_coerce(value)),
         }
     }
 
@@ -236,6 +290,7 @@ impl Interpreter {
             Value::Integer(n) => *n != 0,
             Value::Float(n) => *n != 0.0,
             Value::String(s) => !s.is_empty(),
+            Value::Cons(c) => c.total_len > 0,
             Value::BigInt(n) => *n != 0,
             _ => true,
         }
@@ -254,12 +309,25 @@ impl Interpreter {
                 self.is_equal(left, &Value::Float(if *b { 1.0 } else { 0.0 }))
             }
             (Value::String(a), Value::String(b)) => a == b,
+            (Value::String(a), Value::Cons(c)) => a.as_str() == c.flatten().as_str(),
+            (Value::Cons(c), Value::String(b)) => c.flatten().as_str() == b.as_str(),
+            (Value::Cons(a), Value::Cons(b)) => a.flatten() == b.flatten(),
             (Value::String(s), _) => {
                 let num = s.parse::<f64>().unwrap_or(f64::NAN);
                 self.is_equal(&Value::Float(num), right)
             }
+            (Value::Cons(c), _) => {
+                let flat = c.flatten();
+                let num = flat.parse::<f64>().unwrap_or(f64::NAN);
+                self.is_equal(&Value::Float(num), right)
+            }
             (_, Value::String(s)) => {
                 let num = s.parse::<f64>().unwrap_or(f64::NAN);
+                self.is_equal(left, &Value::Float(num))
+            }
+            (_, Value::Cons(c)) => {
+                let flat = c.flatten();
+                let num = flat.parse::<f64>().unwrap_or(f64::NAN);
                 self.is_equal(left, &Value::Float(num))
             }
             (Value::Integer(a), Value::Integer(b)) => a == b,
@@ -275,6 +343,9 @@ impl Interpreter {
         match (left, right) {
             (Value::Integer(a), Value::Integer(b)) => Ok(a < b),
             (Value::String(a), Value::String(b)) => Ok(a < b),
+            (Value::String(a), Value::Cons(c)) => Ok(a.as_str() < c.flatten().as_str()),
+            (Value::Cons(c), Value::String(b)) => Ok(c.flatten().as_str() < b.as_str()),
+            (Value::Cons(a), Value::Cons(b)) => Ok(a.flatten() < b.flatten()),
             (Value::BigInt(a), Value::BigInt(b)) => Ok(a < b),
             _ => {
                 let l = self.to_number(left)?;
@@ -288,6 +359,9 @@ impl Interpreter {
         match (left, right) {
             (Value::Integer(a), Value::Integer(b)) => Ok(a > b),
             (Value::String(a), Value::String(b)) => Ok(a > b),
+            (Value::String(a), Value::Cons(c)) => Ok(a.as_str() > c.flatten().as_str()),
+            (Value::Cons(c), Value::String(b)) => Ok(c.flatten().as_str() > b.as_str()),
+            (Value::Cons(a), Value::Cons(b)) => Ok(a.flatten() > b.flatten()),
             (Value::BigInt(a), Value::BigInt(b)) => Ok(a > b),
             _ => {
                 let l = self.to_number(left)?;
@@ -301,6 +375,9 @@ impl Interpreter {
         match (left, right) {
             (Value::Integer(a), Value::Integer(b)) => Ok(a <= b),
             (Value::String(a), Value::String(b)) => Ok(a <= b),
+            (Value::String(a), Value::Cons(c)) => Ok(a.as_str() <= c.flatten().as_str()),
+            (Value::Cons(c), Value::String(b)) => Ok(c.flatten().as_str() <= b.as_str()),
+            (Value::Cons(a), Value::Cons(b)) => Ok(a.flatten() <= b.flatten()),
             (Value::BigInt(a), Value::BigInt(b)) => Ok(a <= b),
             _ => {
                 let l = self.to_number(left)?;
@@ -314,6 +391,9 @@ impl Interpreter {
         match (left, right) {
             (Value::Integer(a), Value::Integer(b)) => Ok(a >= b),
             (Value::String(a), Value::String(b)) => Ok(a >= b),
+            (Value::String(a), Value::Cons(c)) => Ok(a.as_str() >= c.flatten().as_str()),
+            (Value::Cons(c), Value::String(b)) => Ok(c.flatten().as_str() >= b.as_str()),
+            (Value::Cons(a), Value::Cons(b)) => Ok(a.flatten() >= b.flatten()),
             (Value::BigInt(a), Value::BigInt(b)) => Ok(a >= b),
             _ => {
                 let l = self.to_number(left)?;
@@ -337,6 +417,14 @@ impl Interpreter {
                     Ok(s.parse::<f64>().unwrap_or(f64::NAN))
                 }
             }
+            Value::Cons(c) => {
+                let flat = c.flatten();
+                if flat.is_empty() {
+                    Ok(0.0)
+                } else {
+                    Ok(flat.parse::<f64>().unwrap_or(f64::NAN))
+                }
+            }
             _ => Ok(f64::NAN),
         }
     }
@@ -355,6 +443,7 @@ impl Interpreter {
                 }
             }
             Value::String(s) => s.clone(),
+            Value::Cons(c) => c.flatten(),
             Value::BigInt(n) => format!("{}n", n),
             Value::Symbol(id) => format!("Symbol({})", id),
             Value::Function(idx) => {
@@ -397,6 +486,7 @@ impl Interpreter {
             Value::Integer(n) => n.to_string(),
             Value::Float(n) => n.to_string(),
             Value::String(s) => format!("\"{}\"", s),
+            Value::Cons(c) => format!("\"{}\"", c.flatten()),
             Value::BigInt(n) => format!("{}n", n),
             Value::Symbol(id) => format!("Symbol({})", id),
             Value::Function(idx) => {

@@ -17,6 +17,74 @@ pub const SYMBOL_ASYNC_ITERATOR: u64 = 7;
 /// Starting ID for user-created symbols
 pub const USER_SYMBOL_START: u64 = 1000;
 
+/// Phase 1.7: ConsString — a binary tree (rope) representation for
+/// deferred string concatenation. Instead of allocating a fresh
+/// `String` of `a.len() + b.len()` bytes on every `+`, we build a
+/// lazy tree node. The actual flat `String` is only produced when the
+/// value is consumed by an operation that requires contiguous bytes
+/// (comparisons, display, `to_number`, etc.).
+///
+/// `total_len` is cached for O(1) `is_truthy` / `length` checks.
+#[derive(Debug, Clone)]
+pub struct ConsString {
+    pub left: Box<Value>,
+    pub right: Box<Value>,
+    pub total_len: usize,
+}
+
+impl ConsString {
+    pub fn new(left: Value, right: Value) -> Self {
+        let total_len = Self::value_len(&left) + Self::value_len(&right);
+        Self {
+            left: Box::new(left),
+            right: Box::new(right),
+            total_len,
+        }
+    }
+
+    fn value_len(v: &Value) -> usize {
+        match v {
+            Value::String(s) => s.len(),
+            Value::Cons(c) => c.total_len,
+            _ => 0,
+        }
+    }
+
+    /// Flatten the tree into a single `String`. Uses a stack-based
+    /// iterative approach to avoid stack overflow on deep trees.
+    pub fn flatten(&self) -> String {
+        let mut result = String::with_capacity(self.total_len);
+        let mut stack: Vec<&Value> = vec![&self.right, &self.left];
+        while let Some(node) = stack.pop() {
+            match node {
+                Value::String(s) => result.push_str(s),
+                Value::Cons(c) => {
+                    stack.push(&c.right);
+                    stack.push(&c.left);
+                }
+                _ => {}
+            }
+        }
+        result
+    }
+
+    /// Write the flattened string into an existing buffer without
+    /// allocating a new String.
+    pub fn flatten_into(&self, buf: &mut String) {
+        let mut stack: Vec<&Value> = vec![&self.right, &self.left];
+        while let Some(node) = stack.pop() {
+            match node {
+                Value::String(s) => buf.push_str(s),
+                Value::Cons(c) => {
+                    stack.push(&c.right);
+                    stack.push(&c.left);
+                }
+                _ => {}
+            }
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub enum Value {
     Undefined,
@@ -25,6 +93,7 @@ pub enum Value {
     Integer(i64),
     Float(f64),
     String(String),
+    Cons(ConsString),
     BigInt(i128),
     Symbol(u64),
     Function(usize),
@@ -50,6 +119,37 @@ pub struct NativeObjectId(pub u32);
 
 impl Eq for Value {}
 
+/// Flatten any `Value` into a `String`. For `Value::String` this is
+/// a clone; for `Value::Cons` it walks the rope tree iteratively.
+pub fn flatten_value(v: &Value) -> String {
+    match v {
+        Value::String(s) => s.clone(),
+        Value::Cons(c) => c.flatten(),
+        _ => v.to_string(),
+    }
+}
+
+/// Write the flattened representation of a string-like `Value` into
+/// `buf`. For `Value::String` this is a `push_str`; for
+/// `Value::Cons` it walks the rope tree iteratively.
+pub fn flatten_value_into(v: &Value, buf: &mut String) {
+    match v {
+        Value::String(s) => buf.push_str(s),
+        Value::Cons(c) => c.flatten_into(buf),
+        _ => buf.push_str(&v.to_string()),
+    }
+}
+
+/// O(1) string length for any string-like `Value`. Returns `None` for
+/// non-string values.
+pub fn value_str_len(v: &Value) -> Option<usize> {
+    match v {
+        Value::String(s) => Some(s.len()),
+        Value::Cons(c) => Some(c.total_len),
+        _ => None,
+    }
+}
+
 impl PartialEq for Value {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
@@ -61,6 +161,9 @@ impl PartialEq for Value {
             (Value::Integer(a), Value::Float(b)) => *a as f64 == *b,
             (Value::Float(a), Value::Integer(b)) => *a == *b as f64,
             (Value::String(a), Value::String(b)) => a == b,
+            (Value::String(a), Value::Cons(c)) => a.as_str() == c.flatten().as_str(),
+            (Value::Cons(c), Value::String(b)) => c.flatten().as_str() == b.as_str(),
+            (Value::Cons(a), Value::Cons(b)) => a.flatten() == b.flatten(),
             (Value::BigInt(a), Value::BigInt(b)) => a == b,
             (Value::Symbol(a), Value::Symbol(b)) => a == b,
             (Value::Function(a), Value::Function(b)) => a == b,
@@ -93,6 +196,10 @@ impl fmt::Display for Value {
             Value::Integer(i) => write!(f, "{}", i),
             Value::Float(fl) => write!(f, "{}", fl),
             Value::String(s) => write!(f, "{}", s),
+            Value::Cons(c) => {
+                let flat = c.flatten();
+                write!(f, "{}", flat)
+            }
             Value::BigInt(i) => write!(f, "{}n", i),
             Value::Symbol(id) => write!(f, "Symbol({})", id),
             Value::Function(_) => write!(f, "[Function]"),

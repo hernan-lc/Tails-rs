@@ -335,6 +335,10 @@ impl GarbageCollector {
             Value::Generator(idx) if *idx < self.marked.len() => {
                 self.marked[*idx] = true;
             }
+            // Phase 1.7: ConsString contains Value children (String/Cons),
+            // not heap indices. No tracing needed — the children are either
+            // inline strings or more Cons nodes.
+            Value::Cons(_) => {}
             _ => {}
         }
     }
@@ -385,6 +389,7 @@ fn heap_value_to_index(value: &Value) -> Option<usize> {
         //     immediate values
         //   - NativeFunction: index into `NATIVE_TABLE`, not `heap`
         //   - NativeObject: handle into the FFI `tails_abi` registry
+        //   - Cons: rope tree containing only String/Cons children
         Value::Undefined
         | Value::Null
         | Value::Boolean(_)
@@ -393,6 +398,7 @@ fn heap_value_to_index(value: &Value) -> Option<usize> {
         | Value::BigInt(_)
         | Value::Symbol(_)
         | Value::String(_)
+        | Value::Cons(_)
         | Value::NativeFunction(_)
         | Value::NativeObject(_) => None,
     }

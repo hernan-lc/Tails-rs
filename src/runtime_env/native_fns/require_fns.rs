@@ -15,6 +15,7 @@ pub(super) fn native_require(
 ) -> Result<Value> {
     let specifier = match args.first() {
         Some(Value::String(s)) => s.clone(),
+        Some(Value::Cons(c)) => c.flatten(),
         Some(v) => {
             return Err(crate::errors::Error::RuntimeError(format!(
                 "require() expected a string argument, got {:?}",

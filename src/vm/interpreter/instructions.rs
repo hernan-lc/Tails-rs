@@ -2,7 +2,7 @@ use super::*;
 use crate::compiler::CompiledModule;
 use crate::compiler::Instruction;
 use crate::errors::{Error, Result};
-use crate::objects::Value;
+use crate::objects::{ConsString, Value};
 
 impl Interpreter {
     pub(crate) fn exec_load_store(
@@ -72,7 +72,7 @@ impl Interpreter {
                     Value::Null => "object",
                     Value::Boolean(_) => "boolean",
                     Value::Integer(_) | Value::Float(_) => "number",
-                    Value::String(_) => "string",
+                    Value::String(_) | Value::Cons(_) => "string",
                     Value::BigInt(_) => "bigint",
                     Value::Symbol(_) => "symbol",
                     Value::Function(_) | Value::NativeFunction(_) => "function",
@@ -182,48 +182,76 @@ impl Interpreter {
                         (Value::Float(a), Value::Integer(b)) => {
                             self.stack[dst_idx] = Value::Float(*a + *b as f64);
                         }
-                        // Phase 5F (String concat hot path): avoid cloning the
-                        // 32-byte `Value::String` wrapper and the 24-byte
-                        // `String` payload for the common `s = s + "x"` pattern
-                        // where both operands are `Value::String`. We can move
-                        // out of `self.stack[dst_idx]` (replacing with
-                        // Undefined) and clone the small `src` String, building
-                        // the result with a single `String::with_capacity` +
-                        // two `push_str` calls. Skips the `add()` helper
-                        // entirely (which would also clone both operands).
+                        // Phase 1.7: String concat via ConsString rope.
+                        // Avoids allocating a fresh String of
+                        // `dst_str.len() + src_str.len()` bytes. Builds a
+                        // lazy tree node instead.
                         (Value::String(dst_str), Value::String(src_str)) => {
-                            let total_len = dst_str.len() + src_str.len();
-                            let mut result = String::with_capacity(total_len);
-                            result.push_str(dst_str);
-                            result.push_str(src_str);
-                            self.stack[dst_idx] = Value::String(result);
+                            self.stack[dst_idx] = Value::Cons(ConsString::new(
+                                Value::String(dst_str.clone()),
+                                Value::String(src_str.clone()),
+                            ));
+                        }
+                        (Value::Cons(c), Value::String(src_str)) => {
+                            self.stack[dst_idx] = Value::Cons(ConsString::new(
+                                Value::Cons(c.clone()),
+                                Value::String(src_str.clone()),
+                            ));
+                        }
+                        (Value::String(dst_str), Value::Cons(c)) => {
+                            self.stack[dst_idx] = Value::Cons(ConsString::new(
+                                Value::String(dst_str.clone()),
+                                Value::Cons(c.clone()),
+                            ));
+                        }
+                        (Value::Cons(a), Value::Cons(b)) => {
+                            self.stack[dst_idx] = Value::Cons(ConsString::new(
+                                Value::Cons(a.clone()),
+                                Value::Cons(b.clone()),
+                            ));
                         }
                         // Phase 5F (String + Number): `"answer: " + 42` is
                         // extremely common. Avoid the `to_string_coerce`
                         // round-trip and the clone of the source `Value::String`
-                        // by formatting the small primitive directly into the
-                        // pre-allocated buffer.
+                        // by formatting the small primitive directly into a
+                        // ConsString leaf.
                         (Value::String(dst_str), Value::Integer(b)) => {
-                            let b_str = b.to_string();
-                            let total_len = dst_str.len() + b_str.len();
-                            let mut result = String::with_capacity(total_len);
-                            result.push_str(dst_str);
-                            result.push_str(&b_str);
-                            self.stack[dst_idx] = Value::String(result);
+                            let b_str = Value::String(b.to_string());
+                            self.stack[dst_idx] = Value::Cons(ConsString::new(
+                                Value::String(dst_str.clone()),
+                                b_str,
+                            ));
                         }
                         (Value::String(dst_str), Value::Float(b)) => {
                             // Match `to_string_coerce` for finite integers:
                             // "5" instead of "5.0" reads better.
                             let b_str = if b.is_finite() && *b == (*b as i64) as f64 {
-                                (*b as i64).to_string()
+                                Value::String((*b as i64).to_string())
                             } else {
-                                b.to_string()
+                                Value::String(b.to_string())
                             };
-                            let total_len = dst_str.len() + b_str.len();
-                            let mut result = String::with_capacity(total_len);
-                            result.push_str(dst_str);
-                            result.push_str(&b_str);
-                            self.stack[dst_idx] = Value::String(result);
+                            self.stack[dst_idx] = Value::Cons(ConsString::new(
+                                Value::String(dst_str.clone()),
+                                b_str,
+                            ));
+                        }
+                        (Value::Cons(c), Value::Integer(b)) => {
+                            let right = Value::String(b.to_string());
+                            self.stack[dst_idx] = Value::Cons(ConsString::new(
+                                Value::Cons(c.clone()),
+                                right,
+                            ));
+                        }
+                        (Value::Cons(c), Value::Float(b)) => {
+                            let right = if b.is_finite() && *b == (*b as i64) as f64 {
+                                Value::String((*b as i64).to_string())
+                            } else {
+                                Value::String(b.to_string())
+                            };
+                            self.stack[dst_idx] = Value::Cons(ConsString::new(
+                                Value::Cons(c.clone()),
+                                right,
+                            ));
                         }
                         _ => {
                             // Fallback: clone is required for self.add(left, right)

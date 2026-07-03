@@ -27,7 +27,7 @@ use crate::compiler::{CompiledModule, Instruction};
 use crate::errors::runtime_errors::runtime_error_stack_overflow;
 use crate::errors::{Error, Result};
 use crate::objects::js_promise::PromiseState;
-use crate::objects::Value;
+use crate::objects::{ConsString, Value};
 use crate::runtime_env::async_runtime::AsyncRuntime;
 use crate::vm::interpreter::control_flow::ControlFlowOutcome;
 use rustc_hash::FxHashMap;
@@ -451,15 +451,36 @@ impl Interpreter {
                                 pc += 1;
                                 continue;
                             }
-                            // Phase 5E: String + String — same-module string
-                            // concatenations. Avoids a `to_string_coerce`
-                            // round-trip + 24-byte String clone.
+                            // Phase 1.7: String concat via ConsString rope.
                             (Value::String(a), Value::String(b)) => {
-                                let mut result =
-                                    String::with_capacity(a.len() + b.len());
-                                result.push_str(a);
-                                result.push_str(b);
-                                self.stack[dst_idx] = Value::String(result);
+                                self.stack[dst_idx] = Value::Cons(ConsString::new(
+                                    Value::String(a.clone()),
+                                    Value::String(b.clone()),
+                                ));
+                                pc += 1;
+                                continue;
+                            }
+                            (Value::Cons(c), Value::String(b)) => {
+                                self.stack[dst_idx] = Value::Cons(ConsString::new(
+                                    Value::Cons(c.clone()),
+                                    Value::String(b.clone()),
+                                ));
+                                pc += 1;
+                                continue;
+                            }
+                            (Value::String(a), Value::Cons(c)) => {
+                                self.stack[dst_idx] = Value::Cons(ConsString::new(
+                                    Value::String(a.clone()),
+                                    Value::Cons(c.clone()),
+                                ));
+                                pc += 1;
+                                continue;
+                            }
+                            (Value::Cons(a), Value::Cons(b)) => {
+                                self.stack[dst_idx] = Value::Cons(ConsString::new(
+                                    Value::Cons(a.clone()),
+                                    Value::Cons(b.clone()),
+                                ));
                                 pc += 1;
                                 continue;
                             }

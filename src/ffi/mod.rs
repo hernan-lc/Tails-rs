@@ -461,6 +461,18 @@ pub fn value_to_tails_value(value: Value) -> TailsValue {
                 data: ptr,
             }
         }
+        Value::Cons(c) => {
+            let flat = c.flatten();
+            let c_string = match CString::new(flat) {
+                Ok(cs) => cs,
+                Err(_) => return TailsValue { tag: 0, data: 0 },
+            };
+            let ptr = c_string.into_raw() as u64;
+            TailsValue {
+                tag: TailsValueType::String as u32,
+                data: ptr,
+            }
+        }
         Value::BigInt(_) => TailsValue {
             tag: TailsValueType::Number as u32,
             data: 0,

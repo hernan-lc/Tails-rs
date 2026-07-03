@@ -44,6 +44,7 @@ pub(super) fn to_string_value(interp: &Interpreter, v: &Value) -> String {
             }
         }
         Value::String(s) => s.clone(),
+        Value::Cons(c) => c.flatten(),
         Value::BigInt(n) => format!("{}n", n),
         Value::Symbol(id) => format!("Symbol({})", id),
         Value::Function(idx) => {
