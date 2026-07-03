@@ -2,8 +2,8 @@ use super::*;
 use crate::errors::{Error, Result};
 use crate::objects::js_promise::PromiseState;
 use crate::objects::Value;
-use crate::runtime_env::native_fns::constants as c;
 use crate::props;
+use crate::runtime_env::native_fns::constants as c;
 
 impl Interpreter {
     fn make_builtin_iter_props() -> FxHashMap<String, Value> {
@@ -63,7 +63,10 @@ impl Interpreter {
             }
             Value::Cons(c) => {
                 let flat = c.flatten();
-                let chars: Vec<Value> = flat.chars().map(|ch| Value::String(ch.to_string())).collect();
+                let chars: Vec<Value> = flat
+                    .chars()
+                    .map(|ch| Value::String(ch.to_string()))
+                    .collect();
                 let data_idx = self.gc.allocate(
                     &mut self.heap,
                     HeapValue::Array(JsArray { elements: chars }),
@@ -180,7 +183,10 @@ impl Interpreter {
             }
             Value::Cons(c) => {
                 let flat = c.flatten();
-                let chars: Vec<Value> = flat.chars().map(|ch| Value::String(ch.to_string())).collect();
+                let chars: Vec<Value> = flat
+                    .chars()
+                    .map(|ch| Value::String(ch.to_string()))
+                    .collect();
                 let data_idx = self.gc.allocate(
                     &mut self.heap,
                     HeapValue::Array(JsArray { elements: chars }),
@@ -294,9 +300,7 @@ impl Interpreter {
                                     }));
                                     self.stack.push(Value::Array(pair_idx));
                                 }
-                                if let HeapValue::Object(iter_obj_mut) =
-                                    &mut self.heap[*iter_idx]
-                                {
+                                if let HeapValue::Object(iter_obj_mut) = &mut self.heap[*iter_idx] {
                                     iter_obj_mut.properties.insert(
                                         "__index".to_string(),
                                         Value::Integer((index + 1) as i64),
@@ -311,9 +315,7 @@ impl Interpreter {
                                     }
                                     self.stack.push(s.values[index].clone());
                                 }
-                                if let HeapValue::Object(iter_obj_mut) =
-                                    &mut self.heap[*iter_idx]
-                                {
+                                if let HeapValue::Object(iter_obj_mut) = &mut self.heap[*iter_idx] {
                                     iter_obj_mut.properties.insert(
                                         "__index".to_string(),
                                         Value::Integer((index + 1) as i64),

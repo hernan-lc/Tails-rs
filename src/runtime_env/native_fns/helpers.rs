@@ -1,6 +1,6 @@
-use rustc_hash::FxHashMap;
 use crate::objects::Value;
 use crate::vm::interpreter::Interpreter;
+use rustc_hash::FxHashMap;
 
 pub(super) fn to_f64(v: &Value) -> f64 {
     match v {

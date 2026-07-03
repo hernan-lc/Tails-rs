@@ -37,10 +37,7 @@ pub(super) fn native_zlib_gzip_sync(
         .unwrap_or_default();
     let level = args.get(1).and_then(|v| get_option_int(interp, v, "level"));
     let encoder = if let Some(lvl) = level {
-        flate2::write::GzEncoder::new(
-            Vec::new(),
-            flate2::Compression::new(lvl as u32),
-        )
+        flate2::write::GzEncoder::new(Vec::new(), flate2::Compression::new(lvl as u32))
     } else {
         flate2::write::GzEncoder::new(Vec::new(), flate2::Compression::fast())
     };
@@ -89,10 +86,7 @@ pub(super) fn native_zlib_deflate_sync(
         .unwrap_or_default();
     let level = args.get(1).and_then(|v| get_option_int(interp, v, "level"));
     let encoder = if let Some(lvl) = level {
-        flate2::write::DeflateEncoder::new(
-            Vec::new(),
-            flate2::Compression::new(lvl as u32),
-        )
+        flate2::write::DeflateEncoder::new(Vec::new(), flate2::Compression::new(lvl as u32))
     } else {
         flate2::write::DeflateEncoder::new(Vec::new(), flate2::Compression::fast())
     };

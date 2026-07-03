@@ -1,7 +1,7 @@
 use crate::errors::{Error, Result};
 use crate::objects::Value;
-use crate::vm::interpreter::{HeapValue, Interpreter, JsObject};
 use crate::props;
+use crate::vm::interpreter::{HeapValue, Interpreter, JsObject};
 
 use super::helpers::to_string_value;
 

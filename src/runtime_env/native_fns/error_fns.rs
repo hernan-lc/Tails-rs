@@ -1,7 +1,7 @@
 use crate::errors::Result;
 use crate::objects::Value;
-use crate::vm::interpreter::Interpreter;
 use crate::props;
+use crate::vm::interpreter::Interpreter;
 
 use super::helpers::{find_error_ctor_proto, find_error_proto, to_string_value};
 

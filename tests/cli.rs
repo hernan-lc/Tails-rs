@@ -13,9 +13,7 @@
 
 use std::fs;
 use std::path::PathBuf;
-use tails::cli::build::{
-    detect_target_triple, get_lib_ext, get_lib_filename, run_clean,
-};
+use tails::cli::build::{detect_target_triple, get_lib_ext, get_lib_filename, run_clean};
 use tails::dotenv::{find_env_files, load_env_files, parse_env_file};
 
 struct TempDir(PathBuf);
@@ -119,8 +117,7 @@ fn parse_env_file_handles_basic_assignment() {
 
 #[test]
 fn parse_env_file_skips_comments_and_blanks() {
-    let parsed =
-        parse_env_file("# top comment\n\nKEY1=value1\n# trailing\nKEY2=value2\n");
+    let parsed = parse_env_file("# top comment\n\nKEY1=value1\n# trailing\nKEY2=value2\n");
     assert_eq!(parsed.get("KEY1").map(String::as_str), Some("value1"));
     assert_eq!(parsed.get("KEY2").map(String::as_str), Some("value2"));
     assert_eq!(parsed.len(), 2);
@@ -128,9 +125,7 @@ fn parse_env_file_skips_comments_and_blanks() {
 
 #[test]
 fn parse_env_file_strips_matching_quotes() {
-    let parsed = parse_env_file(
-        "DOUBLE=\"hello world\"\nSINGLE='single-quoted'\nPLAIN=plain\n",
-    );
+    let parsed = parse_env_file("DOUBLE=\"hello world\"\nSINGLE='single-quoted'\nPLAIN=plain\n");
     assert_eq!(
         parsed.get("DOUBLE").map(String::as_str),
         Some("hello world")
@@ -145,10 +140,7 @@ fn parse_env_file_strips_matching_quotes() {
 #[test]
 fn parse_env_file_expands_dollar_vars() {
     let parsed = parse_env_file("GREETING=hello\nTARGET=world\nMSG=$GREETING $TARGET\n");
-    assert_eq!(
-        parsed.get("MSG").map(String::as_str),
-        Some("hello world")
-    );
+    assert_eq!(parsed.get("MSG").map(String::as_str), Some("hello world"));
 }
 
 #[test]

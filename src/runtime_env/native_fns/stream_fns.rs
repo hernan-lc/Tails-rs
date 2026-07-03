@@ -59,9 +59,9 @@ pub(super) fn native_readable_stream_pipe(
         _ => return Ok(this.clone()),
     };
     let arr_idx = interp.heap.len();
-    interp
-        .heap
-        .push(HeapValue::Array(JsArray { elements: vec![dest] }));
+    interp.heap.push(HeapValue::Array(JsArray {
+        elements: vec![dest],
+    }));
     if let HeapValue::Object(state) = &mut interp.heap[state_idx] {
         state
             .properties
@@ -116,9 +116,9 @@ pub(super) fn native_readable_stream_push(
         Some(Value::Array(idx)) => idx,
         _ => {
             let new_idx = interp.heap.len();
-            interp
-                .heap
-                .push(HeapValue::Array(JsArray { elements: Vec::new() }));
+            interp.heap.push(HeapValue::Array(JsArray {
+                elements: Vec::new(),
+            }));
             if let HeapValue::Object(state) = &mut interp.heap[state_idx] {
                 state
                     .properties
@@ -144,8 +144,7 @@ pub(super) fn native_readable_stream_destroy(
         _ => return Ok(this.clone()),
     };
     if let HeapValue::Object(obj) = &mut interp.heap[obj_idx] {
-        obj.properties
-            .insert("_readableState".into(), Value::Null);
+        obj.properties.insert("_readableState".into(), Value::Null);
     }
     Ok(this.clone())
 }

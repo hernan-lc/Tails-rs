@@ -286,7 +286,11 @@ pub(super) fn native_event_emitter_once(
         }),
     );
 
-    let _ = native_event_emitter_on(interp, this, &[Value::String(event), Value::Object(wrapper_idx)]);
+    let _ = native_event_emitter_on(
+        interp,
+        this,
+        &[Value::String(event), Value::Object(wrapper_idx)],
+    );
     Ok(this.clone())
 }
 

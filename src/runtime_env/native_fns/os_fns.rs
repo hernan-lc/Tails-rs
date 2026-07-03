@@ -1,7 +1,7 @@
 use crate::errors::Result;
 use crate::objects::Value;
-use crate::vm::interpreter::{HeapValue, Interpreter, JsObject};
 use crate::props;
+use crate::vm::interpreter::{HeapValue, Interpreter, JsObject};
 
 pub(super) fn native_os_platform(
     _interp: &mut Interpreter,

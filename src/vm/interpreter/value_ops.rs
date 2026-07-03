@@ -16,41 +16,39 @@ impl Interpreter {
             // Avoids allocating a fresh `String` of `a.len() + b.len()` bytes.
             // The actual flat string is only produced when consumed by an
             // operation that needs contiguous bytes (comparisons, display, etc.).
-            (Value::String(a), Value::String(b)) => {
-                Ok(Value::Cons(ConsString::new(
-                    Value::String(a.clone()),
-                    Value::String(b.clone()),
-                )))
-            }
-            (Value::String(a), Value::Cons(c)) => {
-                Ok(Value::Cons(ConsString::new(
-                    Value::String(a.clone()),
-                    Value::Cons(c.clone()),
-                )))
-            }
-            (Value::Cons(c), Value::String(b)) => {
-                Ok(Value::Cons(ConsString::new(
-                    Value::Cons(c.clone()),
-                    Value::String(b.clone()),
-                )))
-            }
-            (Value::Cons(a), Value::Cons(b)) => {
-                Ok(Value::Cons(ConsString::new(
-                    Value::Cons(a.clone()),
-                    Value::Cons(b.clone()),
-                )))
-            }
+            (Value::String(a), Value::String(b)) => Ok(Value::Cons(ConsString::new(
+                Value::String(a.clone()),
+                Value::String(b.clone()),
+            ))),
+            (Value::String(a), Value::Cons(c)) => Ok(Value::Cons(ConsString::new(
+                Value::String(a.clone()),
+                Value::Cons(c.clone()),
+            ))),
+            (Value::Cons(c), Value::String(b)) => Ok(Value::Cons(ConsString::new(
+                Value::Cons(c.clone()),
+                Value::String(b.clone()),
+            ))),
+            (Value::Cons(a), Value::Cons(b)) => Ok(Value::Cons(ConsString::new(
+                Value::Cons(a.clone()),
+                Value::Cons(b.clone()),
+            ))),
             // Phase 1.7: String + Number — coerce number to string, then
             // build a Cons node. The number-to-string conversion is cheap
             // (format! on a small primitive) and avoids the larger
             // `String::with_capacity` + two `push_str` allocation.
             (Value::String(a), Value::Integer(b)) => {
                 let b_str = Value::String(b.to_string());
-                Ok(Value::Cons(ConsString::new(Value::String(a.clone()), b_str)))
+                Ok(Value::Cons(ConsString::new(
+                    Value::String(a.clone()),
+                    b_str,
+                )))
             }
             (Value::Integer(a), Value::String(b)) => {
                 let a_str = Value::String(a.to_string());
-                Ok(Value::Cons(ConsString::new(a_str, Value::String(b.clone()))))
+                Ok(Value::Cons(ConsString::new(
+                    a_str,
+                    Value::String(b.clone()),
+                )))
             }
             (Value::String(a), Value::Float(b)) => {
                 let b_str = if b.is_finite() && *b == (*b as i64) as f64 {
@@ -58,7 +56,10 @@ impl Interpreter {
                 } else {
                     Value::String(b.to_string())
                 };
-                Ok(Value::Cons(ConsString::new(Value::String(a.clone()), b_str)))
+                Ok(Value::Cons(ConsString::new(
+                    Value::String(a.clone()),
+                    b_str,
+                )))
             }
             (Value::Float(a), Value::String(b)) => {
                 let a_str = if a.is_finite() && *a == (*a as i64) as f64 {
@@ -66,7 +67,10 @@ impl Interpreter {
                 } else {
                     Value::String(a.to_string())
                 };
-                Ok(Value::Cons(ConsString::new(a_str, Value::String(b.clone()))))
+                Ok(Value::Cons(ConsString::new(
+                    a_str,
+                    Value::String(b.clone()),
+                )))
             }
             // Cons + Number: flatten the Cons first, then build a new Cons
             (Value::Cons(c), Value::Integer(b)) => {

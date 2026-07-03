@@ -57,10 +57,7 @@ mod fs_promises_native {
     pub fn write_file(path: String, content: String) -> String {
         match tails_fs::write_file(&path, &content) {
             Ok(()) => __tails_ok(JsonValue::Null),
-            Err(e) => __tails_err(format!(
-                "EACCES: permission denied, open '{}': {}",
-                path, e
-            )),
+            Err(e) => __tails_err(format!("EACCES: permission denied, open '{}': {}", path, e)),
         }
     }
 
@@ -146,10 +143,7 @@ mod fs_promises_native {
     pub fn append_file(path: String, content: String) -> String {
         match tails_fs::append_file(&path, &content) {
             Ok(()) => __tails_ok(JsonValue::Null),
-            Err(e) => __tails_err(format!(
-                "EACCES: permission denied, open '{}': {}",
-                path, e
-            )),
+            Err(e) => __tails_err(format!("EACCES: permission denied, open '{}': {}", path, e)),
         }
     }
 

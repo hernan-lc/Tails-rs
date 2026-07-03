@@ -128,7 +128,18 @@ fn test_process_memory_usage_has_required_fields() {
 
 #[test]
 fn test_buffer_is_encoding_known_encodings() {
-    for enc in &["utf8", "utf-8", "UTF-8", "utf16le", "ucs2", "latin1", "ascii", "hex", "base64", "base64url"] {
+    for enc in &[
+        "utf8",
+        "utf-8",
+        "UTF-8",
+        "utf16le",
+        "ucs2",
+        "latin1",
+        "ascii",
+        "hex",
+        "base64",
+        "base64url",
+    ] {
         let script = format!(r#"Buffer.isEncoding("{}");"#, enc);
         assert_eq!(
             run(&script),

@@ -221,18 +221,18 @@ mod process_fns {
 }
 mod promise_fns;
 mod proxy_fns;
+mod querystring_fns;
 mod reflect_fns;
 mod regexp_fns;
 mod require_fns;
+mod stream_fns;
 mod string_fns;
 mod symbol_fns;
+mod timers_fns;
 mod typed_array_fns;
 mod url_fns;
-mod websocket_fns;
 mod util_fns;
-mod timers_fns;
-mod querystring_fns;
-mod stream_fns;
+mod websocket_fns;
 #[cfg(feature = "zlib")]
 mod zlib_fns;
 #[cfg(not(feature = "zlib"))]

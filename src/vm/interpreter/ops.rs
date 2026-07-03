@@ -253,7 +253,7 @@ impl Interpreter {
                     Value::String(s) => s.as_str(),
                     Value::Cons(c) => {
                         key_owned = c.flatten();
-                        &*key_owned
+                        &key_owned
                     }
                     _ => "",
                 };

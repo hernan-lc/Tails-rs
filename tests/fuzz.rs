@@ -19,8 +19,8 @@
 //! `deterministic_corpus()` body for a `proptest` / `cargo-fuzz`
 //! generator.
 
-use tails::compiler::Compiler;
 use tails::compiler::lexer::tokenize;
+use tails::compiler::Compiler;
 
 /// Deterministic corpus used by the harness. The label is only used
 /// in panic messages to help locate the offending input.

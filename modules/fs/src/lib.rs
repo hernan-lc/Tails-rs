@@ -627,7 +627,11 @@ mod fs_native {
     #[tails_function]
     pub fn watch(path: String, interval_ms: f64) -> String {
         let id = __tails_next_id();
-        let interval = if interval_ms < 10.0 { 100 } else { interval_ms as u64 };
+        let interval = if interval_ms < 10.0 {
+            100
+        } else {
+            interval_ms as u64
+        };
         let watcher = super::FileWatcher::new(&path, interval);
         match watcher {
             Ok(watcher) => {
@@ -680,12 +684,8 @@ mod fs_native {
 
     static STREAMS: once_cell::sync::Lazy<
         std::sync::Mutex<std::collections::HashMap<u32, super::ReadStream>>,
-    > = once_cell::sync::Lazy::new(|| {
-        std::sync::Mutex::new(std::collections::HashMap::new())
-    });
+    > = once_cell::sync::Lazy::new(|| std::sync::Mutex::new(std::collections::HashMap::new()));
     static WATCHERS: once_cell::sync::Lazy<
         std::sync::Mutex<std::collections::HashMap<u32, super::FileWatcher>>,
-    > = once_cell::sync::Lazy::new(|| {
-        std::sync::Mutex::new(std::collections::HashMap::new())
-    });
+    > = once_cell::sync::Lazy::new(|| std::sync::Mutex::new(std::collections::HashMap::new()));
 }

@@ -382,7 +382,8 @@ fn to_i64(v: &Value) -> i64 {
 pub(super) fn is_supported_encoding(enc: &str) -> bool {
     matches!(
         enc.to_ascii_lowercase().as_str(),
-        "utf8" | "utf-8"
+        "utf8"
+            | "utf-8"
             | "utf16le"
             | "utf-16le"
             | "ucs2"
@@ -475,7 +476,7 @@ pub(super) fn native_buffer_transcode(
         "base64url" => {
             let mut s: String = src_bytes.iter().map(|b| *b as char).collect();
             s = s.replace('-', "+").replace('_', "/");
-            while s.len() % 4 != 0 {
+            while !s.len().is_multiple_of(4) {
                 s.push('=');
             }
             match base64_decode_str(&s) {
@@ -540,9 +541,8 @@ fn hex_nibble(c: u8) -> Option<u8> {
 
 /// RFC 4648 §4 base64 encoder used by `Buffer.transcode`.
 fn base64_encode_simple(bytes: &[u8]) -> String {
-    const ALPHA: &[u8; 64] =
-        b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-    let mut out = String::with_capacity((bytes.len() + 2) / 3 * 4);
+    const ALPHA: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    let mut out = String::with_capacity(bytes.len().div_ceil(3) * 4);
     let mut i = 0;
     while i + 3 <= bytes.len() {
         let b0 = bytes[i];
@@ -602,7 +602,7 @@ fn decode_bytes_with_encoding(bytes: &[u8], enc: &str) -> Option<Vec<u8>> {
             // back the padding that base64url strips.
             let mut s: String = bytes.iter().map(|b| *b as char).collect();
             s = s.replace('-', "+").replace('_', "/");
-            while s.len() % 4 != 0 {
+            while !s.len().is_multiple_of(4) {
                 s.push('=');
             }
             base64_decode_simple(s.as_bytes())
@@ -630,7 +630,7 @@ fn base64_decode_simple(bytes: &[u8]) -> Option<Vec<u8>> {
         .copied()
         .filter(|b| !b.is_ascii_whitespace())
         .collect();
-    if bytes.len() % 4 != 0 {
+    if !bytes.len().is_multiple_of(4) {
         return None;
     }
     let mut out = Vec::with_capacity(bytes.len() / 4 * 3);
@@ -698,7 +698,7 @@ fn base64_decode_simple(bytes: &[u8]) -> Option<Vec<u8>> {
 /// `Buffer.transcode(Buffer.from('Hi', 'utf16le'), 'utf16le', 'utf8')`
 /// → `Buffer.from('Hi', 'utf8')`.
 fn decode_utf16le_to_utf8(src: &[u8]) -> Option<Vec<u8>> {
-    if src.len() % 2 != 0 {
+    if !src.len().is_multiple_of(2) {
         // Trailing single byte: treat as malformed, drop it (Node
         // trims the source by length and the remaining pairs are
         // still well-formed).
@@ -759,10 +759,7 @@ fn encode_utf8_to_utf16le(src: &[u8]) -> Option<Vec<u8>> {
                 (0xFFFD, 1)
             }
         } else if b < 0xF0 {
-            if i + 2 < src.len()
-                && (src[i + 1] & 0xC0) == 0x80
-                && (src[i + 2] & 0xC0) == 0x80
-            {
+            if i + 2 < src.len() && (src[i + 1] & 0xC0) == 0x80 && (src[i + 2] & 0xC0) == 0x80 {
                 let cp = ((b as u32 & 0x0F) << 12)
                     | ((src[i + 1] as u32 & 0x3F) << 6)
                     | (src[i + 2] as u32 & 0x3F);

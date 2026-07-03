@@ -1,8 +1,8 @@
-use rustc_hash::FxHashMap;
 use crate::errors::{Error, Result};
 use crate::objects::Value;
 use crate::props;
 use crate::vm::interpreter::{HeapValue, Interpreter, JsObject};
+use rustc_hash::FxHashMap;
 
 use super::helpers::to_string_value;
 

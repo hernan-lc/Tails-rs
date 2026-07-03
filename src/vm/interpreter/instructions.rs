@@ -217,10 +217,8 @@ impl Interpreter {
                         // ConsString leaf.
                         (Value::String(dst_str), Value::Integer(b)) => {
                             let b_str = Value::String(b.to_string());
-                            self.stack[dst_idx] = Value::Cons(ConsString::new(
-                                Value::String(dst_str.clone()),
-                                b_str,
-                            ));
+                            self.stack[dst_idx] =
+                                Value::Cons(ConsString::new(Value::String(dst_str.clone()), b_str));
                         }
                         (Value::String(dst_str), Value::Float(b)) => {
                             // Match `to_string_coerce` for finite integers:
@@ -230,17 +228,13 @@ impl Interpreter {
                             } else {
                                 Value::String(b.to_string())
                             };
-                            self.stack[dst_idx] = Value::Cons(ConsString::new(
-                                Value::String(dst_str.clone()),
-                                b_str,
-                            ));
+                            self.stack[dst_idx] =
+                                Value::Cons(ConsString::new(Value::String(dst_str.clone()), b_str));
                         }
                         (Value::Cons(c), Value::Integer(b)) => {
                             let right = Value::String(b.to_string());
-                            self.stack[dst_idx] = Value::Cons(ConsString::new(
-                                Value::Cons(c.clone()),
-                                right,
-                            ));
+                            self.stack[dst_idx] =
+                                Value::Cons(ConsString::new(Value::Cons(c.clone()), right));
                         }
                         (Value::Cons(c), Value::Float(b)) => {
                             let right = if b.is_finite() && *b == (*b as i64) as f64 {
@@ -248,10 +242,8 @@ impl Interpreter {
                             } else {
                                 Value::String(b.to_string())
                             };
-                            self.stack[dst_idx] = Value::Cons(ConsString::new(
-                                Value::Cons(c.clone()),
-                                right,
-                            ));
+                            self.stack[dst_idx] =
+                                Value::Cons(ConsString::new(Value::Cons(c.clone()), right));
                         }
                         _ => {
                             // Fallback: clone is required for self.add(left, right)

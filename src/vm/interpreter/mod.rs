@@ -589,10 +589,7 @@ impl Interpreter {
                         //         it with Undefined), put `a` into
                         //         stack[len-1] (replacing the original
                         //         `c` and reading it out as `c`).
-                        let a = std::mem::replace(
-                            &mut self.stack[len - 3],
-                            Value::Undefined,
-                        );
+                        let a = std::mem::replace(&mut self.stack[len - 3], Value::Undefined);
                         let c = std::mem::replace(&mut self.stack[len - 1], a);
                         // Step 2: read `b` out of stack[len-2] (replacing
                         //         it with the original `c`).
@@ -743,12 +740,11 @@ impl Interpreter {
                                             // Reuse a fresh empty Vec — this is
                                             // cheaper than a non-trivial
                                             // `Vec::clone`.
-                                            let closure_vars =
-                                                if f.closure.is_empty() {
-                                                    Vec::new()
-                                                } else {
-                                                    f.closure.clone()
-                                                };
+                                            let closure_vars = if f.closure.is_empty() {
+                                                Vec::new()
+                                            } else {
+                                                f.closure.clone()
+                                            };
                                             // Phase 2F (inline Call fast path): skip
                                             // the `Option::clone()` of
                                             // `f.captured_this` for non-arrow

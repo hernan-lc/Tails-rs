@@ -1,8 +1,8 @@
 use super::{HeapValue, Interpreter, JsObject};
 use crate::objects::js_array::{TypedArray, TypedArrayType};
 use crate::objects::Value;
-use crate::runtime_env::native_fns::constants as c;
 use crate::props;
+use crate::runtime_env::native_fns::constants as c;
 
 impl Interpreter {
     pub(super) fn init_builtins(&mut self) {

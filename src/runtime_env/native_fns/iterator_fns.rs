@@ -1,8 +1,8 @@
 use crate::errors::{Error, Result};
 use crate::objects::Value;
+use crate::props;
 use crate::runtime_env::native_fns::constants as c;
 use crate::vm::interpreter::{HeapValue, Interpreter, JsArray, JsObject};
-use crate::props;
 
 // Array[Symbol.iterator]() - creates an iterator for an array
 pub(super) fn native_array_iterator(

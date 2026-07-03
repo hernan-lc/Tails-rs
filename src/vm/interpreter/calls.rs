@@ -46,8 +46,8 @@ impl Interpreter {
                     let rest_param = f.rest_param.is_some();
                     let param_count = f.params.len();
 
-                    let func_module: Option<Rc<CompiledModule>> = owner_module
-                        .or_else(|| self.current_module.clone());
+                    let func_module: Option<Rc<CompiledModule>> =
+                        owner_module.or_else(|| self.current_module.clone());
                     let return_address = func_module
                         .as_ref()
                         .map(|m| m.instructions.len())
@@ -94,8 +94,7 @@ impl Interpreter {
                         func_heap_idx: Some(*func_idx),
                         this_value: Some(this_for_frame),
                         is_construct: false,
-                        source_name: source_file
-                            .or_else(|| self.current_module_path.clone()),
+                        source_name: source_file.or_else(|| self.current_module_path.clone()),
                         generator_heap_idx: None,
                         source_line,
                         source_col: None,

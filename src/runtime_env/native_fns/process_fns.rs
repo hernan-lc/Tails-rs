@@ -2,8 +2,8 @@ use std::sync::{Mutex, OnceLock};
 
 use crate::errors::Result;
 use crate::objects::Value;
-use crate::vm::interpreter::Interpreter;
 use crate::props;
+use crate::vm::interpreter::Interpreter;
 
 use super::helpers::to_string_value;
 

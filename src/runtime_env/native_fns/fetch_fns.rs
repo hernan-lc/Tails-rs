@@ -1,10 +1,10 @@
-use rustc_hash::FxHashMap;
 use crate::errors::{Error, Result};
-use crate::props;
 use crate::objects::js_promise::JsPromise;
 use crate::objects::Value;
+use crate::props;
 use crate::runtime_env::native_fns::constants as c;
 use crate::vm::interpreter::{HeapValue, Interpreter, JsArray, JsObject};
+use rustc_hash::FxHashMap;
 
 use super::helpers::to_string_value;
 

@@ -1,7 +1,7 @@
 use crate::errors::{Error, Result};
 use crate::objects::Value;
-use crate::vm::interpreter::Interpreter;
 use crate::props;
+use crate::vm::interpreter::Interpreter;
 
 pub(super) fn native_reflect_get(
     interp: &mut Interpreter,

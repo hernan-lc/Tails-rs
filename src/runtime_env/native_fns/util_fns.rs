@@ -83,9 +83,7 @@ pub(super) fn native_util_inspect(
         .and_then(|v| match v {
             Value::Object(idx) => {
                 if let HeapValue::Object(obj) = &interp.heap[*idx] {
-                    obj.properties
-                        .get("depth")
-                        .map(|d| to_f64(d) as usize)
+                    obj.properties.get("depth").map(|d| to_f64(d) as usize)
                 } else {
                     None
                 }
@@ -168,7 +166,13 @@ fn inspect_value(interp: &Interpreter, value: &Value, depth: usize, indent: usiz
                 let items: Vec<String> = arr
                     .elements
                     .iter()
-                    .map(|v| format!("{}{}", inner, inspect_value(interp, v, depth - 1, indent + 2)))
+                    .map(|v| {
+                        format!(
+                            "{}{}",
+                            inner,
+                            inspect_value(interp, v, depth - 1, indent + 2)
+                        )
+                    })
                     .collect();
                 format!("[\n{}\n{}]", items.join(",\n"), prefix)
             } else {
@@ -201,9 +205,7 @@ fn inspect_value(interp: &Interpreter, value: &Value, depth: usize, indent: usiz
         }
         Value::Function(idx) => {
             if let HeapValue::Function(f) = &interp.heap[*idx] {
-                f.name
-                    .clone()
-                    .unwrap_or_else(|| "[Function]".to_string())
+                f.name.clone().unwrap_or_else(|| "[Function]".to_string())
             } else {
                 "[Function]".to_string()
             }

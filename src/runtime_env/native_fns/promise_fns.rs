@@ -1,7 +1,7 @@
 use crate::errors::Result;
 use crate::objects::Value;
-use crate::vm::interpreter::Interpreter;
 use crate::props;
+use crate::vm::interpreter::Interpreter;
 
 pub(super) fn native_promise_constructor(
     interp: &mut Interpreter,

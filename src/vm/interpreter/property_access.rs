@@ -71,7 +71,10 @@ impl Interpreter {
         let key_flat;
         let key_str = match key {
             Value::String(s) => s.as_str(),
-            Value::Cons(c) => { key_flat = c.flatten(); &*key_flat }
+            Value::Cons(c) => {
+                key_flat = c.flatten();
+                &*key_flat
+            }
             _ => return Ok(()),
         };
         match object {
@@ -131,15 +134,16 @@ impl Interpreter {
                     let key_flat;
                     let key_str = match key {
                         Value::String(s) => s.as_str(),
-                        Value::Cons(c) => { key_flat = c.flatten(); &*key_flat }
+                        Value::Cons(c) => {
+                            key_flat = c.flatten();
+                            &*key_flat
+                        }
                         _ => return Ok(Value::Undefined),
                     };
                     if let Some(val) = obj.properties.get(key_str) {
                         return Ok(val.clone());
                     }
-                    if let Some(getter_val) =
-                        find_accessor(&obj.properties, "__getter_", key_str)
-                    {
+                    if let Some(getter_val) = find_accessor(&obj.properties, "__getter_", key_str) {
                         return self.call_value(&getter_val, this, &[]);
                     }
                     if let Some(proto_idx) = obj.prototype {
@@ -210,7 +214,10 @@ impl Interpreter {
                 let key_flat;
                 let key_str = match key {
                     Value::String(s) => s.as_str(),
-                    Value::Cons(c) => { key_flat = c.flatten(); &*key_flat }
+                    Value::Cons(c) => {
+                        key_flat = c.flatten();
+                        &*key_flat
+                    }
                     _ => return Ok(Value::Undefined),
                 };
                 match key_str {
@@ -236,7 +243,10 @@ impl Interpreter {
                 let key_flat;
                 let key_str = match key {
                     Value::String(s) => s.as_str(),
-                    Value::Cons(c) => { key_flat = c.flatten(); &*key_flat }
+                    Value::Cons(c) => {
+                        key_flat = c.flatten();
+                        &*key_flat
+                    }
                     _ => return Ok(Value::Undefined),
                 };
                 match key_str {
@@ -269,7 +279,10 @@ impl Interpreter {
                 let key_flat;
                 let key_str = match key {
                     Value::String(s) => s.as_str(),
-                    Value::Cons(c) => { key_flat = c.flatten(); &*key_flat }
+                    Value::Cons(c) => {
+                        key_flat = c.flatten();
+                        &*key_flat
+                    }
                     _ => return Ok(Value::Undefined),
                 };
                 match key_str {
@@ -284,9 +297,7 @@ impl Interpreter {
                         "reject" => return Ok(Value::NativeFunction(c::PROMISE_REJECT)),
                         "all" => return Ok(Value::NativeFunction(c::PROMISE_ALL)),
                         "race" => return Ok(Value::NativeFunction(c::PROMISE_RACE)),
-                        "allSettled" => {
-                            return Ok(Value::NativeFunction(c::PROMISE_ALL_SETTLED))
-                        }
+                        "allSettled" => return Ok(Value::NativeFunction(c::PROMISE_ALL_SETTLED)),
                         "any" => return Ok(Value::NativeFunction(c::PROMISE_ANY)),
                         "withResolvers" => {
                             return Ok(Value::NativeFunction(c::PROMISE_WITH_RESOLVERS))
@@ -298,9 +309,7 @@ impl Interpreter {
                     match key_str {
                         "for" => return Ok(Value::NativeFunction(c::SYMBOL_FOR)),
                         "keyFor" => return Ok(Value::NativeFunction(c::SYMBOL_KEY_FOR)),
-                        "iterator" => {
-                            return Ok(Value::Symbol(crate::objects::SYMBOL_ITERATOR))
-                        }
+                        "iterator" => return Ok(Value::Symbol(crate::objects::SYMBOL_ITERATOR)),
                         "toStringTag" => {
                             return Ok(Value::Symbol(crate::objects::SYMBOL_TO_STRING_TAG))
                         }
@@ -371,7 +380,10 @@ impl Interpreter {
                 let key_flat;
                 let key_str = match key {
                     Value::String(s) => s.as_str(),
-                    Value::Cons(c) => { key_flat = c.flatten(); &*key_flat }
+                    Value::Cons(c) => {
+                        key_flat = c.flatten();
+                        &*key_flat
+                    }
                     _ => return Ok(Value::Undefined),
                 };
                 let _ = key_str;
@@ -385,7 +397,10 @@ impl Interpreter {
                 let key_flat;
                 let key_str = match key {
                     Value::String(s) => s.as_str(),
-                    Value::Cons(c) => { key_flat = c.flatten(); &*key_flat }
+                    Value::Cons(c) => {
+                        key_flat = c.flatten();
+                        &*key_flat
+                    }
                     _ => return Ok(Value::Undefined),
                 };
                 let _ = key_str;
@@ -399,7 +414,10 @@ impl Interpreter {
                 let key_flat;
                 let key_str = match key {
                     Value::String(s) => s.as_str(),
-                    Value::Cons(c) => { key_flat = c.flatten(); &*key_flat }
+                    Value::Cons(c) => {
+                        key_flat = c.flatten();
+                        &*key_flat
+                    }
                     _ => return Ok(Value::Undefined),
                 };
                 if key_str == "length" {
@@ -418,7 +436,10 @@ impl Interpreter {
                 let key_flat;
                 let key_str = match key {
                     Value::String(s) => s.as_str(),
-                    Value::Cons(c) => { key_flat = c.flatten(); &*key_flat }
+                    Value::Cons(c) => {
+                        key_flat = c.flatten();
+                        &*key_flat
+                    }
                     _ => return Ok(Value::Undefined),
                 };
                 match key_str {
@@ -445,7 +466,10 @@ impl Interpreter {
                 let key_flat;
                 let key_str = match key {
                     Value::String(s) => s.as_str(),
-                    Value::Cons(c) => { key_flat = c.flatten(); &*key_flat }
+                    Value::Cons(c) => {
+                        key_flat = c.flatten();
+                        &*key_flat
+                    }
                     _ => return Ok(Value::Undefined),
                 };
                 match key_str {
@@ -471,7 +495,10 @@ impl Interpreter {
                 let key_flat;
                 let key_str = match key {
                     Value::String(s) => s.as_str(),
-                    Value::Cons(c) => { key_flat = c.flatten(); &*key_flat }
+                    Value::Cons(c) => {
+                        key_flat = c.flatten();
+                        &*key_flat
+                    }
                     _ => return Ok(Value::Undefined),
                 };
                 match key_str {
@@ -486,7 +513,10 @@ impl Interpreter {
                 let key_flat;
                 let key_str = match key {
                     Value::String(s) => s.as_str(),
-                    Value::Cons(c) => { key_flat = c.flatten(); &*key_flat }
+                    Value::Cons(c) => {
+                        key_flat = c.flatten();
+                        &*key_flat
+                    }
                     _ => return Ok(Value::Undefined),
                 };
                 match key_str {
@@ -500,7 +530,10 @@ impl Interpreter {
                 let key_flat;
                 let key_str = match key {
                     Value::String(s) => s.as_str(),
-                    Value::Cons(c) => { key_flat = c.flatten(); &*key_flat }
+                    Value::Cons(c) => {
+                        key_flat = c.flatten();
+                        &*key_flat
+                    }
                     _ => return Ok(Value::Undefined),
                 };
                 match key_str {
@@ -508,9 +541,7 @@ impl Interpreter {
                         if let Value::TypedArray(ta_idx) = this {
                             if let HeapValue::TypedArray(ta) = &self.heap[*ta_idx] {
                                 let elem_size =
-                                    crate::objects::js_array::TypedArray::element_size(
-                                        &ta.kind,
-                                    );
+                                    crate::objects::js_array::TypedArray::element_size(&ta.kind);
                                 return Ok(Value::Float((ta.byte_length / elem_size) as f64));
                             }
                         }
@@ -551,7 +582,10 @@ impl Interpreter {
                 let key_flat;
                 let key_str = match key {
                     Value::String(s) => s.as_str(),
-                    Value::Cons(c) => { key_flat = c.flatten(); &*key_flat }
+                    Value::Cons(c) => {
+                        key_flat = c.flatten();
+                        &*key_flat
+                    }
                     _ => return Ok(Value::Undefined),
                 };
                 if let Some(methods) = self.native_object_methods.get(&obj_id.0) {
@@ -603,13 +637,16 @@ impl Interpreter {
         let key_flat;
         let key_str = match key {
             Value::String(ks) => ks.as_str(),
-            Value::Cons(c) => { key_flat = c.flatten(); &*key_flat }
+            Value::Cons(c) => {
+                key_flat = c.flatten();
+                &*key_flat
+            }
             _ => return Ok(Value::Undefined),
         };
         if key_str == "length" {
             return Ok(Value::Float(s.len() as f64));
         }
-        return self.get_string_method(key_str);
+        self.get_string_method(key_str)
     }
 
     pub(super) fn get_string_method(&self, name: &str) -> Result<Value> {
@@ -644,7 +681,10 @@ impl Interpreter {
         let key_flat;
         let key_str = match key {
             Value::String(s) => s.as_str(),
-            Value::Cons(c) => { key_flat = c.flatten(); &*key_flat }
+            Value::Cons(c) => {
+                key_flat = c.flatten();
+                &*key_flat
+            }
             _ => return Ok(Value::Undefined),
         };
         match key_str {
@@ -665,7 +705,10 @@ impl Interpreter {
         let key_flat;
         let key_str = match key {
             Value::String(s) => s.as_str(),
-            Value::Cons(c) => { key_flat = c.flatten(); &*key_flat }
+            Value::Cons(c) => {
+                key_flat = c.flatten();
+                &*key_flat
+            }
             _ => return Ok(Value::Undefined),
         };
         match key_str {
@@ -700,7 +743,10 @@ impl Interpreter {
         let key_flat;
         let key_str = match key {
             Value::String(s) => s.as_str(),
-            Value::Cons(c) => { key_flat = c.flatten(); &*key_flat }
+            Value::Cons(c) => {
+                key_flat = c.flatten();
+                &*key_flat
+            }
             _ => return Value::Boolean(true),
         };
         match object {
@@ -769,7 +815,10 @@ impl Interpreter {
         let key_flat;
         let key_str = match key {
             Value::String(s) => s.as_str(),
-            Value::Cons(c) => { key_flat = c.flatten(); &*key_flat }
+            Value::Cons(c) => {
+                key_flat = c.flatten();
+                &*key_flat
+            }
             _ => return Ok(Value::Boolean(false)),
         };
         match object {
@@ -862,11 +911,7 @@ impl Interpreter {
 /// at most 8 short string keys (the `__getter_` / `__setter_`
 /// prefix is 9 bytes; the iterator can reject almost every key with
 /// a length check before the prefix compare).
-fn find_accessor(
-    properties: &FxHashMap<String, Value>,
-    prefix: &str,
-    key: &str,
-) -> Option<Value> {
+fn find_accessor(properties: &FxHashMap<String, Value>, prefix: &str, key: &str) -> Option<Value> {
     let needed_len = prefix.len() + key.len();
     for (k, v) in properties {
         if k.len() == needed_len && k.starts_with(prefix) && k.ends_with(key) {

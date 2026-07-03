@@ -1,7 +1,7 @@
-use rustc_hash::FxHashMap;
 use crate::errors::{Error, Result};
 use crate::objects::Value;
 use crate::vm::interpreter::Interpreter;
+use rustc_hash::FxHashMap;
 
 /// Function.prototype.call(thisArg, ...args)
 /// Calls a function with a given this value and arguments provided individually.

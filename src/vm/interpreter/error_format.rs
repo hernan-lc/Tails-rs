@@ -61,14 +61,11 @@ impl Interpreter {
                         _ => String::new(),
                     })
                     .unwrap_or_default();
-                let stack = obj
-                    .properties
-                    .get("stack")
-                    .map(|v| match v {
-                        Value::String(s) => s.clone(),
-                        Value::Cons(c) => c.flatten(),
-                        _ => String::new(),
-                    });
+                let stack = obj.properties.get("stack").map(|v| match v {
+                    Value::String(s) => s.clone(),
+                    Value::Cons(c) => c.flatten(),
+                    _ => String::new(),
+                });
                 if let Some(stack) = stack {
                     if !stack.is_empty() {
                         return stack;

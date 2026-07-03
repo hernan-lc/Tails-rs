@@ -5,7 +5,8 @@ use crate::vm::gc::GarbageCollector;
 use crate::vm::interpreter::{HeapValue, JsObject};
 use rustc_hash::FxHashMap;
 
-type NativeModuleFactory = fn(&mut Vec<HeapValue>, &mut GarbageCollector) -> FxHashMap<String, Value>;
+type NativeModuleFactory =
+    fn(&mut Vec<HeapValue>, &mut GarbageCollector) -> FxHashMap<String, Value>;
 
 pub struct NativeModuleRegistry {
     modules: FxHashMap<String, Box<NativeModuleFactory>>,
