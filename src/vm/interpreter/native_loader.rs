@@ -1,4 +1,5 @@
 use crate::objects::Value;
+use crate::props;
 use crate::runtime_env::native_fns::constants as c;
 use crate::vm::gc::GarbageCollector;
 use crate::vm::interpreter::{HeapValue, JsObject};
@@ -84,43 +85,19 @@ pub fn create_fs_module(
     _heap: &mut Vec<HeapValue>,
     _gc: &mut GarbageCollector,
 ) -> FxHashMap<String, Value> {
-    let mut props = FxHashMap::default();
-    props.insert(
-        "readFileSync".into(),
-        Value::NativeFunction(c::FS_READ_FILE_SYNC),
-    );
-    props.insert(
-        "writeFileSync".into(),
-        Value::NativeFunction(c::FS_WRITE_FILE_SYNC),
-    );
-    props.insert(
-        "existsSync".into(),
-        Value::NativeFunction(c::FS_EXISTS_SYNC),
-    );
-    props.insert("mkdirSync".into(), Value::NativeFunction(c::FS_MKDIR_SYNC));
-    props.insert(
-        "readdirSync".into(),
-        Value::NativeFunction(c::FS_READDIR_SYNC),
-    );
-    props.insert("statSync".into(), Value::NativeFunction(c::FS_STAT_SYNC));
-    props.insert(
-        "unlinkSync".into(),
-        Value::NativeFunction(c::FS_UNLINK_SYNC),
-    );
-    props.insert("rmSync".into(), Value::NativeFunction(c::FS_RM_SYNC));
-    props.insert(
-        "copyFileSync".into(),
-        Value::NativeFunction(c::FS_COPY_FILE_SYNC),
-    );
-    props.insert(
-        "renameSync".into(),
-        Value::NativeFunction(c::FS_RENAME_SYNC),
-    );
-    props.insert(
-        "appendFileSync".into(),
-        Value::NativeFunction(c::FS_APPEND_FILE_SYNC),
-    );
-    props
+    props! {
+        "readFileSync" => Value::NativeFunction(c::FS_READ_FILE_SYNC),
+        "writeFileSync" => Value::NativeFunction(c::FS_WRITE_FILE_SYNC),
+        "existsSync" => Value::NativeFunction(c::FS_EXISTS_SYNC),
+        "mkdirSync" => Value::NativeFunction(c::FS_MKDIR_SYNC),
+        "readdirSync" => Value::NativeFunction(c::FS_READDIR_SYNC),
+        "statSync" => Value::NativeFunction(c::FS_STAT_SYNC),
+        "unlinkSync" => Value::NativeFunction(c::FS_UNLINK_SYNC),
+        "rmSync" => Value::NativeFunction(c::FS_RM_SYNC),
+        "copyFileSync" => Value::NativeFunction(c::FS_COPY_FILE_SYNC),
+        "renameSync" => Value::NativeFunction(c::FS_RENAME_SYNC),
+        "appendFileSync" => Value::NativeFunction(c::FS_APPEND_FILE_SYNC),
+    }
 }
 
 #[cfg(feature = "fs")]
@@ -128,16 +105,16 @@ pub fn create_fs_promises_module(
     _heap: &mut Vec<HeapValue>,
     _gc: &mut GarbageCollector,
 ) -> FxHashMap<String, Value> {
-    let mut props = FxHashMap::default();
-    props.insert("readdir".into(), Value::NativeFunction(c::FS_READDIR));
-    props.insert("readFile".into(), Value::NativeFunction(c::FS_READ_FILE));
-    props.insert("writeFile".into(), Value::NativeFunction(c::FS_WRITE_FILE));
-    props.insert("stat".into(), Value::NativeFunction(c::FS_STAT));
-    props.insert("mkdir".into(), Value::NativeFunction(c::FS_MKDIR));
-    props.insert("unlink".into(), Value::NativeFunction(c::FS_UNLINK));
-    props.insert("copyFile".into(), Value::NativeFunction(c::FS_COPY_FILE));
-    props.insert("rename".into(), Value::NativeFunction(c::FS_RENAME));
-    props
+    props! {
+        "readdir" => Value::NativeFunction(c::FS_READDIR),
+        "readFile" => Value::NativeFunction(c::FS_READ_FILE),
+        "writeFile" => Value::NativeFunction(c::FS_WRITE_FILE),
+        "stat" => Value::NativeFunction(c::FS_STAT),
+        "mkdir" => Value::NativeFunction(c::FS_MKDIR),
+        "unlink" => Value::NativeFunction(c::FS_UNLINK),
+        "copyFile" => Value::NativeFunction(c::FS_COPY_FILE),
+        "rename" => Value::NativeFunction(c::FS_RENAME),
+    }
 }
 
 #[cfg(feature = "path")]
@@ -145,25 +122,17 @@ pub fn create_path_module(
     _heap: &mut Vec<HeapValue>,
     _gc: &mut GarbageCollector,
 ) -> FxHashMap<String, Value> {
-    let mut props = FxHashMap::default();
-    props.insert("join".into(), Value::NativeFunction(c::PATH_JOIN));
-    props.insert("resolve".into(), Value::NativeFunction(c::PATH_RESOLVE));
-    props.insert("basename".into(), Value::NativeFunction(c::PATH_BASENAME));
-    props.insert("dirname".into(), Value::NativeFunction(c::PATH_DIRNAME));
-    props.insert("extname".into(), Value::NativeFunction(c::PATH_EXTNAME));
-    props.insert("relative".into(), Value::NativeFunction(c::PATH_RELATIVE));
-    props.insert(
-        "isAbsolute".into(),
-        Value::NativeFunction(c::PATH_IS_ABSOLUTE),
-    );
-    props.insert("normalize".into(), Value::NativeFunction(c::PATH_NORMALIZE));
-    props.insert(
-        "sep".into(),
-        Value::String(std::path::MAIN_SEPARATOR.to_string()),
-    );
-    props.insert(
-        "delimiter".into(),
-        Value::String(
+    props! {
+        "join" => Value::NativeFunction(c::PATH_JOIN),
+        "resolve" => Value::NativeFunction(c::PATH_RESOLVE),
+        "basename" => Value::NativeFunction(c::PATH_BASENAME),
+        "dirname" => Value::NativeFunction(c::PATH_DIRNAME),
+        "extname" => Value::NativeFunction(c::PATH_EXTNAME),
+        "relative" => Value::NativeFunction(c::PATH_RELATIVE),
+        "isAbsolute" => Value::NativeFunction(c::PATH_IS_ABSOLUTE),
+        "normalize" => Value::NativeFunction(c::PATH_NORMALIZE),
+        "sep" => Value::String(std::path::MAIN_SEPARATOR.to_string()),
+        "delimiter" => Value::String(
             if cfg!(target_os = "windows") {
                 ";"
             } else {
@@ -171,8 +140,7 @@ pub fn create_path_module(
             }
             .to_string(),
         ),
-    );
-    props
+    }
 }
 
 #[cfg(feature = "process")]
@@ -240,11 +208,9 @@ pub fn create_process_module(
     props.insert("argv".into(), Value::Array(argv_idx));
 
     // process.stdout
-    let mut stdout_props = FxHashMap::default();
-    stdout_props.insert(
-        "write".into(),
-        Value::NativeFunction(c::PROCESS_STDOUT_WRITE),
-    );
+    let stdout_props = props! {
+        "write" => Value::NativeFunction(c::PROCESS_STDOUT_WRITE),
+    };
     let stdout_idx = gc.allocate(
         heap,
         HeapValue::Object(JsObject {
@@ -256,11 +222,9 @@ pub fn create_process_module(
     props.insert("stdout".into(), Value::Object(stdout_idx));
 
     // process.stderr
-    let mut stderr_props = FxHashMap::default();
-    stderr_props.insert(
-        "write".into(),
-        Value::NativeFunction(c::PROCESS_STDOUT_WRITE),
-    );
+    let stderr_props = props! {
+        "write" => Value::NativeFunction(c::PROCESS_STDOUT_WRITE),
+    };
     let stderr_idx = gc.allocate(
         heap,
         HeapValue::Object(JsObject {
@@ -297,133 +261,85 @@ pub fn create_buffer_module(
     heap: &mut Vec<HeapValue>,
     gc: &mut GarbageCollector,
 ) -> FxHashMap<String, Value> {
-    let mut props = FxHashMap::default();
-
-    // Static methods
-    props.insert("alloc".into(), Value::NativeFunction(c::BUFFER_ALLOC));
-    props.insert("from".into(), Value::NativeFunction(c::BUFFER_FROM));
-    props.insert("concat".into(), Value::NativeFunction(c::BUFFER_CONCAT));
-    props.insert(
-        "isBuffer".into(),
-        Value::NativeFunction(c::BUFFER_IS_BUFFER),
-    );
-    props.insert(
-        "isEncoding".into(),
-        Value::NativeFunction(c::BUFFER_IS_ENCODING),
-    );
-    props.insert(
-        "byteLength".into(),
-        Value::NativeFunction(c::BUFFER_BYTE_LENGTH),
-    );
-    props.insert(
-        "transcode".into(),
-        Value::NativeFunction(c::BUFFER_TRANSCODE),
-    );
-
-    // Prototype methods
-    props.insert(
-        "toString".into(),
-        Value::NativeFunction(c::BUFFER_TO_STRING),
-    );
-    props.insert("write".into(), Value::NativeFunction(c::BUFFER_WRITE));
-    props.insert("slice".into(), Value::NativeFunction(c::BUFFER_SLICE));
-    props.insert("copy".into(), Value::NativeFunction(c::BUFFER_COPY));
-    props.insert("fill".into(), Value::NativeFunction(c::BUFFER_FILL));
-    props.insert("compare".into(), Value::NativeFunction(c::BUFFER_COMPARE));
-    props.insert("equals".into(), Value::NativeFunction(c::BUFFER_EQUALS));
-    props.insert("indexOf".into(), Value::NativeFunction(c::BUFFER_INDEX_OF));
-
-    // Prototype object
     let buffer_proto_idx = gc.allocate(
         heap,
         HeapValue::Object(JsObject {
-            properties: {
-                let mut proto_props = FxHashMap::default();
-                proto_props.insert(
-                    "toString".into(),
-                    Value::NativeFunction(c::BUFFER_TO_STRING),
-                );
-                proto_props.insert("write".into(), Value::NativeFunction(c::BUFFER_WRITE));
-                proto_props.insert("slice".into(), Value::NativeFunction(c::BUFFER_SLICE));
-                proto_props.insert("copy".into(), Value::NativeFunction(c::BUFFER_COPY));
-                proto_props.insert("fill".into(), Value::NativeFunction(c::BUFFER_FILL));
-                proto_props.insert("compare".into(), Value::NativeFunction(c::BUFFER_COMPARE));
-                proto_props.insert("equals".into(), Value::NativeFunction(c::BUFFER_EQUALS));
-                proto_props.insert("indexOf".into(), Value::NativeFunction(c::BUFFER_INDEX_OF));
-                proto_props.insert("length".into(), Value::Integer(0));
-                proto_props
+            properties: props! {
+                "toString" => Value::NativeFunction(c::BUFFER_TO_STRING),
+                "write" => Value::NativeFunction(c::BUFFER_WRITE),
+                "slice" => Value::NativeFunction(c::BUFFER_SLICE),
+                "copy" => Value::NativeFunction(c::BUFFER_COPY),
+                "fill" => Value::NativeFunction(c::BUFFER_FILL),
+                "compare" => Value::NativeFunction(c::BUFFER_COMPARE),
+                "equals" => Value::NativeFunction(c::BUFFER_EQUALS),
+                "indexOf" => Value::NativeFunction(c::BUFFER_INDEX_OF),
+                "length" => Value::Integer(0),
             },
             prototype: None,
             extensible: true,
         }),
     );
-    props.insert("prototype".into(), Value::Object(buffer_proto_idx));
-
-    props
+    props! {
+        "alloc" => Value::NativeFunction(c::BUFFER_ALLOC),
+        "from" => Value::NativeFunction(c::BUFFER_FROM),
+        "concat" => Value::NativeFunction(c::BUFFER_CONCAT),
+        "isBuffer" => Value::NativeFunction(c::BUFFER_IS_BUFFER),
+        "isEncoding" => Value::NativeFunction(c::BUFFER_IS_ENCODING),
+        "byteLength" => Value::NativeFunction(c::BUFFER_BYTE_LENGTH),
+        "transcode" => Value::NativeFunction(c::BUFFER_TRANSCODE),
+        "toString" => Value::NativeFunction(c::BUFFER_TO_STRING),
+        "write" => Value::NativeFunction(c::BUFFER_WRITE),
+        "slice" => Value::NativeFunction(c::BUFFER_SLICE),
+        "copy" => Value::NativeFunction(c::BUFFER_COPY),
+        "fill" => Value::NativeFunction(c::BUFFER_FILL),
+        "compare" => Value::NativeFunction(c::BUFFER_COMPARE),
+        "equals" => Value::NativeFunction(c::BUFFER_EQUALS),
+        "indexOf" => Value::NativeFunction(c::BUFFER_INDEX_OF),
+        "prototype" => Value::Object(buffer_proto_idx),
+    }
 }
 
 pub fn create_intl_module(
     heap: &mut Vec<HeapValue>,
     gc: &mut GarbageCollector,
 ) -> FxHashMap<String, Value> {
-    let mut props = FxHashMap::default();
-
-    let mut intl_obj_props = FxHashMap::default();
-    intl_obj_props.insert(
-        "DateTimeFormat".into(),
-        Value::NativeFunction(c::DATETIME_FORMAT_CONSTRUCTOR),
-    );
-    intl_obj_props.insert(
-        "NumberFormat".into(),
-        Value::NativeFunction(c::NUMBER_FORMAT_CONSTRUCTOR),
-    );
-
     let intl_obj_idx = gc.allocate(
         heap,
         HeapValue::Object(JsObject {
-            properties: intl_obj_props,
+            properties: props! {
+                "DateTimeFormat" => Value::NativeFunction(c::DATETIME_FORMAT_CONSTRUCTOR),
+                "NumberFormat" => Value::NativeFunction(c::NUMBER_FORMAT_CONSTRUCTOR),
+            },
             prototype: None,
             extensible: true,
         }),
     );
-    props.insert("default".into(), Value::Object(intl_obj_idx));
-
-    props
+    props! {
+        "default" => Value::Object(intl_obj_idx),
+    }
 }
 
 pub fn create_events_module(
     heap: &mut Vec<HeapValue>,
     gc: &mut GarbageCollector,
 ) -> FxHashMap<String, Value> {
-    let mut props = FxHashMap::default();
-
-    // EventEmitter constructor
-    props.insert(
-        "EventEmitter".into(),
-        Value::NativeFunction(c::EVENT_EMITTER_CONSTRUCTOR),
-    );
-
-    // Prototype methods
-    let mut proto_props = FxHashMap::default();
-    proto_props.insert("on".into(), Value::NativeFunction(c::EVENT_EMITTER_ON));
-    proto_props.insert("emit".into(), Value::NativeFunction(c::EVENT_EMITTER_EMIT));
-    proto_props.insert("off".into(), Value::NativeFunction(c::EVENT_EMITTER_OFF));
-    proto_props.insert(
-        "listenerCount".into(),
-        Value::NativeFunction(c::EVENT_EMITTER_LISTENER_COUNT),
-    );
-
     let proto_idx = gc.allocate(
         heap,
         HeapValue::Object(JsObject {
-            properties: proto_props,
+            properties: props! {
+                "on" => Value::NativeFunction(c::EVENT_EMITTER_ON),
+                "emit" => Value::NativeFunction(c::EVENT_EMITTER_EMIT),
+                "off" => Value::NativeFunction(c::EVENT_EMITTER_OFF),
+                "listenerCount" => Value::NativeFunction(c::EVENT_EMITTER_LISTENER_COUNT),
+            },
             prototype: None,
             extensible: true,
         }),
     );
-    props.insert("prototype".into(), Value::Object(proto_idx));
-
-    props
+    props! {
+        "EventEmitter" => Value::NativeFunction(c::EVENT_EMITTER_CONSTRUCTOR),
+        "prototype" => Value::Object(proto_idx),
+    }
 }
 
 #[cfg(feature = "os")]
@@ -431,97 +347,76 @@ pub fn create_os_module(
     _heap: &mut Vec<HeapValue>,
     _gc: &mut GarbageCollector,
 ) -> FxHashMap<String, Value> {
-    let mut props = FxHashMap::default();
-    props.insert("platform".into(), Value::NativeFunction(c::OS_PLATFORM));
-    props.insert("arch".into(), Value::NativeFunction(c::OS_ARCH));
-    props.insert("cpus".into(), Value::NativeFunction(c::OS_CPUS));
-    props.insert("totalmem".into(), Value::NativeFunction(c::OS_TOTALMEM));
-    props.insert("freemem".into(), Value::NativeFunction(c::OS_FREEMEM));
-    props.insert("uptime".into(), Value::NativeFunction(c::OS_UPTIME));
-    props.insert("hostname".into(), Value::NativeFunction(c::OS_HOSTNAME));
-    props.insert("type".into(), Value::NativeFunction(c::OS_TYPE));
-    props.insert("release".into(), Value::NativeFunction(c::OS_RELEASE));
-    props.insert("homedir".into(), Value::NativeFunction(c::OS_HOMEDIR));
-    props.insert("tmpdir".into(), Value::NativeFunction(c::OS_TMPDIR));
-    props
+    props! {
+        "platform" => Value::NativeFunction(c::OS_PLATFORM),
+        "arch" => Value::NativeFunction(c::OS_ARCH),
+        "cpus" => Value::NativeFunction(c::OS_CPUS),
+        "totalmem" => Value::NativeFunction(c::OS_TOTALMEM),
+        "freemem" => Value::NativeFunction(c::OS_FREEMEM),
+        "uptime" => Value::NativeFunction(c::OS_UPTIME),
+        "hostname" => Value::NativeFunction(c::OS_HOSTNAME),
+        "type" => Value::NativeFunction(c::OS_TYPE),
+        "release" => Value::NativeFunction(c::OS_RELEASE),
+        "homedir" => Value::NativeFunction(c::OS_HOMEDIR),
+        "tmpdir" => Value::NativeFunction(c::OS_TMPDIR),
+    }
 }
 
 pub fn create_crypto_module(
     _heap: &mut Vec<HeapValue>,
     _gc: &mut GarbageCollector,
 ) -> FxHashMap<String, Value> {
-    let mut props = FxHashMap::default();
-    props.insert(
-        "randomBytes".into(),
-        Value::NativeFunction(c::CRYPTO_RANDOM_BYTES),
-    );
-    props.insert(
-        "randomUUID".into(),
-        Value::NativeFunction(c::CRYPTO_RANDOM_UUID),
-    );
-    props.insert(
-        "createHash".into(),
-        Value::NativeFunction(c::CRYPTO_CREATE_HASH),
-    );
-    props
+    props! {
+        "randomBytes" => Value::NativeFunction(c::CRYPTO_RANDOM_BYTES),
+        "randomUUID" => Value::NativeFunction(c::CRYPTO_RANDOM_UUID),
+        "createHash" => Value::NativeFunction(c::CRYPTO_CREATE_HASH),
+    }
 }
 
 pub fn create_assert_module(
     heap: &mut Vec<HeapValue>,
     gc: &mut GarbageCollector,
 ) -> FxHashMap<String, Value> {
-    let mut props = FxHashMap::default();
-
-    let mut assert_props = FxHashMap::default();
-    assert_props.insert("strictEqual".into(), Value::NativeFunction(c::HEADERS_HAS));
-    assert_props.insert("ok".into(), Value::NativeFunction(c::HEADERS_SET));
-    assert_props.insert("equal".into(), Value::NativeFunction(c::HEADERS_HAS));
-    assert_props.insert("deepEqual".into(), Value::NativeFunction(c::HEADERS_HAS));
-
     let assert_obj_idx = gc.allocate(
         heap,
         HeapValue::Object(JsObject {
-            properties: assert_props,
+            properties: props! {
+                "strictEqual" => Value::NativeFunction(c::HEADERS_HAS),
+                "ok" => Value::NativeFunction(c::HEADERS_SET),
+                "equal" => Value::NativeFunction(c::HEADERS_HAS),
+                "deepEqual" => Value::NativeFunction(c::HEADERS_HAS),
+            },
             prototype: None,
             extensible: true,
         }),
     );
-
-    props.insert("default".into(), Value::Object(assert_obj_idx));
-    props.insert("strictEqual".into(), Value::NativeFunction(c::HEADERS_HAS));
-    props.insert("ok".into(), Value::NativeFunction(c::HEADERS_SET));
-    props.insert("equal".into(), Value::NativeFunction(c::HEADERS_HAS));
-    props.insert("deepEqual".into(), Value::NativeFunction(c::HEADERS_HAS));
-    props
+    props! {
+        "default" => Value::Object(assert_obj_idx),
+        "strictEqual" => Value::NativeFunction(c::HEADERS_HAS),
+        "ok" => Value::NativeFunction(c::HEADERS_SET),
+        "equal" => Value::NativeFunction(c::HEADERS_HAS),
+        "deepEqual" => Value::NativeFunction(c::HEADERS_HAS),
+    }
 }
 
 pub fn create_child_process_module(
     _heap: &mut Vec<HeapValue>,
     _gc: &mut GarbageCollector,
 ) -> FxHashMap<String, Value> {
-    let mut props = FxHashMap::default();
-    props.insert(
-        "execSync".into(),
-        Value::NativeFunction(c::CHILD_PROCESS_EXEC_SYNC),
-    );
-    props.insert("exec".into(), Value::NativeFunction(c::CHILD_PROCESS_EXEC));
-    props.insert(
-        "spawn".into(),
-        Value::NativeFunction(c::CHILD_PROCESS_SPAWN),
-    );
-    props
+    props! {
+        "execSync" => Value::NativeFunction(c::CHILD_PROCESS_EXEC_SYNC),
+        "exec" => Value::NativeFunction(c::CHILD_PROCESS_EXEC),
+        "spawn" => Value::NativeFunction(c::CHILD_PROCESS_SPAWN),
+    }
 }
 
 pub fn create_url_module(
     _heap: &mut Vec<HeapValue>,
     _gc: &mut GarbageCollector,
 ) -> FxHashMap<String, Value> {
-    let mut props = FxHashMap::default();
-    props.insert(
-        "fileURLToPath".into(),
-        Value::NativeFunction(c::URL_FILE_URL_TO_PATH),
-    );
-    props
+    props! {
+        "fileURLToPath" => Value::NativeFunction(c::URL_FILE_URL_TO_PATH),
+    }
 }
 
 #[cfg(feature = "http")]
@@ -529,12 +424,9 @@ pub fn create_http_module(
     _heap: &mut Vec<HeapValue>,
     _gc: &mut GarbageCollector,
 ) -> FxHashMap<String, Value> {
-    let mut props = FxHashMap::default();
-    props.insert(
-        "createServer".into(),
-        Value::NativeFunction(c::HTTP_CREATE_SERVER),
-    );
-    props
+    props! {
+        "createServer" => Value::NativeFunction(c::HTTP_CREATE_SERVER),
+    }
 }
 
 #[cfg(feature = "net")]
@@ -542,12 +434,9 @@ pub fn create_net_module(
     _heap: &mut Vec<HeapValue>,
     _gc: &mut GarbageCollector,
 ) -> FxHashMap<String, Value> {
-    let mut props = FxHashMap::default();
-    props.insert(
-        "createConnection".into(),
-        Value::NativeFunction(c::NET_CREATE_CONNECTION),
-    );
-    props
+    props! {
+        "createConnection" => Value::NativeFunction(c::NET_CREATE_CONNECTION),
+    }
 }
 
 pub fn find_library_in_dir(dir: &std::path::Path, name: &str) -> Option<std::path::PathBuf> {

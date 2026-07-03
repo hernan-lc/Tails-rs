@@ -311,8 +311,9 @@ pub(super) fn native_child_process_spawn(
     child_props.insert("pid".into(), Value::Integer(pid as i64));
 
     // stdout object
-    let mut stdout_props = FxHashMap::default();
-    stdout_props.insert("data".into(), Value::String(stdout_str));
+    let stdout_props = props! {
+        "data" => Value::String(stdout_str),
+    };
     let stdout_idx = interp.heap.len();
     interp.heap.push(HeapValue::Object(JsObject {
         properties: stdout_props,
@@ -322,8 +323,9 @@ pub(super) fn native_child_process_spawn(
     child_props.insert("stdout".into(), Value::Object(stdout_idx));
 
     // stderr object
-    let mut stderr_props = FxHashMap::default();
-    stderr_props.insert("data".into(), Value::String(stderr_str));
+    let stderr_props = props! {
+        "data" => Value::String(stderr_str),
+    };
     let stderr_idx = interp.heap.len();
     interp.heap.push(HeapValue::Object(JsObject {
         properties: stderr_props,

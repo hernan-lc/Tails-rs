@@ -1,5 +1,6 @@
 use rustc_hash::FxHashMap;
 use crate::errors::{Error, Result};
+use crate::props;
 use crate::objects::js_promise::JsPromise;
 use crate::objects::Value;
 use crate::runtime_env::native_fns::constants as c;
@@ -364,31 +365,30 @@ pub(super) fn native_request_constructor(
                     }
                 }
 
-                let mut props = FxHashMap::default();
-                props.insert("url".into(), Value::String(cloned_url));
-                props.insert("method".into(), Value::String(method.to_uppercase()));
-                props.insert("__headers".into(), Value::String(headers_raw.clone()));
-                props.insert(
-                    "__body".into(),
-                    body.clone().map(Value::String).unwrap_or(Value::Null),
-                );
-                props.insert("bodyUsed".into(), Value::Boolean(false));
-                props.insert("__is_request".into(), Value::Boolean(true));
-                props.insert("__method".into(), Value::String(method.to_uppercase()));
+                let mut props = props! {
+                    "url" => Value::String(cloned_url),
+                    "method" => Value::String(method.to_uppercase()),
+                    "__headers" => Value::String(headers_raw.clone()),
+                    "__body" => body.clone().map(Value::String).unwrap_or(Value::Null),
+                    "bodyUsed" => Value::Boolean(false),
+                    "__is_request" => Value::Boolean(true),
+                    "__method" => Value::String(method.to_uppercase()),
+                };
 
                 // Create headers object
                 let h_idx = interp.heap.len();
-                let mut h_props = FxHashMap::default();
-                h_props.insert("__headers".into(), Value::String(headers_raw));
-                h_props.insert("append".into(), Value::NativeFunction(c::HEADERS_APPEND));
-                h_props.insert("get".into(), Value::NativeFunction(c::HEADERS_GET));
-                h_props.insert("set".into(), Value::NativeFunction(c::HEADERS_SET));
-                h_props.insert("has".into(), Value::NativeFunction(c::HEADERS_HAS));
-                h_props.insert("delete".into(), Value::NativeFunction(c::HEADERS_DELETE));
-                h_props.insert("forEach".into(), Value::NativeFunction(c::HEADERS_FOR_EACH));
-                h_props.insert("keys".into(), Value::NativeFunction(c::HEADERS_KEYS));
-                h_props.insert("values".into(), Value::NativeFunction(c::HEADERS_VALUES));
-                h_props.insert("entries".into(), Value::NativeFunction(c::HEADERS_ENTRIES));
+                let h_props = props! {
+                    "__headers" => Value::String(headers_raw),
+                    "append" => Value::NativeFunction(c::HEADERS_APPEND),
+                    "get" => Value::NativeFunction(c::HEADERS_GET),
+                    "set" => Value::NativeFunction(c::HEADERS_SET),
+                    "has" => Value::NativeFunction(c::HEADERS_HAS),
+                    "delete" => Value::NativeFunction(c::HEADERS_DELETE),
+                    "forEach" => Value::NativeFunction(c::HEADERS_FOR_EACH),
+                    "keys" => Value::NativeFunction(c::HEADERS_KEYS),
+                    "values" => Value::NativeFunction(c::HEADERS_VALUES),
+                    "entries" => Value::NativeFunction(c::HEADERS_ENTRIES),
+                };
                 interp.heap.push(HeapValue::Object(JsObject {
                     properties: h_props,
                     prototype: None,
@@ -435,30 +435,29 @@ pub(super) fn native_request_constructor(
         }
     }
 
-    let mut props = FxHashMap::default();
-    props.insert("url".into(), Value::String(url));
-    props.insert("method".into(), Value::String(method.to_uppercase()));
-    props.insert("__headers".into(), Value::String(headers_raw.clone()));
-    props.insert(
-        "__body".into(),
-        body.map(Value::String).unwrap_or(Value::Null),
-    );
-    props.insert("bodyUsed".into(), Value::Boolean(false));
-    props.insert("__is_request".into(), Value::Boolean(true));
+    let mut props = props! {
+        "url" => Value::String(url),
+        "method" => Value::String(method.to_uppercase()),
+        "__headers" => Value::String(headers_raw.clone()),
+        "__body" => body.map(Value::String).unwrap_or(Value::Null),
+        "bodyUsed" => Value::Boolean(false),
+        "__is_request" => Value::Boolean(true),
+    };
 
     // Create headers object
     let h_idx = interp.heap.len();
-    let mut h_props = FxHashMap::default();
-    h_props.insert("__headers".into(), Value::String(headers_raw));
-    h_props.insert("append".into(), Value::NativeFunction(c::HEADERS_APPEND));
-    h_props.insert("get".into(), Value::NativeFunction(c::HEADERS_GET));
-    h_props.insert("set".into(), Value::NativeFunction(c::HEADERS_SET));
-    h_props.insert("has".into(), Value::NativeFunction(c::HEADERS_HAS));
-    h_props.insert("delete".into(), Value::NativeFunction(c::HEADERS_DELETE));
-    h_props.insert("forEach".into(), Value::NativeFunction(c::HEADERS_FOR_EACH));
-    h_props.insert("keys".into(), Value::NativeFunction(c::HEADERS_KEYS));
-    h_props.insert("values".into(), Value::NativeFunction(c::HEADERS_VALUES));
-    h_props.insert("entries".into(), Value::NativeFunction(c::HEADERS_ENTRIES));
+    let h_props = props! {
+        "__headers" => Value::String(headers_raw),
+        "append" => Value::NativeFunction(c::HEADERS_APPEND),
+        "get" => Value::NativeFunction(c::HEADERS_GET),
+        "set" => Value::NativeFunction(c::HEADERS_SET),
+        "has" => Value::NativeFunction(c::HEADERS_HAS),
+        "delete" => Value::NativeFunction(c::HEADERS_DELETE),
+        "forEach" => Value::NativeFunction(c::HEADERS_FOR_EACH),
+        "keys" => Value::NativeFunction(c::HEADERS_KEYS),
+        "values" => Value::NativeFunction(c::HEADERS_VALUES),
+        "entries" => Value::NativeFunction(c::HEADERS_ENTRIES),
+    };
     interp.heap.push(HeapValue::Object(JsObject {
         properties: h_props,
         prototype: None,
@@ -542,35 +541,32 @@ fn build_response(
     status_text: &str,
     headers_raw: &str,
 ) -> Result<Value> {
-    let mut props = FxHashMap::default();
-    props.insert("status".into(), Value::Integer(status as i64));
-    props.insert("statusText".into(), Value::String(status_text.to_string()));
-    props.insert("ok".into(), Value::Boolean((200..300).contains(&status)));
-    props.insert("__body".into(), Value::String(body));
-    props.insert("__headers".into(), Value::String(headers_raw.to_string()));
-
-    // Instance methods
-    props.insert("text".into(), Value::NativeFunction(c::RESPONSE_TEXT));
-    props.insert("json".into(), Value::NativeFunction(c::RESPONSE_JSON));
-    props.insert(
-        "arrayBuffer".into(),
-        Value::NativeFunction(c::RESPONSE_ARRAY_BUFFER),
-    );
-    props.insert("clone".into(), Value::NativeFunction(c::RESPONSE_CLONE));
+    let mut props = props! {
+        "status" => Value::Integer(status as i64),
+        "statusText" => Value::String(status_text.to_string()),
+        "ok" => Value::Boolean((200..300).contains(&status)),
+        "__body" => Value::String(body),
+        "__headers" => Value::String(headers_raw.to_string()),
+        "text" => Value::NativeFunction(c::RESPONSE_TEXT),
+        "json" => Value::NativeFunction(c::RESPONSE_JSON),
+        "arrayBuffer" => Value::NativeFunction(c::RESPONSE_ARRAY_BUFFER),
+        "clone" => Value::NativeFunction(c::RESPONSE_CLONE),
+    };
 
     // Create headers object
     let h_idx = interp.heap.len();
-    let mut h_props = FxHashMap::default();
-    h_props.insert("__headers".into(), Value::String(headers_raw.to_string()));
-    h_props.insert("append".into(), Value::NativeFunction(c::HEADERS_APPEND));
-    h_props.insert("get".into(), Value::NativeFunction(c::HEADERS_GET));
-    h_props.insert("set".into(), Value::NativeFunction(c::HEADERS_SET));
-    h_props.insert("has".into(), Value::NativeFunction(c::HEADERS_HAS));
-    h_props.insert("delete".into(), Value::NativeFunction(c::HEADERS_DELETE));
-    h_props.insert("forEach".into(), Value::NativeFunction(c::HEADERS_FOR_EACH));
-    h_props.insert("keys".into(), Value::NativeFunction(c::HEADERS_KEYS));
-    h_props.insert("values".into(), Value::NativeFunction(c::HEADERS_VALUES));
-    h_props.insert("entries".into(), Value::NativeFunction(c::HEADERS_ENTRIES));
+    let h_props = props! {
+        "__headers" => Value::String(headers_raw.to_string()),
+        "append" => Value::NativeFunction(c::HEADERS_APPEND),
+        "get" => Value::NativeFunction(c::HEADERS_GET),
+        "set" => Value::NativeFunction(c::HEADERS_SET),
+        "has" => Value::NativeFunction(c::HEADERS_HAS),
+        "delete" => Value::NativeFunction(c::HEADERS_DELETE),
+        "forEach" => Value::NativeFunction(c::HEADERS_FOR_EACH),
+        "keys" => Value::NativeFunction(c::HEADERS_KEYS),
+        "values" => Value::NativeFunction(c::HEADERS_VALUES),
+        "entries" => Value::NativeFunction(c::HEADERS_ENTRIES),
+    };
     interp.heap.push(HeapValue::Object(JsObject {
         properties: h_props,
         prototype: None,

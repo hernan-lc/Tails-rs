@@ -2,7 +2,7 @@ use super::{HeapValue, Interpreter, JsObject};
 use crate::objects::js_array::{TypedArray, TypedArrayType};
 use crate::objects::Value;
 use crate::runtime_env::native_fns::constants as c;
-use rustc_hash::FxHashMap;
+use crate::props;
 
 impl Interpreter {
     pub(super) fn init_builtins(&mut self) {
@@ -48,33 +48,28 @@ impl Interpreter {
             .insert("require".into(), Value::NativeFunction(c::REQUIRE));
 
         // console object
-        let mut console_props = FxHashMap::default();
-        console_props.insert("log".into(), Value::NativeFunction(c::CONSOLE_LOG));
-        console_props.insert("warn".into(), Value::NativeFunction(c::CONSOLE_WARN));
-        console_props.insert("error".into(), Value::NativeFunction(c::CONSOLE_ERROR));
-        console_props.insert("info".into(), Value::NativeFunction(c::CONSOLE_INFO));
-        console_props.insert("table".into(), Value::NativeFunction(c::CONSOLE_TABLE));
-        console_props.insert("dir".into(), Value::NativeFunction(c::CONSOLE_DIR));
-        console_props.insert("group".into(), Value::NativeFunction(c::CONSOLE_GROUP));
-        console_props.insert(
-            "groupEnd".into(),
-            Value::NativeFunction(c::CONSOLE_GROUP_END),
-        );
-        console_props.insert(
-            "groupCollapsed".into(),
-            Value::NativeFunction(c::CONSOLE_GROUP_COLLAPSED),
-        );
-        console_props.insert("time".into(), Value::NativeFunction(c::CONSOLE_TIME));
-        console_props.insert("timeEnd".into(), Value::NativeFunction(c::CONSOLE_TIME_END));
-        console_props.insert("assert".into(), Value::NativeFunction(c::CONSOLE_ASSERT));
-        console_props.insert("clear".into(), Value::NativeFunction(c::CONSOLE_CLEAR));
-        console_props.insert("trace".into(), Value::NativeFunction(c::CONSOLE_INFO)); // Use info for now
-        console_props.insert("count".into(), Value::NativeFunction(c::CONSOLE_INFO)); // Use info for now
-        console_props.insert("countReset".into(), Value::NativeFunction(c::CONSOLE_INFO)); // Use info for now
-        console_props.insert("debug".into(), Value::NativeFunction(c::CONSOLE_LOG)); // Use log for now
-        console_props.insert("profile".into(), Value::NativeFunction(c::CONSOLE_INFO)); // Use info for now
-        console_props.insert("profileEnd".into(), Value::NativeFunction(c::CONSOLE_INFO)); // Use info for now
-        console_props.insert("timeLog".into(), Value::NativeFunction(c::CONSOLE_TIME_END)); // Use timeEnd for now
+        let console_props = props! {
+            "log" => Value::NativeFunction(c::CONSOLE_LOG),
+            "warn" => Value::NativeFunction(c::CONSOLE_WARN),
+            "error" => Value::NativeFunction(c::CONSOLE_ERROR),
+            "info" => Value::NativeFunction(c::CONSOLE_INFO),
+            "table" => Value::NativeFunction(c::CONSOLE_TABLE),
+            "dir" => Value::NativeFunction(c::CONSOLE_DIR),
+            "group" => Value::NativeFunction(c::CONSOLE_GROUP),
+            "groupEnd" => Value::NativeFunction(c::CONSOLE_GROUP_END),
+            "groupCollapsed" => Value::NativeFunction(c::CONSOLE_GROUP_COLLAPSED),
+            "time" => Value::NativeFunction(c::CONSOLE_TIME),
+            "timeEnd" => Value::NativeFunction(c::CONSOLE_TIME_END),
+            "assert" => Value::NativeFunction(c::CONSOLE_ASSERT),
+            "clear" => Value::NativeFunction(c::CONSOLE_CLEAR),
+            "trace" => Value::NativeFunction(c::CONSOLE_INFO),
+            "count" => Value::NativeFunction(c::CONSOLE_INFO),
+            "countReset" => Value::NativeFunction(c::CONSOLE_INFO),
+            "debug" => Value::NativeFunction(c::CONSOLE_LOG),
+            "profile" => Value::NativeFunction(c::CONSOLE_INFO),
+            "profileEnd" => Value::NativeFunction(c::CONSOLE_INFO),
+            "timeLog" => Value::NativeFunction(c::CONSOLE_TIME_END),
+        };
         let console_obj_idx = self.gc.allocate(
             &mut self.heap,
             HeapValue::Object(JsObject {
@@ -87,53 +82,9 @@ impl Interpreter {
             .insert("console".into(), Value::Object(console_obj_idx));
 
         // Object
-        let mut object_props = FxHashMap::default();
-        object_props.insert("keys".into(), Value::NativeFunction(c::OBJECT_KEYS));
-        object_props.insert("values".into(), Value::NativeFunction(c::OBJECT_VALUES));
-        object_props.insert("entries".into(), Value::NativeFunction(c::OBJECT_ENTRIES));
-        object_props.insert("assign".into(), Value::NativeFunction(c::OBJECT_ASSIGN));
-        object_props.insert(
-            "defineProperty".into(),
-            Value::NativeFunction(c::OBJECT_DEFINE_PROPERTY),
-        );
-        object_props.insert(
-            "getOwnPropertyDescriptor".into(),
-            Value::NativeFunction(c::OBJECT_GET_OWN_PROPERTY_DESCRIPTOR),
-        );
-        object_props.insert("freeze".into(), Value::NativeFunction(c::OBJECT_FREEZE));
-        object_props.insert("is".into(), Value::NativeFunction(c::OBJECT_IS));
-        object_props.insert(
-            "preventExtensions".into(),
-            Value::NativeFunction(c::OBJECT_PREVENT_EXTENSIONS),
-        );
-        object_props.insert(
-            "isExtensible".into(),
-            Value::NativeFunction(c::OBJECT_IS_EXTENSIBLE),
-        );
-        object_props.insert(
-            "isSealed".into(),
-            Value::NativeFunction(c::OBJECT_IS_SEALED),
-        );
-        object_props.insert(
-            "isFrozen".into(),
-            Value::NativeFunction(c::OBJECT_IS_FROZEN),
-        );
-        object_props.insert("seal".into(), Value::NativeFunction(c::OBJECT_SEAL));
-        object_props.insert(
-            "getPrototypeOf".into(),
-            Value::NativeFunction(c::REFLECT_GET_PROTOTYPE_OF),
-        );
-        object_props.insert(
-            "setPrototypeOf".into(),
-            Value::NativeFunction(c::REFLECT_SET_PROTOTYPE_OF),
-        );
-
-        // Object.prototype with hasOwnProperty
-        let mut object_proto_props = FxHashMap::default();
-        object_proto_props.insert(
-            "hasOwnProperty".into(),
-            Value::NativeFunction(c::OBJECT_HAS_OWN_PROPERTY),
-        );
+        let object_proto_props = props! {
+            "hasOwnProperty" => Value::NativeFunction(c::OBJECT_HAS_OWN_PROPERTY),
+        };
         let object_proto_idx = self.gc.allocate(
             &mut self.heap,
             HeapValue::Object(JsObject {
@@ -142,7 +93,25 @@ impl Interpreter {
                 extensible: true,
             }),
         );
-        object_props.insert("prototype".into(), Value::Object(object_proto_idx));
+
+        let object_props = props! {
+            "keys" => Value::NativeFunction(c::OBJECT_KEYS),
+            "values" => Value::NativeFunction(c::OBJECT_VALUES),
+            "entries" => Value::NativeFunction(c::OBJECT_ENTRIES),
+            "assign" => Value::NativeFunction(c::OBJECT_ASSIGN),
+            "defineProperty" => Value::NativeFunction(c::OBJECT_DEFINE_PROPERTY),
+            "getOwnPropertyDescriptor" => Value::NativeFunction(c::OBJECT_GET_OWN_PROPERTY_DESCRIPTOR),
+            "freeze" => Value::NativeFunction(c::OBJECT_FREEZE),
+            "is" => Value::NativeFunction(c::OBJECT_IS),
+            "preventExtensions" => Value::NativeFunction(c::OBJECT_PREVENT_EXTENSIONS),
+            "isExtensible" => Value::NativeFunction(c::OBJECT_IS_EXTENSIBLE),
+            "isSealed" => Value::NativeFunction(c::OBJECT_IS_SEALED),
+            "isFrozen" => Value::NativeFunction(c::OBJECT_IS_FROZEN),
+            "seal" => Value::NativeFunction(c::OBJECT_SEAL),
+            "getPrototypeOf" => Value::NativeFunction(c::REFLECT_GET_PROTOTYPE_OF),
+            "setPrototypeOf" => Value::NativeFunction(c::REFLECT_SET_PROTOTYPE_OF),
+            "prototype" => Value::Object(object_proto_idx),
+        };
 
         let object_obj_idx = self.gc.allocate(
             &mut self.heap,
@@ -160,44 +129,21 @@ impl Interpreter {
             .insert("Proxy".into(), Value::NativeFunction(c::PROXY_CONSTRUCTOR));
 
         // Reflect
-        let mut reflect_props = FxHashMap::default();
-        reflect_props.insert("get".into(), Value::NativeFunction(c::REFLECT_GET));
-        reflect_props.insert("set".into(), Value::NativeFunction(c::REFLECT_SET));
-        reflect_props.insert("has".into(), Value::NativeFunction(c::REFLECT_HAS));
-        reflect_props.insert(
-            "deleteProperty".into(),
-            Value::NativeFunction(c::REFLECT_DELETE_PROPERTY),
-        );
-        reflect_props.insert("apply".into(), Value::NativeFunction(c::REFLECT_APPLY));
-        reflect_props.insert(
-            "construct".into(),
-            Value::NativeFunction(c::REFLECT_CONSTRUCT),
-        );
-        reflect_props.insert("ownKeys".into(), Value::NativeFunction(c::REFLECT_OWN_KEYS));
-        reflect_props.insert(
-            "getOwnPropertyDescriptor".into(),
-            Value::NativeFunction(c::REFLECT_GET_OWN_PROPERTY_DESCRIPTOR),
-        );
-        reflect_props.insert(
-            "defineProperty".into(),
-            Value::NativeFunction(c::REFLECT_DEFINE_PROPERTY),
-        );
-        reflect_props.insert(
-            "getPrototypeOf".into(),
-            Value::NativeFunction(c::REFLECT_GET_PROTOTYPE_OF),
-        );
-        reflect_props.insert(
-            "setPrototypeOf".into(),
-            Value::NativeFunction(c::REFLECT_SET_PROTOTYPE_OF),
-        );
-        reflect_props.insert(
-            "isExtensible".into(),
-            Value::NativeFunction(c::REFLECT_IS_EXTENSIBLE),
-        );
-        reflect_props.insert(
-            "preventExtensions".into(),
-            Value::NativeFunction(c::REFLECT_PREVENT_EXTENSIONS),
-        );
+        let reflect_props = props! {
+            "get" => Value::NativeFunction(c::REFLECT_GET),
+            "set" => Value::NativeFunction(c::REFLECT_SET),
+            "has" => Value::NativeFunction(c::REFLECT_HAS),
+            "deleteProperty" => Value::NativeFunction(c::REFLECT_DELETE_PROPERTY),
+            "apply" => Value::NativeFunction(c::REFLECT_APPLY),
+            "construct" => Value::NativeFunction(c::REFLECT_CONSTRUCT),
+            "ownKeys" => Value::NativeFunction(c::REFLECT_OWN_KEYS),
+            "getOwnPropertyDescriptor" => Value::NativeFunction(c::REFLECT_GET_OWN_PROPERTY_DESCRIPTOR),
+            "defineProperty" => Value::NativeFunction(c::REFLECT_DEFINE_PROPERTY),
+            "getPrototypeOf" => Value::NativeFunction(c::REFLECT_GET_PROTOTYPE_OF),
+            "setPrototypeOf" => Value::NativeFunction(c::REFLECT_SET_PROTOTYPE_OF),
+            "isExtensible" => Value::NativeFunction(c::REFLECT_IS_EXTENSIBLE),
+            "preventExtensions" => Value::NativeFunction(c::REFLECT_PREVENT_EXTENSIONS),
+        };
         let reflect_obj_idx = self.gc.allocate(
             &mut self.heap,
             HeapValue::Object(JsObject {
@@ -216,9 +162,10 @@ impl Interpreter {
         );
 
         // JSON
-        let mut json_props = FxHashMap::default();
-        json_props.insert("parse".into(), Value::NativeFunction(c::JSON_PARSE));
-        json_props.insert("stringify".into(), Value::NativeFunction(c::JSON_STRINGIFY));
+        let json_props = props! {
+            "parse" => Value::NativeFunction(c::JSON_PARSE),
+            "stringify" => Value::NativeFunction(c::JSON_STRINGIFY),
+        };
         let json_obj_idx = self.gc.allocate(
             &mut self.heap,
             HeapValue::Object(JsObject {
@@ -231,10 +178,11 @@ impl Interpreter {
             .insert("JSON".into(), Value::Object(json_obj_idx));
 
         // Array
-        let mut array_props = FxHashMap::default();
-        array_props.insert("isArray".into(), Value::NativeFunction(c::ARRAY_IS_ARRAY));
-        array_props.insert("from".into(), Value::NativeFunction(c::ARRAY_FROM));
-        array_props.insert("of".into(), Value::NativeFunction(c::ARRAY_OF));
+        let array_props = props! {
+            "isArray" => Value::NativeFunction(c::ARRAY_IS_ARRAY),
+            "from" => Value::NativeFunction(c::ARRAY_FROM),
+            "of" => Value::NativeFunction(c::ARRAY_OF),
+        };
         let array_obj_idx = self.gc.allocate(
             &mut self.heap,
             HeapValue::Object(JsObject {
@@ -259,9 +207,10 @@ impl Interpreter {
             .insert("btoa".into(), Value::NativeFunction(c::BTOA));
 
         // URL object with static methods
-        let mut url_props = FxHashMap::default();
-        url_props.insert("canParse".into(), Value::NativeFunction(c::URL_CAN_PARSE));
-        url_props.insert("parse".into(), Value::NativeFunction(c::URL_PARSE));
+        let url_props = props! {
+            "canParse" => Value::NativeFunction(c::URL_CAN_PARSE),
+            "parse" => Value::NativeFunction(c::URL_PARSE),
+        };
         let _url_obj_idx = self.gc.allocate(
             &mut self.heap,
             HeapValue::Object(JsObject {
@@ -304,131 +253,48 @@ impl Interpreter {
             .insert("fetch".into(), Value::NativeFunction(c::FETCH));
 
         // Date
-        let mut date_proto_props = FxHashMap::default();
-        date_proto_props.insert("getTime".into(), Value::NativeFunction(c::DATE_GET_TIME));
-        date_proto_props.insert(
-            "getFullYear".into(),
-            Value::NativeFunction(c::DATE_GET_FULL_YEAR),
-        );
-        date_proto_props.insert("getMonth".into(), Value::NativeFunction(c::DATE_GET_MONTH));
-        date_proto_props.insert("getDate".into(), Value::NativeFunction(c::DATE_GET_DATE));
-        date_proto_props.insert("getDay".into(), Value::NativeFunction(c::DATE_GET_DAY));
-        date_proto_props.insert("getHours".into(), Value::NativeFunction(c::DATE_GET_HOURS));
-        date_proto_props.insert(
-            "getMinutes".into(),
-            Value::NativeFunction(c::DATE_GET_MINUTES),
-        );
-        date_proto_props.insert(
-            "getSeconds".into(),
-            Value::NativeFunction(c::DATE_GET_SECONDS),
-        );
-        date_proto_props.insert(
-            "getMilliseconds".into(),
-            Value::NativeFunction(c::DATE_GET_MILLISECONDS),
-        );
-        date_proto_props.insert(
-            "getTimezoneOffset".into(),
-            Value::NativeFunction(c::DATE_GET_TIMEZONE_OFFSET),
-        );
-        date_proto_props.insert(
-            "getUTCFullYear".into(),
-            Value::NativeFunction(c::DATE_GET_UTC_FULL_YEAR),
-        );
-        date_proto_props.insert(
-            "getUTCMonth".into(),
-            Value::NativeFunction(c::DATE_GET_UTC_MONTH),
-        );
-        date_proto_props.insert(
-            "getUTCDate".into(),
-            Value::NativeFunction(c::DATE_GET_UTC_DATE),
-        );
-        date_proto_props.insert(
-            "getUTCDay".into(),
-            Value::NativeFunction(c::DATE_GET_UTC_DAY),
-        );
-        date_proto_props.insert(
-            "getUTCHours".into(),
-            Value::NativeFunction(c::DATE_GET_UTC_HOURS),
-        );
-        date_proto_props.insert(
-            "getUTCMinutes".into(),
-            Value::NativeFunction(c::DATE_GET_UTC_MINUTES),
-        );
-        date_proto_props.insert(
-            "getUTCSeconds".into(),
-            Value::NativeFunction(c::DATE_GET_UTC_SECONDS),
-        );
-        date_proto_props.insert(
-            "getUTCMilliseconds".into(),
-            Value::NativeFunction(c::DATE_GET_UTC_MILLISECONDS),
-        );
-        date_proto_props.insert("setTime".into(), Value::NativeFunction(c::DATE_SET_TIME));
-        date_proto_props.insert(
-            "setFullYear".into(),
-            Value::NativeFunction(c::DATE_SET_FULL_YEAR),
-        );
-        date_proto_props.insert("setMonth".into(), Value::NativeFunction(c::DATE_SET_MONTH));
-        date_proto_props.insert("setDate".into(), Value::NativeFunction(c::DATE_SET_DATE));
-        date_proto_props.insert("setHours".into(), Value::NativeFunction(c::DATE_SET_HOURS));
-        date_proto_props.insert(
-            "setMinutes".into(),
-            Value::NativeFunction(c::DATE_SET_MINUTES),
-        );
-        date_proto_props.insert(
-            "setSeconds".into(),
-            Value::NativeFunction(c::DATE_SET_SECONDS),
-        );
-        date_proto_props.insert(
-            "setMilliseconds".into(),
-            Value::NativeFunction(c::DATE_SET_MILLISECONDS),
-        );
-        date_proto_props.insert(
-            "setUTCFullYear".into(),
-            Value::NativeFunction(c::DATE_SET_UTC_FULL_YEAR),
-        );
-        date_proto_props.insert(
-            "setUTCMonth".into(),
-            Value::NativeFunction(c::DATE_SET_UTC_MONTH),
-        );
-        date_proto_props.insert(
-            "setUTCDate".into(),
-            Value::NativeFunction(c::DATE_SET_UTC_DATE),
-        );
-        date_proto_props.insert(
-            "setUTCHours".into(),
-            Value::NativeFunction(c::DATE_SET_UTC_HOURS),
-        );
-        date_proto_props.insert(
-            "setUTCMinutes".into(),
-            Value::NativeFunction(c::DATE_SET_UTC_MINUTES),
-        );
-        date_proto_props.insert(
-            "setUTCSeconds".into(),
-            Value::NativeFunction(c::DATE_SET_UTC_SECONDS),
-        );
-        date_proto_props.insert(
-            "setUTCMilliseconds".into(),
-            Value::NativeFunction(c::DATE_SET_UTC_MILLISECONDS),
-        );
-        date_proto_props.insert("toString".into(), Value::NativeFunction(c::DATE_TO_STRING));
-        date_proto_props.insert(
-            "toISOString".into(),
-            Value::NativeFunction(c::DATE_TO_ISO_STRING),
-        );
-        date_proto_props.insert(
-            "toUTCString".into(),
-            Value::NativeFunction(c::DATE_TO_UTC_STRING),
-        );
-        date_proto_props.insert(
-            "toDateString".into(),
-            Value::NativeFunction(c::DATE_TO_DATE_STRING),
-        );
-        date_proto_props.insert(
-            "toTimeString".into(),
-            Value::NativeFunction(c::DATE_TO_TIME_STRING),
-        );
-        date_proto_props.insert("toJSON".into(), Value::NativeFunction(c::DATE_TO_JSON));
-        date_proto_props.insert("valueOf".into(), Value::NativeFunction(c::DATE_VALUE_OF));
+        let date_proto_props = props! {
+            "getTime" => Value::NativeFunction(c::DATE_GET_TIME),
+            "getFullYear" => Value::NativeFunction(c::DATE_GET_FULL_YEAR),
+            "getMonth" => Value::NativeFunction(c::DATE_GET_MONTH),
+            "getDate" => Value::NativeFunction(c::DATE_GET_DATE),
+            "getDay" => Value::NativeFunction(c::DATE_GET_DAY),
+            "getHours" => Value::NativeFunction(c::DATE_GET_HOURS),
+            "getMinutes" => Value::NativeFunction(c::DATE_GET_MINUTES),
+            "getSeconds" => Value::NativeFunction(c::DATE_GET_SECONDS),
+            "getMilliseconds" => Value::NativeFunction(c::DATE_GET_MILLISECONDS),
+            "getTimezoneOffset" => Value::NativeFunction(c::DATE_GET_TIMEZONE_OFFSET),
+            "getUTCFullYear" => Value::NativeFunction(c::DATE_GET_UTC_FULL_YEAR),
+            "getUTCMonth" => Value::NativeFunction(c::DATE_GET_UTC_MONTH),
+            "getUTCDate" => Value::NativeFunction(c::DATE_GET_UTC_DATE),
+            "getUTCDay" => Value::NativeFunction(c::DATE_GET_UTC_DAY),
+            "getUTCHours" => Value::NativeFunction(c::DATE_GET_UTC_HOURS),
+            "getUTCMinutes" => Value::NativeFunction(c::DATE_GET_UTC_MINUTES),
+            "getUTCSeconds" => Value::NativeFunction(c::DATE_GET_UTC_SECONDS),
+            "getUTCMilliseconds" => Value::NativeFunction(c::DATE_GET_UTC_MILLISECONDS),
+            "setTime" => Value::NativeFunction(c::DATE_SET_TIME),
+            "setFullYear" => Value::NativeFunction(c::DATE_SET_FULL_YEAR),
+            "setMonth" => Value::NativeFunction(c::DATE_SET_MONTH),
+            "setDate" => Value::NativeFunction(c::DATE_SET_DATE),
+            "setHours" => Value::NativeFunction(c::DATE_SET_HOURS),
+            "setMinutes" => Value::NativeFunction(c::DATE_SET_MINUTES),
+            "setSeconds" => Value::NativeFunction(c::DATE_SET_SECONDS),
+            "setMilliseconds" => Value::NativeFunction(c::DATE_SET_MILLISECONDS),
+            "setUTCFullYear" => Value::NativeFunction(c::DATE_SET_UTC_FULL_YEAR),
+            "setUTCMonth" => Value::NativeFunction(c::DATE_SET_UTC_MONTH),
+            "setUTCDate" => Value::NativeFunction(c::DATE_SET_UTC_DATE),
+            "setUTCHours" => Value::NativeFunction(c::DATE_SET_UTC_HOURS),
+            "setUTCMinutes" => Value::NativeFunction(c::DATE_SET_UTC_MINUTES),
+            "setUTCSeconds" => Value::NativeFunction(c::DATE_SET_UTC_SECONDS),
+            "setUTCMilliseconds" => Value::NativeFunction(c::DATE_SET_UTC_MILLISECONDS),
+            "toString" => Value::NativeFunction(c::DATE_TO_STRING),
+            "toISOString" => Value::NativeFunction(c::DATE_TO_ISO_STRING),
+            "toUTCString" => Value::NativeFunction(c::DATE_TO_UTC_STRING),
+            "toDateString" => Value::NativeFunction(c::DATE_TO_DATE_STRING),
+            "toTimeString" => Value::NativeFunction(c::DATE_TO_TIME_STRING),
+            "toJSON" => Value::NativeFunction(c::DATE_TO_JSON),
+            "valueOf" => Value::NativeFunction(c::DATE_VALUE_OF),
+        };
         let date_proto_idx = self.gc.allocate(
             &mut self.heap,
             HeapValue::Object(JsObject {
@@ -444,31 +310,20 @@ impl Interpreter {
         self.date_proto_idx = Some(date_proto_idx);
 
         // RegExp
-        let mut regexp_proto_props = FxHashMap::default();
-        regexp_proto_props.insert("test".into(), Value::NativeFunction(c::REGEXP_TEST));
-        regexp_proto_props.insert("exec".into(), Value::NativeFunction(c::REGEXP_EXEC));
-        regexp_proto_props.insert(
-            "toString".into(),
-            Value::NativeFunction(c::REGEXP_TO_STRING),
-        );
-        regexp_proto_props.insert("source".into(), Value::NativeFunction(c::REGEXP_SOURCE));
-        regexp_proto_props.insert("flags".into(), Value::NativeFunction(c::REGEXP_FLAGS));
-        regexp_proto_props.insert("global".into(), Value::NativeFunction(c::REGEXP_GLOBAL));
-        regexp_proto_props.insert(
-            "ignoreCase".into(),
-            Value::NativeFunction(c::REGEXP_IGNORE_CASE),
-        );
-        regexp_proto_props.insert(
-            "multiline".into(),
-            Value::NativeFunction(c::REGEXP_MULTILINE),
-        );
-        regexp_proto_props.insert("dotAll".into(), Value::NativeFunction(c::REGEXP_DOT_ALL));
-        regexp_proto_props.insert("unicode".into(), Value::NativeFunction(c::REGEXP_UNICODE));
-        regexp_proto_props.insert("sticky".into(), Value::NativeFunction(c::REGEXP_STICKY));
-        regexp_proto_props.insert(
-            "lastIndex".into(),
-            Value::NativeFunction(c::REGEXP_LAST_INDEX),
-        );
+        let regexp_proto_props = props! {
+            "test" => Value::NativeFunction(c::REGEXP_TEST),
+            "exec" => Value::NativeFunction(c::REGEXP_EXEC),
+            "toString" => Value::NativeFunction(c::REGEXP_TO_STRING),
+            "source" => Value::NativeFunction(c::REGEXP_SOURCE),
+            "flags" => Value::NativeFunction(c::REGEXP_FLAGS),
+            "global" => Value::NativeFunction(c::REGEXP_GLOBAL),
+            "ignoreCase" => Value::NativeFunction(c::REGEXP_IGNORE_CASE),
+            "multiline" => Value::NativeFunction(c::REGEXP_MULTILINE),
+            "dotAll" => Value::NativeFunction(c::REGEXP_DOT_ALL),
+            "unicode" => Value::NativeFunction(c::REGEXP_UNICODE),
+            "sticky" => Value::NativeFunction(c::REGEXP_STICKY),
+            "lastIndex" => Value::NativeFunction(c::REGEXP_LAST_INDEX),
+        };
         let regexp_proto_idx = self.gc.allocate(
             &mut self.heap,
             HeapValue::Object(JsObject {
@@ -486,22 +341,23 @@ impl Interpreter {
         self.regexp_proto_idx = Some(regexp_proto_idx);
 
         // Math
-        let mut math_props = FxHashMap::default();
-        math_props.insert("PI".into(), Value::Float(std::f64::consts::PI));
-        math_props.insert("E".into(), Value::Float(std::f64::consts::E));
-        math_props.insert("abs".into(), Value::NativeFunction(c::MATH_ABS));
-        math_props.insert("floor".into(), Value::NativeFunction(c::MATH_FLOOR));
-        math_props.insert("ceil".into(), Value::NativeFunction(c::MATH_CEIL));
-        math_props.insert("round".into(), Value::NativeFunction(c::MATH_ROUND));
-        math_props.insert("min".into(), Value::NativeFunction(c::MATH_MIN));
-        math_props.insert("max".into(), Value::NativeFunction(c::MATH_MAX));
-        math_props.insert("random".into(), Value::NativeFunction(c::MATH_RANDOM));
-        math_props.insert("pow".into(), Value::NativeFunction(c::MATH_POW));
-        math_props.insert("sqrt".into(), Value::NativeFunction(c::MATH_SQRT));
-        math_props.insert("log".into(), Value::NativeFunction(c::MATH_LOG));
-        math_props.insert("sin".into(), Value::NativeFunction(c::MATH_SIN));
-        math_props.insert("cos".into(), Value::NativeFunction(c::MATH_COS));
-        math_props.insert("tan".into(), Value::NativeFunction(c::MATH_TAN));
+        let math_props = props! {
+            "PI" => Value::Float(std::f64::consts::PI),
+            "E" => Value::Float(std::f64::consts::E),
+            "abs" => Value::NativeFunction(c::MATH_ABS),
+            "floor" => Value::NativeFunction(c::MATH_FLOOR),
+            "ceil" => Value::NativeFunction(c::MATH_CEIL),
+            "round" => Value::NativeFunction(c::MATH_ROUND),
+            "min" => Value::NativeFunction(c::MATH_MIN),
+            "max" => Value::NativeFunction(c::MATH_MAX),
+            "random" => Value::NativeFunction(c::MATH_RANDOM),
+            "pow" => Value::NativeFunction(c::MATH_POW),
+            "sqrt" => Value::NativeFunction(c::MATH_SQRT),
+            "log" => Value::NativeFunction(c::MATH_LOG),
+            "sin" => Value::NativeFunction(c::MATH_SIN),
+            "cos" => Value::NativeFunction(c::MATH_COS),
+            "tan" => Value::NativeFunction(c::MATH_TAN),
+        };
         let math_obj_idx = self.gc.allocate(
             &mut self.heap,
             HeapValue::Object(JsObject {
@@ -514,19 +370,14 @@ impl Interpreter {
             .insert("Math".into(), Value::Object(math_obj_idx));
 
         // Number constructor
-        let mut number_props = FxHashMap::default();
-        number_props.insert("isFinite".into(), Value::NativeFunction(c::IS_FINITE));
-        number_props.insert("isNaN".into(), Value::NativeFunction(c::IS_NAN));
-        number_props.insert("parseFloat".into(), Value::NativeFunction(c::PARSE_FLOAT));
-        number_props.insert("parseInt".into(), Value::NativeFunction(c::PARSE_INT));
-        number_props.insert(
-            "isInteger".into(),
-            Value::NativeFunction(c::NUMBER_IS_INTEGER),
-        );
-        number_props.insert(
-            "isSafeInteger".into(),
-            Value::NativeFunction(c::NUMBER_IS_SAFE_INTEGER),
-        );
+        let number_props = props! {
+            "isFinite" => Value::NativeFunction(c::IS_FINITE),
+            "isNaN" => Value::NativeFunction(c::IS_NAN),
+            "parseFloat" => Value::NativeFunction(c::PARSE_FLOAT),
+            "parseInt" => Value::NativeFunction(c::PARSE_INT),
+            "isInteger" => Value::NativeFunction(c::NUMBER_IS_INTEGER),
+            "isSafeInteger" => Value::NativeFunction(c::NUMBER_IS_SAFE_INTEGER),
+        };
         let number_obj_idx = self.gc.allocate(
             &mut self.heap,
             HeapValue::Object(JsObject {
@@ -539,10 +390,11 @@ impl Interpreter {
             .insert("Number".into(), Value::Object(number_obj_idx));
 
         // Promise constructor and prototype
-        let mut promise_proto_props = FxHashMap::default();
-        promise_proto_props.insert("then".into(), Value::NativeFunction(c::PROMISE_THEN));
-        promise_proto_props.insert("catch".into(), Value::NativeFunction(c::PROMISE_CATCH));
-        promise_proto_props.insert("finally".into(), Value::NativeFunction(c::PROMISE_FINALLY));
+        let promise_proto_props = props! {
+            "then" => Value::NativeFunction(c::PROMISE_THEN),
+            "catch" => Value::NativeFunction(c::PROMISE_CATCH),
+            "finally" => Value::NativeFunction(c::PROMISE_FINALLY),
+        };
         let promise_proto_idx = self.gc.allocate(
             &mut self.heap,
             HeapValue::Object(JsObject {
@@ -552,12 +404,13 @@ impl Interpreter {
             }),
         );
 
-        let mut promise_ctor_props = FxHashMap::default();
-        promise_ctor_props.insert("prototype".into(), Value::Object(promise_proto_idx));
-        promise_ctor_props.insert("resolve".into(), Value::NativeFunction(c::PROMISE_RESOLVE));
-        promise_ctor_props.insert("reject".into(), Value::NativeFunction(c::PROMISE_REJECT));
-        promise_ctor_props.insert("all".into(), Value::NativeFunction(c::PROMISE_ALL));
-        promise_ctor_props.insert("race".into(), Value::NativeFunction(c::PROMISE_RACE));
+        let promise_ctor_props = props! {
+            "prototype" => Value::Object(promise_proto_idx),
+            "resolve" => Value::NativeFunction(c::PROMISE_RESOLVE),
+            "reject" => Value::NativeFunction(c::PROMISE_REJECT),
+            "all" => Value::NativeFunction(c::PROMISE_ALL),
+            "race" => Value::NativeFunction(c::PROMISE_RACE),
+        };
         self.gc.allocate(
             &mut self.heap,
             HeapValue::Object(JsObject {
@@ -575,8 +428,9 @@ impl Interpreter {
         let error_proto_idx = self
             .gc
             .allocate(&mut self.heap, HeapValue::Object(JsObject::new()));
-        let mut error_ctor_props = FxHashMap::default();
-        error_ctor_props.insert("prototype".into(), Value::Object(error_proto_idx));
+        let error_ctor_props = props! {
+            "prototype" => Value::Object(error_proto_idx),
+        };
         self.gc.allocate(
             &mut self.heap,
             HeapValue::Object(JsObject {
@@ -589,8 +443,9 @@ impl Interpreter {
             .insert("Error".into(), Value::NativeFunction(c::ERROR_CONSTRUCTOR));
 
         // TypeError constructor
-        let mut type_error_proto_props = FxHashMap::default();
-        type_error_proto_props.insert("name".into(), Value::String("TypeError".into()));
+        let type_error_proto_props = props! {
+            "name" => Value::String("TypeError".into()),
+        };
         let type_error_proto_idx = self.gc.allocate(
             &mut self.heap,
             HeapValue::Object(JsObject {
@@ -599,8 +454,9 @@ impl Interpreter {
                 extensible: true,
             }),
         );
-        let mut type_error_ctor_props = FxHashMap::default();
-        type_error_ctor_props.insert("prototype".into(), Value::Object(type_error_proto_idx));
+        let type_error_ctor_props = props! {
+            "prototype" => Value::Object(type_error_proto_idx),
+        };
         self.gc.allocate(
             &mut self.heap,
             HeapValue::Object(JsObject {
@@ -615,8 +471,9 @@ impl Interpreter {
         );
 
         // ReferenceError constructor
-        let mut ref_error_proto_props = FxHashMap::default();
-        ref_error_proto_props.insert("name".into(), Value::String("ReferenceError".into()));
+        let ref_error_proto_props = props! {
+            "name" => Value::String("ReferenceError".into()),
+        };
         let ref_error_proto_idx = self.gc.allocate(
             &mut self.heap,
             HeapValue::Object(JsObject {
@@ -625,8 +482,9 @@ impl Interpreter {
                 extensible: true,
             }),
         );
-        let mut ref_error_ctor_props = FxHashMap::default();
-        ref_error_ctor_props.insert("prototype".into(), Value::Object(ref_error_proto_idx));
+        let ref_error_ctor_props = props! {
+            "prototype" => Value::Object(ref_error_proto_idx),
+        };
         self.gc.allocate(
             &mut self.heap,
             HeapValue::Object(JsObject {
@@ -641,8 +499,9 @@ impl Interpreter {
         );
 
         // SyntaxError constructor
-        let mut syntax_error_proto_props = FxHashMap::default();
-        syntax_error_proto_props.insert("name".into(), Value::String("SyntaxError".into()));
+        let syntax_error_proto_props = props! {
+            "name" => Value::String("SyntaxError".into()),
+        };
         let syntax_error_proto_idx = self.gc.allocate(
             &mut self.heap,
             HeapValue::Object(JsObject {
@@ -651,8 +510,9 @@ impl Interpreter {
                 extensible: true,
             }),
         );
-        let mut syntax_error_ctor_props = FxHashMap::default();
-        syntax_error_ctor_props.insert("prototype".into(), Value::Object(syntax_error_proto_idx));
+        let syntax_error_ctor_props = props! {
+            "prototype" => Value::Object(syntax_error_proto_idx),
+        };
         self.gc.allocate(
             &mut self.heap,
             HeapValue::Object(JsObject {
@@ -667,8 +527,9 @@ impl Interpreter {
         );
 
         // RangeError constructor
-        let mut range_error_proto_props = FxHashMap::default();
-        range_error_proto_props.insert("name".into(), Value::String("RangeError".into()));
+        let range_error_proto_props = props! {
+            "name" => Value::String("RangeError".into()),
+        };
         let range_error_proto_idx = self.gc.allocate(
             &mut self.heap,
             HeapValue::Object(JsObject {
@@ -677,8 +538,9 @@ impl Interpreter {
                 extensible: true,
             }),
         );
-        let mut range_error_ctor_props = FxHashMap::default();
-        range_error_ctor_props.insert("prototype".into(), Value::Object(range_error_proto_idx));
+        let range_error_ctor_props = props! {
+            "prototype" => Value::Object(range_error_proto_idx),
+        };
         self.gc.allocate(
             &mut self.heap,
             HeapValue::Object(JsObject {
@@ -709,22 +571,15 @@ impl Interpreter {
 
         for (name, ctor_idx) in typed_array_constructors.iter() {
             // Create prototype
-            let mut proto_props = FxHashMap::default();
-            proto_props.insert(
-                "BYTES_PER_ELEMENT".into(),
-                Value::Integer(TypedArray::element_size(&parse_typed_array_type(name)) as i64),
-            );
-            proto_props.insert(
-                "length".into(),
-                Value::NativeFunction(c::TYPED_ARRAY_LENGTH),
-            );
-            proto_props.insert("get".into(), Value::NativeFunction(c::TYPED_ARRAY_GET));
-            proto_props.insert("set".into(), Value::NativeFunction(c::TYPED_ARRAY_SET));
-            proto_props.insert(
-                "subarray".into(),
-                Value::NativeFunction(c::TYPED_ARRAY_SUBARRAY),
-            );
-            proto_props.insert("slice".into(), Value::NativeFunction(c::TYPED_ARRAY_SLICE));
+            let bytes_per_element = TypedArray::element_size(&parse_typed_array_type(name)) as i64;
+            let proto_props = props! {
+                "BYTES_PER_ELEMENT" => Value::Integer(bytes_per_element),
+                "length" => Value::NativeFunction(c::TYPED_ARRAY_LENGTH),
+                "get" => Value::NativeFunction(c::TYPED_ARRAY_GET),
+                "set" => Value::NativeFunction(c::TYPED_ARRAY_SET),
+                "subarray" => Value::NativeFunction(c::TYPED_ARRAY_SUBARRAY),
+                "slice" => Value::NativeFunction(c::TYPED_ARRAY_SLICE),
+            };
             let proto_idx = self.gc.allocate(
                 &mut self.heap,
                 HeapValue::Object(JsObject {
@@ -735,14 +590,12 @@ impl Interpreter {
             );
 
             // Create constructor
-            let mut ctor_props = FxHashMap::default();
-            ctor_props.insert("prototype".into(), Value::Object(proto_idx));
-            ctor_props.insert(
-                "BYTES_PER_ELEMENT".into(),
-                Value::Integer(TypedArray::element_size(&parse_typed_array_type(name)) as i64),
-            );
-            ctor_props.insert("from".into(), Value::NativeFunction(c::TYPED_ARRAY_FROM));
-            ctor_props.insert("of".into(), Value::NativeFunction(c::TYPED_ARRAY_OF));
+            let ctor_props = props! {
+                "prototype" => Value::Object(proto_idx),
+                "BYTES_PER_ELEMENT" => Value::Integer(bytes_per_element),
+                "from" => Value::NativeFunction(c::TYPED_ARRAY_FROM),
+                "of" => Value::NativeFunction(c::TYPED_ARRAY_OF),
+            };
             let _ctor_obj_idx = self.gc.allocate(
                 &mut self.heap,
                 HeapValue::Object(JsObject {
@@ -756,17 +609,18 @@ impl Interpreter {
         }
 
         // Map
-        let mut map_proto_props = FxHashMap::default();
-        map_proto_props.insert("get".into(), Value::NativeFunction(c::MAP_GET));
-        map_proto_props.insert("set".into(), Value::NativeFunction(c::MAP_SET));
-        map_proto_props.insert("has".into(), Value::NativeFunction(c::MAP_HAS));
-        map_proto_props.insert("delete".into(), Value::NativeFunction(c::MAP_DELETE));
-        map_proto_props.insert("clear".into(), Value::NativeFunction(c::MAP_CLEAR));
-        map_proto_props.insert("size".into(), Value::NativeFunction(c::MAP_SIZE));
-        map_proto_props.insert("forEach".into(), Value::NativeFunction(c::MAP_FOR_EACH));
-        map_proto_props.insert("keys".into(), Value::NativeFunction(c::MAP_KEYS));
-        map_proto_props.insert("values".into(), Value::NativeFunction(c::MAP_VALUES));
-        map_proto_props.insert("entries".into(), Value::NativeFunction(c::MAP_ENTRIES));
+        let map_proto_props = props! {
+            "get" => Value::NativeFunction(c::MAP_GET),
+            "set" => Value::NativeFunction(c::MAP_SET),
+            "has" => Value::NativeFunction(c::MAP_HAS),
+            "delete" => Value::NativeFunction(c::MAP_DELETE),
+            "clear" => Value::NativeFunction(c::MAP_CLEAR),
+            "size" => Value::NativeFunction(c::MAP_SIZE),
+            "forEach" => Value::NativeFunction(c::MAP_FOR_EACH),
+            "keys" => Value::NativeFunction(c::MAP_KEYS),
+            "values" => Value::NativeFunction(c::MAP_VALUES),
+            "entries" => Value::NativeFunction(c::MAP_ENTRIES),
+        };
         let map_proto_idx = self.gc.allocate(
             &mut self.heap,
             HeapValue::Object(JsObject {
@@ -776,8 +630,9 @@ impl Interpreter {
             }),
         );
 
-        let mut map_ctor_props = FxHashMap::default();
-        map_ctor_props.insert("prototype".into(), Value::Object(map_proto_idx));
+        let map_ctor_props = props! {
+            "prototype" => Value::Object(map_proto_idx),
+        };
         let _map_ctor_idx = self.gc.allocate(
             &mut self.heap,
             HeapValue::Object(JsObject {
@@ -790,16 +645,17 @@ impl Interpreter {
             .insert("Map".into(), Value::NativeFunction(c::MAP_CONSTRUCTOR));
 
         // Set
-        let mut set_proto_props = FxHashMap::default();
-        set_proto_props.insert("add".into(), Value::NativeFunction(c::SET_ADD));
-        set_proto_props.insert("has".into(), Value::NativeFunction(c::SET_HAS));
-        set_proto_props.insert("delete".into(), Value::NativeFunction(c::SET_DELETE));
-        set_proto_props.insert("clear".into(), Value::NativeFunction(c::SET_CLEAR));
-        set_proto_props.insert("size".into(), Value::NativeFunction(c::SET_SIZE));
-        set_proto_props.insert("forEach".into(), Value::NativeFunction(c::SET_FOR_EACH));
-        set_proto_props.insert("values".into(), Value::NativeFunction(c::SET_VALUES));
-        set_proto_props.insert("keys".into(), Value::NativeFunction(c::SET_KEYS));
-        set_proto_props.insert("entries".into(), Value::NativeFunction(c::SET_ENTRIES));
+        let set_proto_props = props! {
+            "add" => Value::NativeFunction(c::SET_ADD),
+            "has" => Value::NativeFunction(c::SET_HAS),
+            "delete" => Value::NativeFunction(c::SET_DELETE),
+            "clear" => Value::NativeFunction(c::SET_CLEAR),
+            "size" => Value::NativeFunction(c::SET_SIZE),
+            "forEach" => Value::NativeFunction(c::SET_FOR_EACH),
+            "values" => Value::NativeFunction(c::SET_VALUES),
+            "keys" => Value::NativeFunction(c::SET_KEYS),
+            "entries" => Value::NativeFunction(c::SET_ENTRIES),
+        };
         let set_proto_idx = self.gc.allocate(
             &mut self.heap,
             HeapValue::Object(JsObject {
@@ -809,8 +665,9 @@ impl Interpreter {
             }),
         );
 
-        let mut set_ctor_props = FxHashMap::default();
-        set_ctor_props.insert("prototype".into(), Value::Object(set_proto_idx));
+        let set_ctor_props = props! {
+            "prototype" => Value::Object(set_proto_idx),
+        };
         let _set_ctor_idx = self.gc.allocate(
             &mut self.heap,
             HeapValue::Object(JsObject {
@@ -823,11 +680,12 @@ impl Interpreter {
             .insert("Set".into(), Value::NativeFunction(c::SET_CONSTRUCTOR));
 
         // WeakMap
-        let mut weakmap_proto_props = FxHashMap::default();
-        weakmap_proto_props.insert("get".into(), Value::NativeFunction(c::WEAKMAP_GET));
-        weakmap_proto_props.insert("set".into(), Value::NativeFunction(c::WEAKMAP_SET));
-        weakmap_proto_props.insert("has".into(), Value::NativeFunction(c::WEAKMAP_HAS));
-        weakmap_proto_props.insert("delete".into(), Value::NativeFunction(c::WEAKMAP_DELETE));
+        let weakmap_proto_props = props! {
+            "get" => Value::NativeFunction(c::WEAKMAP_GET),
+            "set" => Value::NativeFunction(c::WEAKMAP_SET),
+            "has" => Value::NativeFunction(c::WEAKMAP_HAS),
+            "delete" => Value::NativeFunction(c::WEAKMAP_DELETE),
+        };
         let weakmap_proto_idx = self.gc.allocate(
             &mut self.heap,
             HeapValue::Object(JsObject {
@@ -837,8 +695,9 @@ impl Interpreter {
             }),
         );
 
-        let mut weakmap_ctor_props = FxHashMap::default();
-        weakmap_ctor_props.insert("prototype".into(), Value::Object(weakmap_proto_idx));
+        let weakmap_ctor_props = props! {
+            "prototype" => Value::Object(weakmap_proto_idx),
+        };
         let _weakmap_ctor_idx = self.gc.allocate(
             &mut self.heap,
             HeapValue::Object(JsObject {
@@ -853,10 +712,11 @@ impl Interpreter {
         );
 
         // WeakSet
-        let mut weakset_proto_props = FxHashMap::default();
-        weakset_proto_props.insert("add".into(), Value::NativeFunction(c::WEAKSET_ADD));
-        weakset_proto_props.insert("has".into(), Value::NativeFunction(c::WEAKSET_HAS));
-        weakset_proto_props.insert("delete".into(), Value::NativeFunction(c::WEAKSET_DELETE));
+        let weakset_proto_props = props! {
+            "add" => Value::NativeFunction(c::WEAKSET_ADD),
+            "has" => Value::NativeFunction(c::WEAKSET_HAS),
+            "delete" => Value::NativeFunction(c::WEAKSET_DELETE),
+        };
         let weakset_proto_idx = self.gc.allocate(
             &mut self.heap,
             HeapValue::Object(JsObject {
@@ -866,8 +726,9 @@ impl Interpreter {
             }),
         );
 
-        let mut weakset_ctor_props = FxHashMap::default();
-        weakset_ctor_props.insert("prototype".into(), Value::Object(weakset_proto_idx));
+        let weakset_ctor_props = props! {
+            "prototype" => Value::Object(weakset_proto_idx),
+        };
         let _weakset_ctor_idx = self.gc.allocate(
             &mut self.heap,
             HeapValue::Object(JsObject {
@@ -882,14 +743,12 @@ impl Interpreter {
         );
 
         // Generator
-        let mut generator_proto_props = FxHashMap::default();
-        generator_proto_props.insert("next".into(), Value::NativeFunction(c::GENERATOR_NEXT));
-        generator_proto_props.insert("return".into(), Value::NativeFunction(c::GENERATOR_RETURN));
-        generator_proto_props.insert("throw".into(), Value::NativeFunction(c::GENERATOR_THROW));
-        generator_proto_props.insert(
-            "Symbol.iterator".into(),
-            Value::NativeFunction(c::GENERATOR_SYMBOL_ITERATOR),
-        );
+        let generator_proto_props = props! {
+            "next" => Value::NativeFunction(c::GENERATOR_NEXT),
+            "return" => Value::NativeFunction(c::GENERATOR_RETURN),
+            "throw" => Value::NativeFunction(c::GENERATOR_THROW),
+            "Symbol.iterator" => Value::NativeFunction(c::GENERATOR_SYMBOL_ITERATOR),
+        };
         let generator_proto_idx = self.gc.allocate(
             &mut self.heap,
             HeapValue::Object(JsObject {
@@ -900,8 +759,9 @@ impl Interpreter {
         );
         self.generator_proto_idx = Some(generator_proto_idx);
 
-        let mut generator_ctor_props = FxHashMap::default();
-        generator_ctor_props.insert("prototype".into(), Value::Object(generator_proto_idx));
+        let generator_ctor_props = props! {
+            "prototype" => Value::Object(generator_proto_idx),
+        };
         let generator_ctor_idx = self.gc.allocate(
             &mut self.heap,
             HeapValue::Object(JsObject {
@@ -936,6 +796,16 @@ impl Interpreter {
         {
             use super::native_loader::create_buffer_module;
             let buffer_props = create_buffer_module(&mut self.heap, &mut self.gc);
+            // Capture the prototype index before moving `buffer_props`
+            // into the heap, so subsequent `Value::Buffer(_)` property
+            // lookups (`b.toString(...)`, `b.length`, etc.) can find
+            // their methods. Without this, `buffer_proto_idx` would
+            // only be set when the module is imported explicitly, and
+            // bare `Buffer.from(x).toString("utf8")` would crash with
+            // "undefined is not a function".
+            if let Some(Value::Object(proto_idx)) = buffer_props.get("prototype") {
+                self.buffer_proto_idx = Some(*proto_idx);
+            }
             let buffer_idx = self.gc.allocate(
                 &mut self.heap,
                 HeapValue::Object(JsObject {

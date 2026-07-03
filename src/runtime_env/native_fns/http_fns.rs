@@ -314,13 +314,14 @@ fn handle_one_request(
         extensible: true,
     }));
 
-    let mut req_props = FxHashMap::default();
-    req_props.insert("method".into(), Value::String(req.method));
-    req_props.insert("url".into(), Value::String(req.path));
-    req_props.insert("body".into(), Value::String(req.body.clone()));
-    req_props.insert("__body".into(), Value::String(req.body));
-    req_props.insert("headers".into(), Value::Object(hdr_idx));
-    req_props.insert("on".into(), Value::NativeFunction(c::HTTP_REQ_ON));
+    let req_props = props! {
+        "method" => Value::String(req.method),
+        "url" => Value::String(req.path),
+        "body" => Value::String(req.body.clone()),
+        "__body" => Value::String(req.body),
+        "headers" => Value::Object(hdr_idx),
+        "on" => Value::NativeFunction(c::HTTP_REQ_ON),
+    };
     let req_idx = interp.heap.len();
     interp.heap.push(HeapValue::Object(JsObject {
         properties: req_props,

@@ -1,6 +1,7 @@
 use rustc_hash::FxHashMap;
 use crate::errors::{Error, Result};
 use crate::objects::Value;
+use crate::props;
 use crate::vm::interpreter::{HeapValue, Interpreter, JsObject};
 
 use super::helpers::to_string_value;
@@ -286,14 +287,12 @@ pub(super) fn native_fs_readdir(
         }
         Err(e) => {
             let err_idx = interp.heap.len();
-            let mut props = FxHashMap::default();
-            props.insert(
-                "message".into(),
-                Value::String(format!(
+            let props = props! {
+                "message" => Value::String(format!(
                     "ENOENT: no such file or directory, scandir '{}': {}",
                     path, e
                 )),
-            );
+            };
             interp
                 .heap
                 .push(HeapValue::Object(crate::vm::interpreter::JsObject {
@@ -330,14 +329,12 @@ pub(super) fn native_fs_read_file(
         }
         Err(e) => {
             let err_idx = interp.heap.len();
-            let mut props = FxHashMap::default();
-            props.insert(
-                "message".into(),
-                Value::String(format!(
+            let props = props! {
+                "message" => Value::String(format!(
                     "ENOENT: no such file or directory, open '{}': {}",
                     path, e
                 )),
-            );
+            };
             interp
                 .heap
                 .push(HeapValue::Object(crate::vm::interpreter::JsObject {
@@ -378,11 +375,9 @@ pub(super) fn native_fs_write_file(
         }
         Err(e) => {
             let err_idx = interp.heap.len();
-            let mut props = FxHashMap::default();
-            props.insert(
-                "message".into(),
-                Value::String(format!("EACCES: permission denied, open '{}': {}", path, e)),
-            );
+            let props = props! {
+                "message" => Value::String(format!("EACCES: permission denied, open '{}': {}", path, e)),
+            };
             interp
                 .heap
                 .push(HeapValue::Object(crate::vm::interpreter::JsObject {
@@ -441,14 +436,12 @@ pub(super) fn native_fs_stat(
         }
         Err(e) => {
             let err_idx = interp.heap.len();
-            let mut props = FxHashMap::default();
-            props.insert(
-                "message".into(),
-                Value::String(format!(
+            let props = props! {
+                "message" => Value::String(format!(
                     "ENOENT: no such file or directory, stat '{}': {}",
                     path, e
                 )),
-            );
+            };
             interp
                 .heap
                 .push(HeapValue::Object(crate::vm::interpreter::JsObject {
@@ -499,14 +492,12 @@ pub(super) fn native_fs_mkdir(
         }
         Err(e) => {
             let err_idx = interp.heap.len();
-            let mut props = FxHashMap::default();
-            props.insert(
-                "message".into(),
-                Value::String(format!(
+            let props = props! {
+                "message" => Value::String(format!(
                     "EACCES: permission denied, mkdir '{}': {}",
                     path, e
                 )),
-            );
+            };
             interp
                 .heap
                 .push(HeapValue::Object(crate::vm::interpreter::JsObject {
@@ -543,14 +534,12 @@ pub(super) fn native_fs_unlink(
         }
         Err(e) => {
             let err_idx = interp.heap.len();
-            let mut props = FxHashMap::default();
-            props.insert(
-                "message".into(),
-                Value::String(format!(
+            let props = props! {
+                "message" => Value::String(format!(
                     "ENOENT: no such file or directory, unlink '{}': {}",
                     path, e
                 )),
-            );
+            };
             interp
                 .heap
                 .push(HeapValue::Object(crate::vm::interpreter::JsObject {
@@ -591,14 +580,12 @@ pub(super) fn native_fs_copy_file(
         }
         Err(e) => {
             let err_idx = interp.heap.len();
-            let mut props = FxHashMap::default();
-            props.insert(
-                "message".into(),
-                Value::String(format!(
+            let props = props! {
+                "message" => Value::String(format!(
                     "EACCES: permission denied, copy '{}' to '{}': {}",
                     src, dest, e
                 )),
-            );
+            };
             interp
                 .heap
                 .push(HeapValue::Object(crate::vm::interpreter::JsObject {
@@ -639,14 +626,12 @@ pub(super) fn native_fs_rename(
         }
         Err(e) => {
             let err_idx = interp.heap.len();
-            let mut props = FxHashMap::default();
-            props.insert(
-                "message".into(),
-                Value::String(format!(
+            let props = props! {
+                "message" => Value::String(format!(
                     "EACCES: permission denied, rename '{}' to '{}': {}",
                     old_path, new_path, e
                 )),
-            );
+            };
             interp
                 .heap
                 .push(HeapValue::Object(crate::vm::interpreter::JsObject {

@@ -2,6 +2,7 @@ use super::safe_library::SafeLibrary;
 use super::*;
 use crate::errors::Result;
 use crate::objects::Value;
+use crate::props;
 use crate::runtime_env::native_fns::NATIVE_TABLE;
 use rustc_hash::FxHashMap;
 use std::path::Path;
@@ -163,8 +164,9 @@ impl Interpreter {
                     path
                 )
             };
-            let mut meta_props = FxHashMap::default();
-            meta_props.insert("url".to_string(), Value::String(file_url));
+            let meta_props = props! {
+                "url" => Value::String(file_url),
+            };
             let meta_obj_idx = self.gc.allocate(
                 &mut self.heap,
                 HeapValue::Object(crate::vm::interpreter::JsObject {
@@ -173,8 +175,9 @@ impl Interpreter {
                     extensible: true,
                 }),
             );
-            let mut import_props = FxHashMap::default();
-            import_props.insert("meta".to_string(), Value::Object(meta_obj_idx));
+            let import_props = props! {
+                "meta" => Value::Object(meta_obj_idx),
+            };
             let import_obj_idx = self.gc.allocate(
                 &mut self.heap,
                 HeapValue::Object(crate::vm::interpreter::JsObject {
@@ -663,8 +666,9 @@ impl Interpreter {
 
     pub(crate) fn build_error_promise(&mut self, message: String) -> Value {
         let reason_idx = self.heap.len();
-        let mut props = FxHashMap::default();
-        props.insert("message".into(), Value::String(message));
+        let props = props! {
+            "message" => Value::String(message),
+        };
         self.heap.push(HeapValue::Object(JsObject {
             properties: props,
             prototype: None,
