@@ -62,9 +62,27 @@ pub(super) fn native_buffer_from(
     args: &[Value],
 ) -> Result<Value> {
     let buf_idx = interp.heap.len();
+    // The optional second argument is an encoding name. When present
+    // and recognised, the first argument is decoded according to that
+    // encoding (e.g. `Buffer.from("SGVsbG8=", "base64")` produces the
+    // bytes `Hello`). Without the encoding, a string is treated as raw
+    // UTF-8 bytes — matching Node's `Buffer.from(string)` behaviour.
+    let encoding = args.get(1).map(|v| to_string_value(interp, v));
     let data = if let Some(first) = args.first() {
         match first {
-            Value::String(s) => s.as_bytes().to_vec(),
+            Value::String(s) => {
+                let bytes = s.as_bytes().to_vec();
+                if let Some(enc) = encoding.as_deref() {
+                    if !enc.is_empty() {
+                        decode_bytes_with_encoding(&bytes, &enc.to_ascii_lowercase())
+                            .unwrap_or(bytes)
+                    } else {
+                        bytes
+                    }
+                } else {
+                    bytes
+                }
+            }
             Value::Array(arr_idx) => {
                 if let HeapValue::Array(arr) = &interp.heap[*arr_idx] {
                     arr.elements.iter().map(|v| to_i64(v) as u8).collect()
@@ -81,7 +99,17 @@ pub(super) fn native_buffer_from(
             }
             _ => {
                 let s = to_string_value(interp, first);
-                s.as_bytes().to_vec()
+                let bytes = s.as_bytes().to_vec();
+                if let Some(enc) = encoding.as_deref() {
+                    if !enc.is_empty() {
+                        decode_bytes_with_encoding(&bytes, &enc.to_ascii_lowercase())
+                            .unwrap_or(bytes)
+                    } else {
+                        bytes
+                    }
+                } else {
+                    bytes
+                }
             }
         }
     } else {
@@ -532,6 +560,44 @@ fn base64_decode_str(s: &str) -> Option<Vec<u8>> {
     base64_decode_simple(s.as_bytes())
 }
 
+/// Decode `bytes` according to a Node-style encoding name. Used by
+/// `Buffer.from(string, encoding)` to handle `"base64"`, `"hex"`, etc.
+/// Returns `None` when the encoding is unrecognised or the input is
+/// malformed; the caller should fall back to treating the input as raw
+/// bytes in that case.
+fn decode_bytes_with_encoding(bytes: &[u8], enc: &str) -> Option<Vec<u8>> {
+    match enc {
+        "utf8" | "utf-8" | "ascii" | "latin1" | "binary" => Some(bytes.to_vec()),
+        "hex" => {
+            let mut out = Vec::with_capacity(bytes.len() / 2);
+            let mut i = 0;
+            while i + 1 < bytes.len() {
+                let hi = hex_nibble(bytes[i])?;
+                let lo = hex_nibble(bytes[i + 1])?;
+                out.push((hi << 4) | lo);
+                i += 2;
+            }
+            Some(out)
+        }
+        "base64" => base64_decode_simple(bytes),
+        "base64url" => {
+            // Translate URL-safe base64 to standard base64 by
+            // remapping the two character substitutions and adding
+            // back the padding that base64url strips.
+            let mut s: String = bytes.iter().map(|b| *b as char).collect();
+            s = s.replace('-', "+").replace('_', "/");
+            while s.len() % 4 != 0 {
+                s.push('=');
+            }
+            base64_decode_simple(s.as_bytes())
+        }
+        // Other recognised names (utf16le / ucs2) are accepted but not
+        // actually decoded here — fall through to "raw bytes" so the
+        // caller still gets a Buffer back instead of a hard error.
+        _ => None,
+    }
+}
+
 fn base64_decode_simple(bytes: &[u8]) -> Option<Vec<u8>> {
     fn val(c: u8) -> Option<u8> {
         match c {
@@ -556,24 +622,37 @@ fn base64_decode_simple(bytes: &[u8]) -> Option<Vec<u8>> {
     while i < bytes.len() {
         let a = val(bytes[i])?;
         let b = val(bytes[i + 1])?;
-        let mut c = 0u8;
-        let mut d = 0u8;
+        // `c` and `d` are the third and fourth base64 digits of the
+        // current 4-char group. When a digit is a `=` padding marker
+        // we substitute 0 — but more importantly, the *number* of
+        // output bytes per 4-char group is `3 - pad` (3 if no pad,
+        // 2 if one `=`, 1 if two `=`s). The previous implementation
+        // counted padding separately for `c` and `d` and then
+        // decoded bytes on the basis of `pad < 1` / `pad < 2`, which
+        // corrupted the third output byte when the input had a
+        // single `=` (e.g. `"SGVsbG8="` produced `"Hello\0"` instead
+        // of `"Hello"` because the trailing `(c << 6) | d` shift
+        // included zeroed-out pad bits).
         let mut pad = 0;
-        if bytes[i + 2] != b'=' {
-            c = val(bytes[i + 2])?;
-        } else {
+        let c = if bytes[i + 2] == b'=' {
             pad += 1;
-        }
-        if bytes[i + 3] != b'=' {
-            d = val(bytes[i + 3])?;
+            0u8
         } else {
+            val(bytes[i + 2])?
+        };
+        let d = if bytes[i + 3] == b'=' {
             pad += 1;
-        }
+            0u8
+        } else {
+            val(bytes[i + 3])?
+        };
         out.push((a << 2) | (b >> 4));
-        if pad < 1 {
+        if pad < 2 {
             out.push((b << 4) | (c >> 2));
         }
-        if pad < 2 {
+        // Only emit the third byte when the 4-char group had no
+        // padding at all.
+        if pad == 0 {
             out.push((c << 6) | d);
         }
         i += 4;

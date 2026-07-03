@@ -217,13 +217,30 @@ impl ReadStream {
     }
 
     /// Read up to `chunk_size` bytes. Returns `Ok(None)` at EOF.
-    pub fn read_chunk(&mut self, chunk_size: usize) -> std::io::Result<Option<Vec<u8>>> {
+    /// Sets `*hit_eof` to `true` when the read returned fewer bytes
+    /// than requested (a short read at end-of-file); callers use that
+    /// to surface `{done: true}` to the JS caller even though some
+    /// bytes were returned in the same call.
+    pub fn read_chunk(
+        &mut self,
+        chunk_size: usize,
+        hit_eof: &mut bool,
+    ) -> std::io::Result<Option<Vec<u8>>> {
         use std::io::Read;
         let mut buf = vec![0u8; chunk_size];
         match self.file.read(&mut buf)? {
             0 => Ok(None),
             n => {
                 buf.truncate(n);
+                // A short read (< chunk_size) means we've hit EOF in
+                // the middle of the chunk. The next `read()` will
+                // return 0, but the *current* call still produced
+                // data, so the JS caller expects `{ok: true, done:
+                // true, data: "..."}` rather than `{ok: true, done:
+                // false, data: "..."}` followed by an empty chunk.
+                if n < chunk_size {
+                    *hit_eof = true;
+                }
                 Ok(Some(buf))
             }
         }
@@ -257,13 +274,26 @@ impl FileWatcher {
                 format!("watch path does not exist: {}", path),
             ));
         }
-        Ok(Self {
+        // Take an initial snapshot immediately so the FIRST `poll()`
+        // call after the watcher is set up has something to diff
+        // against. Without this, the first `poll()` would lazy-init
+        // the snapshot after the caller had already mutated the
+        // watched directory (e.g. created a new file), and the
+        // mutation would never appear as a "create" event.
+        let interval_dur = std::time::Duration::from_millis(interval_ms);
+        // Initialise last_walk *before* the current time by the interval
+        // duration so the very first `poll()` call always triggers a re-walk.
+        // Without this, changes made between `watch()` and the first `poll()`
+        // would silently miss the snapshot diff window.
+        let mut me = Self {
             path: p,
-            interval: std::time::Duration::from_millis(interval_ms),
+            interval: interval_dur,
             snapshot: None,
             events: Vec::new(),
-            last_walk: std::time::Instant::now(),
-        })
+            last_walk: std::time::Instant::now() - interval_dur,
+        };
+        me.snapshot = Some(me.walk());
+        Ok(me)
     }
 
     fn walk(&self) -> std::collections::HashMap<String, (u64, Option<u64>)> {
@@ -555,24 +585,27 @@ mod fs_native {
         let chunk_size = chunk_size.max(1.0) as usize;
         let mut guard = STREAMS.lock().unwrap();
         match guard.get_mut(&id) {
-            Some(stream) => match stream.read_chunk(chunk_size) {
-                Ok(Some(bytes)) => serde_json::json!({
-                    "ok": true,
-                    "done": false,
-                    "data": super::base64_encode(&bytes),
-                })
-                .to_string(),
-                Ok(None) => serde_json::json!({
-                    "ok": true,
-                    "done": true,
-                })
-                .to_string(),
-                Err(e) => serde_json::json!({
-                    "ok": false,
-                    "error": format!("read error: {}", e),
-                })
-                .to_string(),
-            },
+            Some(stream) => {
+                let mut hit_eof = false;
+                match stream.read_chunk(chunk_size, &mut hit_eof) {
+                    Ok(Some(bytes)) => serde_json::json!({
+                        "ok": true,
+                        "done": hit_eof,
+                        "data": super::base64_encode(&bytes),
+                    })
+                    .to_string(),
+                    Ok(None) => serde_json::json!({
+                        "ok": true,
+                        "done": true,
+                    })
+                    .to_string(),
+                    Err(e) => serde_json::json!({
+                        "ok": false,
+                        "error": format!("read error: {}", e),
+                    })
+                    .to_string(),
+                }
+            }
             None => serde_json::json!({
                 "ok": false,
                 "error": "invalid stream id",
