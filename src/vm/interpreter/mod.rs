@@ -18,7 +18,7 @@ pub mod safe_function;
 pub mod safe_library;
 mod value_ops;
 
-pub(crate) use call_frame::{CallFrame, ExceptionHandler};
+pub(crate) use call_frame::{CallFrame, ExceptionHandler, SuspendedFrame};
 pub use heap_types::{
     HeapValue, JsArray, JsCompiledRegex, JsFunction, JsGenerator, JsIterator, JsObject,
     JsProxyData, JsRegExp, PropertyStorage,
@@ -60,18 +60,6 @@ pub trait EventSource: 'static {
     /// Implementations may call into the interpreter (e.g. to fire JS request
     /// handlers or event callbacks).
     fn poll(&mut self, interp: &mut Interpreter) -> Result<()>;
-}
-
-#[derive(Clone)]
-pub(crate) struct SuspendedFrame {
-    pub(crate) promise_idx: usize,
-    pub(crate) resume_pc: usize,
-    pub(crate) stack_snapshot: Vec<Value>,
-    pub(crate) call_stack_snapshot: Vec<CallFrame>,
-    pub(crate) module: Option<Rc<CompiledModule>>,
-    pub(crate) module_path: Option<String>,
-    pub(crate) exception_handlers_snapshot: Vec<ExceptionHandler>,
-    pub(crate) block_scope_stack_snapshot: Vec<usize>,
 }
 
 pub struct Interpreter {

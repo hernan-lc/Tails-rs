@@ -1,5 +1,5 @@
-use std::time::{SystemTime, UNIX_EPOCH};
 use crate::objects::js_date_calendar;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 /// JavaScript Date object representation
 /// Stores UTC milliseconds since Unix epoch as f64 (matching JS spec)
@@ -26,8 +26,7 @@ impl JsDate {
 
     /// Reassemble from (days, hours, minutes, seconds, millis) into epoch ms.
     fn set_ymdhms(&mut self, days: f64, h: f64, m: f64, s: f64, ms: f64) {
-        self.utc_ms =
-            days * 86400000.0 + h * 3600000.0 + m * 60000.0 + s * 1000.0 + ms;
+        self.utc_ms = days * 86400000.0 + h * 3600000.0 + m * 60000.0 + s * 1000.0 + ms;
     }
     pub fn now() -> Self {
         let ms = SystemTime::now()
@@ -197,7 +196,13 @@ impl JsDate {
         ms: Option<f64>,
     ) -> f64 {
         let (days, _, minutes, seconds, millis) = self.components();
-        self.set_ymdhms(days, h, min.unwrap_or(minutes), s.unwrap_or(seconds), ms.unwrap_or(millis));
+        self.set_ymdhms(
+            days,
+            h,
+            min.unwrap_or(minutes),
+            s.unwrap_or(seconds),
+            ms.unwrap_or(millis),
+        );
         self.utc_ms
     }
 
@@ -264,8 +269,7 @@ impl JsDate {
         }
         let days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
         let months = [
-            "Jan", "Feb", "Mar", "Apr", "May", "Jun",
-            "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+            "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
         ];
         let (y, m, d) = js_date_calendar::date_from_millis(self.utc_ms);
         let day_idx = self.get_utc_day() as usize;
@@ -274,7 +278,13 @@ impl JsDate {
         let s = self.get_utc_seconds() as u32;
         format!(
             "{} {:02} {} {} {:02}:{:02}:{:02} GMT",
-            days[day_idx], d, months[(m - 1) as usize], y, h, min, s
+            days[day_idx],
+            d,
+            months[(m - 1) as usize],
+            y,
+            h,
+            min,
+            s
         )
     }
 
@@ -284,8 +294,7 @@ impl JsDate {
         }
         let days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
         let months = [
-            "Jan", "Feb", "Mar", "Apr", "May", "Jun",
-            "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+            "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
         ];
         let (y, m, d) = js_date_calendar::date_from_millis(self.utc_ms);
         let day_idx = self.get_utc_day() as usize;

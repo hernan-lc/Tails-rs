@@ -271,5 +271,3 @@ impl Default for JsWeakSet {
         Self::new()
     }
 }
-
-
