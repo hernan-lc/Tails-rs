@@ -27,6 +27,36 @@ macro_rules! with_date {
     };
 }
 
+macro_rules! date_getter {
+    ($name:ident, $method:ident) => {
+        pub(super) fn $name(
+            interp: &mut Interpreter,
+            this: &Value,
+            _args: &[Value],
+        ) -> Result<Value> {
+            with_date!(interp, this, |date: &JsDate| Ok(Value::Float(date.$method())))
+        }
+    };
+}
+
+date_getter!(native_date_get_full_year, get_full_year);
+date_getter!(native_date_get_month, get_month);
+date_getter!(native_date_get_date, get_date);
+date_getter!(native_date_get_day, get_day);
+date_getter!(native_date_get_hours, get_hours);
+date_getter!(native_date_get_minutes, get_minutes);
+date_getter!(native_date_get_seconds, get_seconds);
+date_getter!(native_date_get_milliseconds, get_milliseconds);
+date_getter!(native_date_get_timezone_offset, get_timezone_offset);
+date_getter!(native_date_get_utc_full_year, get_utc_full_year);
+date_getter!(native_date_get_utc_month, get_utc_month);
+date_getter!(native_date_get_utc_date, get_utc_date);
+date_getter!(native_date_get_utc_day, get_utc_day);
+date_getter!(native_date_get_utc_hours, get_utc_hours);
+date_getter!(native_date_get_utc_minutes, get_utc_minutes);
+date_getter!(native_date_get_utc_seconds, get_utc_seconds);
+date_getter!(native_date_get_utc_milliseconds, get_utc_milliseconds);
+
 // Constructors
 
 pub(super) fn native_date_constructor(
@@ -120,177 +150,41 @@ pub(super) fn native_date_get_time(
     with_date!(interp, this, |date: &JsDate| Ok(Value::Float(date.utc_ms)))
 }
 
-pub(super) fn native_date_get_full_year(
-    interp: &mut Interpreter,
-    this: &Value,
-    _args: &[Value],
-) -> Result<Value> {
-    with_date!(interp, this, |date: &JsDate| Ok(Value::Float(
-        date.get_full_year()
-    )))
-}
 
-pub(super) fn native_date_get_month(
-    interp: &mut Interpreter,
-    this: &Value,
-    _args: &[Value],
-) -> Result<Value> {
-    with_date!(interp, this, |date: &JsDate| Ok(Value::Float(
-        date.get_month()
-    )))
-}
 
-pub(super) fn native_date_get_date(
-    interp: &mut Interpreter,
-    this: &Value,
-    _args: &[Value],
-) -> Result<Value> {
-    with_date!(interp, this, |date: &JsDate| Ok(Value::Float(
-        date.get_date()
-    )))
-}
 
-pub(super) fn native_date_get_day(
-    interp: &mut Interpreter,
-    this: &Value,
-    _args: &[Value],
-) -> Result<Value> {
-    with_date!(interp, this, |date: &JsDate| Ok(Value::Float(
-        date.get_day()
-    )))
-}
 
-pub(super) fn native_date_get_hours(
-    interp: &mut Interpreter,
-    this: &Value,
-    _args: &[Value],
-) -> Result<Value> {
-    with_date!(interp, this, |date: &JsDate| Ok(Value::Float(
-        date.get_hours()
-    )))
-}
 
-pub(super) fn native_date_get_minutes(
-    interp: &mut Interpreter,
-    this: &Value,
-    _args: &[Value],
-) -> Result<Value> {
-    with_date!(interp, this, |date: &JsDate| Ok(Value::Float(
-        date.get_minutes()
-    )))
-}
 
-pub(super) fn native_date_get_seconds(
-    interp: &mut Interpreter,
-    this: &Value,
-    _args: &[Value],
-) -> Result<Value> {
-    with_date!(interp, this, |date: &JsDate| Ok(Value::Float(
-        date.get_seconds()
-    )))
-}
 
-pub(super) fn native_date_get_milliseconds(
-    interp: &mut Interpreter,
-    this: &Value,
-    _args: &[Value],
-) -> Result<Value> {
-    with_date!(interp, this, |date: &JsDate| Ok(Value::Float(
-        date.get_milliseconds()
-    )))
-}
 
-pub(super) fn native_date_get_timezone_offset(
-    interp: &mut Interpreter,
-    this: &Value,
-    _args: &[Value],
-) -> Result<Value> {
-    with_date!(interp, this, |date: &JsDate| Ok(Value::Float(
-        date.get_timezone_offset()
-    )))
-}
+
+
+
+
+
+
+
+
+
 
 // UTC getters
 
-pub(super) fn native_date_get_utc_full_year(
-    interp: &mut Interpreter,
-    this: &Value,
-    _args: &[Value],
-) -> Result<Value> {
-    with_date!(interp, this, |date: &JsDate| Ok(Value::Float(
-        date.get_utc_full_year()
-    )))
-}
 
-pub(super) fn native_date_get_utc_month(
-    interp: &mut Interpreter,
-    this: &Value,
-    _args: &[Value],
-) -> Result<Value> {
-    with_date!(interp, this, |date: &JsDate| Ok(Value::Float(
-        date.get_utc_month()
-    )))
-}
 
-pub(super) fn native_date_get_utc_date(
-    interp: &mut Interpreter,
-    this: &Value,
-    _args: &[Value],
-) -> Result<Value> {
-    with_date!(interp, this, |date: &JsDate| Ok(Value::Float(
-        date.get_utc_date()
-    )))
-}
 
-pub(super) fn native_date_get_utc_day(
-    interp: &mut Interpreter,
-    this: &Value,
-    _args: &[Value],
-) -> Result<Value> {
-    with_date!(interp, this, |date: &JsDate| Ok(Value::Float(
-        date.get_utc_day()
-    )))
-}
 
-pub(super) fn native_date_get_utc_hours(
-    interp: &mut Interpreter,
-    this: &Value,
-    _args: &[Value],
-) -> Result<Value> {
-    with_date!(interp, this, |date: &JsDate| Ok(Value::Float(
-        date.get_utc_hours()
-    )))
-}
 
-pub(super) fn native_date_get_utc_minutes(
-    interp: &mut Interpreter,
-    this: &Value,
-    _args: &[Value],
-) -> Result<Value> {
-    with_date!(interp, this, |date: &JsDate| Ok(Value::Float(
-        date.get_utc_minutes()
-    )))
-}
 
-pub(super) fn native_date_get_utc_seconds(
-    interp: &mut Interpreter,
-    this: &Value,
-    _args: &[Value],
-) -> Result<Value> {
-    with_date!(interp, this, |date: &JsDate| Ok(Value::Float(
-        date.get_utc_seconds()
-    )))
-}
 
-pub(super) fn native_date_get_utc_milliseconds(
-    interp: &mut Interpreter,
-    this: &Value,
-    _args: &[Value],
-) -> Result<Value> {
-    with_date!(interp, this, |date: &JsDate| Ok(Value::Float(
-        date.get_utc_milliseconds()
-    )))
-}
+
+
+
+
+
+
+
+
 
 // Setters
 
@@ -481,65 +375,38 @@ pub(super) fn native_date_set_milliseconds(
 
 // String conversion methods
 
-pub(super) fn native_date_to_string(
-    interp: &mut Interpreter,
-    this: &Value,
-    _args: &[Value],
-) -> Result<Value> {
-    with_date!(interp, this, |date: &JsDate| {
-        Ok(Value::String(date.to_utc_string()))
-    })
+
+
+
+
+
+
+
+
+
+
+
+
+macro_rules! date_to_string_fn {
+    ($name:ident, $method:ident) => {
+        pub(super) fn $name(
+            interp: &mut Interpreter,
+            this: &Value,
+            _args: &[Value],
+        ) -> Result<Value> {
+            with_date!(interp, this, |date: &JsDate| {
+                Ok(Value::String(date.$method()))
+            })
+        }
+    };
 }
 
-pub(super) fn native_date_to_iso_string(
-    interp: &mut Interpreter,
-    this: &Value,
-    _args: &[Value],
-) -> Result<Value> {
-    with_date!(interp, this, |date: &JsDate| {
-        Ok(Value::String(date.to_iso_string()))
-    })
-}
-
-pub(super) fn native_date_to_utc_string(
-    interp: &mut Interpreter,
-    this: &Value,
-    _args: &[Value],
-) -> Result<Value> {
-    with_date!(interp, this, |date: &JsDate| {
-        Ok(Value::String(date.to_utc_string()))
-    })
-}
-
-pub(super) fn native_date_to_date_string(
-    interp: &mut Interpreter,
-    this: &Value,
-    _args: &[Value],
-) -> Result<Value> {
-    with_date!(interp, this, |date: &JsDate| {
-        Ok(Value::String(date.to_date_string()))
-    })
-}
-
-pub(super) fn native_date_to_time_string(
-    interp: &mut Interpreter,
-    this: &Value,
-    _args: &[Value],
-) -> Result<Value> {
-    with_date!(interp, this, |date: &JsDate| {
-        Ok(Value::String(date.to_time_string()))
-    })
-}
-
-pub(super) fn native_date_to_json(
-    interp: &mut Interpreter,
-    this: &Value,
-    _args: &[Value],
-) -> Result<Value> {
-    with_date!(interp, this, |date: &JsDate| {
-        Ok(Value::String(date.to_iso_string()))
-    })
-}
+date_to_string_fn!(native_date_to_string, to_utc_string);
+date_to_string_fn!(native_date_to_iso_string, to_iso_string);
+date_to_string_fn!(native_date_to_utc_string, to_utc_string);
+date_to_string_fn!(native_date_to_date_string, to_date_string);
+date_to_string_fn!(native_date_to_time_string, to_time_string);
+date_to_string_fn!(native_date_to_json, to_iso_string);
 
 pub(super) fn native_date_value_of(
     interp: &mut Interpreter,
