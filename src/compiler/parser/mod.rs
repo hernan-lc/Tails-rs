@@ -646,6 +646,7 @@ impl<'a> Parser<'a> {
         }
     }
 
+    #[allow(dead_code)]
     pub(crate) fn expect_identifier(&mut self, context: &str) -> Result<String> {
         let st = self.advance();
         match st.token {
@@ -657,6 +658,7 @@ impl<'a> Parser<'a> {
         }
     }
 
+    #[allow(dead_code)]
     pub(crate) fn optional_return_type(&mut self) -> Result<Option<TypeAnnotation>> {
         if self.peek().token == Token::Colon {
             self.advance();
@@ -666,6 +668,7 @@ impl<'a> Parser<'a> {
         }
     }
 
+    #[allow(dead_code)]
     pub(crate) fn consume_optional_semicolon(&mut self) {
         if self.peek().token == Token::Semicolon {
             self.advance();

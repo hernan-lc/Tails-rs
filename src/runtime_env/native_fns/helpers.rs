@@ -21,10 +21,12 @@ pub(super) fn to_f64(v: &Value) -> f64 {
     }
 }
 
+#[allow(dead_code)]
 pub(super) fn arg_f64(args: &[Value], idx: usize, default: f64) -> f64 {
-    args.get(idx).map(|v| to_f64(v)).unwrap_or(default)
+    args.get(idx).map(to_f64).unwrap_or(default)
 }
 
+#[allow(dead_code)]
 pub(super) fn first_arg(args: &[Value]) -> Value {
     args.first().cloned().unwrap_or(Value::Undefined)
 }
