@@ -22,116 +22,39 @@ impl<'a> Parser<'a> {
 
     pub(crate) fn parse_assignment(&mut self) -> Result<SpannedNode<Expression>> {
         let left = self.parse_ternary()?;
-        match self.peek().token.clone() {
+        let op = match self.peek().token {
             Token::Assign => {
                 self.advance();
                 let value = self.parse_assignment()?;
-                Ok(self.spanned(Expression::Assignment {
+                return Ok(self.spanned(Expression::Assignment {
                     target: Box::new(left.inner),
                     value: Box::new(value.inner),
                     op: None,
-                }))
+                }));
             }
-            Token::PlusAssign => {
-                self.advance();
-                let value = self.parse_assignment()?;
-                Ok(self.spanned(Expression::Assignment {
-                    target: Box::new(left.inner),
-                    value: Box::new(value.inner),
-                    op: Some(CompoundAssignmentOp::AddAssign),
-                }))
-            }
-            Token::MinusAssign => {
-                self.advance();
-                let value = self.parse_assignment()?;
-                Ok(self.spanned(Expression::Assignment {
-                    target: Box::new(left.inner),
-                    value: Box::new(value.inner),
-                    op: Some(CompoundAssignmentOp::SubAssign),
-                }))
-            }
-            Token::StarAssign => {
-                self.advance();
-                let value = self.parse_assignment()?;
-                Ok(self.spanned(Expression::Assignment {
-                    target: Box::new(left.inner),
-                    value: Box::new(value.inner),
-                    op: Some(CompoundAssignmentOp::MulAssign),
-                }))
-            }
-            Token::SlashAssign => {
-                self.advance();
-                let value = self.parse_assignment()?;
-                Ok(self.spanned(Expression::Assignment {
-                    target: Box::new(left.inner),
-                    value: Box::new(value.inner),
-                    op: Some(CompoundAssignmentOp::DivAssign),
-                }))
-            }
-            Token::PercentAssign => {
-                self.advance();
-                let value = self.parse_assignment()?;
-                Ok(self.spanned(Expression::Assignment {
-                    target: Box::new(left.inner),
-                    value: Box::new(value.inner),
-                    op: Some(CompoundAssignmentOp::ModAssign),
-                }))
-            }
-            Token::AndAssign => {
-                self.advance();
-                let value = self.parse_assignment()?;
-                Ok(self.spanned(Expression::Assignment {
-                    target: Box::new(left.inner),
-                    value: Box::new(value.inner),
-                    op: Some(CompoundAssignmentOp::AndAssign),
-                }))
-            }
-            Token::OrAssign => {
-                self.advance();
-                let value = self.parse_assignment()?;
-                Ok(self.spanned(Expression::Assignment {
-                    target: Box::new(left.inner),
-                    value: Box::new(value.inner),
-                    op: Some(CompoundAssignmentOp::OrAssign),
-                }))
-            }
-            Token::XorAssign => {
-                self.advance();
-                let value = self.parse_assignment()?;
-                Ok(self.spanned(Expression::Assignment {
-                    target: Box::new(left.inner),
-                    value: Box::new(value.inner),
-                    op: Some(CompoundAssignmentOp::XorAssign),
-                }))
-            }
-            Token::BitAndAssign => {
-                self.advance();
-                let value = self.parse_assignment()?;
-                Ok(self.spanned(Expression::Assignment {
-                    target: Box::new(left.inner),
-                    value: Box::new(value.inner),
-                    op: Some(CompoundAssignmentOp::BitAndAssign),
-                }))
-            }
-            Token::BitOrAssign => {
-                self.advance();
-                let value = self.parse_assignment()?;
-                Ok(self.spanned(Expression::Assignment {
-                    target: Box::new(left.inner),
-                    value: Box::new(value.inner),
-                    op: Some(CompoundAssignmentOp::BitOrAssign),
-                }))
-            }
-            Token::NullishCoalescingAssign => {
-                self.advance();
-                let value = self.parse_assignment()?;
-                Ok(self.spanned(Expression::Assignment {
-                    target: Box::new(left.inner),
-                    value: Box::new(value.inner),
-                    op: Some(CompoundAssignmentOp::NullishCoalescingAssign),
-                }))
-            }
-            _ => Ok(left),
+            Token::PlusAssign => Some(CompoundAssignmentOp::AddAssign),
+            Token::MinusAssign => Some(CompoundAssignmentOp::SubAssign),
+            Token::StarAssign => Some(CompoundAssignmentOp::MulAssign),
+            Token::SlashAssign => Some(CompoundAssignmentOp::DivAssign),
+            Token::PercentAssign => Some(CompoundAssignmentOp::ModAssign),
+            Token::AndAssign => Some(CompoundAssignmentOp::AndAssign),
+            Token::OrAssign => Some(CompoundAssignmentOp::OrAssign),
+            Token::XorAssign => Some(CompoundAssignmentOp::XorAssign),
+            Token::BitAndAssign => Some(CompoundAssignmentOp::BitAndAssign),
+            Token::BitOrAssign => Some(CompoundAssignmentOp::BitOrAssign),
+            Token::NullishCoalescingAssign => Some(CompoundAssignmentOp::NullishCoalescingAssign),
+            _ => None,
+        };
+        if let Some(op) = op {
+            self.advance();
+            let value = self.parse_assignment()?;
+            Ok(self.spanned(Expression::Assignment {
+                target: Box::new(left.inner),
+                value: Box::new(value.inner),
+                op: Some(op),
+            }))
+        } else {
+            Ok(left)
         }
     }
 
@@ -400,63 +323,25 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_unary(&mut self) -> Result<SpannedNode<Expression>> {
+        let op = match self.peek().token {
+            Token::Minus => Some(UnaryOperator::Negate),
+            Token::Plus => Some(UnaryOperator::UnaryPlus),
+            Token::Not => Some(UnaryOperator::Not),
+            Token::Typeof => Some(UnaryOperator::Typeof),
+            Token::Void => Some(UnaryOperator::Void),
+            Token::Delete => Some(UnaryOperator::Delete),
+            Token::BitNot => Some(UnaryOperator::BitNot),
+            _ => None,
+        };
+        if let Some(op) = op {
+            self.advance();
+            let operand = self.parse_unary()?;
+            return Ok(self.spanned(Expression::UnaryOp {
+                op,
+                operand: Box::new(operand.inner),
+            }));
+        }
         match self.peek().token.clone() {
-            Token::Minus => {
-                self.advance();
-                let operand = self.parse_unary()?;
-                Ok(self.spanned(Expression::UnaryOp {
-                    op: UnaryOperator::Negate,
-                    operand: Box::new(operand.inner),
-                }))
-            }
-            Token::Plus => {
-                self.advance();
-                let operand = self.parse_unary()?;
-                Ok(self.spanned(Expression::UnaryOp {
-                    op: UnaryOperator::UnaryPlus,
-                    operand: Box::new(operand.inner),
-                }))
-            }
-            Token::Not => {
-                self.advance();
-                let operand = self.parse_unary()?;
-                Ok(self.spanned(Expression::UnaryOp {
-                    op: UnaryOperator::Not,
-                    operand: Box::new(operand.inner),
-                }))
-            }
-            Token::Typeof => {
-                self.advance();
-                let operand = self.parse_unary()?;
-                Ok(self.spanned(Expression::UnaryOp {
-                    op: UnaryOperator::Typeof,
-                    operand: Box::new(operand.inner),
-                }))
-            }
-            Token::Void => {
-                self.advance();
-                let operand = self.parse_unary()?;
-                Ok(self.spanned(Expression::UnaryOp {
-                    op: UnaryOperator::Void,
-                    operand: Box::new(operand.inner),
-                }))
-            }
-            Token::Delete => {
-                self.advance();
-                let operand = self.parse_unary()?;
-                Ok(self.spanned(Expression::UnaryOp {
-                    op: UnaryOperator::Delete,
-                    operand: Box::new(operand.inner),
-                }))
-            }
-            Token::BitNot => {
-                self.advance();
-                let operand = self.parse_unary()?;
-                Ok(self.spanned(Expression::UnaryOp {
-                    op: UnaryOperator::BitNot,
-                    operand: Box::new(operand.inner),
-                }))
-            }
             Token::Increment => {
                 self.advance();
                 let operand = self.parse_unary()?;
