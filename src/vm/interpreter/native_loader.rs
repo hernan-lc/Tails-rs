@@ -5,8 +5,7 @@ use crate::vm::gc::GarbageCollector;
 use crate::vm::interpreter::{HeapValue, JsObject, PropertyStorage};
 use rustc_hash::FxHashMap;
 
-type NativeModuleFactory =
-    fn(&mut Vec<HeapValue>, &mut GarbageCollector) -> PropertyStorage;
+type NativeModuleFactory = fn(&mut Vec<HeapValue>, &mut GarbageCollector) -> PropertyStorage;
 
 pub struct NativeModuleRegistry {
     modules: FxHashMap<String, Box<NativeModuleFactory>>,
@@ -92,10 +91,7 @@ pub fn discover_module(name: &str, registry: &mut NativeModuleRegistry) {
 }
 
 #[cfg(feature = "fs")]
-pub fn create_fs_module(
-    _heap: &mut Vec<HeapValue>,
-    _gc: &mut GarbageCollector,
-) -> PropertyStorage {
+pub fn create_fs_module(_heap: &mut Vec<HeapValue>, _gc: &mut GarbageCollector) -> PropertyStorage {
     props! {
         "readFileSync" => Value::NativeFunction(c::FS_READ_FILE_SYNC),
         "writeFileSync" => Value::NativeFunction(c::FS_WRITE_FILE_SYNC),
@@ -296,10 +292,7 @@ pub fn create_buffer_module(
     }
 }
 
-pub fn create_intl_module(
-    heap: &mut Vec<HeapValue>,
-    gc: &mut GarbageCollector,
-) -> PropertyStorage {
+pub fn create_intl_module(heap: &mut Vec<HeapValue>, gc: &mut GarbageCollector) -> PropertyStorage {
     let intl_obj_idx = gc.allocate(
         heap,
         HeapValue::Object(JsObject {
@@ -340,10 +333,7 @@ pub fn create_events_module(
 }
 
 #[cfg(feature = "os")]
-pub fn create_os_module(
-    _heap: &mut Vec<HeapValue>,
-    _gc: &mut GarbageCollector,
-) -> PropertyStorage {
+pub fn create_os_module(_heap: &mut Vec<HeapValue>, _gc: &mut GarbageCollector) -> PropertyStorage {
     props! {
         "platform" => Value::NativeFunction(c::OS_PLATFORM),
         "arch" => Value::NativeFunction(c::OS_ARCH),

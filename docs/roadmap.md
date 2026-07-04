@@ -40,15 +40,6 @@
 
 ---
 
-### Phase 3 — Profile-guided follow-ups
-
-After Phase 2 lands, re-run `benchmarks/runner.sh` and pick top-3 hotspots.
-
-- [ ] **3.4 — RegExp direct fast-path + lazy result**  
-  Next-largest gap on `builtins/regexp.js` after iterator fast-path.
-
----
-
 ## 📋 Out of Scope
 
 - New feature work (modules, globals, APIs)

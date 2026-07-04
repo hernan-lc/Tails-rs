@@ -401,14 +401,14 @@ pub(super) fn native_request_constructor(
                 }));
                 props.insert("headers".into(), Value::Object(h_idx));
 
-    let idx = interp.heap.len();
-    interp.heap.push(HeapValue::Object(JsObject {
-        properties: props.into(),
-        prototype: None,
-        extensible: true,
-    }));
-    return Ok(Value::Object(idx));
-}
+                let idx = interp.heap.len();
+                interp.heap.push(HeapValue::Object(JsObject {
+                    properties: props,
+                    prototype: None,
+                    extensible: true,
+                }));
+                return Ok(Value::Object(idx));
+            }
         }
     }
 

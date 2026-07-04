@@ -13,6 +13,7 @@ const INLINE_CAP: usize = 8;
 /// Phase 3.5 — Hybrid property storage: inline array for small objects (≤8
 /// properties), falling back to `FxHashMap` for larger ones.  Avoids hash-map
 /// overhead for the common case of short-lived, few-property objects.
+#[allow(clippy::large_enum_variant)]
 #[derive(Debug, Clone)]
 pub enum PropertyStorage {
     Inline(u8, [Option<(String, Value)>; INLINE_CAP]),
@@ -30,18 +31,17 @@ impl PropertyStorage {
         Self::Inline(0, Default::default())
     }
 
-    fn upgrade(map: FxHashMap<String, Value>) -> Self {
+    #[allow(dead_code)]
+    pub(crate) fn upgrade(map: FxHashMap<String, Value>) -> Self {
         Self::Map(map)
     }
 
     pub fn get(&self, key: &str) -> Option<&Value> {
         match self {
             Self::Inline(len, slots) => {
-                for slot in slots.iter().take(*len as usize) {
-                    if let Some((k, v)) = slot {
-                        if k == key {
-                            return Some(v);
-                        }
+                for slot in slots.iter().take(*len as usize).flatten() {
+                    if slot.0 == key {
+                        return Some(&slot.1);
                     }
                 }
                 None
@@ -112,11 +112,9 @@ impl PropertyStorage {
     pub fn contains_key(&self, key: &str) -> bool {
         match self {
             Self::Inline(len, slots) => {
-                for slot in slots.iter().take(*len as usize) {
-                    if let Some((k, _)) = slot {
-                        if k == key {
-                            return true;
-                        }
+                for slot in slots.iter().take(*len as usize).flatten() {
+                    if slot.0 == key {
+                        return true;
                     }
                 }
                 false
@@ -147,12 +145,11 @@ impl PropertyStorage {
                     .collect::<Vec<_>>()
                     .into_iter()
             }
-            Self::Map(m) => {
-                m.iter()
-                    .map(|(k, v)| (k.as_str(), v))
-                    .collect::<Vec<_>>()
-                    .into_iter()
-            }
+            Self::Map(m) => m
+                .iter()
+                .map(|(k, v)| (k.as_str(), v))
+                .collect::<Vec<_>>()
+                .into_iter(),
         }
     }
 
@@ -182,12 +179,11 @@ impl PropertyStorage {
                     .collect::<Vec<_>>()
                     .into_iter()
             }
-            Self::Map(m) => {
-                m.iter_mut()
-                    .map(|(k, v)| (k.as_str(), v))
-                    .collect::<Vec<_>>()
-                    .into_iter()
-            }
+            Self::Map(m) => m
+                .iter_mut()
+                .map(|(k, v)| (k.as_str(), v))
+                .collect::<Vec<_>>()
+                .into_iter(),
         }
     }
 }
@@ -326,6 +322,7 @@ pub struct JsIterator {
     pub data: Option<Value>,
 }
 
+#[allow(clippy::large_enum_variant)]
 #[derive(Debug, Clone)]
 pub enum HeapValue {
     String(String),
@@ -480,8 +477,15 @@ impl JsRegExp {
         if self.is_literal_pattern() {
             let tail = &input[start..];
             let found = if self.ignore_case {
-                let needle_lower: Vec<char> = self.source.chars().map(|c| c.to_lowercase().next().unwrap_or(c)).collect();
-                let haystack_lower: Vec<char> = tail.chars().map(|c| c.to_lowercase().next().unwrap_or(c)).collect();
+                let needle_lower: Vec<char> = self
+                    .source
+                    .chars()
+                    .map(|c| c.to_lowercase().next().unwrap_or(c))
+                    .collect();
+                let haystack_lower: Vec<char> = tail
+                    .chars()
+                    .map(|c| c.to_lowercase().next().unwrap_or(c))
+                    .collect();
                 let needle_len = needle_lower.len();
                 haystack_lower
                     .windows(needle_len)
@@ -540,8 +544,15 @@ impl JsRegExp {
         // Phase 3.4 — Fast-path for literal patterns
         if self.is_literal_pattern() {
             return if self.ignore_case {
-                let needle_lower: Vec<char> = self.source.chars().map(|c| c.to_lowercase().next().unwrap_or(c)).collect();
-                let haystack_lower: Vec<char> = input.chars().map(|c| c.to_lowercase().next().unwrap_or(c)).collect();
+                let needle_lower: Vec<char> = self
+                    .source
+                    .chars()
+                    .map(|c| c.to_lowercase().next().unwrap_or(c))
+                    .collect();
+                let haystack_lower: Vec<char> = input
+                    .chars()
+                    .map(|c| c.to_lowercase().next().unwrap_or(c))
+                    .collect();
                 let needle_len = needle_lower.len();
                 haystack_lower
                     .windows(needle_len)
@@ -556,9 +567,9 @@ impl JsRegExp {
                         vec![input[byte_pos..byte_end].to_string()]
                     })
             } else {
-                input.find(self.source.as_str()).map(|pos| {
-                    vec![input[pos..pos + self.source.len()].to_string()]
-                })
+                input
+                    .find(self.source.as_str())
+                    .map(|pos| vec![input[pos..pos + self.source.len()].to_string()])
             };
         }
         self.exec_at(input, 0).map(|(v, _)| v)

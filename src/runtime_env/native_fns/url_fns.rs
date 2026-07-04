@@ -390,11 +390,9 @@ where
                     .iter()
                     .map(|(k, v)| format!("{}={}", k, v))
                     .collect();
-                let _ = obj
-                    .properties
+                obj.properties
                     .insert("__entries".into(), Value::String(new_str.join("&")));
-                let _ = obj
-                    .properties
+                obj.properties
                     .insert("size".into(), Value::Integer(entries.len() as i64));
             }
         }

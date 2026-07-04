@@ -21,11 +21,10 @@ pub(super) fn native_datetime_format_constructor(
     if let Some(Value::Object(opts_idx)) = args.get(1) {
         if let HeapValue::Object(obj) = &interp.heap[*opts_idx] {
             for (k, v) in &obj.properties {
-                options.insert(k.clone(), to_string_value(interp, v));
+                options.insert(k.to_string(), to_string_value(interp, v));
             }
         }
     }
-
     let date_style = options
         .get("dateStyle")
         .cloned()
@@ -413,7 +412,7 @@ pub(super) fn native_number_format_constructor(
     if let Some(Value::Object(opts_idx)) = args.get(1) {
         if let HeapValue::Object(obj) = &interp.heap[*opts_idx] {
             for (k, v) in &obj.properties {
-                options.insert(k.clone(), to_string_value(interp, v));
+                options.insert(k.to_string(), to_string_value(interp, v));
             }
         }
     }
