@@ -727,3 +727,76 @@ fn test_gc_snapshot_capacity_does_not_drop_references() {
         .unwrap();
     assert_eq!(r, Value::Integer(499));
 }
+
+// ---- Phase 3.5 — Inline property storage for small objects ----
+
+#[test]
+fn test_inline_property_basic() {
+    let mut rt = TailsRuntime::default();
+    let r = rt
+        .eval(r#"
+        let obj = { x: 1, y: 2, z: 3 };
+        obj.x + obj.y + obj.z;
+    "#)
+        .unwrap();
+    assert_eq!(r, Value::Integer(6));
+}
+
+#[test]
+fn test_inline_property_many_properties() {
+    // Test that objects with >8 properties fall back to hashmap correctly
+    let mut rt = TailsRuntime::default();
+    let r = rt
+        .eval(r#"
+        let obj = { a: 1, b: 2, c: 3, d: 4, e: 5, f: 6, g: 7, h: 8, i: 9 };
+        obj.a + obj.i;
+    "#)
+        .unwrap();
+    assert_eq!(r, Value::Integer(10));
+}
+
+#[test]
+fn test_inline_property_update_existing() {
+    let mut rt = TailsRuntime::default();
+    let r = rt
+        .eval(r#"
+        let obj = { x: 1 };
+        obj.x = 42;
+        obj.x;
+    "#)
+        .unwrap();
+    assert_eq!(r, Value::Integer(42));
+}
+
+#[test]
+fn test_inline_property_with_prototype() {
+    let mut rt = TailsRuntime::default();
+    let r = rt
+        .eval(r#"
+        let proto = { inherited: 99 };
+        let obj = Object.create(proto);
+        obj.own = 1;
+        obj.inherited + obj.own;
+    "#)
+        .unwrap();
+    assert_eq!(r, Value::Integer(100));
+}
+
+#[test]
+fn test_inline_property_gc_preserves_references() {
+    // Ensure GC correctly traces inline properties
+    let mut rt = TailsRuntime::default();
+    let r = rt
+        .eval(
+            r#"
+            let obj = { value: [1, 2, 3] };
+            // Force GC by allocating
+            for (let i = 0; i < 1000; i++) {
+                Array(i);
+            }
+            obj.value[0];
+        "#,
+        )
+        .unwrap();
+    assert_eq!(r, Value::Integer(1));
+}
