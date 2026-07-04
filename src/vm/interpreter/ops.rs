@@ -3,7 +3,6 @@ use crate::compiler::Instruction;
 use crate::errors::{Error, Result};
 use crate::objects::Value;
 
-const ERR_STACK_UNDERFLOW: &str = "Stack underflow";
 const PROXY_SET_TRAP: &str = "set";
 const PROXY_DELETE_TRAP: &str = "deleteProperty";
 const SETTER_PREFIX: &str = "__setter_";
@@ -22,7 +21,7 @@ impl Interpreter {
     fn stack_pop(&mut self) -> Result<Value> {
         self.stack
             .pop()
-            .ok_or_else(|| Error::RuntimeError(ERR_STACK_UNDERFLOW.into()))
+            .ok_or_else(|| Error::RuntimeError(super::ERR_STACK_UNDERFLOW.into()))
     }
 
     fn pop_binary(&mut self) -> Result<(Value, Value)> {

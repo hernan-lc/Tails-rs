@@ -96,7 +96,7 @@ impl Interpreter {
                 let value = self
                     .stack
                     .pop()
-                    .ok_or_else(|| Error::RuntimeError("Stack underflow".into()))?;
+                    .ok_or_else(|| Error::RuntimeError(super::ERR_STACK_UNDERFLOW.into()))?;
                 self.globals.insert(name.clone(), value);
             }
             Instruction::LoadLocal(slot) => {
@@ -119,7 +119,7 @@ impl Interpreter {
                 let value = self
                     .stack
                     .pop()
-                    .ok_or_else(|| Error::RuntimeError("Stack underflow".into()))?;
+                    .ok_or_else(|| Error::RuntimeError(super::ERR_STACK_UNDERFLOW.into()))?;
                 let base = self.call_stack.last().map(|f| f.base_pointer).unwrap_or(0);
                 let idx = base + *slot as usize;
                 if idx >= self.stack.len() {

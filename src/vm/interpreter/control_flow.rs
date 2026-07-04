@@ -26,7 +26,7 @@ impl Interpreter {
                 let value = self
                     .stack
                     .pop()
-                    .ok_or_else(|| Error::RuntimeError("Stack underflow".into()))?;
+                    .ok_or_else(|| Error::RuntimeError(super::ERR_STACK_UNDERFLOW.into()))?;
                 if self.is_truthy(&value) {
                     *pc = *target as usize;
                     Ok(ControlFlowOutcome::Continue)
@@ -38,7 +38,7 @@ impl Interpreter {
                 let value = self
                     .stack
                     .pop()
-                    .ok_or_else(|| Error::RuntimeError("Stack underflow".into()))?;
+                    .ok_or_else(|| Error::RuntimeError(super::ERR_STACK_UNDERFLOW.into()))?;
                 if !self.is_truthy(&value) {
                     *pc = *target as usize;
                     Ok(ControlFlowOutcome::Continue)
@@ -50,7 +50,7 @@ impl Interpreter {
                 let value = self
                     .stack
                     .pop()
-                    .ok_or_else(|| Error::RuntimeError("Stack underflow".into()))?;
+                    .ok_or_else(|| Error::RuntimeError(super::ERR_STACK_UNDERFLOW.into()))?;
                 if matches!(value, Value::Undefined | Value::Null) {
                     *pc = *target as usize;
                     Ok(ControlFlowOutcome::Continue)
@@ -62,7 +62,7 @@ impl Interpreter {
                 let value = self
                     .stack
                     .last()
-                    .ok_or_else(|| Error::RuntimeError("Stack underflow".into()))?;
+                    .ok_or_else(|| Error::RuntimeError(super::ERR_STACK_UNDERFLOW.into()))?;
                 if !matches!(value, Value::Undefined | Value::Null) {
                     *pc = *target as usize;
                     Ok(ControlFlowOutcome::Continue)

@@ -11,7 +11,7 @@ impl Interpreter {
         let super_val = if class_info.superclass.is_some() {
             self.stack
                 .pop()
-                .ok_or_else(|| Error::RuntimeError("Stack underflow".into()))?
+                .ok_or_else(|| Error::RuntimeError(super::ERR_STACK_UNDERFLOW.into()))?
         } else {
             Value::Undefined
         };
@@ -175,14 +175,14 @@ impl Interpreter {
                     args.push(
                         self.stack
                             .pop()
-                            .ok_or_else(|| Error::RuntimeError("Stack underflow".into()))?,
+                            .ok_or_else(|| Error::RuntimeError(super::ERR_STACK_UNDERFLOW.into()))?,
                     );
                 }
                 args.reverse();
                 let this_val = self
                     .stack
                     .pop()
-                    .ok_or_else(|| Error::RuntimeError("Stack underflow".into()))?;
+                    .ok_or_else(|| Error::RuntimeError(super::ERR_STACK_UNDERFLOW.into()))?;
                 let super_class = {
                     let mut found = Value::Undefined;
                     for frame in self.call_stack.iter().rev() {
@@ -262,11 +262,11 @@ impl Interpreter {
                 let key = self
                     .stack
                     .pop()
-                    .ok_or_else(|| Error::RuntimeError("Stack underflow".into()))?;
+                    .ok_or_else(|| Error::RuntimeError(super::ERR_STACK_UNDERFLOW.into()))?;
                 let _this = self
                     .stack
                     .pop()
-                    .ok_or_else(|| Error::RuntimeError("Stack underflow".into()))?;
+                    .ok_or_else(|| Error::RuntimeError(super::ERR_STACK_UNDERFLOW.into()))?;
                 let super_class = {
                     let mut found = Value::Undefined;
                     for frame in self.call_stack.iter().rev() {

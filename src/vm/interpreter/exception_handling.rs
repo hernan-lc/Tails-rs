@@ -16,7 +16,7 @@ impl Interpreter {
                 let value = self
                     .stack
                     .pop()
-                    .ok_or_else(|| Error::RuntimeError("Stack underflow".into()))?;
+                    .ok_or_else(|| Error::RuntimeError(super::ERR_STACK_UNDERFLOW.into()))?;
                 self.pending_exception = Some(value.clone());
                 while let Some(handler) = self.exception_handlers.last().cloned() {
                     if handler.catch_pc != 0 {

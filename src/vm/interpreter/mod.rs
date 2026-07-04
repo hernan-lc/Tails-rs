@@ -19,6 +19,10 @@ pub mod safe_function;
 pub mod safe_library;
 mod value_ops;
 
+#[allow(dead_code)]
+pub(crate) const ERR_STACK_UNDERFLOW: &str = "Stack underflow";
+pub(crate) const ERR_DIV_BY_ZERO: &str = "Division by zero";
+
 pub(crate) use call_frame::{CallFrame, ExceptionHandler, SuspendedFrame};
 pub use heap_types::{
     HeapValue, JsArray, JsCompiledRegex, JsFunction, JsGenerator, JsIterator, JsObject,

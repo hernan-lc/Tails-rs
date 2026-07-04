@@ -56,7 +56,7 @@ impl Interpreter {
                         self.stack[idx] = value;
                     } else {
                         return Err(
-                            self.err_at_location(Error::RuntimeError("Stack underflow".into()))
+                            self.err_at_location(Error::RuntimeError(super::ERR_STACK_UNDERFLOW.into()))
                         );
                     }
                     pc += 1;
@@ -290,13 +290,13 @@ impl Interpreter {
                     let callee = self
                         .stack
                         .pop()
-                        .ok_or_else(|| Error::RuntimeError("Stack underflow".into()))?;
+                        .ok_or_else(|| Error::RuntimeError(super::ERR_STACK_UNDERFLOW.into()))?;
                     let mut args = Vec::new();
                     for _ in 0..*argc {
                         args.push(
                             self.stack
                                 .pop()
-                                .ok_or_else(|| Error::RuntimeError("Stack underflow".into()))?,
+                                .ok_or_else(|| Error::RuntimeError(super::ERR_STACK_UNDERFLOW.into()))?,
                         );
                     }
                     args.reverse();
@@ -555,18 +555,18 @@ impl Interpreter {
                         args.push(
                             self.stack
                                 .pop()
-                                .ok_or_else(|| Error::RuntimeError("Stack underflow".into()))?,
+                                .ok_or_else(|| Error::RuntimeError(super::ERR_STACK_UNDERFLOW.into()))?,
                         );
                     }
                     args.reverse();
                     let key = self
                         .stack
                         .pop()
-                        .ok_or_else(|| Error::RuntimeError("Stack underflow".into()))?;
+                        .ok_or_else(|| Error::RuntimeError(super::ERR_STACK_UNDERFLOW.into()))?;
                     let object = self
                         .stack
                         .pop()
-                        .ok_or_else(|| Error::RuntimeError("Stack underflow".into()))?;
+                        .ok_or_else(|| Error::RuntimeError(super::ERR_STACK_UNDERFLOW.into()))?;
                     let method = self.get_property(&object, &key)?;
                     match method {
                         Value::Function(func_idx) => {
@@ -689,14 +689,14 @@ impl Interpreter {
                         args.push(
                             self.stack
                                 .pop()
-                                .ok_or_else(|| Error::RuntimeError("Stack underflow".into()))?,
+                                .ok_or_else(|| Error::RuntimeError(super::ERR_STACK_UNDERFLOW.into()))?,
                         );
                     }
                     args.reverse();
                     let constructor = self
                         .stack
                         .pop()
-                        .ok_or_else(|| Error::RuntimeError("Stack underflow".into()))?;
+                        .ok_or_else(|| Error::RuntimeError(super::ERR_STACK_UNDERFLOW.into()))?;
                     match &constructor {
                         Value::Function(func_idx) => {
                             let proto_idx = if let Value::Object(proto_obj_idx) = self
@@ -962,7 +962,7 @@ impl Interpreter {
                     let value = self
                         .stack
                         .pop()
-                        .ok_or_else(|| Error::RuntimeError("Stack underflow".into()))?;
+                        .ok_or_else(|| Error::RuntimeError(super::ERR_STACK_UNDERFLOW.into()))?;
                     if let Value::Promise(promise_idx) = &value {
                         if let HeapValue::Promise(p) = &self.heap[*promise_idx] {
                             match &p.state {
@@ -1005,7 +1005,7 @@ impl Interpreter {
                     let source = self
                         .stack
                         .pop()
-                        .ok_or_else(|| Error::RuntimeError("Stack underflow".into()))?;
+                        .ok_or_else(|| Error::RuntimeError(super::ERR_STACK_UNDERFLOW.into()))?;
                     let source_str = match &source {
                         Value::String(s) => s.clone(),
                         _ => {
@@ -1047,7 +1047,7 @@ impl Interpreter {
                     let iterable = self
                         .stack
                         .pop()
-                        .ok_or_else(|| Error::RuntimeError("Stack underflow".into()))?;
+                        .ok_or_else(|| Error::RuntimeError(super::ERR_STACK_UNDERFLOW.into()))?;
                     let iter = self.exec_get_iterator(iterable)?;
                     self.stack.push(iter);
                 }
@@ -1055,7 +1055,7 @@ impl Interpreter {
                     let iterable = self
                         .stack
                         .pop()
-                        .ok_or_else(|| Error::RuntimeError("Stack underflow".into()))?;
+                        .ok_or_else(|| Error::RuntimeError(super::ERR_STACK_UNDERFLOW.into()))?;
                     let iter = self.exec_get_async_iterator(iterable)?;
                     self.stack.push(iter);
                 }
@@ -1064,7 +1064,7 @@ impl Interpreter {
                         .stack
                         .last()
                         .cloned()
-                        .ok_or_else(|| Error::RuntimeError("Stack underflow".into()))?;
+                        .ok_or_else(|| Error::RuntimeError(super::ERR_STACK_UNDERFLOW.into()))?;
                     match self.exec_iterator_next(iterator, *target as usize)? {
                         ControlFlowOutcome::Jump(jump_target) => {
                             self.stack.pop();
@@ -1079,7 +1079,7 @@ impl Interpreter {
                     let iterator = self
                         .stack
                         .pop()
-                        .ok_or_else(|| Error::RuntimeError("Stack underflow".into()))?;
+                        .ok_or_else(|| Error::RuntimeError(super::ERR_STACK_UNDERFLOW.into()))?;
                     self.exec_iterator_close(iterator)?;
                 }
                 Instruction::AsyncIteratorNext(target) => {
@@ -1087,7 +1087,7 @@ impl Interpreter {
                         .stack
                         .last()
                         .cloned()
-                        .ok_or_else(|| Error::RuntimeError("Stack underflow".into()))?;
+                        .ok_or_else(|| Error::RuntimeError(super::ERR_STACK_UNDERFLOW.into()))?;
                     match self.exec_async_iterator_next(iterator, *target as usize)? {
                         ControlFlowOutcome::Jump(jump_target) => {
                             self.stack.pop();

@@ -244,7 +244,7 @@ impl Interpreter {
         match (&left, &right) {
             (Value::BigInt(a), Value::BigInt(b)) => {
                 if *b == 0 {
-                    return Err(Error::RuntimeError("Division by zero".into()));
+                    return Err(Error::RuntimeError(super::ERR_DIV_BY_ZERO.into()));
                 }
                 Ok(Value::BigInt(a / b))
             }
@@ -252,7 +252,7 @@ impl Interpreter {
                 let l = self.to_number(&left)?;
                 let r = self.to_number(&right)?;
                 if r == 0.0 {
-                    return Err(Error::RuntimeError("Division by zero".into()));
+                    return Err(Error::RuntimeError(super::ERR_DIV_BY_ZERO.into()));
                 }
                 Ok(Value::Float(l / r))
             }
@@ -263,7 +263,7 @@ impl Interpreter {
         match (&left, &right) {
             (Value::BigInt(a), Value::BigInt(b)) => {
                 if *b == 0 {
-                    return Err(Error::RuntimeError("Division by zero".into()));
+                    return Err(Error::RuntimeError(super::ERR_DIV_BY_ZERO.into()));
                 }
                 Ok(Value::BigInt(a % b))
             }
@@ -271,7 +271,7 @@ impl Interpreter {
                 let l = self.to_number(&left)?;
                 let r = self.to_number(&right)?;
                 if r == 0.0 {
-                    return Err(Error::RuntimeError("Division by zero".into()));
+                    return Err(Error::RuntimeError(super::ERR_DIV_BY_ZERO.into()));
                 }
                 Ok(Value::Float(l % r))
             }
