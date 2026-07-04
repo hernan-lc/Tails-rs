@@ -8,6 +8,27 @@ use rustc_hash::FxHashMap;
 
 use super::helpers::to_string_value;
 
+fn create_headers_props(headers_raw: &str) -> PropertyStorage {
+    let mut props = FxHashMap::default();
+    props.insert("__headers".into(), Value::String(headers_raw.to_string()));
+    props.insert("append".into(), Value::NativeFunction(c::HEADERS_APPEND));
+    props.insert("get".into(), Value::NativeFunction(c::HEADERS_GET));
+    props.insert("set".into(), Value::NativeFunction(c::HEADERS_SET));
+    props.insert("has".into(), Value::NativeFunction(c::HEADERS_HAS));
+    props.insert("delete".into(), Value::NativeFunction(c::HEADERS_DELETE));
+    props.insert("forEach".into(), Value::NativeFunction(c::HEADERS_FOR_EACH));
+    props.insert("keys".into(), Value::NativeFunction(c::HEADERS_KEYS));
+    props.insert("values".into(), Value::NativeFunction(c::HEADERS_VALUES));
+    props.insert("entries".into(), Value::NativeFunction(c::HEADERS_ENTRIES));
+    PropertyStorage::Map(props)
+}
+
+fn get_string_prop(obj: &crate::vm::interpreter::JsObject, key: &str) -> Option<String> {
+    obj.properties.get(key).and_then(|v| {
+        if let Value::String(s) = v { Some(s.clone()) } else { None }
+    })
+}
+
 // ============================================================
 // Headers (index 370-379)
 // ============================================================
@@ -27,7 +48,7 @@ pub(super) fn native_headers_constructor(
             Value::Object(obj_idx) => {
                 if let HeapValue::Object(obj) = &interp.heap[*obj_idx] {
                     // Check if it's another Headers instance
-                    if let Some(Value::String(h)) = obj.properties.get("__headers") {
+                    if let Some(h) = get_string_prop(obj, "__headers") {
                         props.insert("__headers".into(), Value::String(h.clone()));
                     } else {
                         // Plain object: key-value pairs
@@ -103,7 +124,7 @@ fn parse_headers(raw: &str) -> Vec<(String, String)> {
 fn get_headers_string(interp: &Interpreter, this: &Value) -> String {
     if let Value::Object(obj_idx) = this {
         if let HeapValue::Object(obj) = &interp.heap[*obj_idx] {
-            if let Some(Value::String(h)) = obj.properties.get("__headers") {
+            if let Some(h) = get_string_prop(obj, "__headers") {
                 return h.clone();
             }
         }
@@ -120,13 +141,7 @@ where
             let raw = obj
                 .properties
                 .get("__headers")
-                .and_then(|v| {
-                    if let Value::String(s) = v {
-                        Some(s.clone())
-                    } else {
-                        None
-                    }
-                })
+                .and_then(|v| if let Value::String(s) = v { Some(s.clone()) } else { None })
                 .unwrap_or_default();
             let mut entries = parse_headers(&raw);
             f(&mut entries);
@@ -348,13 +363,7 @@ pub(super) fn native_request_constructor(
                         }
                     })
                     .unwrap_or_default();
-                body = obj.properties.get("__body").and_then(|v| {
-                    if let Value::String(s) = v {
-                        Some(s.clone())
-                    } else {
-                        None
-                    }
-                });
+                body = get_string_prop(obj, "__body");
                 method = cloned_method;
                 // Use the cloned URL but allow second arg to override
                 let init_url = url;
@@ -382,18 +391,7 @@ pub(super) fn native_request_constructor(
 
                 // Create headers object
                 let h_idx = interp.heap.len();
-                let h_props = props! {
-                    "__headers" => Value::String(headers_raw),
-                    "append" => Value::NativeFunction(c::HEADERS_APPEND),
-                    "get" => Value::NativeFunction(c::HEADERS_GET),
-                    "set" => Value::NativeFunction(c::HEADERS_SET),
-                    "has" => Value::NativeFunction(c::HEADERS_HAS),
-                    "delete" => Value::NativeFunction(c::HEADERS_DELETE),
-                    "forEach" => Value::NativeFunction(c::HEADERS_FOR_EACH),
-                    "keys" => Value::NativeFunction(c::HEADERS_KEYS),
-                    "values" => Value::NativeFunction(c::HEADERS_VALUES),
-                    "entries" => Value::NativeFunction(c::HEADERS_ENTRIES),
-                };
+                let h_props = create_headers_props(&headers_raw);
                 interp.heap.push(HeapValue::Object(JsObject {
                     properties: h_props,
                     prototype: None,
@@ -451,18 +449,7 @@ pub(super) fn native_request_constructor(
 
     // Create headers object
     let h_idx = interp.heap.len();
-    let h_props = props! {
-        "__headers" => Value::String(headers_raw),
-        "append" => Value::NativeFunction(c::HEADERS_APPEND),
-        "get" => Value::NativeFunction(c::HEADERS_GET),
-        "set" => Value::NativeFunction(c::HEADERS_SET),
-        "has" => Value::NativeFunction(c::HEADERS_HAS),
-        "delete" => Value::NativeFunction(c::HEADERS_DELETE),
-        "forEach" => Value::NativeFunction(c::HEADERS_FOR_EACH),
-        "keys" => Value::NativeFunction(c::HEADERS_KEYS),
-        "values" => Value::NativeFunction(c::HEADERS_VALUES),
-        "entries" => Value::NativeFunction(c::HEADERS_ENTRIES),
-    };
+    let h_props = create_headers_props(&headers_raw);
     interp.heap.push(HeapValue::Object(JsObject {
         properties: h_props,
         prototype: None,
@@ -560,18 +547,7 @@ fn build_response(
 
     // Create headers object
     let h_idx = interp.heap.len();
-    let h_props = props! {
-        "__headers" => Value::String(headers_raw.to_string()),
-        "append" => Value::NativeFunction(c::HEADERS_APPEND),
-        "get" => Value::NativeFunction(c::HEADERS_GET),
-        "set" => Value::NativeFunction(c::HEADERS_SET),
-        "has" => Value::NativeFunction(c::HEADERS_HAS),
-        "delete" => Value::NativeFunction(c::HEADERS_DELETE),
-        "forEach" => Value::NativeFunction(c::HEADERS_FOR_EACH),
-        "keys" => Value::NativeFunction(c::HEADERS_KEYS),
-        "values" => Value::NativeFunction(c::HEADERS_VALUES),
-        "entries" => Value::NativeFunction(c::HEADERS_ENTRIES),
-    };
+    let h_props = create_headers_props(headers_raw);
     interp.heap.push(HeapValue::Object(JsObject {
         properties: h_props,
         prototype: None,
@@ -712,7 +688,7 @@ pub(super) fn native_response_text(
 ) -> Result<Value> {
     if let Value::Object(obj_idx) = _this {
         if let HeapValue::Object(obj) = &interp.heap[*obj_idx] {
-            if let Some(Value::String(body)) = obj.properties.get("__body") {
+            if let Some(body) = get_string_prop(obj, "__body") {
                 return Ok(Value::String(body.clone()));
             }
         }
@@ -727,8 +703,8 @@ pub(super) fn native_response_json(
 ) -> Result<Value> {
     if let Value::Object(obj_idx) = _this {
         if let HeapValue::Object(obj) = &interp.heap[*obj_idx] {
-            if let Some(Value::String(body)) = obj.properties.get("__body") {
-                let json_val: serde_json::Value = serde_json::from_str(body)
+            if let Some(body) = get_string_prop(obj, "__body") {
+                let json_val: serde_json::Value = serde_json::from_str(&body)
                     .map_err(|e| Error::RuntimeError(format!("JSON parse error: {}", e)))?;
                 return Ok(super::helpers::from_json_value(interp, json_val));
             }
@@ -744,7 +720,7 @@ pub(super) fn native_response_array_buffer(
 ) -> Result<Value> {
     if let Value::Object(obj_idx) = _this {
         if let HeapValue::Object(obj) = &interp.heap[*obj_idx] {
-            if let Some(Value::String(body)) = obj.properties.get("__body") {
+            if let Some(body) = get_string_prop(obj, "__body") {
                 let bytes = body.as_bytes().to_vec();
                 let buf_idx = interp.heap.len();
                 interp.heap.push(HeapValue::Buffer(bytes));
