@@ -4,41 +4,42 @@ use crate::vm::interpreter::Interpreter;
 
 use super::helpers::to_f64;
 
-pub(super) fn native_math_abs(
-    _interp: &mut Interpreter,
-    _this: &Value,
-    args: &[Value],
-) -> Result<Value> {
-    let n = args.first().map(to_f64).unwrap_or(0.0);
-    Ok(Value::Float(n.abs()))
+/// Macro for generating unary math functions that operate on the first argument.
+///
+/// # Example
+///
+/// ```
+/// unary_math_fn!(pub(super) fn native_math_abs, |n: f64| n.abs());
+/// ```
+///
+/// Expands to:
+/// ```
+/// pub(super) fn native_math_abs(...) -> Result<Value> {
+///     let n = args.first().map(to_f64).unwrap_or(0.0);
+///     Ok(Value::Float((n.abs())))
+/// }
+/// ```
+macro_rules! unary_math_fn {
+    (
+        $vis:vis fn $name:ident,
+        $op:expr
+    ) => {
+        $vis fn $name(
+            _interp: &mut Interpreter,
+            _this: &Value,
+            args: &[Value],
+        ) -> Result<Value> {
+            let n = args.first().map(to_f64).unwrap_or(0.0);
+            Ok(Value::Float($op(n)))
+        }
+    };
 }
 
-pub(super) fn native_math_floor(
-    _interp: &mut Interpreter,
-    _this: &Value,
-    args: &[Value],
-) -> Result<Value> {
-    let n = args.first().map(to_f64).unwrap_or(0.0);
-    Ok(Value::Float(n.floor()))
-}
-
-pub(super) fn native_math_ceil(
-    _interp: &mut Interpreter,
-    _this: &Value,
-    args: &[Value],
-) -> Result<Value> {
-    let n = args.first().map(to_f64).unwrap_or(0.0);
-    Ok(Value::Float(n.ceil()))
-}
-
-pub(super) fn native_math_round(
-    _interp: &mut Interpreter,
-    _this: &Value,
-    args: &[Value],
-) -> Result<Value> {
-    let n = args.first().map(to_f64).unwrap_or(0.0);
-    Ok(Value::Float(n.round()))
-}
+// Unary math functions (9 functions reduced to 9 one-line macro invocations)
+unary_math_fn!(pub(super) fn native_math_abs, |n: f64| n.abs());
+unary_math_fn!(pub(super) fn native_math_floor, |n: f64| n.floor());
+unary_math_fn!(pub(super) fn native_math_ceil, |n: f64| n.ceil());
+unary_math_fn!(pub(super) fn native_math_round, |n: f64| n.round());
 
 pub(super) fn native_math_min(
     _interp: &mut Interpreter,
@@ -99,47 +100,8 @@ pub(super) fn native_math_pow(
     Ok(Value::Float(base.powf(exp)))
 }
 
-pub(super) fn native_math_sqrt(
-    _interp: &mut Interpreter,
-    _this: &Value,
-    args: &[Value],
-) -> Result<Value> {
-    let n = args.first().map(to_f64).unwrap_or(0.0);
-    Ok(Value::Float(n.sqrt()))
-}
-
-pub(super) fn native_math_log(
-    _interp: &mut Interpreter,
-    _this: &Value,
-    args: &[Value],
-) -> Result<Value> {
-    let n = args.first().map(to_f64).unwrap_or(0.0);
-    Ok(Value::Float(n.ln()))
-}
-
-pub(super) fn native_math_sin(
-    _interp: &mut Interpreter,
-    _this: &Value,
-    args: &[Value],
-) -> Result<Value> {
-    let n = args.first().map(to_f64).unwrap_or(0.0);
-    Ok(Value::Float(n.sin()))
-}
-
-pub(super) fn native_math_cos(
-    _interp: &mut Interpreter,
-    _this: &Value,
-    args: &[Value],
-) -> Result<Value> {
-    let n = args.first().map(to_f64).unwrap_or(0.0);
-    Ok(Value::Float(n.cos()))
-}
-
-pub(super) fn native_math_tan(
-    _interp: &mut Interpreter,
-    _this: &Value,
-    args: &[Value],
-) -> Result<Value> {
-    let n = args.first().map(to_f64).unwrap_or(0.0);
-    Ok(Value::Float(n.tan()))
-}
+unary_math_fn!(pub(super) fn native_math_sqrt, |n: f64| n.sqrt());
+unary_math_fn!(pub(super) fn native_math_log, |n: f64| n.ln());
+unary_math_fn!(pub(super) fn native_math_sin, |n: f64| n.sin());
+unary_math_fn!(pub(super) fn native_math_cos, |n: f64| n.cos());
+unary_math_fn!(pub(super) fn native_math_tan, |n: f64| n.tan());
