@@ -2,7 +2,7 @@ use crate::errors::Result;
 use crate::objects::Value;
 use crate::vm::interpreter::Interpreter;
 
-use super::helpers::to_display_string;
+use super::helpers::{is_user_visible_key, to_display_string};
 use colored::*;
 use rustc_hash::FxHashMap;
 use std::cell::RefCell;
@@ -70,7 +70,7 @@ fn collect_object_properties<'a>(
                 all_props.push((prop_name.to_string(), v));
                 continue;
             }
-            if k.starts_with("__setter_") || k.starts_with("__method_") {
+            if !is_user_visible_key(k) {
                 continue;
             }
             all_props.push((k.to_string(), v));
@@ -443,9 +443,7 @@ pub(super) fn native_console_table(
                             &interp.heap[*obj_idx]
                         {
                             for key in obj.properties.keys() {
-                                if key.starts_with("__getter_")
-                                    || key.starts_with("__setter_")
-                                    || key.starts_with("__method_")
+                                if !is_user_visible_key(key)
                                 {
                                     continue;
                                 }
@@ -533,9 +531,7 @@ pub(super) fn native_console_table(
                     .properties
                     .iter()
                     .filter(|(k, _)| {
-                        !k.starts_with("__getter_")
-                            && !k.starts_with("__setter_")
-                            && !k.starts_with("__method_")
+                        is_user_visible_key(k)
                     })
                     .collect();
                 props.sort_by(|a, b| a.0.cmp(b.0));

@@ -2,7 +2,7 @@ use crate::errors::{Error, Result};
 use crate::objects::Value;
 use crate::vm::interpreter::Interpreter;
 
-use super::helpers::{get_array_elements, to_f64, to_string_value};
+use super::helpers::{get_array_elements, normalize_index, to_f64, to_string_value};
 
 pub(super) fn native_array_constructor(
     interp: &mut Interpreter,
@@ -454,14 +454,6 @@ pub(super) fn native_array_flat(
         crate::vm::interpreter::JsArray { elements: flat },
     ));
     Ok(Value::Array(heap_idx))
-}
-
-fn normalize_index(index: i64, len: i64) -> i64 {
-    if index < 0 {
-        (len + index).max(0)
-    } else {
-        index.min(len)
-    }
 }
 
 pub(super) fn native_array_copy_within(

@@ -3,6 +3,8 @@ use crate::objects::js_date::JsDate;
 use crate::objects::Value;
 use crate::vm::interpreter::{HeapValue, Interpreter};
 
+use super::helpers::to_f64;
+
 fn get_date_idx(this: &Value) -> Option<usize> {
     match this {
         Value::Date(idx) => Some(*idx),
@@ -545,25 +547,4 @@ pub(super) fn native_date_value_of(
     _args: &[Value],
 ) -> Result<Value> {
     with_date!(interp, this, |date: &JsDate| Ok(Value::Float(date.utc_ms)))
-}
-
-// Helper
-
-fn to_f64(v: &Value) -> f64 {
-    match v {
-        Value::Integer(n) => *n as f64,
-        Value::Float(n) => *n,
-        Value::Boolean(b) => {
-            if *b {
-                1.0
-            } else {
-                0.0
-            }
-        }
-        Value::Null => 0.0,
-        Value::Undefined => f64::NAN,
-        Value::String(s) => s.parse::<f64>().unwrap_or(f64::NAN),
-        Value::Cons(c) => c.flatten().parse::<f64>().unwrap_or(f64::NAN),
-        _ => f64::NAN,
-    }
 }

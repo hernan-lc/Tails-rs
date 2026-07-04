@@ -16,8 +16,29 @@ pub(super) fn to_f64(v: &Value) -> f64 {
         Value::Null => 0.0,
         Value::Undefined => f64::NAN,
         Value::String(s) => s.parse::<f64>().unwrap_or(f64::NAN),
+        Value::Cons(c) => c.flatten().parse::<f64>().unwrap_or(f64::NAN),
         _ => f64::NAN,
     }
+}
+
+pub(super) fn arg_f64(args: &[Value], idx: usize, default: f64) -> f64 {
+    args.get(idx).map(|v| to_f64(v)).unwrap_or(default)
+}
+
+pub(super) fn first_arg(args: &[Value]) -> Value {
+    args.first().cloned().unwrap_or(Value::Undefined)
+}
+
+pub(super) fn normalize_index(index: i64, len: i64) -> i64 {
+    if index < 0 {
+        (len + index).max(0)
+    } else {
+        index.min(len)
+    }
+}
+
+pub(super) fn is_user_visible_key(k: &str) -> bool {
+    !k.starts_with("__getter_") && !k.starts_with("__setter_") && !k.starts_with("__method_")
 }
 
 pub(super) fn to_i64(v: &Value) -> i64 {
@@ -285,11 +306,7 @@ fn to_json_value_inner(
                 let parts: Vec<String> = obj
                     .properties
                     .iter()
-                    .filter(|(k, _)| {
-                        !k.starts_with("__getter_")
-                            && !k.starts_with("__setter_")
-                            && !k.starts_with("__method_")
-                    })
+                    .filter(|(k, _)| is_user_visible_key(k))
                     .map(|(k, v)| {
                         format!(
                             "\"{}\":{}",
