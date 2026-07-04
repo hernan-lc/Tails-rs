@@ -568,23 +568,7 @@ pub(super) fn native_console_group(
     _this: &Value,
     args: &[Value],
 ) -> Result<Value> {
-    let indent = get_indent();
-    let timestamp = get_timestamp();
-    let parts: Vec<String> = args
-        .iter()
-        .map(|a| format_value_no_colors(interp, a))
-        .collect();
-
-    if !parts.is_empty() {
-        if get_use_colors() {
-            println!("{}{}{}", timestamp, indent, parts.join(" ").bold());
-        } else {
-            println!("{}{}{}", timestamp, indent, parts.join(" "));
-        }
-    }
-
-    GROUP_DEPTH.with(|d| d.set(d.get() + 1));
-
+    console_group_impl(interp, args, "");
     Ok(Value::Undefined)
 }
 
@@ -607,6 +591,11 @@ pub(super) fn native_console_group_collapsed(
     _this: &Value,
     args: &[Value],
 ) -> Result<Value> {
+    console_group_impl(interp, args, "▶ ");
+    Ok(Value::Undefined)
+}
+
+fn console_group_impl(interp: &mut Interpreter, args: &[Value], prefix: &str) {
     let indent = get_indent();
     let timestamp = get_timestamp();
     let parts: Vec<String> = args
@@ -616,15 +605,13 @@ pub(super) fn native_console_group_collapsed(
 
     if !parts.is_empty() {
         if get_use_colors() {
-            println!("{}{}▶ {}", timestamp, indent, parts.join(" ").bold());
+            println!("{}{}{}{}", timestamp, indent, prefix, parts.join(" ").bold());
         } else {
-            println!("{}{}▶ {}", timestamp, indent, parts.join(" "));
+            println!("{}{}{}{}", timestamp, indent, prefix, parts.join(" "));
         }
     }
 
     GROUP_DEPTH.with(|d| d.set(d.get() + 1));
-
-    Ok(Value::Undefined)
 }
 
 pub(super) fn native_console_time(
