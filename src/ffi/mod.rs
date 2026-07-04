@@ -1,11 +1,15 @@
 #![allow(clippy::not_unsafe_ptr_arg_deref)]
 
+pub mod conversions;
+#[macro_use]
+pub mod macros;
 pub mod native;
 pub mod safe_string;
 pub mod safe_wrappers;
 
 use crate::objects::Value;
 use crate::TailsRuntime;
+use conversions::{tails_value_to_value, value_to_tails_value};
 use safe_wrappers::SafeCStr;
 use std::ffi::{CStr, CString};
 use std::os::raw::c_char;
@@ -41,7 +45,6 @@ pub extern "C" fn tails_runtime_new() -> *mut TailsRuntime {
 #[no_mangle]
 pub extern "C" fn tails_runtime_free(runtime: *mut TailsRuntime) {
     if !runtime.is_null() {
-        // Safety: runtime is checked for null and comes from Box::into_raw
         unsafe {
             let _ = Box::from_raw(runtime);
         }
@@ -51,56 +54,32 @@ pub extern "C" fn tails_runtime_free(runtime: *mut TailsRuntime) {
 #[no_mangle]
 pub extern "C" fn tails_eval(runtime: *mut TailsRuntime, source: *const c_char) -> TailsValue {
     if runtime.is_null() || source.is_null() {
-        return TailsValue {
-            tag: TailsValueType::Undefined as u32,
-            data: 0,
-        };
+        return empty_tails_value!();
     }
-
-    // Safety: Both pointers are checked for null
     let runtime = unsafe { &mut *runtime };
-    let source = unsafe { SafeCStr::new(source) };
-
-    match source.to_str() {
-        Some(source_str) => match runtime.eval(source_str) {
-            Ok(value) => value_to_tails_value(value),
-            Err(_) => TailsValue {
-                tag: TailsValueType::Undefined as u32,
-                data: 0,
-            },
-        },
-        None => TailsValue {
-            tag: TailsValueType::Undefined as u32,
-            data: 0,
-        },
+    let source = match unsafe { SafeCStr::new(source) }.to_str() {
+        Some(s) => s,
+        None => return empty_tails_value!(),
+    };
+    match runtime.eval(source) {
+        Ok(value) => value_to_tails_value(value),
+        Err(_) => empty_tails_value!(),
     }
 }
 
 #[no_mangle]
 pub extern "C" fn tails_get_global(runtime: *mut TailsRuntime, name: *const c_char) -> TailsValue {
     if runtime.is_null() || name.is_null() {
-        return TailsValue {
-            tag: TailsValueType::Undefined as u32,
-            data: 0,
-        };
+        return empty_tails_value!();
     }
-
-    // Safety: Both pointers are checked for null
     let runtime = unsafe { &*runtime };
-    let name = unsafe { SafeCStr::new(name) };
-
-    match name.to_str() {
-        Some(name_str) => match runtime.get_global(name_str) {
-            Some(value) => value_to_tails_value(value),
-            None => TailsValue {
-                tag: TailsValueType::Undefined as u32,
-                data: 0,
-            },
-        },
-        None => TailsValue {
-            tag: TailsValueType::Undefined as u32,
-            data: 0,
-        },
+    let name = match unsafe { SafeCStr::new(name) }.to_str() {
+        Some(s) => s,
+        None => return empty_tails_value!(),
+    };
+    match runtime.get_global(name) {
+        Some(value) => value_to_tails_value(value),
+        None => empty_tails_value!(),
     }
 }
 
@@ -113,13 +92,11 @@ pub extern "C" fn tails_set_global(
     if runtime.is_null() || name.is_null() {
         return;
     }
-
     let runtime = unsafe { &mut *runtime };
     let name = unsafe { CStr::from_ptr(name) };
-
     if let Ok(name_str) = name.to_str() {
-        let value = tails_value_to_value(value);
-        runtime.set_global(name_str, value);
+        let val = tails_value_to_value(value);
+        runtime.set_global(name_str, val);
     }
 }
 
@@ -211,22 +188,15 @@ pub extern "C" fn tails_get_string(value: TailsValue) -> *const c_char {
 #[no_mangle]
 pub extern "C" fn tails_string_new(runtime: *mut TailsRuntime, s: *const c_char) -> TailsValue {
     if runtime.is_null() || s.is_null() {
-        return TailsValue {
-            tag: TailsValueType::Undefined as u32,
-            data: 0,
-        };
+        return empty_tails_value!();
     }
-
     let cstr = unsafe { CStr::from_ptr(s) };
     match cstr.to_str() {
         Ok(s) => {
             let value = Value::String(s.to_string());
             value_to_tails_value(value)
         }
-        Err(_) => TailsValue {
-            tag: TailsValueType::Undefined as u32,
-            data: 0,
-        },
+        Err(_) => empty_tails_value!(),
     }
 }
 
@@ -265,12 +235,8 @@ pub extern "C" fn tails_undefined() -> TailsValue {
 #[no_mangle]
 pub extern "C" fn tails_object_new(runtime: *mut TailsRuntime) -> TailsValue {
     if runtime.is_null() {
-        return TailsValue {
-            tag: TailsValueType::Undefined as u32,
-            data: 0,
-        };
+        return empty_tails_value!();
     }
-
     let runtime = unsafe { &mut *runtime };
     let value = runtime.new_object();
     value_to_tails_value(value)
@@ -283,30 +249,19 @@ pub extern "C" fn tails_object_get(
     key: *const c_char,
 ) -> TailsValue {
     if runtime.is_null() || key.is_null() {
-        return TailsValue {
-            tag: TailsValueType::Undefined as u32,
-            data: 0,
-        };
+        return empty_tails_value!();
     }
-
     let runtime = unsafe { &mut *runtime };
     let key = unsafe { CStr::from_ptr(key) };
-
     match key.to_str() {
         Ok(key_str) => {
             let obj_value = tails_value_to_value(object);
             match runtime.get_property(&obj_value, key_str) {
                 Some(value) => value_to_tails_value(value),
-                None => TailsValue {
-                    tag: TailsValueType::Undefined as u32,
-                    data: 0,
-                },
+                None => empty_tails_value!(),
             }
         }
-        Err(_) => TailsValue {
-            tag: TailsValueType::Undefined as u32,
-            data: 0,
-        },
+        Err(_) => empty_tails_value!(),
     }
 }
 
@@ -320,10 +275,8 @@ pub extern "C" fn tails_object_set(
     if runtime.is_null() || key.is_null() {
         return;
     }
-
     let runtime = unsafe { &mut *runtime };
     let key = unsafe { CStr::from_ptr(key) };
-
     if let Ok(key_str) = key.to_str() {
         let obj_value = tails_value_to_value(object);
         let val = tails_value_to_value(value);
@@ -334,12 +287,8 @@ pub extern "C" fn tails_object_set(
 #[no_mangle]
 pub extern "C" fn tails_array_new(runtime: *mut TailsRuntime) -> TailsValue {
     if runtime.is_null() {
-        return TailsValue {
-            tag: TailsValueType::Undefined as u32,
-            data: 0,
-        };
+        return empty_tails_value!();
     }
-
     let runtime = unsafe { &mut *runtime };
     let value = runtime.new_array();
     value_to_tails_value(value)
@@ -363,20 +312,13 @@ pub extern "C" fn tails_array_get(
     index: i32,
 ) -> TailsValue {
     if runtime.is_null() || array.tag != TailsValueType::Array as u32 {
-        return TailsValue {
-            tag: TailsValueType::Undefined as u32,
-            data: 0,
-        };
+        return empty_tails_value!();
     }
-
     let runtime = unsafe { &*runtime };
     let arr_value = tails_value_to_value(array);
     match runtime.get_array_element(&arr_value, index as usize) {
         Some(value) => value_to_tails_value(value),
-        None => TailsValue {
-            tag: TailsValueType::Undefined as u32,
-            data: 0,
-        },
+        None => empty_tails_value!(),
     }
 }
 
@@ -389,7 +331,6 @@ pub extern "C" fn tails_array_push(
     if runtime.is_null() || array.tag != TailsValueType::Array as u32 {
         return -1;
     }
-
     let runtime = unsafe { &mut *runtime };
     let arr_value = tails_value_to_value(array);
     let val = tails_value_to_value(value);
@@ -406,160 +347,20 @@ pub extern "C" fn tails_call(
     args_len: i32,
 ) -> TailsValue {
     if runtime.is_null() {
-        return TailsValue {
-            tag: TailsValueType::Undefined as u32,
-            data: 0,
-        };
+        return empty_tails_value!();
     }
-
     let runtime = unsafe { &mut *runtime };
     let func_value = tails_value_to_value(func);
     let this_value = tails_value_to_value(this);
-
     let args = if args.is_null() || args_len <= 0 {
         &[]
     } else {
         unsafe { std::slice::from_raw_parts(args, args_len as usize) }
     };
-
     let values: Vec<Value> = args.iter().map(|v| tails_value_to_value(*v)).collect();
-
     match runtime.call_function(&func_value, &this_value, &values) {
         Ok(value) => value_to_tails_value(value),
-        Err(_) => TailsValue {
-            tag: TailsValueType::Undefined as u32,
-            data: 0,
-        },
-    }
-}
-
-pub fn value_to_tails_value(value: Value) -> TailsValue {
-    match value {
-        Value::Undefined => TailsValue {
-            tag: TailsValueType::Undefined as u32,
-            data: 0,
-        },
-        Value::Null => TailsValue {
-            tag: TailsValueType::Null as u32,
-            data: 0,
-        },
-        Value::Boolean(b) => TailsValue {
-            tag: TailsValueType::Boolean as u32,
-            data: if b { 1 } else { 0 },
-        },
-        Value::Integer(n) => TailsValue {
-            tag: TailsValueType::Number as u32,
-            data: n as f64 as u64,
-        },
-        Value::Float(n) => TailsValue {
-            tag: TailsValueType::Number as u32,
-            data: n.to_bits(),
-        },
-        Value::String(s) => {
-            let c_string = match CString::new(s) {
-                Ok(cs) => cs,
-                Err(_) => return TailsValue { tag: 0, data: 0 },
-            };
-            let ptr = c_string.into_raw() as u64;
-            TailsValue {
-                tag: TailsValueType::String as u32,
-                data: ptr,
-            }
-        }
-        Value::Cons(c) => {
-            let flat = c.flatten();
-            let c_string = match CString::new(flat) {
-                Ok(cs) => cs,
-                Err(_) => return TailsValue { tag: 0, data: 0 },
-            };
-            let ptr = c_string.into_raw() as u64;
-            TailsValue {
-                tag: TailsValueType::String as u32,
-                data: ptr,
-            }
-        }
-        Value::BigInt(_) => TailsValue {
-            tag: TailsValueType::Number as u32,
-            data: 0,
-        },
-        Value::Function(_) => TailsValue {
-            tag: TailsValueType::Function as u32,
-            data: 0,
-        },
-        Value::NativeFunction(_) => TailsValue {
-            tag: TailsValueType::NativeFunction as u32,
-            data: 0,
-        },
-        Value::Object(_) => TailsValue {
-            tag: TailsValueType::Object as u32,
-            data: 0,
-        },
-        Value::Array(_) => TailsValue {
-            tag: TailsValueType::Array as u32,
-            data: 0,
-        },
-        Value::Promise(_) => TailsValue {
-            tag: TailsValueType::Promise as u32,
-            data: 0,
-        },
-        Value::Proxy(_) => TailsValue {
-            tag: TailsValueType::Proxy as u32,
-            data: 0,
-        },
-        Value::Generator(_) => TailsValue {
-            tag: TailsValueType::Function as u32,
-            data: 0,
-        },
-        Value::TypedArray(_) => TailsValue {
-            tag: TailsValueType::Object as u32,
-            data: 0,
-        },
-        Value::Map(_) => TailsValue {
-            tag: TailsValueType::Object as u32,
-            data: 0,
-        },
-        Value::Set(_) => TailsValue {
-            tag: TailsValueType::Object as u32,
-            data: 0,
-        },
-        Value::WeakMap(_) => TailsValue {
-            tag: TailsValueType::Object as u32,
-            data: 0,
-        },
-        Value::WeakSet(_) => TailsValue {
-            tag: TailsValueType::Object as u32,
-            data: 0,
-        },
-        Value::Symbol(_) => TailsValue {
-            tag: TailsValueType::Object as u32,
-            data: 0,
-        },
-        Value::Date(_) | Value::RegExp(_) | Value::Buffer(_) | Value::NativeObject(_) => {
-            TailsValue { tag: 0, data: 0 }
-        }
-    }
-}
-
-pub fn tails_value_to_value(value: TailsValue) -> Value {
-    match value.tag {
-        0 => Value::Undefined,
-        1 => Value::Null,
-        2 => Value::Boolean(value.data != 0),
-        3 => Value::Float(f64::from_bits(value.data)),
-        4 => {
-            if value.data == 0 {
-                Value::String(String::new())
-            } else {
-                let ptr = value.data as *const c_char;
-                unsafe {
-                    match CStr::from_ptr(ptr).to_str() {
-                        Ok(s) => Value::String(s.to_string()),
-                        Err(_) => Value::String(String::new()),
-                    }
-                }
-            }
-        }
-        _ => Value::Undefined,
+        Err(_) => empty_tails_value!(),
     }
 }
 
