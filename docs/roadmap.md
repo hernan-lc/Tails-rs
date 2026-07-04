@@ -22,6 +22,7 @@
 | 2.3 | Inline `to_string_coerce` in `add` | 4 dedicated arms added |
 | 2.4 | `JsIterator` heap type | Property insert removed |
 | 2.5 | `Vec::with_capacity` native fns | Growth reallocs eliminated |
+| 2.6 | Inline property storage (`PropertyStorage`) | Inline `[Option<(String, Value)>; 8]` for ≤8 prop objects, `FxHashMap` fallback. 547 tests pass |
 
 ---
 
@@ -45,10 +46,6 @@ After Phase 2 lands, re-run `benchmarks/runner.sh` and pick top-3 hotspots.
 
 - [ ] **3.4 — RegExp direct fast-path + lazy result**  
   Next-largest gap on `builtins/regexp.js` after iterator fast-path.
-
-- [ ] **3.5 — Inline property storage for small objects**  
-  Replace `FxHashMap<String, Value>` with `[Option<(Rc<str>, Value)>; 8]` for ≤8-property objects.  
-  Expected: 5–10× on `core/oo.js`.
 
 ---
 
