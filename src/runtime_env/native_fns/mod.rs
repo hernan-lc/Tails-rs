@@ -11,6 +11,50 @@ mod encoding_fns;
 mod error_fns;
 mod events_fns;
 mod fetch_fns;
+
+/// Unified macro for generating stub implementations when a feature is disabled.
+///
+/// Generates multiple pub(super) fn stubs that return a RuntimeError indicating
+/// the module is not enabled. This replaces the previous pattern of separate
+/// `fs_stub!`, `http_stub!`, `net_stub!` macros.
+///
+/// # Example
+///
+/// ```
+/// disabled_module_stub!("fs",
+///     native_fs_read_file_sync,
+///     native_fs_write_file_sync,
+/// );
+/// ```
+///
+/// This generates:
+/// ```
+/// pub(super) fn native_fs_read_file_sync(...) -> Result<Value> {
+///     Err(Error::RuntimeError("fs module is not enabled...".into()))
+/// }
+/// ```
+#[macro_export]
+macro_rules! disabled_module_stub {
+    (
+        $module:literal,
+        $($name:ident),* $(,)?
+    ) => {
+        $(
+            pub(super) fn $name(
+                _interp: &mut Interpreter,
+                _this: &Value,
+                _args: &[Value],
+            ) -> Result<Value> {
+                Err(Error::RuntimeError(
+                    format!("{} module is not enabled. Rebuild with --features {}",
+                        $module, $module
+                    ).into()
+                ))
+            }
+        )*
+    };
+}
+
 #[cfg(feature = "fs")]
 mod fs_fns;
 #[cfg(not(feature = "fs"))]
@@ -19,39 +63,28 @@ mod fs_fns {
     use crate::objects::Value;
     use crate::vm::interpreter::Interpreter;
 
-    macro_rules! fs_stub {
-        ($name:ident) => {
-            pub(super) fn $name(
-                _interp: &mut Interpreter,
-                _this: &Value,
-                _args: &[Value],
-            ) -> Result<Value> {
-                Err(Error::RuntimeError(
-                    "fs module is not enabled. Rebuild with --features fs".into(),
-                ))
-            }
-        };
-    }
-
-    fs_stub!(native_fs_read_file_sync);
-    fs_stub!(native_fs_write_file_sync);
-    fs_stub!(native_fs_exists_sync);
-    fs_stub!(native_fs_mkdir_sync);
-    fs_stub!(native_fs_readdir_sync);
-    fs_stub!(native_fs_stat_sync);
-    fs_stub!(native_fs_unlink_sync);
-    fs_stub!(native_fs_rm_sync);
-    fs_stub!(native_fs_copy_file_sync);
-    fs_stub!(native_fs_rename_sync);
-    fs_stub!(native_fs_append_file_sync);
-    fs_stub!(native_fs_readdir);
-    fs_stub!(native_fs_read_file);
-    fs_stub!(native_fs_write_file);
-    fs_stub!(native_fs_stat);
-    fs_stub!(native_fs_mkdir);
-    fs_stub!(native_fs_unlink);
-    fs_stub!(native_fs_copy_file);
-    fs_stub!(native_fs_rename);
+    disabled_module_stub!(
+        "fs",
+        native_fs_read_file_sync,
+        native_fs_write_file_sync,
+        native_fs_exists_sync,
+        native_fs_mkdir_sync,
+        native_fs_readdir_sync,
+        native_fs_stat_sync,
+        native_fs_unlink_sync,
+        native_fs_rm_sync,
+        native_fs_copy_file_sync,
+        native_fs_rename_sync,
+        native_fs_append_file_sync,
+        native_fs_readdir,
+        native_fs_read_file,
+        native_fs_write_file,
+        native_fs_stat,
+        native_fs_mkdir,
+        native_fs_unlink,
+        native_fs_copy_file,
+        native_fs_rename,
+    );
 }
 mod function_fns;
 mod generator_fns;
@@ -63,27 +96,16 @@ mod http_fns {
     use crate::objects::Value;
     use crate::vm::interpreter::Interpreter;
 
-    macro_rules! http_stub {
-        ($name:ident) => {
-            pub(super) fn $name(
-                _interp: &mut Interpreter,
-                _this: &Value,
-                _args: &[Value],
-            ) -> Result<Value> {
-                Err(Error::RuntimeError(
-                    "http module is not enabled. Rebuild with --features http".into(),
-                ))
-            }
-        };
-    }
-
-    http_stub!(native_http_create_server);
-    http_stub!(native_http_server_listen);
-    http_stub!(native_http_server_close);
-    http_stub!(native_http_req_on);
-    http_stub!(native_http_res_write_head);
-    http_stub!(native_http_res_write);
-    http_stub!(native_http_res_end);
+    disabled_module_stub!(
+        "http",
+        native_http_create_server,
+        native_http_server_listen,
+        native_http_server_close,
+        native_http_req_on,
+        native_http_res_write_head,
+        native_http_res_write,
+        native_http_res_end,
+    );
 }
 #[cfg(feature = "net")]
 mod net_fns;
@@ -93,24 +115,13 @@ mod net_fns {
     use crate::objects::Value;
     use crate::vm::interpreter::Interpreter;
 
-    macro_rules! net_stub {
-        ($name:ident) => {
-            pub(super) fn $name(
-                _interp: &mut Interpreter,
-                _this: &Value,
-                _args: &[Value],
-            ) -> Result<Value> {
-                Err(Error::RuntimeError(
-                    "net module is not enabled. Rebuild with --features net".into(),
-                ))
-            }
-        };
-    }
-
-    net_stub!(native_net_create_connection);
-    net_stub!(native_net_socket_write);
-    net_stub!(native_net_socket_end);
-    net_stub!(native_net_socket_on);
+    disabled_module_stub!(
+        "net",
+        native_net_create_connection,
+        native_net_socket_write,
+        native_net_socket_end,
+        native_net_socket_on,
+    );
 }
 mod global_fns;
 mod helpers;
@@ -854,6 +865,10 @@ pub static NATIVE_TABLE: &[NativeFn] = &[
     dns_fns::native_dns_resolve4,
     dns_fns::native_dns_resolve6,
     dns_fns::native_dns_resolve_mx,
+    // Object.create (463)
+    object_fns::native_object_create,
+    // Array constructor (464)
+    array_fns::native_array_constructor,
 ];
 
 const _: () = assert!(

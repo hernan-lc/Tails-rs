@@ -4,6 +4,33 @@ use crate::vm::interpreter::Interpreter;
 
 use super::helpers::{get_array_elements, to_f64, to_string_value};
 
+pub(super) fn native_array_constructor(
+    interp: &mut Interpreter,
+    _this: &Value,
+    args: &[Value],
+) -> Result<Value> {
+    let elements = match args.len() {
+        0 => Vec::new(),
+        1 => {
+            if let Value::Float(n) = &args[0] {
+                let len = *n as usize;
+                vec![Value::Undefined; len]
+            } else if let Value::Integer(n) = &args[0] {
+                let len = *n as usize;
+                vec![Value::Undefined; len]
+            } else {
+                vec![args[0].clone()]
+            }
+        }
+        _ => args.to_vec(),
+    };
+    let heap_idx = interp.heap.len();
+    interp.heap.push(crate::vm::interpreter::HeapValue::Array(
+        crate::vm::interpreter::JsArray { elements },
+    ));
+    Ok(Value::Array(heap_idx))
+}
+
 pub(super) fn native_array_push(
     interp: &mut Interpreter,
     this: &Value,

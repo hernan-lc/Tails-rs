@@ -1,6 +1,7 @@
-use crate::errors::Result;
+use crate::errors::{Error, Result};
 use crate::objects::Value;
 use crate::vm::interpreter::Interpreter;
+use rustc_hash::FxHashMap;
 
 use super::reflect_fns::native_reflect_get_own_property_descriptor;
 
@@ -396,4 +397,64 @@ pub(super) fn native_object_has_own_property(
         }
         _ => Ok(Value::Boolean(false)),
     }
+}
+
+pub(super) fn native_object_create(
+    interp: &mut Interpreter,
+    _this: &Value,
+    args: &[Value],
+) -> Result<Value> {
+    let proto = args.first().cloned().unwrap_or(Value::Null);
+    let properties = args.get(1).cloned();
+
+    // Object.create(proto, [propertiesObject])
+    // proto must be an object or null
+    let proto_idx = match &proto {
+        Value::Null => None,
+        Value::Object(idx) => Some(*idx),
+        _ => {
+            return Err(Error::TypeError(
+                "Object prototype may only be an Object or null".into(),
+            ))
+        }
+    };
+
+    // Create new object with the specified prototype
+    let new_obj_idx = interp.gc.allocate(
+        &mut interp.heap,
+        crate::vm::interpreter::HeapValue::Object(crate::vm::interpreter::JsObject {
+            properties: FxHashMap::default(),
+            prototype: proto_idx,
+            extensible: true,
+        }),
+    );
+
+    // If properties object is provided, define properties
+    if let Some(Value::Object(props_idx)) = properties {
+        // Collect property definitions first to avoid borrow issues
+        let mut prop_defs = Vec::new();
+        if let crate::vm::interpreter::HeapValue::Object(props_obj) = &interp.heap[props_idx] {
+            for (key, desc) in &props_obj.properties {
+                if let Value::Object(desc_idx) = desc {
+                    if let crate::vm::interpreter::HeapValue::Object(desc_obj) =
+                        &interp.heap[*desc_idx]
+                    {
+                        if let Some(value) = desc_obj.properties.get("value") {
+                            prop_defs.push((key.clone(), value.clone()));
+                        }
+                    }
+                }
+            }
+        }
+        // Now apply the collected properties
+        for (key, value) in prop_defs {
+            if let crate::vm::interpreter::HeapValue::Object(new_obj) =
+                &mut interp.heap[new_obj_idx]
+            {
+                new_obj.properties.insert(key, value);
+            }
+        }
+    }
+
+    Ok(Value::Object(new_obj_idx))
 }

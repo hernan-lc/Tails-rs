@@ -40,57 +40,29 @@ pub enum ErrorKind {
     InternalError(String),
 }
 
+// Macro for generating backward-compatible error type constructors
+macro_rules! define_error_constructor {
+    ($name:ident, $variant:ident) => {
+        pub fn $name(msg: String) -> Self {
+            Self {
+                kind: ErrorKind::$variant(msg),
+                span: None,
+                file: None,
+                backtrace: None,
+            }
+        }
+    };
+}
+
 // Backward-compatible enum-style constructors
 #[allow(non_snake_case)]
 impl Error {
-    pub fn ParseError(msg: String) -> Self {
-        Self {
-            kind: ErrorKind::ParseError(msg),
-            span: None,
-            file: None,
-            backtrace: None,
-        }
-    }
-    pub fn TypeError(msg: String) -> Self {
-        Self {
-            kind: ErrorKind::TypeError(msg),
-            span: None,
-            file: None,
-            backtrace: None,
-        }
-    }
-    pub fn ReferenceError(msg: String) -> Self {
-        Self {
-            kind: ErrorKind::ReferenceError(msg),
-            span: None,
-            file: None,
-            backtrace: None,
-        }
-    }
-    pub fn SyntaxError(msg: String) -> Self {
-        Self {
-            kind: ErrorKind::SyntaxError(msg),
-            span: None,
-            file: None,
-            backtrace: None,
-        }
-    }
-    pub fn RuntimeError(msg: String) -> Self {
-        Self {
-            kind: ErrorKind::RuntimeError(msg),
-            span: None,
-            file: None,
-            backtrace: None,
-        }
-    }
-    pub fn InternalError(msg: String) -> Self {
-        Self {
-            kind: ErrorKind::InternalError(msg),
-            span: None,
-            file: None,
-            backtrace: None,
-        }
-    }
+    define_error_constructor!(ParseError, ParseError);
+    define_error_constructor!(TypeError, TypeError);
+    define_error_constructor!(ReferenceError, ReferenceError);
+    define_error_constructor!(SyntaxError, SyntaxError);
+    define_error_constructor!(RuntimeError, RuntimeError);
+    define_error_constructor!(InternalError, InternalError);
 
     pub fn with_span(mut self, span: Span) -> Self {
         self.span = Some(span);

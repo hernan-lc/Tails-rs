@@ -83,7 +83,7 @@ fn run_pipeline(bytes: &[u8]) {
 fn fuzz_corpus_does_not_panic() {
     for (label, bytes) in CORPUS {
         let label = *label;
-        let bytes: &[u8] = *bytes;
+        let bytes: &[u8] = bytes;
         // `catch_unwind` is the standard way to assert
         // "this code must not panic" without aborting the whole
         // test binary.

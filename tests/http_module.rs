@@ -69,8 +69,7 @@ where
     // Run the event loop — it will exit once maxConnections is reached.
     rt.run_event_loop().expect("event loop failed");
 
-    let resp = client_handle.join().expect("client thread panicked");
-    let _ = resp; // assertions are done inside the closure via returns
+    client_handle.join().expect("client thread panicked");
 }
 
 /// Like `run_server_with_client` but returns the client's response string.
