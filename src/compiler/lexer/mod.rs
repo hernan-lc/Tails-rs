@@ -1,130 +1,7 @@
-use crate::errors::{Error, Result, Span};
+mod token;
+pub use token::*;
 
-#[derive(Debug, Clone, PartialEq)]
-pub struct SpannedToken {
-    pub token: Token,
-    pub span: Span,
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub enum Token {
-    Number(f64),
-    String(String),
-    BigInt(String),
-    Regex(String),
-    Identifier(String),
-    TemplateLiteral(Vec<TemplatePart>),
-    Const,
-    Let,
-    Var,
-    Function,
-    Return,
-    If,
-    Else,
-    While,
-    For,
-    Do,
-    Switch,
-    Case,
-    Break,
-    Continue,
-    New,
-    Void,
-    Delete,
-    Typeof,
-    Instanceof,
-    Constructor,
-    In,
-    Of,
-    Class,
-    Extends,
-    Super,
-    This,
-    Import,
-    Export,
-    Default,
-    From,
-    As,
-    Type,
-    Interface,
-    Enum,
-    Async,
-    Await,
-    Promise,
-    Try,
-    Catch,
-    Finally,
-    Throw,
-    Static,
-    Get,
-    Set,
-    Yield,
-    Public,
-    Private,
-    Protected,
-    Readonly,
-    Plus,
-    Minus,
-    Star,
-    Slash,
-    Percent,
-    Power,
-    Assign,
-    PlusAssign,
-    MinusAssign,
-    StarAssign,
-    SlashAssign,
-    PercentAssign,
-    PowerAssign,
-    AndAssign,
-    OrAssign,
-    XorAssign,
-    BitAndAssign,
-    BitOrAssign,
-    Equal,
-    StrictEqual,
-    NotEqual,
-    StrictNotEqual,
-    Less,
-    Greater,
-    LessEqual,
-    GreaterEqual,
-    And,
-    Or,
-    Not,
-    BitAnd,
-    BitOr,
-    BitXor,
-    BitNot,
-    ShiftLeft,
-    ShiftRight,
-    UnsignedShiftRight,
-    Increment,
-    Decrement,
-    LeftParen,
-    RightParen,
-    LeftBrace,
-    RightBrace,
-    LeftBracket,
-    RightBracket,
-    Semicolon,
-    Colon,
-    Comma,
-    Dot,
-    Question,
-    QuestionDot,
-    NullishCoalescing,
-    NullishCoalescingAssign,
-    Arrow,
-    Ellipsis,
-    Eof,
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub enum TemplatePart {
-    Text(String),
-    Expression(Vec<SpannedToken>),
-}
+use crate::errors::{Error, Result};
 
 fn tokenize_template_literal(
     chars: &mut std::iter::Peekable<std::str::CharIndices>,
@@ -208,7 +85,7 @@ fn tokenize_template_literal(
 pub fn tokenize(source: &str) -> Result<Vec<SpannedToken>> {
     let mut tokens = Vec::new();
     let mut chars = source.char_indices().peekable();
-    let mut expects_regex = true; // Start of file expects expression start
+    let mut expects_regex = true;
     let mut line: usize = 1;
     let mut col: usize = 1;
 
@@ -216,7 +93,7 @@ pub fn tokenize(source: &str) -> Result<Vec<SpannedToken>> {
         |tokens: &mut Vec<SpannedToken>, token: Token, line: usize, col: usize, offset: usize| {
             tokens.push(SpannedToken {
                 token,
-                span: Span::new(line, col, offset),
+                span: crate::errors::Span::new(line, col, offset),
             });
         };
 
@@ -237,7 +114,6 @@ pub fn tokenize(source: &str) -> Result<Vec<SpannedToken>> {
                 let tok_offset = pos;
                 chars.next();
                 col += 1;
-                // Always check for comments first, regardless of regex context
                 if let Some(&(_, '/')) = chars.peek() {
                     while let Some(&(_, c)) = chars.peek() {
                         if c == '\n' {
@@ -270,7 +146,6 @@ pub fn tokenize(source: &str) -> Result<Vec<SpannedToken>> {
                         }
                     }
                 } else if expects_regex {
-                    // Parse regex literal
                     let mut pattern = String::new();
                     let mut escaped = false;
                     let mut bracket_depth = 0;
@@ -359,7 +234,6 @@ pub fn tokenize(source: &str) -> Result<Vec<SpannedToken>> {
                         break;
                     }
                 }
-                // Handle scientific notation: e.g. 1e10, 1.5e-3, 3.4e+38
                 if let Some(&(_, 'e' | 'E')) = chars.peek() {
                     num.push(chars.next().unwrap().1);
                     col += 1;
@@ -377,7 +251,6 @@ pub fn tokenize(source: &str) -> Result<Vec<SpannedToken>> {
                         }
                     }
                 }
-                // Check for BigInt suffix 'n'
                 if let Some(&(_, 'n')) = chars.peek() {
                     chars.next();
                     col += 1;
@@ -992,8 +865,6 @@ pub fn tokenize(source: &str) -> Result<Vec<SpannedToken>> {
             }
         }
 
-        // After expression-ending tokens, `/` is division, not regex start.
-        // After keywords/operators, `/` starts a regex literal.
         if let Some(last) = tokens.last() {
             expects_regex = !matches!(
                 last.token,
