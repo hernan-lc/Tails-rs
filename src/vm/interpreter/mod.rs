@@ -20,7 +20,8 @@ mod value_ops;
 
 pub(crate) use call_frame::{CallFrame, ExceptionHandler};
 pub use heap_types::{
-    HeapValue, JsArray, JsCompiledRegex, JsFunction, JsGenerator, JsIterator, JsObject, JsProxyData, JsRegExp,
+    HeapValue, JsArray, JsCompiledRegex, JsFunction, JsGenerator, JsIterator, JsObject,
+    JsProxyData, JsRegExp,
 };
 
 use crate::compiler::{CompiledModule, Instruction};
@@ -31,9 +32,9 @@ use crate::objects::{ConsString, Value};
 use crate::runtime_env::async_runtime::AsyncRuntime;
 use crate::vm::interpreter::control_flow::ControlFlowOutcome;
 use rustc_hash::FxHashMap;
+use std::cell::RefCell;
 use std::collections::{HashMap, VecDeque};
 use std::rc::Rc;
-use std::cell::RefCell;
 
 // ── Event-loop integration trait ──────────────────────────────────────────
 //
@@ -150,48 +151,6 @@ impl Interpreter {
         interp.init_builtins();
         Ok(interp)
     }
-
-    // ── Allocation Helpers ───────────────────────────────────────────────────
-    //
-    // Convenience wrappers around `gc.allocate` for common heap object types.
-    // These reduce boilerplate when creating objects, arrays, and strings
-    // in native function implementations.
-
-    /// Allocate a new object on the heap with the given properties and prototype.
-    pub(super) fn alloc_object(
-        &mut self,
-        properties: FxHashMap<String, Value>,
-        prototype: Option<usize>,
-    ) -> usize {
-        self.gc.allocate(
-            &mut self.heap,
-            HeapValue::Object(JsObject {
-                properties,
-                prototype,
-                extensible: true,
-            }),
-        )
-    }
-
-    /// Allocate a new array on the heap with the given elements.
-    pub(super) fn alloc_array(&mut self, elements: Vec<Value>) -> usize {
-        self.gc.allocate(
-            &mut self.heap,
-            HeapValue::Array(JsArray { elements }),
-        )
-    }
-
-    /// Allocate a new string on the heap.
-    pub(super) fn alloc_string(&mut self, value: String) -> usize {
-        self.gc.allocate(&mut self.heap, HeapValue::String(value))
-    }
-
-    /// Allocate a new promise on the heap.
-    pub(super) fn alloc_promise(&mut self, promise: crate::objects::js_promise::JsPromise) -> usize {
-        self.gc.allocate(&mut self.heap, HeapValue::Promise(promise))
-    }
-
-    // ── End Allocation Helpers ───────────────────────────────────────────────
 
     pub fn execute(&mut self, module: &CompiledModule) -> Result<Value> {
         self.current_module = Some(Rc::new(module.clone()));
@@ -685,17 +644,17 @@ impl Interpreter {
                     match &callee {
                         Value::Function(func_idx) => {
                             // Clone needed values before any heap mutation
-                                let (is_generator, bytecode_index, has_promise_resolve) =
-                                    if let HeapValue::Function(f) = &self.heap[*func_idx] {
-                                        let has_promise = f.bytecode_index == usize::MAX
-                                            && f.closure
-                                                .borrow()
-                                                .first()
-                                                .is_some_and(|v| matches!(v, Value::Promise(_)));
-                                        (f.is_generator, f.bytecode_index, has_promise)
-                                    } else {
-                                        (false, 0, false)
-                                    };
+                            let (is_generator, bytecode_index, has_promise_resolve) =
+                                if let HeapValue::Function(f) = &self.heap[*func_idx] {
+                                    let has_promise = f.bytecode_index == usize::MAX
+                                        && f.closure
+                                            .borrow()
+                                            .first()
+                                            .is_some_and(|v| matches!(v, Value::Promise(_)));
+                                    (f.is_generator, f.bytecode_index, has_promise)
+                                } else {
+                                    (false, 0, false)
+                                };
 
                             if is_generator {
                                 if cfg!(debug_assertions) && std::env::var("GEN_TRACE").is_ok() {
@@ -718,7 +677,11 @@ impl Interpreter {
                                     let promise_idx = {
                                         let closure = f.closure.borrow();
                                         closure.first().and_then(|v| {
-                                            if let Value::Promise(idx) = v { Some(*idx) } else { None }
+                                            if let Value::Promise(idx) = v {
+                                                Some(*idx)
+                                            } else {
+                                                None
+                                            }
                                         })
                                     };
                                     if let Some(promise_idx) = promise_idx {
@@ -785,30 +748,30 @@ impl Interpreter {
                                         false
                                     };
                                 if same_module {
-                                        let func_info = {
-                                            if let HeapValue::Function(f) = &self.heap[*func_idx] {
-                                                let closure_rc = if f.closure.borrow().is_empty() {
-                                                    Rc::new(RefCell::new(Vec::new()))
-                                                } else {
-                                                    f.closure.clone()
-                                                };
-                                                let captured_this = if f.is_arrow {
-                                                    f.captured_this.clone()
-                                                } else {
-                                                    None
-                                                };
-                                                Some((
-                                                    closure_rc,
-                                                    f.bytecode_index,
-                                                    f.is_arrow,
-                                                    captured_this,
-                                                    f.rest_param.is_some(),
-                                                    f.params.len(),
-                                                ))
+                                    let func_info = {
+                                        if let HeapValue::Function(f) = &self.heap[*func_idx] {
+                                            let closure_rc = if f.closure.borrow().is_empty() {
+                                                Rc::new(RefCell::new(Vec::new()))
+                                            } else {
+                                                f.closure.clone()
+                                            };
+                                            let captured_this = if f.is_arrow {
+                                                f.captured_this.clone()
                                             } else {
                                                 None
-                                            }
-                                        };
+                                            };
+                                            Some((
+                                                closure_rc,
+                                                f.bytecode_index,
+                                                f.is_arrow,
+                                                captured_this,
+                                                f.rest_param.is_some(),
+                                                f.params.len(),
+                                            ))
+                                        } else {
+                                            None
+                                        }
+                                    };
                                     if let Some((
                                         closure_vars,
                                         bytecode_index,
@@ -1206,7 +1169,8 @@ impl Interpreter {
                                                     .clone(),
                                                 shared_closure_env: HashMap::new(),
                                             });
-                                            for closure_var in closure_vars.borrow().iter().cloned() {
+                                            for closure_var in closure_vars.borrow().iter().cloned()
+                                            {
                                                 self.stack.push(closure_var);
                                             }
                                             for arg in args {

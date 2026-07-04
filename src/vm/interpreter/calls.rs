@@ -10,11 +10,15 @@ impl Interpreter {
             Value::Function(func_idx) => {
                 if let HeapValue::Function(f) = &self.heap[*func_idx] {
                     // Quick path: resolve/reject promise callbacks
-                     if f.bytecode_index == usize::MAX {
+                    if f.bytecode_index == usize::MAX {
                         let promise_idx = {
                             let closure = f.closure.borrow();
                             closure.first().and_then(|v| {
-                                if let Value::Promise(idx) = v { Some(*idx) } else { None }
+                                if let Value::Promise(idx) = v {
+                                    Some(*idx)
+                                } else {
+                                    None
+                                }
                             })
                         };
                         if let Some(promise_idx) = promise_idx {

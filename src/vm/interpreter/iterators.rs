@@ -4,7 +4,6 @@ use crate::objects::js_promise::PromiseState;
 use crate::objects::Value;
 
 impl Interpreter {
-
     pub(crate) fn exec_get_iterator(&mut self, iterable: Value) -> Result<Value> {
         match &iterable {
             Value::Array(arr_idx) => {
@@ -221,10 +220,7 @@ impl Interpreter {
                                 }
                                 let pair_idx = self.heap.len();
                                 self.heap.push(HeapValue::Array(JsArray {
-                                    elements: vec![
-                                        m.keys[index].clone(),
-                                        m.values[index].clone(),
-                                    ],
+                                    elements: vec![m.keys[index].clone(), m.values[index].clone()],
                                 }));
                                 self.stack.push(Value::Array(pair_idx));
                                 if let HeapValue::Iterator(iter_mut) = &mut self.heap[*iter_idx] {

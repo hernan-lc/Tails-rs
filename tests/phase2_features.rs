@@ -291,13 +291,15 @@ fn test_regexp_lazy_cache_basic() {
     let mut rt = TailsRuntime::default();
     // Create a non-global regexp and test it multiple times on the same input
     let r = rt
-        .eval(r#"
+        .eval(
+            r#"
         let re = new RegExp("hello");
         let result1 = re.test("hello world");
         let result2 = re.test("hello world");
         let result3 = re.test("goodbye");
         result1 && result2 && !result3;
-    "#)
+    "#,
+        )
         .unwrap();
     assert_eq!(r, Value::Boolean(true));
 }
@@ -307,12 +309,14 @@ fn test_regexp_lazy_cache_false_positive() {
     let mut rt = TailsRuntime::default();
     // Ensure cache correctly handles false results
     let r = rt
-        .eval(r#"
+        .eval(
+            r#"
         let re = new RegExp("xyz");
         let result1 = re.test("hello world");
         let result2 = re.test("hello world");
         !result1 && !result2;
-    "#)
+    "#,
+        )
         .unwrap();
     assert_eq!(r, Value::Boolean(true));
 }
@@ -322,12 +326,14 @@ fn test_regexp_no_cache_for_global() {
     let mut rt = TailsRuntime::default();
     // Global regexp should not use cache (has stateful lastIndex)
     let r = rt
-        .eval(r#"
+        .eval(
+            r#"
         let re = new RegExp("a", "g");
         let result1 = re.test("aaa");
         let result2 = re.test("aaa");
         result1 && result2;
-    "#)
+    "#,
+        )
         .unwrap();
     assert_eq!(r, Value::Boolean(true));
 }
@@ -337,12 +343,14 @@ fn test_regexp_no_cache_for_sticky() {
     let mut rt = TailsRuntime::default();
     // Sticky regexp should not use cache (has stateful lastIndex)
     let r = rt
-        .eval(r#"
+        .eval(
+            r#"
         let re = new RegExp("a", "y");
         let result1 = re.test("aaa");
         let result2 = re.test("aaa");
         result1 && result2;
-    "#)
+    "#,
+        )
         .unwrap();
     assert_eq!(r, Value::Boolean(true));
 }
@@ -734,10 +742,12 @@ fn test_gc_snapshot_capacity_does_not_drop_references() {
 fn test_inline_property_basic() {
     let mut rt = TailsRuntime::default();
     let r = rt
-        .eval(r#"
+        .eval(
+            r#"
         let obj = { x: 1, y: 2, z: 3 };
         obj.x + obj.y + obj.z;
-    "#)
+    "#,
+        )
         .unwrap();
     assert_eq!(r, Value::Integer(6));
 }
@@ -747,10 +757,12 @@ fn test_inline_property_many_properties() {
     // Test that objects with >8 properties fall back to hashmap correctly
     let mut rt = TailsRuntime::default();
     let r = rt
-        .eval(r#"
+        .eval(
+            r#"
         let obj = { a: 1, b: 2, c: 3, d: 4, e: 5, f: 6, g: 7, h: 8, i: 9 };
         obj.a + obj.i;
-    "#)
+    "#,
+        )
         .unwrap();
     assert_eq!(r, Value::Integer(10));
 }
@@ -759,11 +771,13 @@ fn test_inline_property_many_properties() {
 fn test_inline_property_update_existing() {
     let mut rt = TailsRuntime::default();
     let r = rt
-        .eval(r#"
+        .eval(
+            r#"
         let obj = { x: 1 };
         obj.x = 42;
         obj.x;
-    "#)
+    "#,
+        )
         .unwrap();
     assert_eq!(r, Value::Integer(42));
 }
@@ -772,13 +786,15 @@ fn test_inline_property_update_existing() {
 fn test_inline_property_with_prototype() {
     let mut rt = TailsRuntime::default();
     let r = rt
-        .eval(r#"
+        .eval(
+            r#"
         let proto = { inherited: 99 };
         let obj = {};
         Object.setPrototypeOf(obj, proto);
         obj.own = 1;
         obj.inherited + obj.own;
-    "#)
+    "#,
+        )
         .unwrap();
     assert_eq!(r, Value::Integer(100));
 }

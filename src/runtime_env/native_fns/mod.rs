@@ -63,7 +63,8 @@ mod fs_fns {
     use crate::objects::Value;
     use crate::vm::interpreter::Interpreter;
 
-    disabled_module_stub!("fs",
+    disabled_module_stub!(
+        "fs",
         native_fs_read_file_sync,
         native_fs_write_file_sync,
         native_fs_exists_sync,
@@ -95,7 +96,8 @@ mod http_fns {
     use crate::objects::Value;
     use crate::vm::interpreter::Interpreter;
 
-    disabled_module_stub!("http",
+    disabled_module_stub!(
+        "http",
         native_http_create_server,
         native_http_server_listen,
         native_http_server_close,
@@ -113,7 +115,8 @@ mod net_fns {
     use crate::objects::Value;
     use crate::vm::interpreter::Interpreter;
 
-    disabled_module_stub!("net",
+    disabled_module_stub!(
+        "net",
         native_net_create_connection,
         native_net_socket_write,
         native_net_socket_end,

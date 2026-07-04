@@ -5,8 +5,8 @@ use crate::objects::js_date::JsDate;
 use crate::objects::js_promise::JsPromise;
 use crate::objects::Value;
 use rustc_hash::FxHashMap;
-use std::rc::Rc;
 use std::cell::RefCell;
+use std::rc::Rc;
 
 /// Creates an `FxHashMap<String, Value>` from key-value pairs.
 ///
@@ -363,10 +363,10 @@ impl JsRegExp {
                 }
             }
         }
-        
+
         // Cache miss: run the actual test
         let result = self.test(input);
-        
+
         // Update cache
         if !self.global && !self.sticky {
             // Only cache for non-global, non-sticky regexps (test() semantics)
@@ -375,18 +375,16 @@ impl JsRegExp {
                 // Find match positions for caching
                 if let Some(ref compiled) = self.compiled {
                     let (match_start, match_end) = match compiled {
-                        JsCompiledRegex::Simple(re) => {
-                            re.find(input)
-                                .map(|m| (m.start(), m.end()))
-                                .unwrap_or((0, 0))
-                        }
-                        JsCompiledRegex::Advanced(re) => {
-                            re.find(input)
-                                .ok()
-                                .flatten()
-                                .map(|m| (m.start(), m.end()))
-                                .unwrap_or((0, 0))
-                        }
+                        JsCompiledRegex::Simple(re) => re
+                            .find(input)
+                            .map(|m| (m.start(), m.end()))
+                            .unwrap_or((0, 0)),
+                        JsCompiledRegex::Advanced(re) => re
+                            .find(input)
+                            .ok()
+                            .flatten()
+                            .map(|m| (m.start(), m.end()))
+                            .unwrap_or((0, 0)),
                     };
                     // Cache the match positions if we found a match
                     // (match_end > match_start) or if it's a zero-length match at position 0
@@ -403,7 +401,7 @@ impl JsRegExp {
                 self.last_match_end = None;
             }
         }
-        
+
         result
     }
 }

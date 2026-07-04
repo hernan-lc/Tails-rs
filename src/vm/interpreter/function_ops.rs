@@ -56,11 +56,8 @@ impl Interpreter {
             }
             Instruction::MakeClosure(func_idx, _capture_slots) => {
                 let func_info = module.functions[*func_idx as usize].clone();
-                let base_pointer: usize = self
-                    .call_stack
-                    .last()
-                    .map(|f| f.base_pointer)
-                    .unwrap_or(0);
+                let base_pointer: usize =
+                    self.call_stack.last().map(|f| f.base_pointer).unwrap_or(0);
                 let snapshot: Vec<Value> = _capture_slots
                     .iter()
                     .map(|slot| {
@@ -83,9 +80,7 @@ impl Interpreter {
                         None => {
                             let rc = Rc::new(RefCell::new(snapshot));
                             if let Some(frame) = self.call_stack.last_mut() {
-                                frame
-                                    .shared_closure_env
-                                    .insert(*func_idx, rc.clone());
+                                frame.shared_closure_env.insert(*func_idx, rc.clone());
                             }
                             rc
                         }
