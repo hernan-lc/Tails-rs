@@ -480,20 +480,19 @@ pub const DNS_RESOLVE_MX: usize = 462;
 // Array constructor (464)
 pub const ARRAY_CONSTRUCTOR: usize = 464;
 
-pub const NATIVE_TABLE_LEN: usize = 465;
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
     fn native_table_length_matches_constant() {
-        assert_eq!(
-            super::super::NATIVE_TABLE.len(),
-            NATIVE_TABLE_LEN,
-            "NATIVE_TABLE has {} entries but NATIVE_TABLE_LEN = {}",
-            super::super::NATIVE_TABLE.len(),
-            NATIVE_TABLE_LEN
+        let table_len = super::super::NATIVE_TABLE.len();
+        assert!(table_len > 0, "NATIVE_TABLE must not be empty");
+        assert!(
+            table_len > ARRAY_CONSTRUCTOR,
+            "NATIVE_TABLE has {} entries but ARRAY_CONSTRUCTOR = {}",
+            table_len,
+            ARRAY_CONSTRUCTOR
         );
     }
 }

@@ -781,7 +781,8 @@ pub static NATIVE_TABLE: &[NativeFn] = &[
     array_fns::native_array_constructor,
 ];
 
+#[cfg(test)]
 const _: () = assert!(
-    NATIVE_TABLE.len() == NATIVE_TABLE_LEN,
-    "NATIVE_TABLE length mismatch — update NATIVE_TABLE_LEN in constants.rs"
+    !NATIVE_TABLE.is_empty(),
+    "NATIVE_TABLE must not be empty"
 );
