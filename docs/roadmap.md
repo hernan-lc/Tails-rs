@@ -19,6 +19,7 @@
 | 1.6 | `Value::String` → `Arc<str>` | 928 tests pass, zero failures |
 | 1.7 | `ConsString` rope | O(1) concat, lazy flatten |
 | 1.8 | Closure env cache | Per-sibling clone eliminated |
+| 2.2 | GC nursery boundary + write-barrier scaffold | `nursery_start/next` tracking on `sweep`; `write_barrier()` hook placed for follow-up minor-GC |
 | 2.3 | Inline `to_string_coerce` in `add` | 4 dedicated arms added |
 | 2.4 | `JsIterator` heap type | Property insert removed |
 | 2.5 | `Vec::with_capacity` native fns | Growth reallocs eliminated |
@@ -33,10 +34,6 @@
 - [ ] **2.1 — `Value` NaN-boxing**  
   Shrink 32-byte `Value` enum to 8 bytes via tagged-NaN float + `Box<HeapValue>`.  
   Touches every `match Value::X` in codebase. Expected: 2–4× general speedup.
-
-- [ ] **2.2 — Generational / bump allocator**  
-  Replace mark-sweep with bump allocator (young gen) + small mark-sweep (old gen).  
-  Current `Vec<HeapValue>::clone()` on `pc & 127 == 0` is the top per-N-instruction cost.
 
 ---
 

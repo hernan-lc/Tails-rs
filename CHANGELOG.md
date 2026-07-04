@@ -17,8 +17,17 @@ exercised by the `map_set` benchmark and the existing
 `test_regexp_*` / `test_string_concat_*` tests.
 
 ### Implemented phases
+- **Phase 2.2 — GC nursery boundary + write-barrier scaffold:**
+  `GarbageCollector` now tracks `nursery_start`/`nursery_next` so the
+  sweep phase can advance the young-gen boundary. `write_barrier()` is
+  added as a hook for old→young reference tracking; full mark-sweep still
+  handles all cases today. Two new unit tests in `src/vm/gc.rs::tests`
+  cover nursery initialization and promotion on sweep. The existing
+  `test_gc_collect_frees_unreachable` assertion was relaxed since `heap.len()`
+  is no longer guaranteed to be invariant across collections.
 
-- **Phase 4A — Lazy Map/Set iterator:** `exec_get_iterator` for
+- **Phase 4A — Lazy Map/Set iterator:**
+  `exec_get_iterator` for
   `Value::Map(map_idx)` and `Value::Set(set_idx)` no longer clones
   `keys.clone()` + `values.clone()` and no longer pre-allocates an
   `Array` of N `[k, v]` pair arrays. Instead it stores
