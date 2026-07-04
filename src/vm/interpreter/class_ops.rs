@@ -3,7 +3,6 @@ use crate::compiler::CompiledModule;
 use crate::compiler::Instruction;
 use crate::errors::{Error, Result};
 use crate::objects::Value;
-use std::collections::HashMap;
 
 impl Interpreter {
     fn handle_make_class(&mut self, class_info_idx: &u32, module: &CompiledModule) -> Result<()> {
@@ -173,9 +172,9 @@ impl Interpreter {
                 let mut args = Vec::new();
                 for _ in 0..*argc {
                     args.push(
-                        self.stack
-                            .pop()
-                            .ok_or_else(|| Error::RuntimeError(super::ERR_STACK_UNDERFLOW.into()))?,
+                        self.stack.pop().ok_or_else(|| {
+                            Error::RuntimeError(super::ERR_STACK_UNDERFLOW.into())
+                        })?,
                     );
                 }
                 args.reverse();
@@ -234,7 +233,7 @@ impl Interpreter {
                                 } else {
                                     self.exception_handlers.clone()
                                 },
-                                shared_closure_env: HashMap::new(),
+                                shared_closure_env: None,
                             });
                             for closure_var in f_clone.closure.borrow().iter().cloned() {
                                 self.stack.push(closure_var);

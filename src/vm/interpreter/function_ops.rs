@@ -71,7 +71,10 @@ impl Interpreter {
                 let closure_vars: Rc<RefCell<Vec<Value>>> = {
                     let cached: Option<Rc<RefCell<Vec<Value>>>> =
                         if let Some(frame) = self.call_stack.last() {
-                            frame.shared_closure_env.get(func_idx).cloned()
+                            frame
+                                .shared_closure_env
+                                .as_ref()
+                                .and_then(|env| env.get(func_idx).cloned())
                         } else {
                             None
                         };
@@ -80,7 +83,9 @@ impl Interpreter {
                         None => {
                             let rc = Rc::new(RefCell::new(snapshot));
                             if let Some(frame) = self.call_stack.last_mut() {
-                                frame.shared_closure_env.insert(*func_idx, rc.clone());
+                                frame
+                                    .get_or_init_closure_env()
+                                    .insert(*func_idx, rc.clone());
                             }
                             rc
                         }

@@ -1,9 +1,8 @@
+use super::helpers::is_user_visible_key;
 use crate::errors::{Error, Result};
 use crate::objects::Value;
-use super::helpers::is_user_visible_key;
 use crate::props;
 use crate::vm::interpreter::Interpreter;
-use std::collections::HashMap;
 
 pub(super) fn native_reflect_get(
     interp: &mut Interpreter,
@@ -147,7 +146,7 @@ pub(super) fn native_reflect_construct(
                 source_line: None,
                 source_col: None,
                 exception_handlers_snapshot: interp.exception_handlers.clone(),
-                shared_closure_env: HashMap::new(),
+                shared_closure_env: None,
             });
 
             for closure_var in f.closure.borrow().iter().cloned() {
@@ -193,8 +192,7 @@ pub(super) fn native_reflect_own_keys(
         Value::Object(obj_idx) => {
             if let crate::vm::interpreter::HeapValue::Object(obj) = &interp.heap[*obj_idx] {
                 for k in obj.properties.keys() {
-                    if !is_user_visible_key(k)
-                    {
+                    if !is_user_visible_key(k) {
                         continue;
                     }
                     keys.push(Value::String(k.to_string()));
@@ -212,8 +210,7 @@ pub(super) fn native_reflect_own_keys(
         Value::Function(func_idx) => {
             if let crate::vm::interpreter::HeapValue::Function(f) = &interp.heap[*func_idx] {
                 for k in f.properties.keys() {
-                    if !is_user_visible_key(k)
-                    {
+                    if !is_user_visible_key(k) {
                         continue;
                     }
                     keys.push(Value::String(k.to_string()));

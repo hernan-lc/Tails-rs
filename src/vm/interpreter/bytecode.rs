@@ -465,7 +465,7 @@ impl Interpreter {
                                             } else {
                                                 self.exception_handlers.clone()
                                             },
-                                            shared_closure_env: HashMap::new(),
+                                            shared_closure_env: None,
                                         });
                                         for closure_var in closure_vars.borrow().iter().cloned() {
                                             self.stack.push(closure_var);
@@ -627,7 +627,7 @@ impl Interpreter {
                                             } else {
                                                 self.exception_handlers.clone()
                                             },
-                                            shared_closure_env: HashMap::new(),
+                                            shared_closure_env: None,
                                         });
                                         for closure_var in closure_vars.borrow().iter().cloned() {
                                             self.stack.push(closure_var);
@@ -732,7 +732,7 @@ impl Interpreter {
                                                         exception_handlers_snapshot: self
                                                             .exception_handlers
                                                             .clone(),
-                                                        shared_closure_env: HashMap::new(),
+                                                        shared_closure_env: None,
                                                     });
                                                     for arg in args {
                                                         self.stack.push(arg);
@@ -811,7 +811,7 @@ impl Interpreter {
                                                 exception_handlers_snapshot: self
                                                     .exception_handlers
                                                     .clone(),
-                                                shared_closure_env: HashMap::new(),
+                                                shared_closure_env: None,
                                             });
                                             for closure_var in closure_vars.borrow().iter().cloned()
                                             {
