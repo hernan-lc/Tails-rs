@@ -309,7 +309,7 @@ fn handle_one_request(
     }
     let hdr_idx = interp.heap.len();
     interp.heap.push(HeapValue::Object(JsObject {
-        properties: hdr_props,
+        properties: hdr_props.into(),
         prototype: None,
         extensible: true,
     }));
@@ -382,7 +382,7 @@ fn handle_one_request(
                     .iter()
                     .filter_map(|(k, v)| {
                         if let Value::String(s) = v {
-                            Some((k.clone(), s.clone()))
+                            Some((k.to_string(), s.clone()))
                         } else {
                             None
                         }

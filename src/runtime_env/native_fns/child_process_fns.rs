@@ -355,7 +355,7 @@ fn parse_spawn_options(
             let mut env_map = std::collections::HashMap::new();
             for (k, v) in &env_obj.properties {
                 if !k.starts_with('_') {
-                    env_map.insert(k.clone(), to_string_value(interp, v));
+                    env_map.insert(k.to_string(), to_string_value(interp, v));
                 }
             }
             *env = Some(env_map);

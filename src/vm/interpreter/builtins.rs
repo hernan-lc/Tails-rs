@@ -805,7 +805,7 @@ impl Interpreter {
             let buffer_idx = self.gc.allocate(
                 &mut self.heap,
                 HeapValue::Object(JsObject {
-                    properties: buffer_props,
+                    properties: buffer_props.into(),
                     prototype: None,
                     extensible: true,
                 }),
@@ -830,7 +830,7 @@ impl Interpreter {
             let process_idx = self.gc.allocate(
                 &mut self.heap,
                 HeapValue::Object(JsObject {
-                    properties: process_props,
+                    properties: process_props.into(),
                     prototype: None,
                     extensible: true,
                 }),

@@ -431,7 +431,7 @@ impl Default for GarbageCollector {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::vm::interpreter::{JsArray, JsObject};
+    use crate::vm::interpreter::{JsArray, JsObject, PropertyStorage};
 
     fn make_obj() -> HeapValue {
         HeapValue::Object(JsObject::new())
@@ -584,7 +584,7 @@ mod tests {
                 )])),
                 prototype: None,
                 super_class: None,
-                properties: FxHashMap::default(),
+                properties: PropertyStorage::new(),
                 owner_module: None,
                 module_scope: None,
                 is_generator: false,

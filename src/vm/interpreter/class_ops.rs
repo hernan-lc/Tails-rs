@@ -3,7 +3,6 @@ use crate::compiler::CompiledModule;
 use crate::compiler::Instruction;
 use crate::errors::{Error, Result};
 use crate::objects::Value;
-use rustc_hash::FxHashMap;
 use std::collections::HashMap;
 
 impl Interpreter {
@@ -54,7 +53,7 @@ impl Interpreter {
                     closure: Rc::new(RefCell::new(Vec::new())),
                     prototype: Some(proto_obj_idx),
                     super_class: Some(super_val.clone()),
-                    properties: FxHashMap::default(),
+                    properties: PropertyStorage::new(),
                     owner_module: owner,
                     module_scope: None,
                     is_generator: false,
@@ -77,7 +76,7 @@ impl Interpreter {
                     closure: Rc::new(RefCell::new(Vec::new())),
                     prototype: Some(proto_obj_idx),
                     super_class: Some(super_val.clone()),
-                    properties: FxHashMap::default(),
+                    properties: PropertyStorage::new(),
                     owner_module: None,
                     module_scope: None,
                     is_generator: false,
@@ -111,7 +110,7 @@ impl Interpreter {
                     closure: Rc::new(RefCell::new(Vec::new())),
                     prototype: Some(method_proto_idx),
                     super_class: None,
-                    properties: FxHashMap::default(),
+                    properties: PropertyStorage::new(),
                     owner_module: owner,
                     module_scope: None,
                     is_generator: false,

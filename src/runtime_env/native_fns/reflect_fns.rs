@@ -198,7 +198,7 @@ pub(super) fn native_reflect_own_keys(
                     {
                         continue;
                     }
-                    keys.push(Value::String(k.clone()));
+                    keys.push(Value::String(k.to_string()));
                 }
             }
         }
@@ -219,7 +219,7 @@ pub(super) fn native_reflect_own_keys(
                     {
                         continue;
                     }
-                    keys.push(Value::String(k.clone()));
+                    keys.push(Value::String(k.to_string()));
                 }
             }
         }

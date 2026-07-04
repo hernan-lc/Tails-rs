@@ -46,7 +46,7 @@ pub(super) fn native_datetime_format_constructor(
     // the two style names, and the two always-on method pointers.
     // Dynamic per-part options (weekday / year / ... / second) are
     // merged in below when the user actually provided them.
-    let mut formatter_props: FxHashMap<String, Value> = props! {
+    let mut formatter_props = props! {
         "type" => Value::String("datetime".into()),
         "dateStyle" => Value::String(date_style),
         "timeStyle" => Value::String(time_style),
@@ -435,7 +435,7 @@ pub(super) fn native_number_format_constructor(
     // Static baseline (type tag, style, fraction digit defaults, the
     // `format` method). The dynamic `currency` is inserted below only
     // when the user actually supplied one.
-    let mut formatter_props: FxHashMap<String, Value> = props! {
+    let mut formatter_props = props! {
         "type" => Value::String("number".into()),
         "style" => Value::String(style),
         "minimumFractionDigits" => Value::Integer(minimum_fraction_digits as i64),

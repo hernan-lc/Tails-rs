@@ -21,7 +21,7 @@ mod value_ops;
 pub(crate) use call_frame::{CallFrame, ExceptionHandler};
 pub use heap_types::{
     HeapValue, JsArray, JsCompiledRegex, JsFunction, JsGenerator, JsIterator, JsObject,
-    JsProxyData, JsRegExp,
+    JsProxyData, JsRegExp, PropertyStorage,
 };
 
 use crate::compiler::{CompiledModule, Instruction};

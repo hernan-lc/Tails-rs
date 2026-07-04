@@ -1,6 +1,6 @@
 use crate::errors::Result;
 use crate::objects::Value;
-use crate::vm::interpreter::Interpreter;
+use crate::vm::interpreter::{Interpreter, PropertyStorage};
 use rustc_hash::FxHashMap;
 
 /// native_require(specifier) — CommonJS require() function
@@ -57,7 +57,7 @@ pub(super) fn native_require(
                 }
                 let mut props: FxHashMap<String, Value> = FxHashMap::default();
                 for (name, val) in &exports {
-                    props.insert(name.clone(), val.clone());
+                    props.insert(name.to_string(), val.clone());
                 }
                 interp
                     .module_registry
@@ -196,9 +196,13 @@ pub(super) fn native_require(
 
     // 14. Store exports in registry
     let export_props = extract_object_properties(interp, &final_exports);
+    let export_map: FxHashMap<String, Value> = export_props
+        .iter()
+        .map(|(k, v)| (k.to_string(), v.clone()))
+        .collect();
     interp
         .module_registry
-        .insert(module_path.clone(), export_props.clone());
+        .insert(module_path.clone(), export_map.clone());
     interp.current_module_path = saved_path;
     interp.current_module = saved_module;
     let exec_exports = std::mem::replace(&mut interp.module_exports, prev_exports);
@@ -216,7 +220,7 @@ pub(super) fn native_require(
 
     // If module.exports was reassigned to a non-object (function, string, etc.), return it directly
     let result = match &final_exports {
-        Value::Object(_) => interp.build_module_object_from_exports(&export_props),
+        Value::Object(_) => interp.build_module_object_from_exports(&export_map),
         other => other.clone(),
     };
     interp
@@ -225,13 +229,13 @@ pub(super) fn native_require(
     Ok(result)
 }
 
-/// Extract all properties from a JS object into a FxHashMap
-fn extract_object_properties(interp: &Interpreter, obj: &Value) -> FxHashMap<String, Value> {
-    let mut props = FxHashMap::default();
+/// Extract all properties from a JS object into a PropertyStorage
+fn extract_object_properties(interp: &Interpreter, obj: &Value) -> PropertyStorage {
+    let mut props = PropertyStorage::new();
     if let Value::Object(idx) = obj {
         if let crate::vm::interpreter::HeapValue::Object(obj_data) = &interp.heap[*idx] {
             for (k, v) in &obj_data.properties {
-                props.insert(k.clone(), v.clone());
+                props.insert(k.to_string(), v.clone());
             }
         }
     }

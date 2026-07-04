@@ -379,16 +379,19 @@ impl Interpreter {
                 let target = self.stack_pop()?;
                 if let Value::Object(target_idx) = target {
                     if let Value::Object(source_idx) = source {
-                        if let HeapValue::Object(source_obj) = &self.heap[source_idx] {
-                            let props: Vec<(String, Value)> = source_obj
-                                .properties
-                                .iter()
-                                .map(|(k, v)| (k.clone(), v.clone()))
-                                .collect();
-                            if let HeapValue::Object(target_obj) = &mut self.heap[target_idx] {
-                                for (k, v) in props {
-                                    target_obj.properties.insert(k, v);
-                                }
+                        let props: Vec<(String, Value)> =
+                            if let HeapValue::Object(source_obj) = &self.heap[source_idx] {
+                                source_obj
+                                    .properties
+                                    .iter()
+                                    .map(|(k, v)| (k.to_string(), v.clone()))
+                                    .collect()
+                            } else {
+                                Vec::new()
+                            };
+                        if let HeapValue::Object(target_obj) = &mut self.heap[target_idx] {
+                            for (k, v) in props {
+                                target_obj.properties.insert(k, v);
                             }
                         }
                     }
@@ -417,7 +420,7 @@ impl Interpreter {
                                         && !k.starts_with(SETTER_PREFIX)
                                         && !k.starts_with(METHOD_PREFIX)
                                 })
-                                .map(|k| Value::String(k.clone()))
+                                .map(|k| Value::String(k.to_string()))
                                 .collect()
                         } else {
                             vec![]

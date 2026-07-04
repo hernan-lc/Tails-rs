@@ -8,7 +8,244 @@ use rustc_hash::FxHashMap;
 use std::cell::RefCell;
 use std::rc::Rc;
 
-/// Creates an `FxHashMap<String, Value>` from key-value pairs.
+const INLINE_CAP: usize = 8;
+
+/// Phase 3.5 — Hybrid property storage: inline array for small objects (≤8
+/// properties), falling back to `FxHashMap` for larger ones.  Avoids hash-map
+/// overhead for the common case of short-lived, few-property objects.
+#[derive(Debug, Clone)]
+pub enum PropertyStorage {
+    Inline(u8, [Option<(String, Value)>; INLINE_CAP]),
+    Map(FxHashMap<String, Value>),
+}
+
+impl Default for PropertyStorage {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl PropertyStorage {
+    pub fn new() -> Self {
+        Self::Inline(0, Default::default())
+    }
+
+    fn upgrade(map: FxHashMap<String, Value>) -> Self {
+        Self::Map(map)
+    }
+
+    pub fn get(&self, key: &str) -> Option<&Value> {
+        match self {
+            Self::Inline(len, slots) => {
+                for slot in slots.iter().take(*len as usize) {
+                    if let Some((k, v)) = slot {
+                        if k == key {
+                            return Some(v);
+                        }
+                    }
+                }
+                None
+            }
+            Self::Map(m) => m.get(key),
+        }
+    }
+
+    pub fn insert(&mut self, key: String, value: Value) {
+        match self {
+            Self::Inline(len, slots) => {
+                let n = *len as usize;
+                // Update existing
+                for slot in slots.iter_mut().take(n) {
+                    if let Some((k, _)) = slot {
+                        if *k == key {
+                            *slot = Some((key, value));
+                            return;
+                        }
+                    }
+                }
+                // Insert new
+                if n < INLINE_CAP {
+                    slots[n] = Some((key, value));
+                    *len += 1;
+                } else {
+                    // Upgrade to map
+                    let mut map = FxHashMap::default();
+                    for slot in slots.iter_mut().take(INLINE_CAP) {
+                        if let Some((k, v)) = slot.take() {
+                            map.insert(k, v);
+                        }
+                    }
+                    map.insert(key, value);
+                    *self = Self::Map(map);
+                }
+            }
+            Self::Map(m) => {
+                m.insert(key, value);
+            }
+        }
+    }
+
+    pub fn remove(&mut self, key: &str) -> Option<Value> {
+        match self {
+            Self::Inline(len, slots) => {
+                let n = *len as usize;
+                for i in 0..n {
+                    if let Some((k, _)) = &slots[i] {
+                        if k == key {
+                            let slot = slots[i].take();
+                            // Shift remaining slots
+                            for j in i..n - 1 {
+                                slots[j] = slots[j + 1].take();
+                            }
+                            slots[n - 1] = None;
+                            *len -= 1;
+                            return slot.map(|(_, v)| v);
+                        }
+                    }
+                }
+                None
+            }
+            Self::Map(m) => m.remove(key),
+        }
+    }
+
+    pub fn contains_key(&self, key: &str) -> bool {
+        match self {
+            Self::Inline(len, slots) => {
+                for slot in slots.iter().take(*len as usize) {
+                    if let Some((k, _)) = slot {
+                        if k == key {
+                            return true;
+                        }
+                    }
+                }
+                false
+            }
+            Self::Map(m) => m.contains_key(key),
+        }
+    }
+
+    pub fn len(&self) -> usize {
+        match self {
+            Self::Inline(len, _) => *len as usize,
+            Self::Map(m) => m.len(),
+        }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = (&str, &Value)> {
+        match self {
+            Self::Inline(len, slots) => {
+                let n = *len as usize;
+                slots
+                    .iter()
+                    .take(n)
+                    .filter_map(|slot| slot.as_ref().map(|(k, v)| (k.as_str(), v)))
+                    .collect::<Vec<_>>()
+                    .into_iter()
+            }
+            Self::Map(m) => {
+                m.iter()
+                    .map(|(k, v)| (k.as_str(), v))
+                    .collect::<Vec<_>>()
+                    .into_iter()
+            }
+        }
+    }
+
+    pub fn values(&self) -> impl Iterator<Item = &Value> {
+        match self {
+            Self::Inline(len, slots) => {
+                let n = *len as usize;
+                slots
+                    .iter()
+                    .take(n)
+                    .filter_map(|slot| slot.as_ref().map(|(_, v)| v))
+                    .collect::<Vec<_>>()
+                    .into_iter()
+            }
+            Self::Map(m) => m.values().collect::<Vec<_>>().into_iter(),
+        }
+    }
+
+    pub fn iter_mut(&mut self) -> impl Iterator<Item = (&str, &mut Value)> {
+        match self {
+            Self::Inline(len, slots) => {
+                let n = *len as usize;
+                slots
+                    .iter_mut()
+                    .take(n)
+                    .filter_map(|slot| slot.as_mut().map(|(k, v)| (k.as_str(), v)))
+                    .collect::<Vec<_>>()
+                    .into_iter()
+            }
+            Self::Map(m) => {
+                m.iter_mut()
+                    .map(|(k, v)| (k.as_str(), v))
+                    .collect::<Vec<_>>()
+                    .into_iter()
+            }
+        }
+    }
+}
+
+impl From<FxHashMap<String, Value>> for PropertyStorage {
+    fn from(map: FxHashMap<String, Value>) -> Self {
+        Self::Map(map)
+    }
+}
+
+impl PropertyStorage {
+    pub fn keys(&self) -> impl Iterator<Item = &str> {
+        match self {
+            Self::Inline(len, slots) => {
+                let n = *len as usize;
+                slots
+                    .iter()
+                    .take(n)
+                    .filter_map(|slot| slot.as_ref().map(|(k, _)| k.as_str()))
+                    .collect::<Vec<_>>()
+                    .into_iter()
+            }
+            Self::Map(m) => m.keys().map(|k| k.as_str()).collect::<Vec<_>>().into_iter(),
+        }
+    }
+
+    pub fn clear(&mut self) {
+        match self {
+            Self::Inline(len, slots) => {
+                for slot in slots.iter_mut() {
+                    *slot = None;
+                }
+                *len = 0;
+            }
+            Self::Map(m) => m.clear(),
+        }
+    }
+}
+
+impl<'a> IntoIterator for &'a PropertyStorage {
+    type Item = (&'a str, &'a Value);
+    type IntoIter = std::vec::IntoIter<(&'a str, &'a Value)>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter().collect::<Vec<_>>().into_iter()
+    }
+}
+
+impl<'a> IntoIterator for &'a mut PropertyStorage {
+    type Item = (&'a str, &'a mut Value);
+    type IntoIter = std::vec::IntoIter<(&'a str, &'a mut Value)>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter_mut().collect::<Vec<_>>().into_iter()
+    }
+}
+
+/// Creates a `PropertyStorage` from key-value pairs.
 ///
 /// # Example
 /// ```ignore
@@ -22,13 +259,13 @@ macro_rules! props {
     ($($key:expr => $value:expr),* $(,)?) => {{
         let mut map = ::rustc_hash::FxHashMap::default();
         $(map.insert($key.to_string(), $value);)*
-        map
+        $crate::vm::interpreter::PropertyStorage::from(map)
     }};
 }
 
 #[derive(Debug, Clone)]
 pub struct JsObject {
-    pub properties: FxHashMap<String, Value>,
+    pub properties: PropertyStorage,
     pub prototype: Option<usize>,
     pub extensible: bool,
 }
@@ -42,7 +279,7 @@ impl Default for JsObject {
 impl JsObject {
     pub fn new() -> Self {
         Self {
-            properties: FxHashMap::default(),
+            properties: PropertyStorage::new(),
             prototype: None,
             extensible: true,
         }
@@ -50,7 +287,7 @@ impl JsObject {
 
     pub fn with_prototype(prototype: Option<usize>) -> Self {
         Self {
-            properties: FxHashMap::default(),
+            properties: PropertyStorage::new(),
             prototype,
             extensible: true,
         }
@@ -71,7 +308,7 @@ pub struct JsFunction {
     pub closure: Rc<RefCell<Vec<Value>>>,
     pub prototype: Option<usize>,
     pub super_class: Option<Value>,
-    pub properties: FxHashMap<String, Value>,
+    pub properties: PropertyStorage,
     pub owner_module: Option<Rc<CompiledModule>>,
     pub module_scope: Option<Rc<FxHashMap<String, Value>>>,
     pub is_generator: bool,
@@ -218,6 +455,15 @@ impl JsRegExp {
     }
 
     pub fn test(&self, input: &str) -> bool {
+        // Phase 3.4 — Fast-path: for literal patterns (no metacharacters), use
+        // str::contains directly instead of the regex engine.
+        if self.is_literal_pattern() {
+            return if self.ignore_case {
+                input.to_lowercase().contains(&self.source.to_lowercase())
+            } else {
+                input.contains(self.source.as_str())
+            };
+        }
         if let Some(ref compiled) = self.compiled {
             match compiled {
                 JsCompiledRegex::Simple(re) => re.is_match(input),
@@ -229,6 +475,35 @@ impl JsRegExp {
     }
 
     pub fn exec_at(&self, input: &str, start: usize) -> Option<(Vec<String>, usize)> {
+        // Phase 3.4 — Fast-path: for literal patterns, use str::find instead of
+        // the regex engine. Returns the first match as a single capture group.
+        if self.is_literal_pattern() {
+            let tail = &input[start..];
+            let found = if self.ignore_case {
+                let needle_lower: Vec<char> = self.source.chars().map(|c| c.to_lowercase().next().unwrap_or(c)).collect();
+                let haystack_lower: Vec<char> = tail.chars().map(|c| c.to_lowercase().next().unwrap_or(c)).collect();
+                let needle_len = needle_lower.len();
+                haystack_lower
+                    .windows(needle_len)
+                    .position(|w| w == needle_lower.as_slice())
+                    .map(|pos| {
+                        let byte_pos = tail.char_indices().nth(pos).map(|(i, _)| i).unwrap_or(0);
+                        let byte_end = tail[byte_pos..]
+                            .char_indices()
+                            .nth(needle_len)
+                            .map(|(i, _)| byte_pos + i)
+                            .unwrap_or(tail.len());
+                        (tail[byte_pos..byte_end].to_string(), start + byte_end)
+                    })
+            } else {
+                tail.find(self.source.as_str()).map(|pos| {
+                    let end = pos + self.source.len();
+                    (self.source.clone(), start + end)
+                })
+            };
+            return found.map(|(m, e)| (vec![m], e));
+        }
+
         let tail = &input[start..];
         let (results, match_end) = match self.compiled.as_ref()? {
             JsCompiledRegex::Simple(re) => {
@@ -262,6 +537,30 @@ impl JsRegExp {
     }
 
     pub fn exec(&self, input: &str) -> Option<Vec<String>> {
+        // Phase 3.4 — Fast-path for literal patterns
+        if self.is_literal_pattern() {
+            return if self.ignore_case {
+                let needle_lower: Vec<char> = self.source.chars().map(|c| c.to_lowercase().next().unwrap_or(c)).collect();
+                let haystack_lower: Vec<char> = input.chars().map(|c| c.to_lowercase().next().unwrap_or(c)).collect();
+                let needle_len = needle_lower.len();
+                haystack_lower
+                    .windows(needle_len)
+                    .position(|w| w == needle_lower.as_slice())
+                    .map(|pos| {
+                        let byte_pos = input.char_indices().nth(pos).map(|(i, _)| i).unwrap_or(0);
+                        let byte_end = input[byte_pos..]
+                            .char_indices()
+                            .nth(needle_len)
+                            .map(|(i, _)| byte_pos + i)
+                            .unwrap_or(input.len());
+                        vec![input[byte_pos..byte_end].to_string()]
+                    })
+            } else {
+                input.find(self.source.as_str()).map(|pos| {
+                    vec![input[pos..pos + self.source.len()].to_string()]
+                })
+            };
+        }
         self.exec_at(input, 0).map(|(v, _)| v)
     }
 
@@ -331,23 +630,20 @@ impl JsRegExp {
     /// metacharacters) and indicate they can use str::find directly,
     /// bypassing the regex crate entirely.
     pub fn is_literal_pattern(&self) -> bool {
-        if self.compiled.is_some() {
-            return false;
-        }
-        self.source.find(".").is_none()
-            && self.source.find("^").is_none()
-            && self.source.find("$").is_none()
-            && !self.source.contains("*")
-            && !self.source.contains("+")
-            && !self.source.contains("?")
-            && !self.source.contains("(")
-            && !self.source.contains(")")
-            && !self.source.contains("[")
-            && !self.source.contains("]")
-            && !self.source.contains("{")
-            && !self.source.contains("}")
-            && self.source.find("\\").is_none()
-            && !self.source.contains("|")
+        !self.source.contains('.')
+            && !self.source.contains('^')
+            && !self.source.contains('$')
+            && !self.source.contains('*')
+            && !self.source.contains('+')
+            && !self.source.contains('?')
+            && !self.source.contains('(')
+            && !self.source.contains(')')
+            && !self.source.contains('[')
+            && !self.source.contains(']')
+            && !self.source.contains('{')
+            && !self.source.contains('}')
+            && !self.source.contains('\\')
+            && !self.source.contains('|')
     }
 
     /// Phase 3.4 — Lazy result cache hit for repeated `test()` calls on the

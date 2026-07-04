@@ -369,7 +369,7 @@ pub(super) fn native_event_emitter_event_names(
             if let Value::Array(arr_idx) = val {
                 if let HeapValue::Array(arr) = &interp.heap[*arr_idx] {
                     if !arr.elements.is_empty() {
-                        names.push(Value::String(key.clone()));
+                        names.push(Value::String(key.to_string()));
                     }
                 }
             }

@@ -128,7 +128,7 @@ pub(super) fn native_fs_stat_sync(
     // Static baseline of the stat result. The platform-specific
     // `mode`, `mtimeMs`, and `birthtimeMs` are merged in below when
     // the underlying `tails_fs::stat` call reported them.
-    let mut props: FxHashMap<String, Value> = props! {
+    let mut props = props! {
         "size" => Value::Integer(stat.size as i64),
         "isFile" => Value::Boolean(stat.is_file),
         "isDirectory" => Value::Boolean(stat.is_directory),
@@ -425,7 +425,7 @@ pub(super) fn native_fs_stat(
             interp
                 .heap
                 .push(HeapValue::Object(crate::vm::interpreter::JsObject {
-                    properties: props,
+                    properties: props.into(),
                     prototype: None,
                     extensible: true,
                 }));

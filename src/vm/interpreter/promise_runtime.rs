@@ -1,7 +1,6 @@
-use super::{HeapValue, Interpreter, JsFunction, JsObject};
+use super::{HeapValue, Interpreter, JsFunction, JsObject, PropertyStorage};
 use crate::objects::js_promise::PromiseState;
 use crate::objects::Value;
-use rustc_hash::FxHashMap;
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -29,7 +28,7 @@ impl Interpreter {
                 closure: Rc::new(RefCell::new(vec![Value::Promise(promise_idx)])),
                 prototype: Some(proto_idx),
                 super_class: None,
-                properties: FxHashMap::default(),
+                properties: PropertyStorage::new(),
                 owner_module: None,
                 module_scope: None,
                 is_generator: false,
@@ -56,7 +55,7 @@ impl Interpreter {
                 closure: Rc::new(RefCell::new(vec![Value::Promise(promise_idx)])),
                 prototype: Some(proto_idx),
                 super_class: None,
-                properties: FxHashMap::default(),
+                properties: PropertyStorage::new(),
                 owner_module: None,
                 module_scope: None,
                 is_generator: false,

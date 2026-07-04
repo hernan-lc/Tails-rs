@@ -258,7 +258,7 @@ impl Interpreter {
                         .load_module(module_name, &mut self.heap, &mut self.gc)?;
                 let mut props = FxHashMap::default();
                 for (name, val) in &exports {
-                    props.insert(name.clone(), val.clone());
+                    props.insert(name.to_string(), val.clone());
                 }
                 self.module_registry.insert(module_name.to_string(), props);
                 return Ok(Some(module_name.to_string()));
@@ -363,7 +363,7 @@ impl Interpreter {
                 }
                 let mut props = FxHashMap::default();
                 for (name, val) in &exports {
-                    props.insert(name.clone(), val.clone());
+                    props.insert(name.to_string(), val.clone());
                 }
                 self.module_registry.insert(module_name.to_string(), props);
                 return Ok(Some(module_name.to_string()));
@@ -408,7 +408,7 @@ impl Interpreter {
                     }
                     let mut props = FxHashMap::default();
                     for (name, val) in &exports {
-                        props.insert(name.clone(), val.clone());
+                        props.insert(name.to_string(), val.clone());
                     }
                     self.module_registry.insert(module_name.to_string(), props);
                     return Ok(Some(module_name.to_string()));
@@ -659,7 +659,7 @@ impl Interpreter {
             props.insert(k.clone(), v.clone());
         }
         self.heap.push(HeapValue::Object(JsObject {
-            properties: props,
+            properties: PropertyStorage::Map(props),
             prototype: None,
             extensible: true,
         }));

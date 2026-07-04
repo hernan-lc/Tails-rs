@@ -1,7 +1,6 @@
 use crate::errors::{Error, Result};
 use crate::objects::Value;
-use crate::vm::interpreter::Interpreter;
-use rustc_hash::FxHashMap;
+use crate::vm::interpreter::{Interpreter, PropertyStorage};
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -86,7 +85,7 @@ pub(super) fn native_function_bind(
                 closure: closure_rc,
                 prototype: None,
                 super_class: None,
-                properties: FxHashMap::default(),
+                properties: PropertyStorage::new(),
                 owner_module: None,
                 module_scope: None,
                 is_generator: false,

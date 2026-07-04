@@ -1,9 +1,8 @@
-use super::{HeapValue, Interpreter};
+use super::{HeapValue, Interpreter, PropertyStorage};
 use crate::errors::{Error, Result};
 use crate::objects::js_promise::PromiseState;
 use crate::objects::Value;
 use crate::runtime_env::native_fns::constants as c;
-use rustc_hash::FxHashMap;
 
 impl Interpreter {
     pub fn new_object(&mut self) -> Value {
@@ -919,7 +918,7 @@ impl Interpreter {
 /// at most 8 short string keys (the `__getter_` / `__setter_`
 /// prefix is 9 bytes; the iterator can reject almost every key with
 /// a length check before the prefix compare).
-fn find_accessor(properties: &FxHashMap<String, Value>, prefix: &str, key: &str) -> Option<Value> {
+fn find_accessor(properties: &PropertyStorage, prefix: &str, key: &str) -> Option<Value> {
     let needed_len = prefix.len() + key.len();
     for (k, v) in properties {
         if k.len() == needed_len && k.starts_with(prefix) && k.ends_with(key) {

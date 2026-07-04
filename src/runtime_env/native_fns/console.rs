@@ -73,7 +73,7 @@ fn collect_object_properties<'a>(
             if k.starts_with("__setter_") || k.starts_with("__method_") {
                 continue;
             }
-            all_props.push((k.clone(), v));
+            all_props.push((k.to_string(), v));
         }
         if let Some(proto_idx) = obj.prototype {
             let proto_props = collect_object_properties(interp, proto_idx, visited);
@@ -449,8 +449,8 @@ pub(super) fn native_console_table(
                                 {
                                     continue;
                                 }
-                                if !all_keys.contains(key) {
-                                    all_keys.push(key.clone());
+                                if !all_keys.iter().any(|k| k == key) {
+                                    all_keys.push(key.to_string());
                                 }
                             }
                         }
@@ -529,7 +529,7 @@ pub(super) fn native_console_table(
         }
         Value::Object(obj_idx) => {
             if let crate::vm::interpreter::HeapValue::Object(obj) = &interp.heap[*obj_idx] {
-                let mut props: Vec<(&String, &Value)> = obj
+                let mut props: Vec<(&str, &Value)> = obj
                     .properties
                     .iter()
                     .filter(|(k, _)| {

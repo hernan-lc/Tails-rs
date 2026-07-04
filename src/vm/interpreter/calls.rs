@@ -260,7 +260,7 @@ impl Interpreter {
                             if let HeapValue::Object(obj) = &self.heap[*obj_idx] {
                                 let mut json_obj = simd_json::value::owned::Object::new();
                                 for (k, v) in &obj.properties {
-                                    json_obj.insert(k.clone(), self.value_to_json(v));
+                                    json_obj.insert(k.to_string(), self.value_to_json(v));
                                 }
                                 let sv = simd_json::OwnedValue::Object(Box::new(json_obj));
                                 tails_abi::store_handle(sv)
@@ -390,7 +390,7 @@ impl Interpreter {
                 if let HeapValue::Object(obj) = &self.heap[*obj_idx] {
                     let mut json_obj = simd_json::value::owned::Object::new();
                     for (k, v) in &obj.properties {
-                        json_obj.insert(k.clone(), self.value_to_json(v));
+                        json_obj.insert(k.to_string(), self.value_to_json(v));
                     }
                     simd_json::OwnedValue::Object(Box::new(json_obj))
                 } else {

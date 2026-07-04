@@ -3,7 +3,7 @@ use crate::objects::js_promise::JsPromise;
 use crate::objects::Value;
 use crate::props;
 use crate::runtime_env::native_fns::constants as c;
-use crate::vm::interpreter::{HeapValue, Interpreter, JsArray, JsObject};
+use crate::vm::interpreter::{HeapValue, Interpreter, JsArray, JsObject, PropertyStorage};
 use rustc_hash::FxHashMap;
 
 use super::helpers::to_string_value;
@@ -75,13 +75,13 @@ pub(super) fn native_headers_constructor(
         "values" => Value::NativeFunction(c::HEADERS_VALUES),
         "entries" => Value::NativeFunction(c::HEADERS_ENTRIES),
     };
-    for (k, v) in static_props {
-        props.insert(k, v);
+    for (k, v) in &static_props {
+        props.insert(k.to_string(), v.clone());
     }
 
     let idx = interp.heap.len();
     interp.heap.push(HeapValue::Object(JsObject {
-        properties: props,
+        properties: PropertyStorage::Map(props),
         prototype: None,
         extensible: true,
     }));
@@ -401,14 +401,14 @@ pub(super) fn native_request_constructor(
                 }));
                 props.insert("headers".into(), Value::Object(h_idx));
 
-                let idx = interp.heap.len();
-                interp.heap.push(HeapValue::Object(JsObject {
-                    properties: props,
-                    prototype: None,
-                    extensible: true,
-                }));
-                return Ok(Value::Object(idx));
-            }
+    let idx = interp.heap.len();
+    interp.heap.push(HeapValue::Object(JsObject {
+        properties: props.into(),
+        prototype: None,
+        extensible: true,
+    }));
+    return Ok(Value::Object(idx));
+}
         }
     }
 
@@ -875,7 +875,7 @@ fn parse_fetch_args(
                     } else {
                         for (k, v) in &hdr_obj.properties {
                             if !k.starts_with('_') {
-                                hdrs.insert(k.clone(), to_string_value(interp, v));
+                                hdrs.insert(k.to_string(), to_string_value(interp, v));
                             }
                         }
                     }
@@ -919,7 +919,7 @@ fn parse_fetch_options(
                 if let HeapValue::Object(hdr_obj) = &interp.heap[*hdr_idx] {
                     for (k, v) in &hdr_obj.properties {
                         if !k.starts_with('_') {
-                            hdrs.insert(k.clone(), to_string_value(interp, v));
+                            hdrs.insert(k.to_string(), to_string_value(interp, v));
                         }
                     }
                 }

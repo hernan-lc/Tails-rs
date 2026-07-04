@@ -20,7 +20,7 @@ mod fetch_fns;
 ///
 /// # Example
 ///
-/// ```
+/// ```ignore
 /// disabled_module_stub!("fs",
 ///     native_fs_read_file_sync,
 ///     native_fs_write_file_sync,
@@ -28,7 +28,7 @@ mod fetch_fns;
 /// ```
 ///
 /// This generates:
-/// ```
+/// ```ignore
 /// pub(super) fn native_fs_read_file_sync(...) -> Result<Value> {
 ///     Err(Error::RuntimeError("fs module is not enabled...".into()))
 /// }

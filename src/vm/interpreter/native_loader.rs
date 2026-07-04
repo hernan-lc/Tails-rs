@@ -2,11 +2,11 @@ use crate::objects::Value;
 use crate::props;
 use crate::runtime_env::native_fns::constants as c;
 use crate::vm::gc::GarbageCollector;
-use crate::vm::interpreter::{HeapValue, JsObject};
+use crate::vm::interpreter::{HeapValue, JsObject, PropertyStorage};
 use rustc_hash::FxHashMap;
 
 type NativeModuleFactory =
-    fn(&mut Vec<HeapValue>, &mut GarbageCollector) -> FxHashMap<String, Value>;
+    fn(&mut Vec<HeapValue>, &mut GarbageCollector) -> PropertyStorage;
 
 pub struct NativeModuleRegistry {
     modules: FxHashMap<String, Box<NativeModuleFactory>>,
@@ -32,7 +32,7 @@ impl NativeModuleRegistry {
         name: &str,
         heap: &mut Vec<HeapValue>,
         gc: &mut GarbageCollector,
-    ) -> crate::errors::Result<FxHashMap<String, Value>> {
+    ) -> crate::errors::Result<PropertyStorage> {
         if let Some(factory) = self.modules.get(name) {
             Ok(factory(heap, gc))
         } else {
@@ -95,7 +95,7 @@ pub fn discover_module(name: &str, registry: &mut NativeModuleRegistry) {
 pub fn create_fs_module(
     _heap: &mut Vec<HeapValue>,
     _gc: &mut GarbageCollector,
-) -> FxHashMap<String, Value> {
+) -> PropertyStorage {
     props! {
         "readFileSync" => Value::NativeFunction(c::FS_READ_FILE_SYNC),
         "writeFileSync" => Value::NativeFunction(c::FS_WRITE_FILE_SYNC),
@@ -115,7 +115,7 @@ pub fn create_fs_module(
 pub fn create_fs_promises_module(
     _heap: &mut Vec<HeapValue>,
     _gc: &mut GarbageCollector,
-) -> FxHashMap<String, Value> {
+) -> PropertyStorage {
     props! {
         "readdir" => Value::NativeFunction(c::FS_READDIR),
         "read_file" => Value::NativeFunction(c::FS_READ_FILE),
@@ -132,7 +132,7 @@ pub fn create_fs_promises_module(
 pub fn create_path_module(
     _heap: &mut Vec<HeapValue>,
     _gc: &mut GarbageCollector,
-) -> FxHashMap<String, Value> {
+) -> PropertyStorage {
     props! {
         "join" => Value::NativeFunction(c::PATH_JOIN),
         "resolve" => Value::NativeFunction(c::PATH_RESOLVE),
@@ -158,12 +158,12 @@ pub fn create_path_module(
 pub fn create_process_module(
     heap: &mut Vec<HeapValue>,
     gc: &mut GarbageCollector,
-) -> FxHashMap<String, Value> {
+) -> PropertyStorage {
     // Start with the static set of `process.<name>` properties (function
     // pointers, scalar compile-time constants, and the `pid`). The
     // dynamic sub-objects (env / argv / stdout / stderr) are merged in
     // after the heap allocations below.
-    let mut props: FxHashMap<String, Value> = props! {
+    let mut props = props! {
         "exit" => Value::NativeFunction(c::PROCESS_EXIT),
         "cwd" => Value::NativeFunction(c::PROCESS_CWD),
         "chdir" => Value::NativeFunction(c::PROCESS_CHDIR),
@@ -201,7 +201,7 @@ pub fn create_process_module(
     };
 
     // process.env
-    let mut env_props = FxHashMap::default();
+    let mut env_props = PropertyStorage::new();
     for (key, value) in std::env::vars() {
         env_props.insert(key, Value::String(value));
     }
@@ -257,7 +257,7 @@ pub fn create_process_module(
 pub fn create_buffer_module(
     heap: &mut Vec<HeapValue>,
     gc: &mut GarbageCollector,
-) -> FxHashMap<String, Value> {
+) -> PropertyStorage {
     let buffer_proto_idx = gc.allocate(
         heap,
         HeapValue::Object(JsObject {
@@ -299,7 +299,7 @@ pub fn create_buffer_module(
 pub fn create_intl_module(
     heap: &mut Vec<HeapValue>,
     gc: &mut GarbageCollector,
-) -> FxHashMap<String, Value> {
+) -> PropertyStorage {
     let intl_obj_idx = gc.allocate(
         heap,
         HeapValue::Object(JsObject {
@@ -319,7 +319,7 @@ pub fn create_intl_module(
 pub fn create_events_module(
     heap: &mut Vec<HeapValue>,
     gc: &mut GarbageCollector,
-) -> FxHashMap<String, Value> {
+) -> PropertyStorage {
     let proto_idx = gc.allocate(
         heap,
         HeapValue::Object(JsObject {
@@ -343,7 +343,7 @@ pub fn create_events_module(
 pub fn create_os_module(
     _heap: &mut Vec<HeapValue>,
     _gc: &mut GarbageCollector,
-) -> FxHashMap<String, Value> {
+) -> PropertyStorage {
     props! {
         "platform" => Value::NativeFunction(c::OS_PLATFORM),
         "arch" => Value::NativeFunction(c::OS_ARCH),
@@ -362,7 +362,7 @@ pub fn create_os_module(
 pub fn create_crypto_module(
     _heap: &mut Vec<HeapValue>,
     _gc: &mut GarbageCollector,
-) -> FxHashMap<String, Value> {
+) -> PropertyStorage {
     props! {
         "randomBytes" => Value::NativeFunction(c::CRYPTO_RANDOM_BYTES),
         "randomUUID" => Value::NativeFunction(c::CRYPTO_RANDOM_UUID),
@@ -373,7 +373,7 @@ pub fn create_crypto_module(
 pub fn create_assert_module(
     heap: &mut Vec<HeapValue>,
     gc: &mut GarbageCollector,
-) -> FxHashMap<String, Value> {
+) -> PropertyStorage {
     let assert_obj_idx = gc.allocate(
         heap,
         HeapValue::Object(JsObject {
@@ -399,7 +399,7 @@ pub fn create_assert_module(
 pub fn create_child_process_module(
     _heap: &mut Vec<HeapValue>,
     _gc: &mut GarbageCollector,
-) -> FxHashMap<String, Value> {
+) -> PropertyStorage {
     props! {
         "execSync" => Value::NativeFunction(c::CHILD_PROCESS_EXEC_SYNC),
         "exec" => Value::NativeFunction(c::CHILD_PROCESS_EXEC),
@@ -410,7 +410,7 @@ pub fn create_child_process_module(
 pub fn create_url_module(
     _heap: &mut Vec<HeapValue>,
     _gc: &mut GarbageCollector,
-) -> FxHashMap<String, Value> {
+) -> PropertyStorage {
     props! {
         "fileURLToPath" => Value::NativeFunction(c::URL_FILE_URL_TO_PATH),
     }
@@ -419,7 +419,7 @@ pub fn create_url_module(
 pub fn create_util_module(
     _heap: &mut Vec<HeapValue>,
     _gc: &mut GarbageCollector,
-) -> FxHashMap<String, Value> {
+) -> PropertyStorage {
     props! {
         "format" => Value::NativeFunction(c::UTIL_FORMAT),
         "inspect" => Value::NativeFunction(c::UTIL_INSPECT),
@@ -431,7 +431,7 @@ pub fn create_util_module(
 pub fn create_timers_module(
     _heap: &mut Vec<HeapValue>,
     _gc: &mut GarbageCollector,
-) -> FxHashMap<String, Value> {
+) -> PropertyStorage {
     props! {
         "setImmediate" => Value::NativeFunction(c::SET_IMMEDIATE),
         "clearImmediate" => Value::NativeFunction(c::CLEAR_IMMEDIATE),
@@ -441,7 +441,7 @@ pub fn create_timers_module(
 pub fn create_querystring_module(
     _heap: &mut Vec<HeapValue>,
     _gc: &mut GarbageCollector,
-) -> FxHashMap<String, Value> {
+) -> PropertyStorage {
     props! {
         "parse" => Value::NativeFunction(c::QUERYSTRING_PARSE),
         "stringify" => Value::NativeFunction(c::QUERYSTRING_STRINGIFY),
@@ -453,7 +453,7 @@ pub fn create_querystring_module(
 pub fn create_stream_module(
     heap: &mut Vec<HeapValue>,
     gc: &mut GarbageCollector,
-) -> FxHashMap<String, Value> {
+) -> PropertyStorage {
     let readable_proto_idx = gc.allocate(
         heap,
         HeapValue::Object(JsObject {
@@ -498,7 +498,7 @@ pub fn create_stream_module(
 pub fn create_zlib_module(
     _heap: &mut Vec<HeapValue>,
     _gc: &mut GarbageCollector,
-) -> FxHashMap<String, Value> {
+) -> PropertyStorage {
     props! {
         "gzipSync" => Value::NativeFunction(c::ZLIB_GZIP_SYNC),
         "gunzipSync" => Value::NativeFunction(c::ZLIB_GUNZIP_SYNC),
@@ -517,7 +517,7 @@ pub fn create_zlib_module(
 pub fn create_tls_module(
     _heap: &mut Vec<HeapValue>,
     _gc: &mut GarbageCollector,
-) -> FxHashMap<String, Value> {
+) -> PropertyStorage {
     props! {
         "connect" => Value::NativeFunction(c::TLS_CONNECT),
         "createSecureContext" => Value::NativeFunction(c::TLS_CREATE_SECURE_CONTEXT),
@@ -530,7 +530,7 @@ pub fn create_tls_module(
 pub fn create_dns_module(
     _heap: &mut Vec<HeapValue>,
     _gc: &mut GarbageCollector,
-) -> FxHashMap<String, Value> {
+) -> PropertyStorage {
     props! {
         "resolve" => Value::NativeFunction(c::DNS_RESOLVE),
         "lookup" => Value::NativeFunction(c::DNS_LOOKUP),
@@ -544,7 +544,7 @@ pub fn create_dns_module(
 pub fn create_http_module(
     _heap: &mut Vec<HeapValue>,
     _gc: &mut GarbageCollector,
-) -> FxHashMap<String, Value> {
+) -> PropertyStorage {
     props! {
         "createServer" => Value::NativeFunction(c::HTTP_CREATE_SERVER),
     }
@@ -554,7 +554,7 @@ pub fn create_http_module(
 pub fn create_net_module(
     _heap: &mut Vec<HeapValue>,
     _gc: &mut GarbageCollector,
-) -> FxHashMap<String, Value> {
+) -> PropertyStorage {
     props! {
         "createConnection" => Value::NativeFunction(c::NET_CREATE_CONNECTION),
     }

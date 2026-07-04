@@ -1,7 +1,6 @@
 use crate::errors::{Error, Result};
 use crate::objects::Value;
-use crate::vm::interpreter::Interpreter;
-use rustc_hash::FxHashMap;
+use crate::vm::interpreter::{Interpreter, PropertyStorage};
 
 use super::reflect_fns::native_reflect_get_own_property_descriptor;
 
@@ -22,7 +21,7 @@ pub(super) fn native_object_keys(
                     {
                         continue;
                     }
-                    keys.push(Value::String(k.clone()));
+                    keys.push(Value::String(k.to_string()));
                 }
                 keys
             } else {
@@ -96,7 +95,7 @@ pub(super) fn native_object_entries(
             if let crate::vm::interpreter::HeapValue::Object(obj) = &interp.heap[*obj_idx] {
                 let mut pairs = Vec::with_capacity(obj.properties.len());
                 for (k, v) in obj.properties.iter() {
-                    pairs.push((k.clone(), v.clone()));
+                    pairs.push((k.to_string(), v.clone()));
                 }
                 pairs
             } else {
@@ -151,7 +150,7 @@ pub(super) fn native_object_assign(
                     {
                         let mut cloned = Vec::with_capacity(src_obj.properties.len());
                         for (k, v) in src_obj.properties.iter() {
-                            cloned.push((k.clone(), v.clone()));
+                            cloned.push((k.to_string(), v.clone()));
                         }
                         cloned
                     } else {
@@ -423,7 +422,7 @@ pub(super) fn native_object_create(
     let new_obj_idx = interp.gc.allocate(
         &mut interp.heap,
         crate::vm::interpreter::HeapValue::Object(crate::vm::interpreter::JsObject {
-            properties: FxHashMap::default(),
+            properties: PropertyStorage::new(),
             prototype: proto_idx,
             extensible: true,
         }),
@@ -440,7 +439,7 @@ pub(super) fn native_object_create(
                         &interp.heap[*desc_idx]
                     {
                         if let Some(value) = desc_obj.properties.get("value") {
-                            prop_defs.push((key.clone(), value.clone()));
+                            prop_defs.push((key.to_string(), value.clone()));
                         }
                     }
                 }

@@ -344,7 +344,7 @@ pub(super) fn from_json_value(interp: &mut Interpreter, val: serde_json::Value) 
             let heap_idx = interp.heap.len();
             interp.heap.push(crate::vm::interpreter::HeapValue::Object(
                 crate::vm::interpreter::JsObject {
-                    properties: props,
+                    properties: props.into(),
                     prototype: None,
                     extensible: true,
                 },
@@ -429,7 +429,7 @@ fn collect_all_properties<'a>(
             if k == "constructor" {
                 continue;
             }
-            out.push((k.clone(), v));
+            out.push((k.to_string(), v));
         }
         if let Some(proto_idx) = obj.prototype {
             collect_all_properties(interp, proto_idx, out, visited);
