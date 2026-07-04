@@ -3,6 +3,20 @@ use rustc_hash::FxHashMap;
 use rustc_hash::FxHashSet;
 use std::hash::{Hash, Hasher};
 
+/// Swap-remove `item` from `vec` in O(1). Returns whether the item was found.
+fn swap_remove_vec<T: PartialEq>(vec: &mut Vec<T>, item: &T) -> bool {
+    if let Some(idx) = vec.iter().position(|v| v == item) {
+        let last = vec.len() - 1;
+        if idx != last {
+            vec.swap(idx, last);
+        }
+        vec.pop();
+        true
+    } else {
+        false
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct JsMap {
     map: FxHashMap<Value, usize>,
@@ -44,11 +58,15 @@ impl JsMap {
             if idx != last {
                 self.keys.swap(idx, last);
                 self.values.swap(idx, last);
-                let moved_key = &self.keys[idx];
-                *self.map.get_mut(moved_key).unwrap() = idx;
+                self.keys.pop();
+                self.values.pop();
+                // Update index of key that was moved from last to idx
+                let moved_key = self.keys[idx].clone();
+                *self.map.get_mut(&moved_key).unwrap() = idx;
+            } else {
+                self.keys.pop();
+                self.values.pop();
             }
-            self.keys.pop();
-            self.values.pop();
             true
         } else {
             false
@@ -120,13 +138,7 @@ impl JsSet {
 
     pub fn delete(&mut self, value: &Value) -> bool {
         if self.set.remove(value) {
-            let idx = self.values.iter().position(|v| v == value).unwrap();
-            let last = self.values.len() - 1;
-            if idx != last {
-                self.values.swap(idx, last);
-            }
-            self.values.pop();
-            true
+            swap_remove_vec(&mut self.values, value)
         } else {
             false
         }

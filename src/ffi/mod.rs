@@ -129,44 +129,49 @@ pub extern "C" fn tails_value_get_tag(value: TailsValue) -> u32 {
 }
 
 #[no_mangle]
+pub extern "C" fn tails_is_type(value: TailsValue, tag: TailsValueType) -> bool {
+    value.tag == tag as u32
+}
+
+#[no_mangle]
 pub extern "C" fn tails_is_undefined(value: TailsValue) -> bool {
-    value.tag == TailsValueType::Undefined as u32
+    tails_is_type(value, TailsValueType::Undefined)
 }
 
 #[no_mangle]
 pub extern "C" fn tails_is_null(value: TailsValue) -> bool {
-    value.tag == TailsValueType::Null as u32
+    tails_is_type(value, TailsValueType::Null)
 }
 
 #[no_mangle]
 pub extern "C" fn tails_is_boolean(value: TailsValue) -> bool {
-    value.tag == TailsValueType::Boolean as u32
+    tails_is_type(value, TailsValueType::Boolean)
 }
 
 #[no_mangle]
 pub extern "C" fn tails_is_number(value: TailsValue) -> bool {
-    value.tag == TailsValueType::Number as u32
+    tails_is_type(value, TailsValueType::Number)
 }
 
 #[no_mangle]
 pub extern "C" fn tails_is_string(value: TailsValue) -> bool {
-    value.tag == TailsValueType::String as u32
+    tails_is_type(value, TailsValueType::String)
 }
 
 #[no_mangle]
 pub extern "C" fn tails_is_object(value: TailsValue) -> bool {
-    value.tag == TailsValueType::Object as u32
+    tails_is_type(value, TailsValueType::Object)
 }
 
 #[no_mangle]
 pub extern "C" fn tails_is_array(value: TailsValue) -> bool {
-    value.tag == TailsValueType::Array as u32
+    tails_is_type(value, TailsValueType::Array)
 }
 
 #[no_mangle]
 pub extern "C" fn tails_is_function(value: TailsValue) -> bool {
-    value.tag == TailsValueType::Function as u32
-        || value.tag == TailsValueType::NativeFunction as u32
+    tails_is_type(value, TailsValueType::Function)
+        || tails_is_type(value, TailsValueType::NativeFunction)
 }
 
 #[no_mangle]

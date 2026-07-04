@@ -135,100 +135,55 @@ mod object_fns;
 mod os_fns;
 #[cfg(not(feature = "os"))]
 mod os_fns {
-    use crate::errors::{Error, Result};
-    use crate::objects::Value;
-    use crate::vm::interpreter::Interpreter;
-
-    macro_rules! os_stub {
-        ($name:ident) => {
-            pub(super) fn $name(
-                _interp: &mut Interpreter,
-                _this: &Value,
-                _args: &[Value],
-            ) -> Result<Value> {
-                Err(Error::RuntimeError(
-                    "os module is not enabled. Rebuild with --features os".into(),
-                ))
-            }
-        };
-    }
-
-    os_stub!(native_os_platform);
-    os_stub!(native_os_arch);
-    os_stub!(native_os_cpus);
-    os_stub!(native_os_totalmem);
-    os_stub!(native_os_freemem);
-    os_stub!(native_os_uptime);
-    os_stub!(native_os_hostname);
-    os_stub!(native_os_type);
-    os_stub!(native_os_release);
-    os_stub!(native_os_homedir);
-    os_stub!(native_os_tmpdir);
+    disabled_module_stub!(
+        "os",
+        native_os_platform,
+        native_os_arch,
+        native_os_cpus,
+        native_os_totalmem,
+        native_os_freemem,
+        native_os_uptime,
+        native_os_hostname,
+        native_os_type,
+        native_os_release,
+        native_os_homedir,
+        native_os_tmpdir,
+    );
 }
 #[cfg(feature = "path")]
 mod path_fns;
 #[cfg(not(feature = "path"))]
 mod path_fns {
-    use crate::errors::{Error, Result};
-    use crate::objects::Value;
-    use crate::vm::interpreter::Interpreter;
-
-    macro_rules! path_stub {
-        ($name:ident) => {
-            pub(super) fn $name(
-                _interp: &mut Interpreter,
-                _this: &Value,
-                _args: &[Value],
-            ) -> Result<Value> {
-                Err(Error::RuntimeError(
-                    "path module is not enabled. Rebuild with --features path".into(),
-                ))
-            }
-        };
-    }
-
-    path_stub!(native_path_join);
-    path_stub!(native_path_resolve);
-    path_stub!(native_path_basename);
-    path_stub!(native_path_dirname);
-    path_stub!(native_path_extname);
-    path_stub!(native_path_relative);
-    path_stub!(native_path_is_absolute);
-    path_stub!(native_path_normalize);
+    disabled_module_stub!(
+        "path",
+        native_path_join,
+        native_path_resolve,
+        native_path_basename,
+        native_path_dirname,
+        native_path_extname,
+        native_path_relative,
+        native_path_is_absolute,
+        native_path_normalize,
+    );
 }
 #[cfg(feature = "process")]
 mod process_fns;
 #[cfg(not(feature = "process"))]
 mod process_fns {
-    use crate::errors::{Error, Result};
-    use crate::objects::Value;
-    use crate::vm::interpreter::Interpreter;
-
-    macro_rules! process_stub {
-        ($name:ident) => {
-            pub(super) fn $name(
-                _interp: &mut Interpreter,
-                _this: &Value,
-                _args: &[Value],
-            ) -> Result<Value> {
-                Err(Error::RuntimeError(
-                    "process module is not enabled. Rebuild with --features process".into(),
-                ))
-            }
-        };
-    }
-
-    process_stub!(native_process_exit);
-    process_stub!(native_process_cwd);
-    process_stub!(native_process_chdir);
-    process_stub!(native_process_stdout_write);
-    process_stub!(native_process_hrtime);
-    process_stub!(native_process_hrtime_bigint);
-    process_stub!(native_process_next_tick);
-    process_stub!(native_process_kill);
-    process_stub!(native_process_uptime);
-    process_stub!(native_process_memory_usage);
-    process_stub!(native_process_on);
+    disabled_module_stub!(
+        "process",
+        native_process_exit,
+        native_process_cwd,
+        native_process_chdir,
+        native_process_stdout_write,
+        native_process_hrtime,
+        native_process_hrtime_bigint,
+        native_process_next_tick,
+        native_process_kill,
+        native_process_uptime,
+        native_process_memory_usage,
+        native_process_on,
+    );
 }
 mod promise_fns;
 mod proxy_fns;
@@ -248,90 +203,45 @@ mod websocket_fns;
 mod zlib_fns;
 #[cfg(not(feature = "zlib"))]
 mod zlib_fns {
-    use crate::errors::{Error, Result};
-    use crate::objects::Value;
-    use crate::vm::interpreter::Interpreter;
-
-    macro_rules! zlib_stub {
-        ($name:ident) => {
-            pub(super) fn $name(
-                _interp: &mut Interpreter,
-                _this: &Value,
-                _args: &[Value],
-            ) -> Result<Value> {
-                Err(Error::RuntimeError(
-                    "zlib module is not enabled. Rebuild with --features zlib".into(),
-                ))
-            }
-        };
-    }
-
-    zlib_stub!(native_zlib_gzip_sync);
-    zlib_stub!(native_zlib_gunzip_sync);
-    zlib_stub!(native_zlib_deflate_sync);
-    zlib_stub!(native_zlib_inflate_sync);
-    zlib_stub!(native_zlib_deflate_raw_sync);
-    zlib_stub!(native_zlib_inflate_raw_sync);
-    zlib_stub!(native_zlib_gzip);
-    zlib_stub!(native_zlib_gunzip);
-    zlib_stub!(native_zlib_deflate);
-    zlib_stub!(native_zlib_inflate);
+    disabled_module_stub!(
+        "zlib",
+        native_zlib_gzip_sync,
+        native_zlib_gunzip_sync,
+        native_zlib_deflate_sync,
+        native_zlib_inflate_sync,
+        native_zlib_deflate_raw_sync,
+        native_zlib_inflate_raw_sync,
+        native_zlib_gzip,
+        native_zlib_gunzip,
+        native_zlib_deflate,
+        native_zlib_inflate,
+    );
 }
 #[cfg(feature = "tls")]
 mod tls_fns;
 #[cfg(not(feature = "tls"))]
 mod tls_fns {
-    use crate::errors::{Error, Result};
-    use crate::objects::Value;
-    use crate::vm::interpreter::Interpreter;
-
-    macro_rules! tls_stub {
-        ($name:ident) => {
-            pub(super) fn $name(
-                _interp: &mut Interpreter,
-                _this: &Value,
-                _args: &[Value],
-            ) -> Result<Value> {
-                Err(Error::RuntimeError(
-                    "tls module is not enabled. Rebuild with --features tls".into(),
-                ))
-            }
-        };
-    }
-
-    tls_stub!(native_tls_connect);
-    tls_stub!(native_tls_create_secure_context);
-    tls_stub!(native_tls_socket_write);
-    tls_stub!(native_tls_socket_end);
-    tls_stub!(native_tls_create_server);
+    disabled_module_stub!(
+        "tls",
+        native_tls_connect,
+        native_tls_create_secure_context,
+        native_tls_socket_write,
+        native_tls_socket_end,
+        native_tls_create_server,
+    );
 }
 #[cfg(feature = "dns")]
 mod dns_fns;
 #[cfg(not(feature = "dns"))]
 mod dns_fns {
-    use crate::errors::{Error, Result};
-    use crate::objects::Value;
-    use crate::vm::interpreter::Interpreter;
-
-    macro_rules! dns_stub {
-        ($name:ident) => {
-            pub(super) fn $name(
-                _interp: &mut Interpreter,
-                _this: &Value,
-                _args: &[Value],
-            ) -> Result<Value> {
-                Err(Error::RuntimeError(
-                    "dns module is not enabled. Rebuild with --features dns".into(),
-                ))
-            }
-        };
-    }
-
-    dns_stub!(native_dns_resolve);
-    dns_stub!(native_dns_lookup);
-    dns_stub!(native_dns_resolve4);
-    dns_stub!(native_dns_resolve6);
-    dns_stub!(native_dns_resolve_mx);
+    disabled_module_stub!(
+        "dns",
+        native_dns_resolve,
+        native_dns_lookup,
+        native_dns_resolve4,
+        native_dns_resolve6,
+        native_dns_resolve_mx,
+    );
 }
 
 pub use constants::*;

@@ -119,34 +119,34 @@ pub struct NativeObjectId(pub u32);
 
 impl Eq for Value {}
 
-/// Flatten any `Value` into a `String`. For `Value::String` this is
-/// a clone; for `Value::Cons` it walks the rope tree iteratively.
-pub fn flatten_value(v: &Value) -> String {
-    match v {
-        Value::String(s) => s.clone(),
-        Value::Cons(c) => c.flatten(),
-        _ => v.to_string(),
+impl Value {
+    /// Flatten this value into a `String`. For `Value::String` this is
+    /// a clone; for `Value::Cons` it walks the rope tree iteratively.
+    pub fn flatten(&self) -> String {
+        match self {
+            Value::String(s) => s.clone(),
+            Value::Cons(c) => c.flatten(),
+            _ => self.to_string(),
+        }
     }
-}
 
-/// Write the flattened representation of a string-like `Value` into
-/// `buf`. For `Value::String` this is a `push_str`; for
-/// `Value::Cons` it walks the rope tree iteratively.
-pub fn flatten_value_into(v: &Value, buf: &mut String) {
-    match v {
-        Value::String(s) => buf.push_str(s),
-        Value::Cons(c) => c.flatten_into(buf),
-        _ => buf.push_str(&v.to_string()),
+    /// Write the flattened representation of this value into `buf`.
+    pub fn flatten_into(&self, buf: &mut String) {
+        match self {
+            Value::String(s) => buf.push_str(s),
+            Value::Cons(c) => c.flatten_into(buf),
+            _ => buf.push_str(&self.to_string()),
+        }
     }
-}
 
-/// O(1) string length for any string-like `Value`. Returns `None` for
-/// non-string values.
-pub fn value_str_len(v: &Value) -> Option<usize> {
-    match v {
-        Value::String(s) => Some(s.len()),
-        Value::Cons(c) => Some(c.total_len),
-        _ => None,
+    /// O(1) string length for string-like `Value`. Returns `None` for
+    /// non-string values.
+    pub fn str_len(&self) -> Option<usize> {
+        match self {
+            Value::String(s) => Some(s.len()),
+            Value::Cons(c) => Some(c.total_len),
+            _ => None,
+        }
     }
 }
 

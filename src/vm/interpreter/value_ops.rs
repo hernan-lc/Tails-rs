@@ -1,6 +1,6 @@
 use super::Interpreter;
 use crate::errors::{Error, Result};
-use crate::objects::{flatten_value, ConsString, Value};
+use crate::objects::{ConsString, Value};
 
 impl Interpreter {
     pub(super) fn add(&self, left: Value, right: Value) -> Result<Value> {
@@ -102,28 +102,28 @@ impl Interpreter {
             // Cold path: coerce left operand to string if needed, then
             // build a Cons node.
             (Value::String(a), r) => {
-                let coerced = flatten_value(&self.to_string_coerce_value(r));
+                let coerced = self.to_string_coerce_value(r).flatten();
                 Ok(Value::Cons(ConsString::new(
                     Value::String(a.clone()),
                     Value::String(coerced),
                 )))
             }
             (l, Value::String(b)) => {
-                let coerced = flatten_value(&self.to_string_coerce_value(l));
+                let coerced = self.to_string_coerce_value(l).flatten();
                 Ok(Value::Cons(ConsString::new(
                     Value::String(coerced),
                     Value::String(b.clone()),
                 )))
             }
             (Value::Cons(c), r) => {
-                let coerced = flatten_value(&self.to_string_coerce_value(r));
+                let coerced = self.to_string_coerce_value(r).flatten();
                 Ok(Value::Cons(ConsString::new(
                     Value::Cons(c.clone()),
                     Value::String(coerced),
                 )))
             }
             (l, Value::Cons(c)) => {
-                let coerced = flatten_value(&self.to_string_coerce_value(l));
+                let coerced = self.to_string_coerce_value(l).flatten();
                 Ok(Value::Cons(ConsString::new(
                     Value::String(coerced),
                     Value::Cons(c.clone()),
