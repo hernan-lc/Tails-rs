@@ -4,6 +4,14 @@ use crate::objects::js_promise::PromiseState;
 use crate::objects::Value;
 use crate::runtime_env::native_fns::constants as c;
 
+fn key_to_str(key: &Value) -> Option<String> {
+    match key {
+        Value::String(s) => Some(s.clone()),
+        Value::Cons(c) => Some(c.flatten()),
+        _ => None,
+    }
+}
+
 impl Interpreter {
     pub fn new_object(&mut self) -> Value {
         let idx = self.heap.len();
@@ -67,14 +75,9 @@ impl Interpreter {
     }
 
     pub fn set_property(&mut self, object: &Value, key: &Value, value: Value) -> Result<()> {
-        let key_flat;
-        let key_str = match key {
-            Value::String(s) => s.as_str(),
-            Value::Cons(c) => {
-                key_flat = c.flatten();
-                &*key_flat
-            }
-            _ => return Ok(()),
+        let key_str = match key_to_str(key) {
+            Some(s) => s,
+            None => return Ok(()),
         };
         match object {
             Value::Object(obj_idx) => {
@@ -130,19 +133,14 @@ impl Interpreter {
             }
             Value::Object(obj_idx) => {
                 if let HeapValue::Object(obj) = &self.heap[*obj_idx] {
-                    let key_flat;
-                    let key_str = match key {
-                        Value::String(s) => s.as_str(),
-                        Value::Cons(c) => {
-                            key_flat = c.flatten();
-                            &*key_flat
-                        }
-                        _ => return Ok(Value::Undefined),
+                    let key_str = match key_to_str(key) {
+                        Some(s) => s,
+                        None => return Ok(Value::Undefined),
                     };
-                    if let Some(val) = obj.properties.get(key_str) {
+                    if let Some(val) = obj.properties.get(&key_str) {
                         return Ok(val.clone());
                     }
-                    if let Some(getter_val) = find_accessor(&obj.properties, "__getter_", key_str) {
+                    if let Some(getter_val) = find_accessor(&obj.properties, "__getter_", &key_str) {
                         return self.call_value(&getter_val, this, &[]);
                     }
                     if let Some(proto_idx) = obj.prototype {
@@ -210,16 +208,11 @@ impl Interpreter {
                 return self.get_property_from_primitive_boolean(object, key);
             }
             Value::Function(func_idx) => {
-                let key_flat;
-                let key_str = match key {
-                    Value::String(s) => s.as_str(),
-                    Value::Cons(c) => {
-                        key_flat = c.flatten();
-                        &*key_flat
-                    }
-                    _ => return Ok(Value::Undefined),
+                let key_str = match key_to_str(key) {
+                    Some(s) => s,
+                    None => return Ok(Value::Undefined),
                 };
-                match key_str {
+                match key_str.as_str() {
                     "call" => return Ok(Value::NativeFunction(c::FUNCTION_CALL)),
                     "apply" => return Ok(Value::NativeFunction(c::FUNCTION_APPLY)),
                     "bind" => return Ok(Value::NativeFunction(c::FUNCTION_BIND)),
@@ -233,22 +226,17 @@ impl Interpreter {
                     }
                 }
                 if let HeapValue::Function(f) = &self.heap[*func_idx] {
-                    if let Some(val) = f.properties.get(key_str) {
+                    if let Some(val) = f.properties.get(&key_str) {
                         return Ok(val.clone());
                     }
                 }
             }
             Value::Promise(promise_idx) => {
-                let key_flat;
-                let key_str = match key {
-                    Value::String(s) => s.as_str(),
-                    Value::Cons(c) => {
-                        key_flat = c.flatten();
-                        &*key_flat
-                    }
-                    _ => return Ok(Value::Undefined),
+                let key_str = match key_to_str(key) {
+                    Some(s) => s,
+                    None => return Ok(Value::Undefined),
                 };
-                match key_str {
+                match key_str.as_str() {
                     "then" => return Ok(Value::NativeFunction(c::PROMISE_THEN)),
                     "catch" => return Ok(Value::NativeFunction(c::PROMISE_CATCH)),
                     "finally" => return Ok(Value::NativeFunction(c::PROMISE_FINALLY)),
@@ -275,23 +263,18 @@ impl Interpreter {
                 }
             }
             Value::NativeFunction(idx) => {
-                let key_flat;
-                let key_str = match key {
-                    Value::String(s) => s.as_str(),
-                    Value::Cons(c) => {
-                        key_flat = c.flatten();
-                        &*key_flat
-                    }
-                    _ => return Ok(Value::Undefined),
+                let key_str = match key_to_str(key) {
+                    Some(s) => s,
+                    None => return Ok(Value::Undefined),
                 };
-                match key_str {
+                match key_str.as_str() {
                     "call" => return Ok(Value::NativeFunction(c::FUNCTION_CALL)),
                     "apply" => return Ok(Value::NativeFunction(c::FUNCTION_APPLY)),
                     "bind" => return Ok(Value::NativeFunction(c::FUNCTION_BIND)),
                     _ => {}
                 }
                 if *idx == c::PROMISE_CONSTRUCTOR {
-                    match key_str {
+                    match key_str.as_str() {
                         "resolve" => return Ok(Value::NativeFunction(c::PROMISE_RESOLVE)),
                         "reject" => return Ok(Value::NativeFunction(c::PROMISE_REJECT)),
                         "all" => return Ok(Value::NativeFunction(c::PROMISE_ALL)),
@@ -305,7 +288,7 @@ impl Interpreter {
                     }
                 }
                 if *idx == c::SYMBOL_CONSTRUCTOR {
-                    match key_str {
+                    match key_str.as_str() {
                         "for" => return Ok(Value::NativeFunction(c::SYMBOL_FOR)),
                         "keyFor" => return Ok(Value::NativeFunction(c::SYMBOL_KEY_FOR)),
                         "iterator" => return Ok(Value::Symbol(crate::objects::SYMBOL_ITERATOR)),
@@ -329,7 +312,7 @@ impl Interpreter {
                     }
                 }
                 if *idx == c::DATE_CONSTRUCTOR {
-                    match key_str {
+                    match key_str.as_str() {
                         "now" => return Ok(Value::NativeFunction(c::DATE_NOW)),
                         "parse" => return Ok(Value::NativeFunction(c::DATE_PARSE)),
                         "UTC" => return Ok(Value::NativeFunction(c::DATE_UTC)),
@@ -337,7 +320,7 @@ impl Interpreter {
                     }
                 }
                 if *idx == c::ARRAY_CONSTRUCTOR {
-                    match key_str {
+                    match key_str.as_str() {
                         "isArray" => return Ok(Value::NativeFunction(c::ARRAY_IS_ARRAY)),
                         "from" => return Ok(Value::NativeFunction(c::ARRAY_FROM)),
                         "of" => return Ok(Value::NativeFunction(c::ARRAY_OF)),
@@ -345,14 +328,14 @@ impl Interpreter {
                     }
                 }
                 if *idx == c::URL_CONSTRUCTOR {
-                    match key_str {
+                    match key_str.as_str() {
                         "canParse" => return Ok(Value::NativeFunction(c::URL_CAN_PARSE)),
                         "parse" => return Ok(Value::NativeFunction(c::URL_PARSE)),
                         _ => {}
                     }
                 }
                 if *idx == c::RESPONSE_CONSTRUCTOR {
-                    match key_str {
+                    match key_str.as_str() {
                         "json" => return Ok(Value::NativeFunction(c::RESPONSE_JSON_STATIC)),
                         "error" => return Ok(Value::NativeFunction(c::RESPONSE_ERROR)),
                         "redirect" => return Ok(Value::NativeFunction(c::RESPONSE_REDIRECT)),
@@ -384,14 +367,9 @@ impl Interpreter {
                 }
             }
             Value::Date(_date_idx) => {
-                let key_flat;
-                let key_str = match key {
-                    Value::String(s) => s.as_str(),
-                    Value::Cons(c) => {
-                        key_flat = c.flatten();
-                        &*key_flat
-                    }
-                    _ => return Ok(Value::Undefined),
+                let key_str = match key_to_str(key) {
+                    Some(s) => s,
+                    None => return Ok(Value::Undefined),
                 };
                 let _ = key_str;
                 let proto_idx = self.date_proto_idx;
@@ -401,14 +379,9 @@ impl Interpreter {
                 }
             }
             Value::RegExp(_re_idx) => {
-                let key_flat;
-                let key_str = match key {
-                    Value::String(s) => s.as_str(),
-                    Value::Cons(c) => {
-                        key_flat = c.flatten();
-                        &*key_flat
-                    }
-                    _ => return Ok(Value::Undefined),
+                let key_str = match key_to_str(key) {
+                    Some(s) => s,
+                    None => return Ok(Value::Undefined),
                 };
                 let _ = key_str;
                 let proto_idx = self.regexp_proto_idx;
@@ -418,14 +391,9 @@ impl Interpreter {
                 }
             }
             Value::Buffer(_buf_idx) => {
-                let key_flat;
-                let key_str = match key {
-                    Value::String(s) => s.as_str(),
-                    Value::Cons(c) => {
-                        key_flat = c.flatten();
-                        &*key_flat
-                    }
-                    _ => return Ok(Value::Undefined),
+                let key_str = match key_to_str(key) {
+                    Some(s) => s,
+                    None => return Ok(Value::Undefined),
                 };
                 if key_str == "length" {
                     if let Value::Buffer(bidx) = this {
@@ -440,16 +408,11 @@ impl Interpreter {
                 }
             }
             Value::Map(_map_idx) => {
-                let key_flat;
-                let key_str = match key {
-                    Value::String(s) => s.as_str(),
-                    Value::Cons(c) => {
-                        key_flat = c.flatten();
-                        &*key_flat
-                    }
-                    _ => return Ok(Value::Undefined),
+                let key_str = match key_to_str(key) {
+                    Some(s) => s,
+                    None => return Ok(Value::Undefined),
                 };
-                match key_str {
+                match key_str.as_str() {
                     "size" => {
                         if let Value::Map(map_idx) = this {
                             if let HeapValue::Map(map) = &self.heap[*map_idx] {
@@ -470,16 +433,11 @@ impl Interpreter {
                 }
             }
             Value::Set(_set_idx) => {
-                let key_flat;
-                let key_str = match key {
-                    Value::String(s) => s.as_str(),
-                    Value::Cons(c) => {
-                        key_flat = c.flatten();
-                        &*key_flat
-                    }
-                    _ => return Ok(Value::Undefined),
+                let key_str = match key_to_str(key) {
+                    Some(s) => s,
+                    None => return Ok(Value::Undefined),
                 };
-                match key_str {
+                match key_str.as_str() {
                     "size" => {
                         if let Value::Set(set_idx) = this {
                             if let HeapValue::Set(set) = &self.heap[*set_idx] {
@@ -499,16 +457,11 @@ impl Interpreter {
                 }
             }
             Value::WeakMap(_weakmap_idx) => {
-                let key_flat;
-                let key_str = match key {
-                    Value::String(s) => s.as_str(),
-                    Value::Cons(c) => {
-                        key_flat = c.flatten();
-                        &*key_flat
-                    }
-                    _ => return Ok(Value::Undefined),
+                let key_str = match key_to_str(key) {
+                    Some(s) => s,
+                    None => return Ok(Value::Undefined),
                 };
-                match key_str {
+                match key_str.as_str() {
                     "get" => return Ok(Value::NativeFunction(c::WEAKMAP_GET)),
                     "set" => return Ok(Value::NativeFunction(c::WEAKMAP_SET)),
                     "has" => return Ok(Value::NativeFunction(c::WEAKMAP_HAS)),
@@ -517,16 +470,11 @@ impl Interpreter {
                 }
             }
             Value::WeakSet(_weakset_idx) => {
-                let key_flat;
-                let key_str = match key {
-                    Value::String(s) => s.as_str(),
-                    Value::Cons(c) => {
-                        key_flat = c.flatten();
-                        &*key_flat
-                    }
-                    _ => return Ok(Value::Undefined),
+                let key_str = match key_to_str(key) {
+                    Some(s) => s,
+                    None => return Ok(Value::Undefined),
                 };
-                match key_str {
+                match key_str.as_str() {
                     "add" => return Ok(Value::NativeFunction(c::WEAKSET_ADD)),
                     "has" => return Ok(Value::NativeFunction(c::WEAKSET_HAS)),
                     "delete" => return Ok(Value::NativeFunction(c::WEAKSET_DELETE)),
@@ -534,16 +482,11 @@ impl Interpreter {
                 }
             }
             Value::TypedArray(_ta_idx) => {
-                let key_flat;
-                let key_str = match key {
-                    Value::String(s) => s.as_str(),
-                    Value::Cons(c) => {
-                        key_flat = c.flatten();
-                        &*key_flat
-                    }
-                    _ => return Ok(Value::Undefined),
+                let key_str = match key_to_str(key) {
+                    Some(s) => s,
+                    None => return Ok(Value::Undefined),
                 };
-                match key_str {
+                match key_str.as_str() {
                     "length" => {
                         if let Value::TypedArray(ta_idx) = this {
                             if let HeapValue::TypedArray(ta) = &self.heap[*ta_idx] {
@@ -586,17 +529,12 @@ impl Interpreter {
                 }
             }
             Value::NativeObject(obj_id) => {
-                let key_flat;
-                let key_str = match key {
-                    Value::String(s) => s.as_str(),
-                    Value::Cons(c) => {
-                        key_flat = c.flatten();
-                        &*key_flat
-                    }
-                    _ => return Ok(Value::Undefined),
+                let key_str = match key_to_str(key) {
+                    Some(s) => s,
+                    None => return Ok(Value::Undefined),
                 };
                 if let Some(methods) = self.native_object_methods.get(&obj_id.0) {
-                    if let Some(method) = methods.get(key_str) {
+                    if let Some(method) = methods.get(&key_str) {
                         return Ok(method.clone());
                     }
                 }
@@ -641,19 +579,14 @@ impl Interpreter {
     }
 
     pub(super) fn get_property_from_primitive_string(&self, s: &str, key: &Value) -> Result<Value> {
-        let key_flat;
-        let key_str = match key {
-            Value::String(ks) => ks.as_str(),
-            Value::Cons(c) => {
-                key_flat = c.flatten();
-                &*key_flat
-            }
-            _ => return Ok(Value::Undefined),
+        let key_str = match key_to_str(key) {
+            Some(s) => s,
+            None => return Ok(Value::Undefined),
         };
         if key_str == "length" {
             return Ok(Value::Float(s.len() as f64));
         }
-        self.get_string_method(key_str)
+        self.get_string_method(&key_str)
     }
 
     pub(super) fn get_string_method(&self, name: &str) -> Result<Value> {
@@ -685,19 +618,14 @@ impl Interpreter {
         _n: &Value,
         key: &Value,
     ) -> Result<Value> {
-        let key_flat;
-        let key_str = match key {
-            Value::String(s) => s.as_str(),
-            Value::Cons(c) => {
-                key_flat = c.flatten();
-                &*key_flat
-            }
-            _ => return Ok(Value::Undefined),
+        let key_str = match key_to_str(key) {
+            Some(s) => s,
+            None => return Ok(Value::Undefined),
         };
-        match key_str {
+        match key_str.as_str() {
             "toString" | "toFixed" | "valueOf" | "toExponential" | "toPrecision"
             | "toLocaleString" => {
-                return Ok(self.make_native_number_method(key_str));
+                return Ok(self.make_native_number_method(&key_str));
             }
             _ => {}
         }
@@ -709,18 +637,13 @@ impl Interpreter {
         _b: &Value,
         key: &Value,
     ) -> Result<Value> {
-        let key_flat;
-        let key_str = match key {
-            Value::String(s) => s.as_str(),
-            Value::Cons(c) => {
-                key_flat = c.flatten();
-                &*key_flat
-            }
-            _ => return Ok(Value::Undefined),
+        let key_str = match key_to_str(key) {
+            Some(s) => s,
+            None => return Ok(Value::Undefined),
         };
-        match key_str {
+        match key_str.as_str() {
             "toString" | "valueOf" => {
-                return Ok(self.make_native_boolean_method(key_str));
+                return Ok(self.make_native_boolean_method(&key_str));
             }
             _ => {}
         }
@@ -747,19 +670,14 @@ impl Interpreter {
     }
 
     pub(crate) fn delete_property(&mut self, object: &Value, key: &Value) -> Value {
-        let key_flat;
-        let key_str = match key {
-            Value::String(s) => s.as_str(),
-            Value::Cons(c) => {
-                key_flat = c.flatten();
-                &*key_flat
-            }
-            _ => return Value::Boolean(true),
+        let key_str = match key_to_str(key) {
+            Some(s) => s,
+            None => return Value::Boolean(true),
         };
         match object {
             Value::Object(obj_idx) => {
                 if let HeapValue::Object(obj) = &mut self.heap[*obj_idx] {
-                    if obj.properties.remove(key_str).is_some() {
+                    if obj.properties.remove(&key_str).is_some() {
                         return Value::Boolean(true);
                     }
                 }
@@ -819,23 +737,18 @@ impl Interpreter {
     }
 
     pub(crate) fn in_check_mut(&mut self, key: &Value, object: &Value) -> Result<Value> {
-        let key_flat;
-        let key_str = match key {
-            Value::String(s) => s.as_str(),
-            Value::Cons(c) => {
-                key_flat = c.flatten();
-                &*key_flat
-            }
-            _ => return Ok(Value::Boolean(false)),
+        let key_str = match key_to_str(key) {
+            Some(s) => s,
+            None => return Ok(Value::Boolean(false)),
         };
         match object {
             Value::Object(obj_idx) => {
                 if let HeapValue::Object(obj) = &self.heap[*obj_idx] {
-                    if obj.properties.contains_key(key_str) {
+                    if obj.properties.contains_key(&key_str) {
                         return Ok(Value::Boolean(true));
                     }
-                    if find_accessor(&obj.properties, "__getter_", key_str).is_some()
-                        || find_accessor(&obj.properties, "__setter_", key_str).is_some()
+                    if find_accessor(&obj.properties, "__getter_", &key_str).is_some()
+                        || find_accessor(&obj.properties, "__setter_", &key_str).is_some()
                     {
                         return Ok(Value::Boolean(true));
                     }
