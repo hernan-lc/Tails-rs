@@ -3,6 +3,110 @@ use crate::objects::js_collections::{JsMap, JsSet, JsWeakMap, JsWeakSet};
 use crate::objects::Value;
 use crate::vm::interpreter::Interpreter;
 
+macro_rules! with_map {
+    ($interp:expr, $this:expr, |$idx:ident, $map:ident| $body:block) => {{
+        let $idx = match $this {
+            Value::Map(idx) => *idx,
+            _ => return Err(Error::TypeError("Not a Map".into())),
+        };
+        match &$interp.heap[$idx] {
+            crate::vm::interpreter::HeapValue::Map($map) => $body,
+            _ => Err(Error::TypeError("Not a Map".into())),
+        }
+    }};
+}
+
+macro_rules! with_map_mut {
+    ($interp:expr, $this:expr, |$idx:ident, $map:ident| $body:block) => {{
+        let $idx = match $this {
+            Value::Map(idx) => *idx,
+            _ => return Err(Error::TypeError("Not a Map".into())),
+        };
+        match &mut $interp.heap[$idx] {
+            crate::vm::interpreter::HeapValue::Map($map) => $body,
+            _ => Err(Error::TypeError("Not a Map".into())),
+        }
+    }};
+}
+
+macro_rules! with_set {
+    ($interp:expr, $this:expr, |$idx:ident, $set:ident| $body:block) => {{
+        let $idx = match $this {
+            Value::Set(idx) => *idx,
+            _ => return Err(Error::TypeError("Not a Set".into())),
+        };
+        match &$interp.heap[$idx] {
+            crate::vm::interpreter::HeapValue::Set($set) => $body,
+            _ => Err(Error::TypeError("Not a Set".into())),
+        }
+    }};
+}
+
+macro_rules! with_set_mut {
+    ($interp:expr, $this:expr, |$idx:ident, $set:ident| $body:block) => {{
+        let $idx = match $this {
+            Value::Set(idx) => *idx,
+            _ => return Err(Error::TypeError("Not a Set".into())),
+        };
+        match &mut $interp.heap[$idx] {
+            crate::vm::interpreter::HeapValue::Set($set) => $body,
+            _ => Err(Error::TypeError("Not a Set".into())),
+        }
+    }};
+}
+
+macro_rules! with_weakmap {
+    ($interp:expr, $this:expr, |$idx:ident, $map:ident| $body:block) => {{
+        let $idx = match $this {
+            Value::WeakMap(idx) => *idx,
+            _ => return Err(Error::TypeError("Not a WeakMap".into())),
+        };
+        match &$interp.heap[$idx] {
+            crate::vm::interpreter::HeapValue::WeakMap($map) => $body,
+            _ => Err(Error::TypeError("Not a WeakMap".into())),
+        }
+    }};
+}
+
+macro_rules! with_weakmap_mut {
+    ($interp:expr, $this:expr, |$idx:ident, $map:ident| $body:block) => {{
+        let $idx = match $this {
+            Value::WeakMap(idx) => *idx,
+            _ => return Err(Error::TypeError("Not a WeakMap".into())),
+        };
+        match &mut $interp.heap[$idx] {
+            crate::vm::interpreter::HeapValue::WeakMap($map) => $body,
+            _ => Err(Error::TypeError("Not a WeakMap".into())),
+        }
+    }};
+}
+
+macro_rules! with_weakset {
+    ($interp:expr, $this:expr, |$idx:ident, $set:ident| $body:block) => {{
+        let $idx = match $this {
+            Value::WeakSet(idx) => *idx,
+            _ => return Err(Error::TypeError("Not a WeakSet".into())),
+        };
+        match &$interp.heap[$idx] {
+            crate::vm::interpreter::HeapValue::WeakSet($set) => $body,
+            _ => Err(Error::TypeError("Not a WeakSet".into())),
+        }
+    }};
+}
+
+macro_rules! with_weakset_mut {
+    ($interp:expr, $this:expr, |$idx:ident, $set:ident| $body:block) => {{
+        let $idx = match $this {
+            Value::WeakSet(idx) => *idx,
+            _ => return Err(Error::TypeError("Not a WeakSet".into())),
+        };
+        match &mut $interp.heap[$idx] {
+            crate::vm::interpreter::HeapValue::WeakSet($set) => $body,
+            _ => Err(Error::TypeError("Not a WeakSet".into())),
+        }
+    }};
+}
+
 // Map functions
 pub(super) fn native_map_constructor(
     interp: &mut Interpreter,
@@ -22,18 +126,10 @@ pub(super) fn native_map_get(
     this: &Value,
     args: &[Value],
 ) -> Result<Value> {
-    let idx = match this {
-        Value::Map(idx) => *idx,
-        _ => return Err(Error::TypeError("Not a Map".into())),
-    };
-
-    let key = args.first().cloned().unwrap_or(Value::Undefined);
-
-    if let crate::vm::interpreter::HeapValue::Map(map) = &interp.heap[idx] {
+    with_map!(interp, this, |idx, map| {
+        let key = args.first().cloned().unwrap_or(Value::Undefined);
         Ok(map.get(&key).cloned().unwrap_or(Value::Undefined))
-    } else {
-        Err(Error::TypeError("Not a Map".into()))
-    }
+    })
 }
 
 pub(super) fn native_map_set(
@@ -41,20 +137,12 @@ pub(super) fn native_map_set(
     this: &Value,
     args: &[Value],
 ) -> Result<Value> {
-    let idx = match this {
-        Value::Map(idx) => *idx,
-        _ => return Err(Error::TypeError("Not a Map".into())),
-    };
-
-    let key = args.first().cloned().unwrap_or(Value::Undefined);
-    let value = args.get(1).cloned().unwrap_or(Value::Undefined);
-
-    if let crate::vm::interpreter::HeapValue::Map(map) = &mut interp.heap[idx] {
+    with_map_mut!(interp, this, |idx, map| {
+        let key = args.first().cloned().unwrap_or(Value::Undefined);
+        let value = args.get(1).cloned().unwrap_or(Value::Undefined);
         map.set(key, value);
         Ok(this.clone())
-    } else {
-        Err(Error::TypeError("Not a Map".into()))
-    }
+    })
 }
 
 pub(super) fn native_map_has(
@@ -62,18 +150,10 @@ pub(super) fn native_map_has(
     this: &Value,
     args: &[Value],
 ) -> Result<Value> {
-    let idx = match this {
-        Value::Map(idx) => *idx,
-        _ => return Err(Error::TypeError("Not a Map".into())),
-    };
-
-    let key = args.first().cloned().unwrap_or(Value::Undefined);
-
-    if let crate::vm::interpreter::HeapValue::Map(map) = &interp.heap[idx] {
+    with_map!(interp, this, |idx, map| {
+        let key = args.first().cloned().unwrap_or(Value::Undefined);
         Ok(Value::Boolean(map.has(&key)))
-    } else {
-        Err(Error::TypeError("Not a Map".into()))
-    }
+    })
 }
 
 pub(super) fn native_map_delete(
@@ -81,18 +161,10 @@ pub(super) fn native_map_delete(
     this: &Value,
     args: &[Value],
 ) -> Result<Value> {
-    let idx = match this {
-        Value::Map(idx) => *idx,
-        _ => return Err(Error::TypeError("Not a Map".into())),
-    };
-
-    let key = args.first().cloned().unwrap_or(Value::Undefined);
-
-    if let crate::vm::interpreter::HeapValue::Map(map) = &mut interp.heap[idx] {
+    with_map_mut!(interp, this, |idx, map| {
+        let key = args.first().cloned().unwrap_or(Value::Undefined);
         Ok(Value::Boolean(map.delete(&key)))
-    } else {
-        Err(Error::TypeError("Not a Map".into()))
-    }
+    })
 }
 
 pub(super) fn native_map_clear(
