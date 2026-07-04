@@ -4,6 +4,32 @@ use crate::vm::interpreter::{HeapValue, Interpreter};
 
 use super::helpers::to_string_value;
 
+macro_rules! with_buffer {
+    ($interp:expr, $this:expr, |$idx:ident, $buf:ident| $body:block) => {{
+        let $idx = match $this {
+            Value::Buffer(idx) => *idx,
+            _ => return Ok(Value::Undefined),
+        };
+        match &$interp.heap[$idx] {
+            HeapValue::Buffer($buf) => $body,
+            _ => Ok(Value::Undefined),
+        }
+    }};
+}
+
+macro_rules! with_buffer_mut {
+    ($interp:expr, $this:expr, |$idx:ident, $buf:ident| $body:block) => {{
+        let $idx = match $this {
+            Value::Buffer(idx) => *idx,
+            _ => return Ok(Value::Undefined),
+        };
+        match &mut $interp.heap[$idx] {
+            HeapValue::Buffer($buf) => $body,
+            _ => Ok(Value::Undefined),
+        }
+    }};
+}
+
 pub(super) fn native_buffer_constructor(
     interp: &mut Interpreter,
     _this: &Value,
@@ -194,17 +220,13 @@ pub(super) fn native_buffer_to_string(
     _this: &Value,
     args: &[Value],
 ) -> Result<Value> {
-    if let Value::Buffer(buf_idx) = _this {
-        if let HeapValue::Buffer(buf) = &interp.heap[*buf_idx] {
-            let start = args.first().map(|v| to_i64(v) as usize).unwrap_or(0);
-            let end = args.get(1).map(|v| to_i64(v) as usize).unwrap_or(buf.len());
-            let end = end.min(buf.len());
-            let start = start.min(end);
-            let s = String::from_utf8_lossy(&buf[start..end]).to_string();
-            return Ok(Value::String(s));
-        }
-    }
-    Ok(Value::String(String::new()))
+    with_buffer!(interp, _this, |_idx, buf| {
+        let start = args.first().map(|v| to_i64(v) as usize).unwrap_or(0);
+        let end = args.get(1).map(|v| to_i64(v) as usize).unwrap_or(buf.len());
+        let end = end.min(buf.len());
+        let start = start.min(end);
+        Ok(Value::String(String::from_utf8_lossy(&buf[start..end]).to_string()))
+    })
 }
 
 pub(super) fn native_buffer_write(
@@ -212,20 +234,14 @@ pub(super) fn native_buffer_write(
     _this: &Value,
     args: &[Value],
 ) -> Result<Value> {
-    if let Value::Buffer(buf_idx) = _this {
-        let data = args
-            .first()
-            .map(|v| to_string_value(interp, v))
-            .unwrap_or_default();
-        let offset = args.get(1).map(|v| to_i64(v) as usize).unwrap_or(0);
-        let bytes = data.as_bytes();
-        if let HeapValue::Buffer(buf) = &mut interp.heap[*buf_idx] {
-            let len = bytes.len().min(buf.len() - offset);
-            buf[offset..offset + len].copy_from_slice(&bytes[..len]);
-            return Ok(Value::Integer(len as i64));
-        }
-    }
-    Ok(Value::Integer(0))
+    let data = args.first().map(|v| to_string_value(interp, v)).unwrap_or_default();
+    let offset = args.get(1).map(|v| to_i64(v) as usize).unwrap_or(0);
+    let bytes = data.as_bytes();
+    with_buffer_mut!(interp, _this, |_idx, buf| {
+        let len = bytes.len().min(buf.len() - offset);
+        buf[offset..offset + len].copy_from_slice(&bytes[..len]);
+        Ok(Value::Integer(len as i64))
+    })
 }
 
 pub(super) fn native_buffer_slice(
@@ -233,21 +249,16 @@ pub(super) fn native_buffer_slice(
     _this: &Value,
     args: &[Value],
 ) -> Result<Value> {
-    if let Value::Buffer(buf_idx) = _this {
-        if let HeapValue::Buffer(buf) = &interp.heap[*buf_idx] {
-            let start = args.first().map(|v| to_i64(v) as usize).unwrap_or(0);
-            let end = args.get(1).map(|v| to_i64(v) as usize).unwrap_or(buf.len());
-            let end = end.min(buf.len());
-            let start = start.min(end);
-            let new_buf = buf[start..end].to_vec();
-            let new_idx = interp.heap.len();
-            interp.heap.push(HeapValue::Buffer(new_buf));
-            return Ok(Value::Buffer(new_idx));
-        }
-    }
-    let new_idx = interp.heap.len();
-    interp.heap.push(HeapValue::Buffer(Vec::new()));
-    Ok(Value::Buffer(new_idx))
+    with_buffer!(interp, _this, |_idx, buf| {
+        let start = args.first().map(|v| to_i64(v) as usize).unwrap_or(0);
+        let end = args.get(1).map(|v| to_i64(v) as usize).unwrap_or(buf.len());
+        let end = end.min(buf.len());
+        let start = start.min(end);
+        let new_buf = buf[start..end].to_vec();
+        let new_idx = interp.heap.len();
+        interp.heap.push(HeapValue::Buffer(new_buf));
+        Ok(Value::Buffer(new_idx))
+    })
 }
 
 pub(super) fn native_buffer_copy(
@@ -255,20 +266,13 @@ pub(super) fn native_buffer_copy(
     _this: &Value,
     args: &[Value],
 ) -> Result<Value> {
-    if let Value::Buffer(src_idx) = _this {
-        let src_clone = if let HeapValue::Buffer(src) = &interp.heap[*src_idx] {
-            src.clone()
-        } else {
-            return Ok(Value::Integer(0));
-        };
+    with_buffer!(interp, _this, |_idx, src| {
+        let src_clone = src.clone();
         if let Some(Value::Buffer(dst_idx)) = args.first() {
             if let HeapValue::Buffer(dst) = &mut interp.heap[*dst_idx] {
                 let target_start = args.get(1).map(|v| to_i64(v) as usize).unwrap_or(0);
                 let source_start = args.get(2).map(|v| to_i64(v) as usize).unwrap_or(0);
-                let source_end = args
-                    .get(3)
-                    .map(|v| to_i64(v) as usize)
-                    .unwrap_or(src_clone.len());
+                let source_end = args.get(3).map(|v| to_i64(v) as usize).unwrap_or(src_clone.len());
                 let source_end = source_end.min(src_clone.len());
                 let source_start = source_start.min(source_end);
                 let len = source_end - source_start;
@@ -279,8 +283,8 @@ pub(super) fn native_buffer_copy(
                 return Ok(Value::Integer(copy_len as i64));
             }
         }
-    }
-    Ok(Value::Integer(0))
+        Ok(Value::Integer(0))
+    })
 }
 
 pub(super) fn native_buffer_fill(
@@ -288,20 +292,17 @@ pub(super) fn native_buffer_fill(
     _this: &Value,
     args: &[Value],
 ) -> Result<Value> {
-    if let Value::Buffer(buf_idx) = _this {
-        if let HeapValue::Buffer(buf) = &mut interp.heap[*buf_idx] {
-            let fill_val = args.first().map(|v| to_i64(v) as u8).unwrap_or(0);
-            let start = args.get(1).map(|v| to_i64(v) as usize).unwrap_or(0);
-            let end = args.get(2).map(|v| to_i64(v) as usize).unwrap_or(buf.len());
-            let end = end.min(buf.len());
-            let start = start.min(end);
-            for byte in &mut buf[start..end] {
-                *byte = fill_val;
-            }
-            return Ok(Value::Buffer(*buf_idx));
+    with_buffer_mut!(interp, _this, |idx, buf| {
+        let fill_val = args.first().map(|v| to_i64(v) as u8).unwrap_or(0);
+        let start = args.get(1).map(|v| to_i64(v) as usize).unwrap_or(0);
+        let end = args.get(2).map(|v| to_i64(v) as usize).unwrap_or(buf.len());
+        let end = end.min(buf.len());
+        let start = start.min(end);
+        for byte in &mut buf[start..end] {
+            *byte = fill_val;
         }
-    }
-    Ok(Value::Undefined)
+        Ok(Value::Buffer(idx))
+    })
 }
 
 pub(super) fn native_buffer_compare(
@@ -309,16 +310,11 @@ pub(super) fn native_buffer_compare(
     _this: &Value,
     args: &[Value],
 ) -> Result<Value> {
-    if let Value::Buffer(src_idx) = _this {
-        let src_clone = if let HeapValue::Buffer(src) = &interp.heap[*src_idx] {
-            src.clone()
-        } else {
-            return Ok(Value::Integer(0));
-        };
+    with_buffer!(interp, _this, |_idx, src| {
+        let src_clone = src.clone();
         if let Some(Value::Buffer(dst_idx)) = args.first() {
             if let HeapValue::Buffer(dst) = &interp.heap[*dst_idx] {
-                let ord = src_clone.cmp(dst);
-                let cmp_val = match ord {
+                let cmp_val = match src_clone.cmp(dst) {
                     std::cmp::Ordering::Less => -1,
                     std::cmp::Ordering::Equal => 0,
                     std::cmp::Ordering::Greater => 1,
@@ -326,8 +322,8 @@ pub(super) fn native_buffer_compare(
                 return Ok(Value::Integer(cmp_val));
             }
         }
-    }
-    Ok(Value::Integer(0))
+        Ok(Value::Integer(0))
+    })
 }
 
 pub(super) fn native_buffer_equals(
@@ -335,16 +331,14 @@ pub(super) fn native_buffer_equals(
     _this: &Value,
     args: &[Value],
 ) -> Result<Value> {
-    if let Value::Buffer(src_idx) = _this {
-        if let HeapValue::Buffer(src) = &interp.heap[*src_idx] {
-            if let Some(Value::Buffer(dst_idx)) = args.first() {
-                if let HeapValue::Buffer(dst) = &interp.heap[*dst_idx] {
-                    return Ok(Value::Boolean(src == dst));
-                }
+    with_buffer!(interp, _this, |_idx, src| {
+        if let Some(Value::Buffer(dst_idx)) = args.first() {
+            if let HeapValue::Buffer(dst) = &interp.heap[*dst_idx] {
+                return Ok(Value::Boolean(src == dst));
             }
         }
-    }
-    Ok(Value::Boolean(false))
+        Ok(Value::Boolean(false))
+    })
 }
 
 pub(super) fn native_buffer_index_of(
@@ -352,29 +346,23 @@ pub(super) fn native_buffer_index_of(
     _this: &Value,
     args: &[Value],
 ) -> Result<Value> {
-    if let Value::Buffer(buf_idx) = _this {
-        if let HeapValue::Buffer(buf) = &interp.heap[*buf_idx] {
-            let search = args
-                .first()
-                .map(|v| to_string_value(interp, v))
-                .unwrap_or_default();
-            let byte_offset = args.get(1).map(|v| to_i64(v) as usize).unwrap_or(0);
-            let search_bytes = search.as_bytes();
-            if search_bytes.is_empty() {
-                return Ok(Value::Integer(byte_offset as i64));
-            }
-            if byte_offset >= buf.len() {
-                return Ok(Value::Integer(-1));
-            }
-            for i in byte_offset..=buf.len().saturating_sub(search_bytes.len()) {
-                if &buf[i..i + search_bytes.len()] == search_bytes {
-                    return Ok(Value::Integer(i as i64));
-                }
-            }
+    with_buffer!(interp, _this, |_idx, buf| {
+        let search = args.first().map(|v| to_string_value(interp, v)).unwrap_or_default();
+        let byte_offset = args.get(1).map(|v| to_i64(v) as usize).unwrap_or(0);
+        let search_bytes = search.as_bytes();
+        if search_bytes.is_empty() {
+            return Ok(Value::Integer(byte_offset as i64));
+        }
+        if byte_offset >= buf.len() {
             return Ok(Value::Integer(-1));
         }
-    }
-    Ok(Value::Integer(-1))
+        for i in byte_offset..=buf.len().saturating_sub(search_bytes.len()) {
+            if &buf[i..i + search_bytes.len()] == search_bytes {
+                return Ok(Value::Integer(i as i64));
+            }
+        }
+        Ok(Value::Integer(-1))
+    })
 }
 
 fn to_i64(v: &Value) -> i64 {
