@@ -5,6 +5,19 @@ use std::os::raw::c_char;
 use super::TailsValue;
 use super::TailsValueType;
 
+fn string_to_tails_value(s: &str) -> TailsValue {
+    match CString::new(s) {
+        Ok(c_string) => TailsValue {
+            tag: TailsValueType::String as u32,
+            data: c_string.into_raw() as u64,
+        },
+        Err(_) => TailsValue {
+            tag: TailsValueType::Undefined as u32,
+            data: 0,
+        },
+    }
+}
+
 pub fn value_to_tails_value(value: Value) -> TailsValue {
     match value {
         Value::Undefined => TailsValue {
@@ -27,38 +40,10 @@ pub fn value_to_tails_value(value: Value) -> TailsValue {
             tag: TailsValueType::Number as u32,
             data: n.to_bits(),
         },
-        Value::String(s) => {
-            let c_string = match CString::new(s) {
-                Ok(cs) => cs,
-                Err(_) => {
-                    return TailsValue {
-                        tag: TailsValueType::Undefined as u32,
-                        data: 0,
-                    }
-                }
-            };
-            let ptr = c_string.into_raw() as u64;
-            TailsValue {
-                tag: TailsValueType::String as u32,
-                data: ptr,
-            }
-        }
+        Value::String(s) => string_to_tails_value(&s),
         Value::Cons(c) => {
             let flat = c.flatten();
-            let c_string = match CString::new(flat) {
-                Ok(cs) => cs,
-                Err(_) => {
-                    return TailsValue {
-                        tag: TailsValueType::Undefined as u32,
-                        data: 0,
-                    }
-                }
-            };
-            let ptr = c_string.into_raw() as u64;
-            TailsValue {
-                tag: TailsValueType::String as u32,
-                data: ptr,
-            }
+            string_to_tails_value(&flat)
         }
         Value::BigInt(_) => TailsValue {
             tag: TailsValueType::Number as u32,

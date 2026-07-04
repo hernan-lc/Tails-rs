@@ -53,9 +53,7 @@ pub extern "C" fn tails_runtime_free(runtime: *mut TailsRuntime) {
 
 #[no_mangle]
 pub extern "C" fn tails_eval(runtime: *mut TailsRuntime, source: *const c_char) -> TailsValue {
-    if runtime.is_null() || source.is_null() {
-        return empty_tails_value!();
-    }
+    null_guard!(runtime, source);
     let runtime = unsafe { &mut *runtime };
     let source = match unsafe { SafeCStr::new(source) }.to_str() {
         Some(s) => s,
@@ -69,9 +67,7 @@ pub extern "C" fn tails_eval(runtime: *mut TailsRuntime, source: *const c_char) 
 
 #[no_mangle]
 pub extern "C" fn tails_get_global(runtime: *mut TailsRuntime, name: *const c_char) -> TailsValue {
-    if runtime.is_null() || name.is_null() {
-        return empty_tails_value!();
-    }
+    null_guard!(runtime, name);
     let runtime = unsafe { &*runtime };
     let name = match unsafe { SafeCStr::new(name) }.to_str() {
         Some(s) => s,
@@ -89,9 +85,7 @@ pub extern "C" fn tails_set_global(
     name: *const c_char,
     value: TailsValue,
 ) {
-    if runtime.is_null() || name.is_null() {
-        return;
-    }
+    null_guard_void!(runtime, name);
     let runtime = unsafe { &mut *runtime };
     let name = unsafe { CStr::from_ptr(name) };
     if let Ok(name_str) = name.to_str() {
@@ -187,9 +181,7 @@ pub extern "C" fn tails_get_string(value: TailsValue) -> *const c_char {
 
 #[no_mangle]
 pub extern "C" fn tails_string_new(runtime: *mut TailsRuntime, s: *const c_char) -> TailsValue {
-    if runtime.is_null() || s.is_null() {
-        return empty_tails_value!();
-    }
+    null_guard!(runtime, s);
     let cstr = unsafe { CStr::from_ptr(s) };
     match cstr.to_str() {
         Ok(s) => {
@@ -234,9 +226,7 @@ pub extern "C" fn tails_undefined() -> TailsValue {
 
 #[no_mangle]
 pub extern "C" fn tails_object_new(runtime: *mut TailsRuntime) -> TailsValue {
-    if runtime.is_null() {
-        return empty_tails_value!();
-    }
+    null_guard_single!(runtime);
     let runtime = unsafe { &mut *runtime };
     let value = runtime.new_object();
     value_to_tails_value(value)
@@ -248,9 +238,7 @@ pub extern "C" fn tails_object_get(
     object: TailsValue,
     key: *const c_char,
 ) -> TailsValue {
-    if runtime.is_null() || key.is_null() {
-        return empty_tails_value!();
-    }
+    null_guard!(runtime, key);
     let runtime = unsafe { &mut *runtime };
     let key = unsafe { CStr::from_ptr(key) };
     match key.to_str() {
@@ -272,9 +260,7 @@ pub extern "C" fn tails_object_set(
     key: *const c_char,
     value: TailsValue,
 ) {
-    if runtime.is_null() || key.is_null() {
-        return;
-    }
+    null_guard_void!(runtime, key);
     let runtime = unsafe { &mut *runtime };
     let key = unsafe { CStr::from_ptr(key) };
     if let Ok(key_str) = key.to_str() {
@@ -286,9 +272,7 @@ pub extern "C" fn tails_object_set(
 
 #[no_mangle]
 pub extern "C" fn tails_array_new(runtime: *mut TailsRuntime) -> TailsValue {
-    if runtime.is_null() {
-        return empty_tails_value!();
-    }
+    null_guard_single!(runtime);
     let runtime = unsafe { &mut *runtime };
     let value = runtime.new_array();
     value_to_tails_value(value)
@@ -296,9 +280,7 @@ pub extern "C" fn tails_array_new(runtime: *mut TailsRuntime) -> TailsValue {
 
 #[no_mangle]
 pub extern "C" fn tails_array_length(runtime: *mut TailsRuntime, array: TailsValue) -> i32 {
-    if runtime.is_null() || array.tag != TailsValueType::Array as u32 {
-        return -1;
-    }
+    array_guard_i32!(runtime, array, -1);
 
     let runtime = unsafe { &*runtime };
     let arr_value = tails_value_to_value(array);
@@ -311,9 +293,7 @@ pub extern "C" fn tails_array_get(
     array: TailsValue,
     index: i32,
 ) -> TailsValue {
-    if runtime.is_null() || array.tag != TailsValueType::Array as u32 {
-        return empty_tails_value!();
-    }
+    array_guard!(runtime, array);
     let runtime = unsafe { &*runtime };
     let arr_value = tails_value_to_value(array);
     match runtime.get_array_element(&arr_value, index as usize) {
@@ -328,9 +308,7 @@ pub extern "C" fn tails_array_push(
     array: TailsValue,
     value: TailsValue,
 ) -> i32 {
-    if runtime.is_null() || array.tag != TailsValueType::Array as u32 {
-        return -1;
-    }
+    array_guard_i32!(runtime, array, -1);
     let runtime = unsafe { &mut *runtime };
     let arr_value = tails_value_to_value(array);
     let val = tails_value_to_value(value);
@@ -346,9 +324,7 @@ pub extern "C" fn tails_call(
     args: *const TailsValue,
     args_len: i32,
 ) -> TailsValue {
-    if runtime.is_null() {
-        return empty_tails_value!();
-    }
+    null_guard_single!(runtime);
     let runtime = unsafe { &mut *runtime };
     let func_value = tails_value_to_value(func);
     let this_value = tails_value_to_value(this);
