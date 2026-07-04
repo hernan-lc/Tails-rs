@@ -25,8 +25,8 @@ impl Hash for Value {
             }
             Value::Cons(c) => {
                 5u8.hash(state);
-                let flat = c.flatten();
-                flat.hash(state);
+                let h = c.hash_cons_string();
+                h.hash(state);
             }
             Value::BigInt(i) => {
                 6u8.hash(state);

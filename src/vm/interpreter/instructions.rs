@@ -160,10 +160,11 @@ impl Interpreter {
                 let dst_idx = base + *dst as usize;
                 let src_idx = base + *src as usize;
                 if dst_idx < self.stack.len() && src_idx < self.stack.len() {
-                    // Specialized hot path: avoid cloning the 32-byte Value
-                    // when both operands are primitives. The common case in
-                    // numeric loops is Integer+Integer, which we handle
-                    // in-place with only the discriminant being touched.
+                    // Phase 1.8: For string concat arms, move values out of
+                    // the stack first to avoid borrow conflicts between the
+                    // match (which borrows &self.stack) and mem::replace
+                    // (which needs &mut self.stack). Numeric arms stay
+                    // in-place for zero-allocation fast paths.
                     match (&self.stack[dst_idx], &self.stack[src_idx]) {
                         (Value::Integer(a), Value::Integer(b)) => {
                             if let Some(result) = a.checked_add(*b) {
@@ -173,7 +174,6 @@ impl Interpreter {
                             }
                         }
                         (Value::Float(a), Value::Float(b)) => {
-                            // Direct in-place write: no clone, no push/pop churn.
                             self.stack[dst_idx] = Value::Float(a + b);
                         }
                         (Value::Integer(a), Value::Float(b)) => {
@@ -182,75 +182,63 @@ impl Interpreter {
                         (Value::Float(a), Value::Integer(b)) => {
                             self.stack[dst_idx] = Value::Float(*a + *b as f64);
                         }
-                        // Phase 1.7: String concat via ConsString rope.
-                        // Avoids allocating a fresh String of
-                        // `dst_str.len() + src_str.len()` bytes. Builds a
-                        // lazy tree node instead.
-                        (Value::String(dst_str), Value::String(src_str)) => {
-                            self.stack[dst_idx] = Value::Cons(ConsString::new(
-                                Value::String(dst_str.clone()),
-                                Value::String(src_str.clone()),
-                            ));
-                        }
-                        (Value::Cons(c), Value::String(src_str)) => {
-                            self.stack[dst_idx] = Value::Cons(ConsString::new(
-                                Value::Cons(c.clone()),
-                                Value::String(src_str.clone()),
-                            ));
-                        }
-                        (Value::String(dst_str), Value::Cons(c)) => {
-                            self.stack[dst_idx] = Value::Cons(ConsString::new(
-                                Value::String(dst_str.clone()),
-                                Value::Cons(c.clone()),
-                            ));
-                        }
-                        (Value::Cons(a), Value::Cons(b)) => {
-                            self.stack[dst_idx] = Value::Cons(ConsString::new(
-                                Value::Cons(a.clone()),
-                                Value::Cons(b.clone()),
-                            ));
-                        }
-                        // Phase 5F (String + Number): `"answer: " + 42` is
-                        // extremely common. Avoid the `to_string_coerce`
-                        // round-trip and the clone of the source `Value::String`
-                        // by formatting the small primitive directly into a
-                        // ConsString leaf.
-                        (Value::String(dst_str), Value::Integer(b)) => {
-                            let b_str = Value::String(b.to_string());
-                            self.stack[dst_idx] =
-                                Value::Cons(ConsString::new(Value::String(dst_str.clone()), b_str));
-                        }
-                        (Value::String(dst_str), Value::Float(b)) => {
-                            // Match `to_string_coerce` for finite integers:
-                            // "5" instead of "5.0" reads better.
-                            let b_str = if b.is_finite() && *b == (*b as i64) as f64 {
-                                Value::String((*b as i64).to_string())
-                            } else {
-                                Value::String(b.to_string())
-                            };
-                            self.stack[dst_idx] =
-                                Value::Cons(ConsString::new(Value::String(dst_str.clone()), b_str));
-                        }
-                        (Value::Cons(c), Value::Integer(b)) => {
-                            let right = Value::String(b.to_string());
-                            self.stack[dst_idx] =
-                                Value::Cons(ConsString::new(Value::Cons(c.clone()), right));
-                        }
-                        (Value::Cons(c), Value::Float(b)) => {
-                            let right = if b.is_finite() && *b == (*b as i64) as f64 {
-                                Value::String((*b as i64).to_string())
-                            } else {
-                                Value::String(b.to_string())
-                            };
-                            self.stack[dst_idx] =
-                                Value::Cons(ConsString::new(Value::Cons(c.clone()), right));
-                        }
                         _ => {
-                            // Fallback: clone is required for self.add(left, right)
-                            // which takes by-value. This is the cold path.
-                            let dst_val = self.stack[dst_idx].clone();
-                            let src_val = self.stack[src_idx].clone();
-                            self.stack[dst_idx] = self.add(dst_val, src_val)?;
+                            // String/Cons/cold path: move both values out
+                            // to avoid borrow conflicts, then handle.
+                            let left =
+                                std::mem::replace(&mut self.stack[dst_idx], Value::Undefined);
+                            let right =
+                                std::mem::replace(&mut self.stack[src_idx], Value::Undefined);
+                            match (&left, &right) {
+                                (Value::String(a), Value::String(b)) => {
+                                    self.stack[dst_idx] = Value::Cons(ConsString::new_smart(
+                                        Value::String(a.clone()),
+                                        Value::String(b.clone()),
+                                    ));
+                                }
+                                (Value::Cons(_), Value::String(_))
+                                | (Value::String(_), Value::Cons(_))
+                                | (Value::Cons(_), Value::Cons(_)) => {
+                                    self.stack[dst_idx] = Value::Cons(ConsString::new(left, right));
+                                }
+                                (Value::String(_), Value::Integer(b)) => {
+                                    let b_val = *b;
+                                    self.stack[dst_idx] = Value::Cons(ConsString::new(
+                                        left,
+                                        Value::String(b_val.to_string()),
+                                    ));
+                                }
+                                (Value::String(_), Value::Float(b)) => {
+                                    let b_val = *b;
+                                    let b_str =
+                                        if b_val.is_finite() && b_val == (b_val as i64) as f64 {
+                                            Value::String((b_val as i64).to_string())
+                                        } else {
+                                            Value::String(b_val.to_string())
+                                        };
+                                    self.stack[dst_idx] = Value::Cons(ConsString::new(left, b_str));
+                                }
+                                (Value::Cons(_), Value::Integer(b)) => {
+                                    let b_val = *b;
+                                    self.stack[dst_idx] = Value::Cons(ConsString::new(
+                                        left,
+                                        Value::String(b_val.to_string()),
+                                    ));
+                                }
+                                (Value::Cons(_), Value::Float(b)) => {
+                                    let b_val = *b;
+                                    let right =
+                                        if b_val.is_finite() && b_val == (b_val as i64) as f64 {
+                                            Value::String((b_val as i64).to_string())
+                                        } else {
+                                            Value::String(b_val.to_string())
+                                        };
+                                    self.stack[dst_idx] = Value::Cons(ConsString::new(left, right));
+                                }
+                                _ => {
+                                    self.stack[dst_idx] = self.add(left, right)?;
+                                }
+                            }
                         }
                     }
                 }

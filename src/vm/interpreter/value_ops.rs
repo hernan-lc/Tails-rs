@@ -33,10 +33,9 @@ impl Interpreter {
                 }
             }
             // Phase 1.7: String + String — O(1) ConsString rope node.
-            // Avoids allocating a fresh `String` of `a.len() + b.len()` bytes.
-            // The actual flat string is only produced when consumed by an
-            // operation that needs contiguous bytes (comparisons, display, etc.).
-            (Value::String(a), Value::String(b)) => Ok(Value::Cons(ConsString::new(
+            // Phase 1.8: Use new_smart for short strings to eagerly
+            // flatten small concatenations.
+            (Value::String(a), Value::String(b)) => Ok(Value::Cons(ConsString::new_smart(
                 Value::String(a.clone()),
                 Value::String(b.clone()),
             ))),
@@ -52,10 +51,7 @@ impl Interpreter {
                 Value::Cons(a.clone()),
                 Value::Cons(b.clone()),
             ))),
-            // Phase 1.7: String + Number — coerce number to string, then
-            // build a Cons node. The number-to-string conversion is cheap
-            // (format! on a small primitive) and avoids the larger
-            // `String::with_capacity` + two `push_str` allocation.
+            // Phase 1.7: String + Number
             (Value::String(a), Value::Integer(b)) => {
                 let b_str = Value::String(b.to_string());
                 Ok(Value::Cons(ConsString::new(
@@ -92,7 +88,7 @@ impl Interpreter {
                     Value::String(b.clone()),
                 )))
             }
-            // Cons + Number: flatten the Cons first, then build a new Cons
+            // Cons + Number
             (Value::Cons(c), Value::Integer(b)) => {
                 let left = Value::Cons(c.clone());
                 let right = Value::String(b.to_string());
@@ -119,8 +115,7 @@ impl Interpreter {
                 };
                 Ok(Value::Cons(ConsString::new(left, Value::Cons(c.clone()))))
             }
-            // Cold path: coerce left operand to string if needed, then
-            // build a Cons node.
+            // Cold path: coerce non-string to string, then build Cons.
             (Value::String(a), r) => {
                 let coerced = self.to_string_coerce_value(r).flatten();
                 Ok(Value::Cons(ConsString::new(

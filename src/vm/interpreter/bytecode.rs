@@ -55,9 +55,9 @@ impl Interpreter {
                         }
                         self.stack[idx] = value;
                     } else {
-                        return Err(
-                            self.err_at_location(Error::RuntimeError(super::ERR_STACK_UNDERFLOW.into()))
-                        );
+                        return Err(self.err_at_location(Error::RuntimeError(
+                            super::ERR_STACK_UNDERFLOW.into(),
+                        )));
                     }
                     pc += 1;
                     continue;
@@ -113,41 +113,32 @@ impl Interpreter {
                                 pc += 1;
                                 continue;
                             }
-                            // Phase 1.7: String concat via ConsString rope.
-                            (Value::String(a), Value::String(b)) => {
-                                self.stack[dst_idx] = Value::Cons(ConsString::new(
-                                    Value::String(a.clone()),
-                                    Value::String(b.clone()),
-                                ));
-                                pc += 1;
-                                continue;
-                            }
-                            (Value::Cons(c), Value::String(b)) => {
-                                self.stack[dst_idx] = Value::Cons(ConsString::new(
-                                    Value::Cons(c.clone()),
-                                    Value::String(b.clone()),
-                                ));
-                                pc += 1;
-                                continue;
-                            }
-                            (Value::String(a), Value::Cons(c)) => {
-                                self.stack[dst_idx] = Value::Cons(ConsString::new(
-                                    Value::String(a.clone()),
-                                    Value::Cons(c.clone()),
-                                ));
-                                pc += 1;
-                                continue;
-                            }
-                            (Value::Cons(a), Value::Cons(b)) => {
-                                self.stack[dst_idx] = Value::Cons(ConsString::new(
-                                    Value::Cons(a.clone()),
-                                    Value::Cons(b.clone()),
-                                ));
-                                pc += 1;
-                                continue;
-                            }
                             _ => {
-                                // Cold path: fall through to exec_load_store.
+                                // Phase 1.8: Move values out to avoid borrow
+                                // conflicts, then handle string/cons/cold paths.
+                                let left =
+                                    std::mem::replace(&mut self.stack[dst_idx], Value::Undefined);
+                                let right =
+                                    std::mem::replace(&mut self.stack[src_idx], Value::Undefined);
+                                match (&left, &right) {
+                                    (Value::String(a), Value::String(b)) => {
+                                        self.stack[dst_idx] = Value::Cons(ConsString::new_smart(
+                                            Value::String(a.clone()),
+                                            Value::String(b.clone()),
+                                        ));
+                                    }
+                                    (Value::Cons(_), Value::String(_))
+                                    | (Value::String(_), Value::Cons(_))
+                                    | (Value::Cons(_), Value::Cons(_)) => {
+                                        self.stack[dst_idx] =
+                                            Value::Cons(ConsString::new(left, right));
+                                    }
+                                    _ => {
+                                        self.stack[dst_idx] = self.add(left, right)?;
+                                    }
+                                }
+                                pc += 1;
+                                continue;
                             }
                         }
                     }
@@ -293,11 +284,9 @@ impl Interpreter {
                         .ok_or_else(|| Error::RuntimeError(super::ERR_STACK_UNDERFLOW.into()))?;
                     let mut args = Vec::new();
                     for _ in 0..*argc {
-                        args.push(
-                            self.stack
-                                .pop()
-                                .ok_or_else(|| Error::RuntimeError(super::ERR_STACK_UNDERFLOW.into()))?,
-                        );
+                        args.push(self.stack.pop().ok_or_else(|| {
+                            Error::RuntimeError(super::ERR_STACK_UNDERFLOW.into())
+                        })?);
                     }
                     args.reverse();
                     match &callee {
@@ -552,11 +541,9 @@ impl Interpreter {
                     // `usize` for `Vec::with_capacity`.
                     let mut args = Vec::with_capacity(usize::from(*argc));
                     for _ in 0..*argc {
-                        args.push(
-                            self.stack
-                                .pop()
-                                .ok_or_else(|| Error::RuntimeError(super::ERR_STACK_UNDERFLOW.into()))?,
-                        );
+                        args.push(self.stack.pop().ok_or_else(|| {
+                            Error::RuntimeError(super::ERR_STACK_UNDERFLOW.into())
+                        })?);
                     }
                     args.reverse();
                     let key = self
@@ -686,11 +673,9 @@ impl Interpreter {
                 Instruction::Construct(argc) => {
                     let mut args = Vec::new();
                     for _ in 0..*argc {
-                        args.push(
-                            self.stack
-                                .pop()
-                                .ok_or_else(|| Error::RuntimeError(super::ERR_STACK_UNDERFLOW.into()))?,
-                        );
+                        args.push(self.stack.pop().ok_or_else(|| {
+                            Error::RuntimeError(super::ERR_STACK_UNDERFLOW.into())
+                        })?);
                     }
                     args.reverse();
                     let constructor = self
@@ -1060,11 +1045,10 @@ impl Interpreter {
                     self.stack.push(iter);
                 }
                 Instruction::IteratorNext(target) => {
-                    let iterator = self
-                        .stack
-                        .last()
-                        .cloned()
-                        .ok_or_else(|| Error::RuntimeError(super::ERR_STACK_UNDERFLOW.into()))?;
+                    let iterator =
+                        self.stack.last().cloned().ok_or_else(|| {
+                            Error::RuntimeError(super::ERR_STACK_UNDERFLOW.into())
+                        })?;
                     match self.exec_iterator_next(iterator, *target as usize)? {
                         ControlFlowOutcome::Jump(jump_target) => {
                             self.stack.pop();
@@ -1083,11 +1067,10 @@ impl Interpreter {
                     self.exec_iterator_close(iterator)?;
                 }
                 Instruction::AsyncIteratorNext(target) => {
-                    let iterator = self
-                        .stack
-                        .last()
-                        .cloned()
-                        .ok_or_else(|| Error::RuntimeError(super::ERR_STACK_UNDERFLOW.into()))?;
+                    let iterator =
+                        self.stack.last().cloned().ok_or_else(|| {
+                            Error::RuntimeError(super::ERR_STACK_UNDERFLOW.into())
+                        })?;
                     match self.exec_async_iterator_next(iterator, *target as usize)? {
                         ControlFlowOutcome::Jump(jump_target) => {
                             self.stack.pop();
