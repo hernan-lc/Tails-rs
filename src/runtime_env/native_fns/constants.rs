@@ -381,6 +381,7 @@ pub const CHILD_PROCESS_EXEC_SYNC: usize = 377;
 pub const CHILD_PROCESS_EXEC: usize = 378;
 pub const CHILD_PROCESS_SPAWN: usize = 379;
 pub const OBJECT_HAS_OWN_PROPERTY: usize = 380;
+pub const OBJECT_CREATE: usize = 463;
 pub const REQUIRE: usize = 381;
 pub const URL_FILE_URL_TO_PATH: usize = 382;
 pub const NUMBER_TO_FIXED: usize = 383;
@@ -493,4 +494,4 @@ mod tests {
     }
 }
 
-pub const NATIVE_TABLE_LEN: usize = 463;
+pub const NATIVE_TABLE_LEN: usize = 464;

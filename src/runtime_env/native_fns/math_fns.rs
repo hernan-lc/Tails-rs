@@ -8,12 +8,12 @@ use super::helpers::to_f64;
 ///
 /// # Example
 ///
-/// ```
+/// ```ignore
 /// unary_math_fn!(pub(super) fn native_math_abs, |n: f64| n.abs());
 /// ```
 ///
 /// Expands to:
-/// ```
+/// ```ignore
 /// pub(super) fn native_math_abs(...) -> Result<Value> {
 ///     let n = args.first().map(to_f64).unwrap_or(0.0);
 ///     Ok(Value::Float((n.abs())))

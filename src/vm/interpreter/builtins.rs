@@ -107,6 +107,7 @@ impl Interpreter {
             "values" => Value::NativeFunction(c::OBJECT_VALUES),
             "entries" => Value::NativeFunction(c::OBJECT_ENTRIES),
             "assign" => Value::NativeFunction(c::OBJECT_ASSIGN),
+            "create" => Value::NativeFunction(c::OBJECT_CREATE),
             "defineProperty" => Value::NativeFunction(c::OBJECT_DEFINE_PROPERTY),
             "getOwnPropertyDescriptor" => Value::NativeFunction(c::OBJECT_GET_OWN_PROPERTY_DESCRIPTOR),
             "freeze" => Value::NativeFunction(c::OBJECT_FREEZE),
