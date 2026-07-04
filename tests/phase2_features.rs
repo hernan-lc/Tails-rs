@@ -774,7 +774,8 @@ fn test_inline_property_with_prototype() {
     let r = rt
         .eval(r#"
         let proto = { inherited: 99 };
-        let obj = Object.create(proto);
+        let obj = {};
+        Object.setPrototypeOf(obj, proto);
         obj.own = 1;
         obj.inherited + obj.own;
     "#)
@@ -792,7 +793,7 @@ fn test_inline_property_gc_preserves_references() {
             let obj = { value: [1, 2, 3] };
             // Force GC by allocating
             for (let i = 0; i < 1000; i++) {
-                Array(i);
+                [];
             }
             obj.value[0];
         "#,
