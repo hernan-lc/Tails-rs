@@ -1,6 +1,22 @@
 use super::*;
 use crate::errors::{Error, Result};
 
+macro_rules! parse_left_assoc {
+    ($self:ident, $next:ident, $token:pat, $op:expr) => {{
+        let mut left = $self.$next()?;
+        while matches!($self.peek().token, $token) {
+            $self.advance();
+            let right = $self.$next()?;
+            left = $self.spanned(Expression::BinaryOp {
+                op: $op,
+                left: Box::new(left.inner),
+                right: Box::new(right.inner),
+            });
+        }
+        Ok(left)
+    }};
+}
+
 impl<'a> Parser<'a> {
     pub(crate) fn parse_expression(&mut self) -> Result<SpannedNode<Expression>> {
         self.parse_assignment()
@@ -76,45 +92,15 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_or(&mut self) -> Result<SpannedNode<Expression>> {
-        let mut left = self.parse_and()?;
-        while self.peek().token == Token::Or {
-            self.advance();
-            let right = self.parse_and()?;
-            left = self.spanned(Expression::BinaryOp {
-                op: BinaryOperator::Or,
-                left: Box::new(left.inner),
-                right: Box::new(right.inner),
-            });
-        }
-        Ok(left)
+        parse_left_assoc!(self, parse_and, Token::Or, BinaryOperator::Or)
     }
 
     fn parse_nullish(&mut self) -> Result<SpannedNode<Expression>> {
-        let mut left = self.parse_or()?;
-        while self.peek().token == Token::NullishCoalescing {
-            self.advance();
-            let right = self.parse_or()?;
-            left = self.spanned(Expression::BinaryOp {
-                op: BinaryOperator::NullishCoalescing,
-                left: Box::new(left.inner),
-                right: Box::new(right.inner),
-            });
-        }
-        Ok(left)
+        parse_left_assoc!(self, parse_or, Token::NullishCoalescing, BinaryOperator::NullishCoalescing)
     }
 
     fn parse_and(&mut self) -> Result<SpannedNode<Expression>> {
-        let mut left = self.parse_equality()?;
-        while self.peek().token == Token::And {
-            self.advance();
-            let right = self.parse_equality()?;
-            left = self.spanned(Expression::BinaryOp {
-                op: BinaryOperator::And,
-                left: Box::new(left.inner),
-                right: Box::new(right.inner),
-            });
-        }
-        Ok(left)
+        parse_left_assoc!(self, parse_equality, Token::And, BinaryOperator::And)
     }
 
     fn parse_equality(&mut self) -> Result<SpannedNode<Expression>> {
@@ -143,73 +129,23 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_bitwise_or(&mut self) -> Result<SpannedNode<Expression>> {
-        let mut left = self.parse_bitwise_xor()?;
-        while self.peek().token == Token::BitOr {
-            self.advance();
-            let right = self.parse_bitwise_xor()?;
-            left = self.spanned(Expression::BinaryOp {
-                op: BinaryOperator::BitOr,
-                left: Box::new(left.inner),
-                right: Box::new(right.inner),
-            });
-        }
-        Ok(left)
+        parse_left_assoc!(self, parse_bitwise_xor, Token::BitOr, BinaryOperator::BitOr)
     }
 
     fn parse_bitwise_xor(&mut self) -> Result<SpannedNode<Expression>> {
-        let mut left = self.parse_bitwise_and()?;
-        while self.peek().token == Token::BitXor {
-            self.advance();
-            let right = self.parse_bitwise_and()?;
-            left = self.spanned(Expression::BinaryOp {
-                op: BinaryOperator::BitXor,
-                left: Box::new(left.inner),
-                right: Box::new(right.inner),
-            });
-        }
-        Ok(left)
+        parse_left_assoc!(self, parse_bitwise_and, Token::BitXor, BinaryOperator::BitXor)
     }
 
     fn parse_bitwise_and(&mut self) -> Result<SpannedNode<Expression>> {
-        let mut left = self.parse_instanceof()?;
-        while self.peek().token == Token::BitAnd {
-            self.advance();
-            let right = self.parse_instanceof()?;
-            left = self.spanned(Expression::BinaryOp {
-                op: BinaryOperator::BitAnd,
-                left: Box::new(left.inner),
-                right: Box::new(right.inner),
-            });
-        }
-        Ok(left)
+        parse_left_assoc!(self, parse_instanceof, Token::BitAnd, BinaryOperator::BitAnd)
     }
 
     fn parse_instanceof(&mut self) -> Result<SpannedNode<Expression>> {
-        let mut left = self.parse_in()?;
-        while self.peek().token == Token::Instanceof {
-            self.advance();
-            let right = self.parse_in()?;
-            left = self.spanned(Expression::BinaryOp {
-                op: BinaryOperator::Instanceof,
-                left: Box::new(left.inner),
-                right: Box::new(right.inner),
-            });
-        }
-        Ok(left)
+        parse_left_assoc!(self, parse_in, Token::Instanceof, BinaryOperator::Instanceof)
     }
 
     fn parse_in(&mut self) -> Result<SpannedNode<Expression>> {
-        let mut left = self.parse_comparison()?;
-        while self.peek().token == Token::In {
-            self.advance();
-            let right = self.parse_comparison()?;
-            left = self.spanned(Expression::BinaryOp {
-                op: BinaryOperator::In,
-                left: Box::new(left.inner),
-                right: Box::new(right.inner),
-            });
-        }
-        Ok(left)
+        parse_left_assoc!(self, parse_comparison, Token::In, BinaryOperator::In)
     }
 
     fn parse_comparison(&mut self) -> Result<SpannedNode<Expression>> {
