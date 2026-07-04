@@ -151,6 +151,48 @@ impl Interpreter {
         Ok(interp)
     }
 
+    // ── Allocation Helpers ───────────────────────────────────────────────────
+    //
+    // Convenience wrappers around `gc.allocate` for common heap object types.
+    // These reduce boilerplate when creating objects, arrays, and strings
+    // in native function implementations.
+
+    /// Allocate a new object on the heap with the given properties and prototype.
+    pub(super) fn alloc_object(
+        &mut self,
+        properties: FxHashMap<String, Value>,
+        prototype: Option<usize>,
+    ) -> usize {
+        self.gc.allocate(
+            &mut self.heap,
+            HeapValue::Object(JsObject {
+                properties,
+                prototype,
+                extensible: true,
+            }),
+        )
+    }
+
+    /// Allocate a new array on the heap with the given elements.
+    pub(super) fn alloc_array(&mut self, elements: Vec<Value>) -> usize {
+        self.gc.allocate(
+            &mut self.heap,
+            HeapValue::Array(JsArray { elements }),
+        )
+    }
+
+    /// Allocate a new string on the heap.
+    pub(super) fn alloc_string(&mut self, value: String) -> usize {
+        self.gc.allocate(&mut self.heap, HeapValue::String(value))
+    }
+
+    /// Allocate a new promise on the heap.
+    pub(super) fn alloc_promise(&mut self, promise: crate::objects::js_promise::JsPromise) -> usize {
+        self.gc.allocate(&mut self.heap, HeapValue::Promise(promise))
+    }
+
+    // ── End Allocation Helpers ───────────────────────────────────────────────
+
     pub fn execute(&mut self, module: &CompiledModule) -> Result<Value> {
         self.current_module = Some(Rc::new(module.clone()));
         let saved_call_stack_len = self.call_stack.len();
