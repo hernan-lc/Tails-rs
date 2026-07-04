@@ -447,63 +447,7 @@ impl<'a> Parser<'a> {
             args,
         });
         // Chain member access and calls: new Date().toISOString(), new Foo().bar(), etc.
-        loop {
-            if self.peek().token == Token::Dot {
-                self.advance();
-                let property = self.token_to_property_name()?;
-                expr = self.spanned(Expression::Member {
-                    object: Box::new(expr.inner),
-                    property: Box::new(property),
-                    computed: false,
-                });
-            } else if self.peek().token == Token::QuestionDot {
-                self.advance();
-                if self.peek().token == Token::LeftParen {
-                    self.advance();
-                    let args = self.parse_args()?;
-                    self.expect(&Token::RightParen)?;
-                    expr = self.spanned(Expression::OptionalCall {
-                        callee: Box::new(expr.inner),
-                        args,
-                    });
-                } else if self.peek().token == Token::LeftBracket {
-                    self.advance();
-                    let property = self.parse_expression()?.inner;
-                    self.expect(&Token::RightBracket)?;
-                    expr = self.spanned(Expression::OptionalMember {
-                        object: Box::new(expr.inner),
-                        property: Box::new(property),
-                        computed: true,
-                    });
-                } else {
-                    let property = self.token_to_property_name()?;
-                    expr = self.spanned(Expression::OptionalMember {
-                        object: Box::new(expr.inner),
-                        property: Box::new(property),
-                        computed: false,
-                    });
-                }
-            } else if self.peek().token == Token::LeftBracket {
-                self.advance();
-                let property = self.parse_expression()?.inner;
-                self.expect(&Token::RightBracket)?;
-                expr = self.spanned(Expression::Member {
-                    object: Box::new(expr.inner),
-                    property: Box::new(property),
-                    computed: true,
-                });
-            } else if self.peek().token == Token::LeftParen {
-                self.advance();
-                let args = self.parse_args()?;
-                self.expect(&Token::RightParen)?;
-                expr = self.spanned(Expression::Call {
-                    callee: Box::new(expr.inner),
-                    args,
-                });
-            } else {
-                break;
-            }
-        }
+        expr = self.parse_member_chain(expr)?;
         Ok(expr)
     }
 
@@ -548,8 +492,7 @@ impl<'a> Parser<'a> {
         }
     }
 
-    pub(crate) fn parse_call(&mut self) -> Result<SpannedNode<Expression>> {
-        let mut expr = self.parse_primary()?;
+    fn parse_member_chain(&mut self, mut expr: SpannedNode<Expression>) -> Result<SpannedNode<Expression>> {
         loop {
             if self.peek().token == Token::LeftParen {
                 self.advance();
@@ -610,12 +553,26 @@ impl<'a> Parser<'a> {
                     property: Box::new(property),
                     computed: true,
                 });
-            } else if self.peek().token == Token::Not {
-                // TypeScript non-null assertion: expr!
-                self.advance();
             } else {
                 break;
             }
+        }
+        Ok(expr)
+    }
+
+    pub(crate) fn parse_call(&mut self) -> Result<SpannedNode<Expression>> {
+        let mut expr = self.parse_primary()?;
+        loop {
+            if self.peek().token == Token::Not {
+                // TypeScript non-null assertion: expr!
+                self.advance();
+                continue;
+            }
+            let next = self.peek().token.clone();
+            if !matches!(next, Token::LeftParen | Token::QuestionDot | Token::Dot | Token::LeftBracket) {
+                break;
+            }
+            expr = self.parse_member_chain(expr)?;
         }
         Ok(expr)
     }
