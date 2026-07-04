@@ -172,15 +172,10 @@ pub(super) fn native_map_clear(
     this: &Value,
     _args: &[Value],
 ) -> Result<Value> {
-    let idx = match this {
-        Value::Map(idx) => *idx,
-        _ => return Err(Error::TypeError("Not a Map".into())),
-    };
-
-    if let crate::vm::interpreter::HeapValue::Map(map) = &mut interp.heap[idx] {
+    with_map_mut!(interp, this, |_idx, map| {
         map.clear();
-    }
-    Ok(Value::Undefined)
+        Ok(Value::Undefined)
+    })
 }
 
 pub(super) fn native_map_size(
@@ -188,16 +183,9 @@ pub(super) fn native_map_size(
     this: &Value,
     _args: &[Value],
 ) -> Result<Value> {
-    let idx = match this {
-        Value::Map(idx) => *idx,
-        _ => return Err(Error::TypeError("Not a Map".into())),
-    };
-
-    if let crate::vm::interpreter::HeapValue::Map(map) = &interp.heap[idx] {
+    with_map!(interp, this, |_idx, map| {
         Ok(Value::Float(map.size() as f64))
-    } else {
-        Err(Error::TypeError("Not a Map".into()))
-    }
+    })
 }
 
 pub(super) fn native_map_for_each(
@@ -205,30 +193,19 @@ pub(super) fn native_map_for_each(
     this: &Value,
     args: &[Value],
 ) -> Result<Value> {
-    let idx = match this {
-        Value::Map(idx) => *idx,
-        _ => return Err(Error::TypeError("Not a Map".into())),
-    };
-
-    let callback = args.first().cloned().unwrap_or(Value::Undefined);
-    let this_arg = args.get(1).cloned().unwrap_or(Value::Undefined);
-
-    // Clone entries to avoid borrow issues
-    let entries: Vec<(Value, Value)> =
-        if let crate::vm::interpreter::HeapValue::Map(map) = &interp.heap[idx] {
-            map.keys
-                .iter()
-                .zip(map.values.iter())
-                .map(|(k, v)| (k.clone(), v.clone()))
-                .collect()
-        } else {
-            return Err(Error::TypeError("Not a Map".into()));
-        };
-
-    for (k, v) in entries {
-        interp.call_value(&callback, &this_arg, &[v.clone(), k.clone(), this.clone()])?;
-    }
-    Ok(Value::Undefined)
+    with_map!(interp, this, |_idx, map| {
+        let callback = args.first().cloned().unwrap_or(Value::Undefined);
+        let this_arg = args.get(1).cloned().unwrap_or(Value::Undefined);
+        let entries: Vec<(Value, Value)> = map.keys
+            .iter()
+            .zip(map.values.iter())
+            .map(|(k, v)| (k.clone(), v.clone()))
+            .collect();
+        for (k, v) in entries {
+            interp.call_value(&callback, &this_arg, &[v.clone(), k.clone(), this.clone()])?;
+        }
+        Ok(Value::Undefined)
+    })
 }
 
 pub(super) fn native_map_keys(
@@ -236,21 +213,14 @@ pub(super) fn native_map_keys(
     this: &Value,
     _args: &[Value],
 ) -> Result<Value> {
-    let idx = match this {
-        Value::Map(idx) => *idx,
-        _ => return Err(Error::TypeError("Not a Map".into())),
-    };
-
-    if let crate::vm::interpreter::HeapValue::Map(map) = &interp.heap[idx] {
+    with_map!(interp, this, |_idx, map| {
         let keys = map.keys();
         let heap_idx = interp.heap.len();
         interp.heap.push(crate::vm::interpreter::HeapValue::Array(
             crate::vm::interpreter::JsArray { elements: keys },
         ));
         Ok(Value::Array(heap_idx))
-    } else {
-        Err(Error::TypeError("Not a Map".into()))
-    }
+    })
 }
 
 pub(super) fn native_map_values(
@@ -258,21 +228,14 @@ pub(super) fn native_map_values(
     this: &Value,
     _args: &[Value],
 ) -> Result<Value> {
-    let idx = match this {
-        Value::Map(idx) => *idx,
-        _ => return Err(Error::TypeError("Not a Map".into())),
-    };
-
-    if let crate::vm::interpreter::HeapValue::Map(map) = &interp.heap[idx] {
+    with_map!(interp, this, |_idx, map| {
         let values = map.values();
         let heap_idx = interp.heap.len();
         interp.heap.push(crate::vm::interpreter::HeapValue::Array(
             crate::vm::interpreter::JsArray { elements: values },
         ));
         Ok(Value::Array(heap_idx))
-    } else {
-        Err(Error::TypeError("Not a Map".into()))
-    }
+    })
 }
 
 pub(super) fn native_map_entries(
@@ -280,12 +243,7 @@ pub(super) fn native_map_entries(
     this: &Value,
     _args: &[Value],
 ) -> Result<Value> {
-    let idx = match this {
-        Value::Map(idx) => *idx,
-        _ => return Err(Error::TypeError("Not a Map".into())),
-    };
-
-    if let crate::vm::interpreter::HeapValue::Map(map) = &interp.heap[idx] {
+    with_map!(interp, this, |_idx, map| {
         let entries = map.entries();
         let arr_elements: Vec<Value> = entries
             .into_iter()
@@ -306,9 +264,7 @@ pub(super) fn native_map_entries(
             },
         ));
         Ok(Value::Array(heap_idx))
-    } else {
-        Err(Error::TypeError("Not a Map".into()))
-    }
+    })
 }
 
 // Set functions
@@ -330,19 +286,11 @@ pub(super) fn native_set_add(
     this: &Value,
     args: &[Value],
 ) -> Result<Value> {
-    let idx = match this {
-        Value::Set(idx) => *idx,
-        _ => return Err(Error::TypeError("Not a Set".into())),
-    };
-
-    let value = args.first().cloned().unwrap_or(Value::Undefined);
-
-    if let crate::vm::interpreter::HeapValue::Set(set) = &mut interp.heap[idx] {
+    with_set_mut!(interp, this, |_idx, set| {
+        let value = args.first().cloned().unwrap_or(Value::Undefined);
         set.add(value);
         Ok(this.clone())
-    } else {
-        Err(Error::TypeError("Not a Set".into()))
-    }
+    })
 }
 
 pub(super) fn native_set_has(
@@ -350,18 +298,10 @@ pub(super) fn native_set_has(
     this: &Value,
     args: &[Value],
 ) -> Result<Value> {
-    let idx = match this {
-        Value::Set(idx) => *idx,
-        _ => return Err(Error::TypeError("Not a Set".into())),
-    };
-
-    let value = args.first().cloned().unwrap_or(Value::Undefined);
-
-    if let crate::vm::interpreter::HeapValue::Set(set) = &interp.heap[idx] {
+    with_set!(interp, this, |_idx, set| {
+        let value = args.first().cloned().unwrap_or(Value::Undefined);
         Ok(Value::Boolean(set.has(&value)))
-    } else {
-        Err(Error::TypeError("Not a Set".into()))
-    }
+    })
 }
 
 pub(super) fn native_set_delete(
@@ -369,18 +309,10 @@ pub(super) fn native_set_delete(
     this: &Value,
     args: &[Value],
 ) -> Result<Value> {
-    let idx = match this {
-        Value::Set(idx) => *idx,
-        _ => return Err(Error::TypeError("Not a Set".into())),
-    };
-
-    let value = args.first().cloned().unwrap_or(Value::Undefined);
-
-    if let crate::vm::interpreter::HeapValue::Set(set) = &mut interp.heap[idx] {
+    with_set_mut!(interp, this, |_idx, set| {
+        let value = args.first().cloned().unwrap_or(Value::Undefined);
         Ok(Value::Boolean(set.delete(&value)))
-    } else {
-        Err(Error::TypeError("Not a Set".into()))
-    }
+    })
 }
 
 pub(super) fn native_set_clear(
@@ -388,15 +320,10 @@ pub(super) fn native_set_clear(
     this: &Value,
     _args: &[Value],
 ) -> Result<Value> {
-    let idx = match this {
-        Value::Set(idx) => *idx,
-        _ => return Err(Error::TypeError("Not a Set".into())),
-    };
-
-    if let crate::vm::interpreter::HeapValue::Set(set) = &mut interp.heap[idx] {
+    with_set_mut!(interp, this, |_idx, set| {
         set.clear();
-    }
-    Ok(Value::Undefined)
+        Ok(Value::Undefined)
+    })
 }
 
 pub(super) fn native_set_size(
@@ -404,16 +331,9 @@ pub(super) fn native_set_size(
     this: &Value,
     _args: &[Value],
 ) -> Result<Value> {
-    let idx = match this {
-        Value::Set(idx) => *idx,
-        _ => return Err(Error::TypeError("Not a Set".into())),
-    };
-
-    if let crate::vm::interpreter::HeapValue::Set(set) = &interp.heap[idx] {
+    with_set!(interp, this, |_idx, set| {
         Ok(Value::Float(set.size() as f64))
-    } else {
-        Err(Error::TypeError("Not a Set".into()))
-    }
+    })
 }
 
 pub(super) fn native_set_for_each(
@@ -421,26 +341,15 @@ pub(super) fn native_set_for_each(
     this: &Value,
     args: &[Value],
 ) -> Result<Value> {
-    let idx = match this {
-        Value::Set(idx) => *idx,
-        _ => return Err(Error::TypeError("Not a Set".into())),
-    };
-
-    let callback = args.first().cloned().unwrap_or(Value::Undefined);
-    let this_arg = args.get(1).cloned().unwrap_or(Value::Undefined);
-
-    // Clone values to avoid borrow issues
-    let values: Vec<Value> = if let crate::vm::interpreter::HeapValue::Set(set) = &interp.heap[idx]
-    {
-        set.values.clone()
-    } else {
-        return Err(Error::TypeError("Not a Set".into()));
-    };
-
-    for v in values {
-        interp.call_value(&callback, &this_arg, &[v.clone(), v.clone(), this.clone()])?;
-    }
-    Ok(Value::Undefined)
+    with_set!(interp, this, |_idx, set| {
+        let callback = args.first().cloned().unwrap_or(Value::Undefined);
+        let this_arg = args.get(1).cloned().unwrap_or(Value::Undefined);
+        let values: Vec<Value> = set.values.clone();
+        for v in values {
+            interp.call_value(&callback, &this_arg, &[v.clone(), v.clone(), this.clone()])?;
+        }
+        Ok(Value::Undefined)
+    })
 }
 
 pub(super) fn native_set_values(
@@ -448,21 +357,14 @@ pub(super) fn native_set_values(
     this: &Value,
     _args: &[Value],
 ) -> Result<Value> {
-    let idx = match this {
-        Value::Set(idx) => *idx,
-        _ => return Err(Error::TypeError("Not a Set".into())),
-    };
-
-    if let crate::vm::interpreter::HeapValue::Set(set) = &interp.heap[idx] {
+    with_set!(interp, this, |_idx, set| {
         let values = set.values();
         let heap_idx = interp.heap.len();
         interp.heap.push(crate::vm::interpreter::HeapValue::Array(
             crate::vm::interpreter::JsArray { elements: values },
         ));
         Ok(Value::Array(heap_idx))
-    } else {
-        Err(Error::TypeError("Not a Set".into()))
-    }
+    })
 }
 
 pub(super) fn native_set_keys(
@@ -479,36 +381,26 @@ pub(super) fn native_set_entries(
     this: &Value,
     _args: &[Value],
 ) -> Result<Value> {
-    let idx = match this {
-        Value::Set(idx) => *idx,
-        _ => return Err(Error::TypeError("Not a Set".into())),
-    };
-
-    // Clone values to avoid borrow issues
-    let values: Vec<Value> = if let crate::vm::interpreter::HeapValue::Set(set) = &interp.heap[idx]
-    {
-        set.values.clone()
-    } else {
-        return Err(Error::TypeError("Not a Set".into()));
-    };
-
-    let entries: Vec<Value> = values
-        .into_iter()
-        .map(|v| {
-            let heap_idx = interp.heap.len();
-            interp.heap.push(crate::vm::interpreter::HeapValue::Array(
-                crate::vm::interpreter::JsArray {
-                    elements: vec![v.clone(), v.clone()],
-                },
-            ));
-            Value::Array(heap_idx)
-        })
-        .collect();
-    let heap_idx = interp.heap.len();
-    interp.heap.push(crate::vm::interpreter::HeapValue::Array(
-        crate::vm::interpreter::JsArray { elements: entries },
-    ));
-    Ok(Value::Array(heap_idx))
+    with_set!(interp, this, |_idx, set| {
+        let values: Vec<Value> = set.values.clone();
+        let entries: Vec<Value> = values
+            .into_iter()
+            .map(|v| {
+                let heap_idx = interp.heap.len();
+                interp.heap.push(crate::vm::interpreter::HeapValue::Array(
+                    crate::vm::interpreter::JsArray {
+                        elements: vec![v.clone(), v.clone()],
+                    },
+                ));
+                Value::Array(heap_idx)
+            })
+            .collect();
+        let heap_idx = interp.heap.len();
+        interp.heap.push(crate::vm::interpreter::HeapValue::Array(
+            crate::vm::interpreter::JsArray { elements: entries },
+        ));
+        Ok(Value::Array(heap_idx))
+    })
 }
 
 // WeakMap functions
@@ -530,18 +422,10 @@ pub(super) fn native_weakmap_get(
     this: &Value,
     args: &[Value],
 ) -> Result<Value> {
-    let idx = match this {
-        Value::WeakMap(idx) => *idx,
-        _ => return Err(Error::TypeError("Not a WeakMap".into())),
-    };
-
-    let key = args.first().cloned().unwrap_or(Value::Undefined);
-
-    if let crate::vm::interpreter::HeapValue::WeakMap(map) = &interp.heap[idx] {
+    with_weakmap!(interp, this, |_idx, map| {
+        let key = args.first().cloned().unwrap_or(Value::Undefined);
         Ok(map.get(&key).cloned().unwrap_or(Value::Undefined))
-    } else {
-        Err(Error::TypeError("Not a WeakMap".into()))
-    }
+    })
 }
 
 pub(super) fn native_weakmap_set(
@@ -549,20 +433,12 @@ pub(super) fn native_weakmap_set(
     this: &Value,
     args: &[Value],
 ) -> Result<Value> {
-    let idx = match this {
-        Value::WeakMap(idx) => *idx,
-        _ => return Err(Error::TypeError("Not a WeakMap".into())),
-    };
-
-    let key = args.first().cloned().unwrap_or(Value::Undefined);
-    let value = args.get(1).cloned().unwrap_or(Value::Undefined);
-
-    if let crate::vm::interpreter::HeapValue::WeakMap(map) = &mut interp.heap[idx] {
+    with_weakmap_mut!(interp, this, |_idx, map| {
+        let key = args.first().cloned().unwrap_or(Value::Undefined);
+        let value = args.get(1).cloned().unwrap_or(Value::Undefined);
         map.set(key, value);
         Ok(this.clone())
-    } else {
-        Err(Error::TypeError("Not a WeakMap".into()))
-    }
+    })
 }
 
 pub(super) fn native_weakmap_has(
@@ -570,18 +446,10 @@ pub(super) fn native_weakmap_has(
     this: &Value,
     args: &[Value],
 ) -> Result<Value> {
-    let idx = match this {
-        Value::WeakMap(idx) => *idx,
-        _ => return Err(Error::TypeError("Not a WeakMap".into())),
-    };
-
-    let key = args.first().cloned().unwrap_or(Value::Undefined);
-
-    if let crate::vm::interpreter::HeapValue::WeakMap(map) = &interp.heap[idx] {
+    with_weakmap!(interp, this, |_idx, map| {
+        let key = args.first().cloned().unwrap_or(Value::Undefined);
         Ok(Value::Boolean(map.has(&key)))
-    } else {
-        Err(Error::TypeError("Not a WeakMap".into()))
-    }
+    })
 }
 
 pub(super) fn native_weakmap_delete(
@@ -589,18 +457,10 @@ pub(super) fn native_weakmap_delete(
     this: &Value,
     args: &[Value],
 ) -> Result<Value> {
-    let idx = match this {
-        Value::WeakMap(idx) => *idx,
-        _ => return Err(Error::TypeError("Not a WeakMap".into())),
-    };
-
-    let key = args.first().cloned().unwrap_or(Value::Undefined);
-
-    if let crate::vm::interpreter::HeapValue::WeakMap(map) = &mut interp.heap[idx] {
+    with_weakmap_mut!(interp, this, |_idx, map| {
+        let key = args.first().cloned().unwrap_or(Value::Undefined);
         Ok(Value::Boolean(map.delete(&key)))
-    } else {
-        Err(Error::TypeError("Not a WeakMap".into()))
-    }
+    })
 }
 
 // WeakSet functions
@@ -622,19 +482,11 @@ pub(super) fn native_weakset_add(
     this: &Value,
     args: &[Value],
 ) -> Result<Value> {
-    let idx = match this {
-        Value::WeakSet(idx) => *idx,
-        _ => return Err(Error::TypeError("Not a WeakSet".into())),
-    };
-
-    let value = args.first().cloned().unwrap_or(Value::Undefined);
-
-    if let crate::vm::interpreter::HeapValue::WeakSet(set) = &mut interp.heap[idx] {
+    with_weakset_mut!(interp, this, |_idx, set| {
+        let value = args.first().cloned().unwrap_or(Value::Undefined);
         set.add(value);
         Ok(this.clone())
-    } else {
-        Err(Error::TypeError("Not a WeakSet".into()))
-    }
+    })
 }
 
 pub(super) fn native_weakset_has(
@@ -642,18 +494,10 @@ pub(super) fn native_weakset_has(
     this: &Value,
     args: &[Value],
 ) -> Result<Value> {
-    let idx = match this {
-        Value::WeakSet(idx) => *idx,
-        _ => return Err(Error::TypeError("Not a WeakSet".into())),
-    };
-
-    let value = args.first().cloned().unwrap_or(Value::Undefined);
-
-    if let crate::vm::interpreter::HeapValue::WeakSet(set) = &interp.heap[idx] {
+    with_weakset!(interp, this, |_idx, set| {
+        let value = args.first().cloned().unwrap_or(Value::Undefined);
         Ok(Value::Boolean(set.has(&value)))
-    } else {
-        Err(Error::TypeError("Not a WeakSet".into()))
-    }
+    })
 }
 
 pub(super) fn native_weakset_delete(
@@ -661,16 +505,8 @@ pub(super) fn native_weakset_delete(
     this: &Value,
     args: &[Value],
 ) -> Result<Value> {
-    let idx = match this {
-        Value::WeakSet(idx) => *idx,
-        _ => return Err(Error::TypeError("Not a WeakSet".into())),
-    };
-
-    let value = args.first().cloned().unwrap_or(Value::Undefined);
-
-    if let crate::vm::interpreter::HeapValue::WeakSet(set) = &mut interp.heap[idx] {
+    with_weakset_mut!(interp, this, |_idx, set| {
+        let value = args.first().cloned().unwrap_or(Value::Undefined);
         Ok(Value::Boolean(set.delete(&value)))
-    } else {
-        Err(Error::TypeError("Not a WeakSet".into()))
-    }
+    })
 }
