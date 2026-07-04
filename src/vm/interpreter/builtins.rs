@@ -4,6 +4,37 @@ use crate::objects::Value;
 use crate::props;
 use crate::runtime_env::native_fns::constants as c;
 
+fn register_error_subclass(
+    interp: &mut Interpreter,
+    name: &str,
+    error_proto_idx: usize,
+    ctor_const: usize,
+) {
+    let proto_props = props! {
+        "name" => Value::String(name.into()),
+    };
+    let proto_idx = interp.gc.allocate(
+        &mut interp.heap,
+        HeapValue::Object(JsObject {
+            properties: proto_props,
+            prototype: Some(error_proto_idx),
+            extensible: true,
+        }),
+    );
+    let ctor_props = props! {
+        "prototype" => Value::Object(proto_idx),
+    };
+    interp.gc.allocate(
+        &mut interp.heap,
+        HeapValue::Object(JsObject {
+            properties: ctor_props,
+            prototype: None,
+            extensible: true,
+        }),
+    );
+    interp.globals.insert(name.into(), Value::NativeFunction(ctor_const));
+}
+
 impl Interpreter {
     pub(super) fn init_builtins(&mut self) {
         // Global constants
@@ -438,117 +469,13 @@ impl Interpreter {
         self.globals
             .insert("Error".into(), Value::NativeFunction(c::ERROR_CONSTRUCTOR));
 
-        // TypeError constructor
-        let type_error_proto_props = props! {
-            "name" => Value::String("TypeError".into()),
-        };
-        let type_error_proto_idx = self.gc.allocate(
-            &mut self.heap,
-            HeapValue::Object(JsObject {
-                properties: type_error_proto_props,
-                prototype: Some(error_proto_idx),
-                extensible: true,
-            }),
-        );
-        let type_error_ctor_props = props! {
-            "prototype" => Value::Object(type_error_proto_idx),
-        };
-        self.gc.allocate(
-            &mut self.heap,
-            HeapValue::Object(JsObject {
-                properties: type_error_ctor_props,
-                prototype: None,
-                extensible: true,
-            }),
-        );
-        self.globals.insert(
-            "TypeError".into(),
-            Value::NativeFunction(c::TYPE_ERROR_CONSTRUCTOR),
-        );
+        register_error_subclass(self, "TypeError", error_proto_idx, c::TYPE_ERROR_CONSTRUCTOR);
 
-        // ReferenceError constructor
-        let ref_error_proto_props = props! {
-            "name" => Value::String("ReferenceError".into()),
-        };
-        let ref_error_proto_idx = self.gc.allocate(
-            &mut self.heap,
-            HeapValue::Object(JsObject {
-                properties: ref_error_proto_props,
-                prototype: Some(error_proto_idx),
-                extensible: true,
-            }),
-        );
-        let ref_error_ctor_props = props! {
-            "prototype" => Value::Object(ref_error_proto_idx),
-        };
-        self.gc.allocate(
-            &mut self.heap,
-            HeapValue::Object(JsObject {
-                properties: ref_error_ctor_props,
-                prototype: None,
-                extensible: true,
-            }),
-        );
-        self.globals.insert(
-            "ReferenceError".into(),
-            Value::NativeFunction(c::REFERENCE_ERROR_CONSTRUCTOR),
-        );
+        register_error_subclass(self, "ReferenceError", error_proto_idx, c::REFERENCE_ERROR_CONSTRUCTOR);
 
-        // SyntaxError constructor
-        let syntax_error_proto_props = props! {
-            "name" => Value::String("SyntaxError".into()),
-        };
-        let syntax_error_proto_idx = self.gc.allocate(
-            &mut self.heap,
-            HeapValue::Object(JsObject {
-                properties: syntax_error_proto_props,
-                prototype: Some(error_proto_idx),
-                extensible: true,
-            }),
-        );
-        let syntax_error_ctor_props = props! {
-            "prototype" => Value::Object(syntax_error_proto_idx),
-        };
-        self.gc.allocate(
-            &mut self.heap,
-            HeapValue::Object(JsObject {
-                properties: syntax_error_ctor_props,
-                prototype: None,
-                extensible: true,
-            }),
-        );
-        self.globals.insert(
-            "SyntaxError".into(),
-            Value::NativeFunction(c::SYNTAX_ERROR_CONSTRUCTOR),
-        );
+        register_error_subclass(self, "SyntaxError", error_proto_idx, c::SYNTAX_ERROR_CONSTRUCTOR);
 
-        // RangeError constructor
-        let range_error_proto_props = props! {
-            "name" => Value::String("RangeError".into()),
-        };
-        let range_error_proto_idx = self.gc.allocate(
-            &mut self.heap,
-            HeapValue::Object(JsObject {
-                properties: range_error_proto_props,
-                prototype: Some(error_proto_idx),
-                extensible: true,
-            }),
-        );
-        let range_error_ctor_props = props! {
-            "prototype" => Value::Object(range_error_proto_idx),
-        };
-        self.gc.allocate(
-            &mut self.heap,
-            HeapValue::Object(JsObject {
-                properties: range_error_ctor_props,
-                prototype: None,
-                extensible: true,
-            }),
-        );
-        self.globals.insert(
-            "RangeError".into(),
-            Value::NativeFunction(c::RANGE_ERROR_CONSTRUCTOR),
-        );
+        register_error_subclass(self, "RangeError", error_proto_idx, c::RANGE_ERROR_CONSTRUCTOR);
 
         // TypedArray constructors
         let typed_array_constructors = [
