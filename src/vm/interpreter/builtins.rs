@@ -187,21 +187,8 @@ impl Interpreter {
             .insert("JSON".into(), Value::Object(json_obj_idx));
 
         // Array
-        let array_props = props! {
-            "isArray" => Value::NativeFunction(c::ARRAY_IS_ARRAY),
-            "from" => Value::NativeFunction(c::ARRAY_FROM),
-            "of" => Value::NativeFunction(c::ARRAY_OF),
-        };
-        let array_obj_idx = self.gc.allocate(
-            &mut self.heap,
-            HeapValue::Object(JsObject {
-                properties: array_props,
-                prototype: None,
-                extensible: true,
-            }),
-        );
         self.globals
-            .insert("Array".into(), Value::Object(array_obj_idx));
+            .insert("Array".into(), Value::NativeFunction(c::ARRAY_CONSTRUCTOR));
 
         // BigInt
         self.globals.insert(

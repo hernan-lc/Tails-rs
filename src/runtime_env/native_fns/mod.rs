@@ -761,7 +761,6 @@ pub static NATIVE_TABLE: &[NativeFn] = &[
     child_process_fns::native_child_process_spawn,
     // Object.prototype methods
     object_fns::native_object_has_own_property,
-    object_fns::native_object_create,
     // CommonJS require()
     require_fns::native_require,
     // fileURLToPath (382)
@@ -863,6 +862,10 @@ pub static NATIVE_TABLE: &[NativeFn] = &[
     dns_fns::native_dns_resolve4,
     dns_fns::native_dns_resolve6,
     dns_fns::native_dns_resolve_mx,
+    // Object.create (463)
+    object_fns::native_object_create,
+    // Array constructor (464)
+    array_fns::native_array_constructor,
 ];
 
 const _: () = assert!(

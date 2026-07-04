@@ -337,6 +337,14 @@ impl Interpreter {
                         _ => {}
                     }
                 }
+                if *idx == c::ARRAY_CONSTRUCTOR {
+                    match key_str {
+                        "isArray" => return Ok(Value::NativeFunction(c::ARRAY_IS_ARRAY)),
+                        "from" => return Ok(Value::NativeFunction(c::ARRAY_FROM)),
+                        "of" => return Ok(Value::NativeFunction(c::ARRAY_OF)),
+                        _ => {}
+                    }
+                }
                 if *idx == c::URL_CONSTRUCTOR {
                     match key_str {
                         "canParse" => return Ok(Value::NativeFunction(c::URL_CAN_PARSE)),

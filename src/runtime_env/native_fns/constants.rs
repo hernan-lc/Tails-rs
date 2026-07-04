@@ -477,6 +477,8 @@ pub const DNS_LOOKUP: usize = 459;
 pub const DNS_RESOLVE4: usize = 460;
 pub const DNS_RESOLVE6: usize = 461;
 pub const DNS_RESOLVE_MX: usize = 462;
+// Array constructor (464)
+pub const ARRAY_CONSTRUCTOR: usize = 464;
 
 #[cfg(test)]
 mod tests {
@@ -494,4 +496,4 @@ mod tests {
     }
 }
 
-pub const NATIVE_TABLE_LEN: usize = 464;
+pub const NATIVE_TABLE_LEN: usize = 465;
