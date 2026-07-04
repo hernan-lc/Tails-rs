@@ -233,6 +233,19 @@ pub(super) fn native_string_repeat(
     Ok(Value::String(result))
 }
 
+fn pad_string(s: &str, target_len: usize, pad_char: char, pad_start: bool) -> String {
+    if s.len() >= target_len {
+        return s.to_string();
+    }
+    let pad_count = target_len - s.len();
+    let padding: String = std::iter::repeat_n(pad_char, pad_count).collect();
+    if pad_start {
+        format!("{}{}", padding, s)
+    } else {
+        format!("{}{}", s, padding)
+    }
+}
+
 pub(super) fn native_string_pad_start(
     _interp: &mut Interpreter,
     this: &Value,
@@ -244,12 +257,7 @@ pub(super) fn native_string_pad_start(
         Some(Value::String(ss)) => ss.chars().next().unwrap_or(' '),
         _ => ' ',
     };
-    if s.len() >= target_len {
-        return Ok(Value::String(s));
-    }
-    let pad_count = target_len - s.len();
-    let padding: String = std::iter::repeat_n(pad_char, pad_count).collect();
-    Ok(Value::String(format!("{}{}", padding, s)))
+    Ok(Value::String(pad_string(&s, target_len, pad_char, true)))
 }
 
 pub(super) fn native_string_pad_end(
@@ -263,12 +271,7 @@ pub(super) fn native_string_pad_end(
         Some(Value::String(ss)) => ss.chars().next().unwrap_or(' '),
         _ => ' ',
     };
-    if s.len() >= target_len {
-        return Ok(Value::String(s));
-    }
-    let pad_count = target_len - s.len();
-    let padding: String = std::iter::repeat_n(pad_char, pad_count).collect();
-    Ok(Value::String(format!("{}{}", s, padding)))
+    Ok(Value::String(pad_string(&s, target_len, pad_char, false)))
 }
 
 pub(super) fn native_string_match_all(

@@ -336,83 +336,36 @@ fn colorize_value(interp: &Interpreter, v: &Value) -> String {
     pretty_format(interp, v, 0, use_colors, false)
 }
 
-pub(super) fn native_console_log(
-    interp: &mut Interpreter,
-    _this: &Value,
-    args: &[Value],
-) -> Result<Value> {
-    let indent = get_indent();
-    let timestamp = get_timestamp();
-    let parts: Vec<String> = args
-        .iter()
-        .map(|a| format_value_no_colors(interp, a))
-        .collect();
-    println!("{}{}{}", timestamp, indent, parts.join(" "));
-    Ok(Value::Undefined)
+macro_rules! console_output_fn {
+    ($name:ident, $stream:ident, $color:expr) => {
+        pub(super) fn $name(
+            interp: &mut Interpreter,
+            _this: &Value,
+            args: &[Value],
+        ) -> Result<Value> {
+            let indent = get_indent();
+            let timestamp = get_timestamp();
+            let use_colors = get_use_colors();
+            let parts: Vec<String> = args
+                .iter()
+                .map(|a| format_value_no_colors(interp, a))
+                .collect();
+            let msg = parts.join(" ");
+            if use_colors {
+                let colored = $color(&msg);
+                $stream!("{}{}{}", timestamp, indent, colored);
+            } else {
+                $stream!("{}{}{}", timestamp, indent, msg);
+            }
+            Ok(Value::Undefined)
+        }
+    };
 }
 
-pub(super) fn native_console_warn(
-    interp: &mut Interpreter,
-    _this: &Value,
-    args: &[Value],
-) -> Result<Value> {
-    let indent = get_indent();
-    let timestamp = get_timestamp();
-    let use_colors = get_use_colors();
-    let parts: Vec<String> = args
-        .iter()
-        .map(|a| format_value_no_colors(interp, a))
-        .collect();
-    let msg = parts.join(" ");
-    if use_colors {
-        eprintln!("{}{}{}", timestamp, indent, msg.yellow());
-    } else {
-        eprintln!("{}{}{}", timestamp, indent, msg);
-    }
-    Ok(Value::Undefined)
-}
-
-pub(super) fn native_console_error(
-    interp: &mut Interpreter,
-    _this: &Value,
-    args: &[Value],
-) -> Result<Value> {
-    let indent = get_indent();
-    let timestamp = get_timestamp();
-    let use_colors = get_use_colors();
-    let parts: Vec<String> = args
-        .iter()
-        .map(|a| format_value_no_colors(interp, a))
-        .collect();
-    let msg = parts.join(" ");
-    if use_colors {
-        eprintln!("{}{}{}", timestamp, indent, msg.red());
-    } else {
-        eprintln!("{}{}{}", timestamp, indent, msg);
-    }
-    Ok(Value::Undefined)
-}
-
-pub(super) fn native_console_info(
-    interp: &mut Interpreter,
-    _this: &Value,
-    args: &[Value],
-) -> Result<Value> {
-    let indent = get_indent();
-    let timestamp = get_timestamp();
-    let use_colors = get_use_colors();
-    let parts: Vec<String> = args
-        .iter()
-        .map(|a| format_value_no_colors(interp, a))
-        .collect();
-    let msg = parts.join(" ");
-    if use_colors {
-        println!("{}{}{}", timestamp, indent, msg.blue());
-    } else {
-        println!("{}{}{}", timestamp, indent, msg);
-    }
-    Ok(Value::Undefined)
-}
+console_output_fn!(native_console_log, println, |_msg: &str| String::new());
+console_output_fn!(native_console_warn, eprintln, |msg: &str| msg.yellow().to_string());
+console_output_fn!(native_console_error, eprintln, |msg: &str| msg.red().to_string());
+console_output_fn!(native_console_info, println, |msg: &str| msg.blue().to_string());
 
 pub(super) fn native_console_table(
     interp: &mut Interpreter,
