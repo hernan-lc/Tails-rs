@@ -590,6 +590,32 @@ impl<'a> Parser<'a> {
         }
     }
 
+    pub(crate) fn expect_identifier(&mut self, context: &str) -> Result<String> {
+        let st = self.advance();
+        match st.token {
+            Token::Identifier(name) => Ok(name),
+            t => Err(Error::ParseError(format!(
+                "Expected {}, got {:?}",
+                context, t
+            ))),
+        }
+    }
+
+    pub(crate) fn optional_return_type(&mut self) -> Result<Option<TypeAnnotation>> {
+        if self.peek().token == Token::Colon {
+            self.advance();
+            Ok(Some(self.parse_type_annotation()?))
+        } else {
+            Ok(None)
+        }
+    }
+
+    pub(crate) fn consume_optional_semicolon(&mut self) {
+        if self.peek().token == Token::Semicolon {
+            self.advance();
+        }
+    }
+
     pub(crate) fn is_function_type_after_paren(&self) -> bool {
         let mut depth = 1;
         let mut pos = self.pos;
