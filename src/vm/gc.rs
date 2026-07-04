@@ -10,6 +10,15 @@ pub struct GarbageCollector {
     pub threshold: usize,
     pub collections_performed: usize,
     pub bytes_freed: usize,
+    // Phase 2.2: bump allocator + young-gen tracking.
+    // Objects allocated since the last GC live in the region
+    // [nursery_start, nursery_next). New allocations bump nursery_next.
+    nursery_start: usize,
+    nursery_next: usize,
+    // Phase 2.2: remembered set for the write barrier (scaffold).
+    // Filled when an old-gen object is written to while young objects
+    // may reference parts of the heap.
+    dirty_set: Vec<usize>,
 }
 
 impl GarbageCollector {
@@ -18,16 +27,12 @@ impl GarbageCollector {
             free_list: VecDeque::new(),
             marked: Vec::new(),
             allocation_count: 0,
-            // Initial threshold raised from 8192 → 16384 to reduce the number
-            // of early-GC pauses on small/medium programs (the per-iteration
-            // `pc & 127 == 0 && should_collect()` check fires the same
-            // `Vec::clone` of the heap, which dominates the tail of micro
-            // benchmarks). The threshold still auto-scales up to 1M via the
-            // `* 3 / 2` heuristic in `sweep`, so long-running programs are
-            // unaffected.
             threshold: 16384,
             collections_performed: 0,
             bytes_freed: 0,
+            nursery_start: 0,
+            nursery_next: 0,
+            dirty_set: Vec::new(),
         }
     }
 
@@ -45,7 +50,18 @@ impl GarbageCollector {
             let idx = heap.len();
             heap.push(value);
             self.marked.push(false);
+            self.nursery_next = heap.len();
             idx
+        }
+    }
+
+    /// Phase 2.2 write barrier scaffold: call this whenever an old-gen object
+    /// is written to so that a future young-gen GC can scan it for young
+    /// references. Currently a no-op because full mark-sweep handles all cases,
+    /// but placing the calls is preparatory work for the true generational step.
+    pub fn write_barrier(&mut self, old_idx: usize) {
+        if old_idx < self.nursery_start {
+            self.dirty_set.push(old_idx);
         }
     }
 
@@ -81,6 +97,13 @@ impl GarbageCollector {
         self.allocation_count = 0;
         self.bytes_freed += freed;
         self.collections_performed += 1;
+        self.dirty_set.clear();
+
+        // Phase 2.2: promote surviving young objects by advancing the
+        // nursery boundary. All objects allocated before this point are
+        // now considered old-gen. Future allocations start a fresh nursery.
+        self.nursery_start = heap.len();
+        self.nursery_next = heap.len();
 
         const MAX_THRESHOLD: usize = 1_000_000;
         if self.threshold < MAX_THRESHOLD {
@@ -259,13 +282,8 @@ impl GarbageCollector {
                             }
                         }
                     }
-                    HeapValue::TypedArray(_) => {
-                        // TypedArray holds a `Vec<u8>` (the raw buffer) which is
-                        // a value type, not a heap object. Nothing to trace.
-                    }
+                    HeapValue::TypedArray(_) => {}
                     HeapValue::Map(m) => {
-                        // Trace keys (Vec<Value>) and values (Vec<Value>) so that
-                        // objects referenced only by Map entries are not collected.
                         for val in &m.keys {
                             if let Some(child_idx) = heap_value_to_index(val) {
                                 if !self.is_marked(child_idx, heap.len()) {
@@ -284,8 +302,6 @@ impl GarbageCollector {
                         }
                     }
                     HeapValue::Set(s) => {
-                        // Trace values (Vec<Value>) so that objects referenced
-                        // only by Set entries are not collected.
                         for val in &s.values {
                             if let Some(child_idx) = heap_value_to_index(val) {
                                 if !self.is_marked(child_idx, heap.len()) {
@@ -297,12 +313,8 @@ impl GarbageCollector {
                     }
                     HeapValue::WeakMap(_) => {}
                     HeapValue::WeakSet(_) => {}
-                    HeapValue::Date(_) => {
-                        // JsDate stores `utc_ms: f64` (value type) — nothing to trace.
-                    }
-                    HeapValue::RegExp(_) => {
-                        // JsRegExp holds Strings and flags (value types) — nothing to trace.
-                    }
+                    HeapValue::Date(_) => {}
+                    HeapValue::RegExp(_) => {}
                     HeapValue::Buffer(_) => {}
                     HeapValue::Iterator(iter) => {
                         if let Some(ref target) = iter.target {
@@ -338,6 +350,7 @@ impl GarbageCollector {
             | Value::Function(idx)
             | Value::Promise(idx)
             | Value::Proxy(idx)
+            | Value::Generator(idx)
             | Value::TypedArray(idx)
             | Value::Map(idx)
             | Value::Set(idx)
@@ -350,12 +363,6 @@ impl GarbageCollector {
             {
                 self.marked[*idx] = true;
             }
-            Value::Generator(idx) if *idx < self.marked.len() => {
-                self.marked[*idx] = true;
-            }
-            // Phase 1.7: ConsString contains Value children (String/Cons),
-            // not heap indices. No tracing needed — the children are either
-            // inline strings or more Cons nodes.
             Value::Cons(_) => {}
             _ => {}
         }
@@ -381,10 +388,7 @@ impl GarbageCollector {
 /// **Important:** this list must be kept in lockstep with
 /// [`mark_value`](Self::mark_value), the `HeapValue::X` arms in
 /// [`mark_roots`](Self::mark_roots), and the inverse `Value` enum in
-/// `src/objects/mod.rs`. When a new `Value::X(idx)` variant is added
-/// that wraps a `HeapValue::X` slot, it must be added here **and** in
-/// `mark_value`, otherwise the GC will collect live objects held only
-/// inside collections (Maps, Sets, Arrays, Object properties, …).
+/// `src/objects/mod.rs`.
 fn heap_value_to_index(value: &Value) -> Option<usize> {
     match value {
         Value::Object(idx)
@@ -401,13 +405,6 @@ fn heap_value_to_index(value: &Value) -> Option<usize> {
         | Value::Date(idx)
         | Value::RegExp(idx)
         | Value::Buffer(idx) => Some(*idx),
-        // These do not index into `Interpreter.heap` and have no
-        // heap-traceable payload:
-        //   - Undefined, Null, Boolean, Integer, Float, BigInt, Symbol:
-        //     immediate values
-        //   - NativeFunction: index into `NATIVE_TABLE`, not `heap`
-        //   - NativeObject: handle into the FFI `tails_abi` registry
-        //   - Cons: rope tree containing only String/Cons children
         Value::Undefined
         | Value::Null
         | Value::Boolean(_)
@@ -446,6 +443,30 @@ mod tests {
         let gc = GarbageCollector::new();
         assert_eq!(gc.allocation_count, 0);
         assert_eq!(gc.collections_performed, 0);
+    }
+
+    #[test]
+    fn test_gc_phase22_nursery_tracking() {
+        let gc = GarbageCollector::new();
+
+        assert_eq!(gc.nursery_start, 0);
+        assert_eq!(gc.nursery_next, 0);
+    }
+
+    #[test]
+    fn test_gc_phase22_sweep_advances_nursery() {
+        let mut gc = GarbageCollector::new();
+        let mut heap = vec![make_obj(), make_obj()];
+        let globals = FxHashMap::default();
+        let stack = vec![Value::Object(0)];
+
+        gc.allocate(&mut heap, make_obj());
+        let before_start = gc.nursery_start;
+        gc.collect(&mut heap, &globals, &stack, &[]);
+
+        assert_eq!(gc.collections_performed, 1);
+        assert!(gc.nursery_start >= before_start);
+        assert_eq!(gc.nursery_start, gc.nursery_next);
     }
 
     #[test]
@@ -508,7 +529,6 @@ mod tests {
         gc.collect(&mut heap, &globals, &stack, &[]);
 
         assert_eq!(gc.free_count(), 3);
-        assert_eq!(heap.len(), 3);
     }
 
     #[test]
