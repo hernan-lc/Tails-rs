@@ -75,9 +75,24 @@ pub(super) fn native_regexp_test(
         None => return Ok(Value::Boolean(false)),
     };
 
-    with_regexp!(interp, this, |regexp: &JsRegExp| {
-        Ok(Value::Boolean(regexp.test(input)))
-    })
+    // Phase 3.4: Use cached test for non-global, non-sticky regexps to avoid
+    // re-running the regex engine on repeated calls with the same input.
+    let idx = match get_regexp_idx(this) {
+        Some(idx) => idx,
+        None => return Err(Error::TypeError("Not a RegExp".into())),
+    };
+
+    let result = if let HeapValue::RegExp(ref mut regexp) = interp.heap[idx] {
+        if !regexp.global && !regexp.sticky {
+            regexp.test_cached(input)
+        } else {
+            regexp.test(input)
+        }
+    } else {
+        return Err(Error::TypeError("Not a RegExp".into()));
+    };
+
+    Ok(Value::Boolean(result))
 }
 
 pub(super) fn native_regexp_exec(

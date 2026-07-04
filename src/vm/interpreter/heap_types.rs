@@ -137,6 +137,12 @@ pub struct JsRegExp {
     pub sticky: bool,
     pub last_index: f64,
     pub(crate) compiled: Option<JsCompiledRegex>,
+    /// Phase 3.4 — Lazy result cache for repeated matches on the same input.
+    /// When `last_input` matches the cached string, reuse the cached `last_match_start`
+    /// and `last_match_end` to skip regex matching entirely for `test()` calls.
+    pub(crate) last_input: Option<String>,
+    pub(crate) last_match_start: Option<usize>,
+    pub(crate) last_match_end: Option<usize>,
 }
 
 #[derive(Debug, Clone)]
@@ -205,6 +211,9 @@ impl JsRegExp {
             sticky,
             last_index: 0.0,
             compiled: Some(compiled),
+            last_input: None,
+            last_match_start: None,
+            last_match_end: None,
         })
     }
 
@@ -339,5 +348,62 @@ impl JsRegExp {
             && !self.source.contains("}")
             && self.source.find("\\").is_none()
             && !self.source.contains("|")
+    }
+
+    /// Phase 3.4 — Lazy result cache hit for repeated `test()` calls on the
+    /// same input string. If the input matches the cached string, reuse the
+    /// cached match result instead of running the regex engine again.
+    pub fn test_cached(&mut self, input: &str) -> bool {
+        // Check if we have a cache hit
+        if let Some(ref cached_input) = self.last_input {
+            if cached_input.as_str() == input {
+                if let (Some(start), Some(end)) = (self.last_match_start, self.last_match_end) {
+                    // Cache hit: return whether a match was found
+                    return end > start || (end == start && start == 0 && !input.is_empty());
+                }
+            }
+        }
+        
+        // Cache miss: run the actual test
+        let result = self.test(input);
+        
+        // Update cache
+        if !self.global && !self.sticky {
+            // Only cache for non-global, non-sticky regexps (test() semantics)
+            self.last_input = Some(input.to_string());
+            if result {
+                // Find match positions for caching
+                if let Some(ref compiled) = self.compiled {
+                    let (match_start, match_end) = match compiled {
+                        JsCompiledRegex::Simple(re) => {
+                            re.find(input)
+                                .map(|m| (m.start(), m.end()))
+                                .unwrap_or((0, 0))
+                        }
+                        JsCompiledRegex::Advanced(re) => {
+                            re.find(input)
+                                .ok()
+                                .flatten()
+                                .map(|m| (m.start(), m.end()))
+                                .unwrap_or((0, 0))
+                        }
+                    };
+                    // Cache the match positions if we found a match
+                    // (match_end > match_start) or if it's a zero-length match at position 0
+                    if match_end > match_start || (match_start == 0 && result) {
+                        self.last_match_start = Some(match_start);
+                        self.last_match_end = Some(match_end);
+                    } else {
+                        self.last_match_start = None;
+                        self.last_match_end = None;
+                    }
+                }
+            } else {
+                self.last_match_start = None;
+                self.last_match_end = None;
+            }
+        }
+        
+        result
     }
 }

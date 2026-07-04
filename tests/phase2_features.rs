@@ -284,6 +284,69 @@ fn test_regexp_constructor_from_regexp() {
     assert_eq!(r, Value::String("abc".to_string()));
 }
 
+// ---- Phase 3.4 — RegExp Lazy Result Cache ----
+
+#[test]
+fn test_regexp_lazy_cache_basic() {
+    let mut rt = TailsRuntime::default();
+    // Create a non-global regexp and test it multiple times on the same input
+    let r = rt
+        .eval(r#"
+        let re = new RegExp("hello");
+        let result1 = re.test("hello world");
+        let result2 = re.test("hello world");
+        let result3 = re.test("goodbye");
+        result1 && result2 && !result3;
+    "#)
+        .unwrap();
+    assert_eq!(r, Value::Boolean(true));
+}
+
+#[test]
+fn test_regexp_lazy_cache_false_positive() {
+    let mut rt = TailsRuntime::default();
+    // Ensure cache correctly handles false results
+    let r = rt
+        .eval(r#"
+        let re = new RegExp("xyz");
+        let result1 = re.test("hello world");
+        let result2 = re.test("hello world");
+        !result1 && !result2;
+    "#)
+        .unwrap();
+    assert_eq!(r, Value::Boolean(true));
+}
+
+#[test]
+fn test_regexp_no_cache_for_global() {
+    let mut rt = TailsRuntime::default();
+    // Global regexp should not use cache (has stateful lastIndex)
+    let r = rt
+        .eval(r#"
+        let re = new RegExp("a", "g");
+        let result1 = re.test("aaa");
+        let result2 = re.test("aaa");
+        result1 && result2;
+    "#)
+        .unwrap();
+    assert_eq!(r, Value::Boolean(true));
+}
+
+#[test]
+fn test_regexp_no_cache_for_sticky() {
+    let mut rt = TailsRuntime::default();
+    // Sticky regexp should not use cache (has stateful lastIndex)
+    let r = rt
+        .eval(r#"
+        let re = new RegExp("a", "y");
+        let result1 = re.test("aaa");
+        let result2 = re.test("aaa");
+        result1 && result2;
+    "#)
+        .unwrap();
+    assert_eq!(r, Value::Boolean(true));
+}
+
 // ---- Iterator Helpers ----
 #[test]
 fn test_symbol_iterator_on_array() {
