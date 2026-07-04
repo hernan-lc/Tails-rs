@@ -12,6 +12,15 @@ fn key_to_str(key: &Value) -> Option<String> {
     }
 }
 
+fn check_call_apply_bind(key_str: &str) -> Option<Value> {
+    match key_str {
+        "call" => Some(Value::NativeFunction(c::FUNCTION_CALL)),
+        "apply" => Some(Value::NativeFunction(c::FUNCTION_APPLY)),
+        "bind" => Some(Value::NativeFunction(c::FUNCTION_BIND)),
+        _ => None,
+    }
+}
+
 impl Interpreter {
     pub fn new_object(&mut self) -> Value {
         let idx = self.heap.len();
@@ -212,11 +221,8 @@ impl Interpreter {
                     Some(s) => s,
                     None => return Ok(Value::Undefined),
                 };
-                match key_str.as_str() {
-                    "call" => return Ok(Value::NativeFunction(c::FUNCTION_CALL)),
-                    "apply" => return Ok(Value::NativeFunction(c::FUNCTION_APPLY)),
-                    "bind" => return Ok(Value::NativeFunction(c::FUNCTION_BIND)),
-                    _ => {}
+                if let Some(val) = check_call_apply_bind(&key_str) {
+                    return Ok(val);
                 }
                 if key_str == "prototype" {
                     if let HeapValue::Function(f) = &self.heap[*func_idx] {
@@ -267,11 +273,8 @@ impl Interpreter {
                     Some(s) => s,
                     None => return Ok(Value::Undefined),
                 };
-                match key_str.as_str() {
-                    "call" => return Ok(Value::NativeFunction(c::FUNCTION_CALL)),
-                    "apply" => return Ok(Value::NativeFunction(c::FUNCTION_APPLY)),
-                    "bind" => return Ok(Value::NativeFunction(c::FUNCTION_BIND)),
-                    _ => {}
+                if let Some(val) = check_call_apply_bind(&key_str) {
+                    return Ok(val);
                 }
                 if *idx == c::PROMISE_CONSTRUCTOR {
                     match key_str.as_str() {
