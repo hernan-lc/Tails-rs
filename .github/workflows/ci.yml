@@ -19,25 +19,6 @@ env:
   CARGO_TERM_COLOR: always
   RUST_BACKTRACE: short
 
-# Shared cargo-cache config — kept in one place so each job just
-# references it. Workspaces map each member crate to the same target
-# dir, which is how Cargo handles shared compilation artifacts.
-.x-cargo-cache: &cargo-cache
-  uses: Swatinem/rust-cache@v2
-  with:
-    workspaces: |
-      . -> target
-      modules/abi -> target
-      modules/native-macros -> target
-      modules/tails-validator -> target
-      modules/fs -> target
-      modules/path -> target
-      modules/process -> target
-      modules/os -> target
-      modules/websocket -> target
-      modules/http -> target
-      modules/net -> target
-
 jobs:
   # ──────────────────────────────────────────────────────────────────────
   # Build: cheapest fast-fail check. Catches compile errors across the
@@ -62,7 +43,20 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
 
       - name: Cache cargo registry & target
-        uses: *cargo-cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            . -> target
+            modules/abi -> target
+            modules/native-macros -> target
+            modules/tails-validator -> target
+            modules/fs -> target
+            modules/path -> target
+            modules/process -> target
+            modules/os -> target
+            modules/websocket -> target
+            modules/http -> target
+            modules/net -> target
 
       - name: Build workspace
         run: cargo build --locked --all-features --workspace
@@ -93,7 +87,20 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
 
       - name: Cache cargo registry & target
-        uses: *cargo-cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            . -> target
+            modules/abi -> target
+            modules/native-macros -> target
+            modules/tails-validator -> target
+            modules/fs -> target
+            modules/path -> target
+            modules/process -> target
+            modules/os -> target
+            modules/websocket -> target
+            modules/http -> target
+            modules/net -> target
 
       - name: Build test binaries
         # Building first gives a faster, more readable failure if anything
@@ -124,7 +131,20 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
 
       - name: Cache cargo registry & target
-        uses: *cargo-cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            . -> target
+            modules/abi -> target
+            modules/native-macros -> target
+            modules/tails-validator -> target
+            modules/fs -> target
+            modules/path -> target
+            modules/process -> target
+            modules/os -> target
+            modules/websocket -> target
+            modules/http -> target
+            modules/net -> target
 
       - name: Run tests
         run: cargo test --locked --no-default-features -- --test-threads=1
@@ -152,7 +172,20 @@ jobs:
           components: clippy
 
       - name: Cache cargo registry & target
-        uses: *cargo-cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            . -> target
+            modules/abi -> target
+            modules/native-macros -> target
+            modules/tails-validator -> target
+            modules/fs -> target
+            modules/path -> target
+            modules/process -> target
+            modules/os -> target
+            modules/websocket -> target
+            modules/http -> target
+            modules/net -> target
 
       - name: Clippy
         run: cargo clippy --locked --all-features --workspace --all-targets
