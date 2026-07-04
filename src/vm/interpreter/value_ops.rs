@@ -394,6 +394,21 @@ impl Interpreter {
         }
     }
 
+    fn format_function(&self, idx: &usize) -> String {
+        if let crate::vm::interpreter::HeapValue::Function(f) = &self.heap[*idx] {
+            let name = f.name.as_deref().unwrap_or("");
+            if f.prototype.is_some() && f.super_class.is_some() {
+                format!("[class {}]", name)
+            } else if !name.is_empty() {
+                format!("[Function: {}]", name)
+            } else {
+                "[Function]".to_string()
+            }
+        } else {
+            "[Function]".to_string()
+        }
+    }
+
     pub(super) fn value_to_string_raw(&self, value: &Value) -> String {
         match value {
             Value::Undefined => "undefined".to_string(),
@@ -411,20 +426,7 @@ impl Interpreter {
             Value::Cons(c) => c.flatten(),
             Value::BigInt(n) => format!("{}n", n),
             Value::Symbol(id) => format!("Symbol({})", id),
-            Value::Function(idx) => {
-                if let crate::vm::interpreter::HeapValue::Function(f) = &self.heap[*idx] {
-                    let name = f.name.as_deref().unwrap_or("");
-                    if f.prototype.is_some() && f.super_class.is_some() {
-                        format!("[class {}]", name)
-                    } else if !name.is_empty() {
-                        format!("[Function: {}]", name)
-                    } else {
-                        "[Function]".to_string()
-                    }
-                } else {
-                    "[Function]".to_string()
-                }
-            }
+            Value::Function(idx) => self.format_function(idx),
             Value::NativeFunction(_) => "[NativeFunction]".to_string(),
             Value::Object(_) => "[Object]".to_string(),
             Value::Array(_) => "[Array]".to_string(),
@@ -454,20 +456,7 @@ impl Interpreter {
             Value::Cons(c) => format!("\"{}\"", c.flatten()),
             Value::BigInt(n) => format!("{}n", n),
             Value::Symbol(id) => format!("Symbol({})", id),
-            Value::Function(idx) => {
-                if let crate::vm::interpreter::HeapValue::Function(f) = &self.heap[*idx] {
-                    let name = f.name.as_deref().unwrap_or("");
-                    if f.prototype.is_some() && f.super_class.is_some() {
-                        format!("[class {}]", name)
-                    } else if !name.is_empty() {
-                        format!("[Function: {}]", name)
-                    } else {
-                        "[Function]".to_string()
-                    }
-                } else {
-                    "[Function]".to_string()
-                }
-            }
+            Value::Function(idx) => self.format_function(idx),
             Value::NativeFunction(_) => "[NativeFunction]".to_string(),
             Value::Object(_) => "[Object]".to_string(),
             Value::Array(_) => "[Array]".to_string(),
