@@ -2,6 +2,26 @@ use super::Interpreter;
 use crate::errors::{Error, Result};
 use crate::objects::{ConsString, Value};
 
+macro_rules! compare_values {
+    ($name:ident, $op:tt) => {
+        pub(super) fn $name(&self, left: &Value, right: &Value) -> Result<bool> {
+            match (left, right) {
+                (Value::Integer(a), Value::Integer(b)) => Ok(a $op b),
+                (Value::String(a), Value::String(b)) => Ok(a $op b),
+                (Value::String(a), Value::Cons(c)) => Ok(a.as_str() $op c.flatten().as_str()),
+                (Value::Cons(c), Value::String(b)) => Ok(c.flatten().as_str() $op b.as_str()),
+                (Value::Cons(a), Value::Cons(b)) => Ok(a.flatten() $op b.flatten()),
+                (Value::BigInt(a), Value::BigInt(b)) => Ok(a $op b),
+                _ => {
+                    let l = self.to_number(left)?;
+                    let r = self.to_number(right)?;
+                    Ok(l $op r)
+                }
+            }
+        }
+    };
+}
+
 impl Interpreter {
     pub(super) fn add(&self, left: Value, right: Value) -> Result<Value> {
         match (&left, &right) {
@@ -343,69 +363,10 @@ impl Interpreter {
         }
     }
 
-    pub(super) fn less_than(&self, left: &Value, right: &Value) -> Result<bool> {
-        match (left, right) {
-            (Value::Integer(a), Value::Integer(b)) => Ok(a < b),
-            (Value::String(a), Value::String(b)) => Ok(a < b),
-            (Value::String(a), Value::Cons(c)) => Ok(a.as_str() < c.flatten().as_str()),
-            (Value::Cons(c), Value::String(b)) => Ok(c.flatten().as_str() < b.as_str()),
-            (Value::Cons(a), Value::Cons(b)) => Ok(a.flatten() < b.flatten()),
-            (Value::BigInt(a), Value::BigInt(b)) => Ok(a < b),
-            _ => {
-                let l = self.to_number(left)?;
-                let r = self.to_number(right)?;
-                Ok(l < r)
-            }
-        }
-    }
-
-    pub(super) fn greater_than(&self, left: &Value, right: &Value) -> Result<bool> {
-        match (left, right) {
-            (Value::Integer(a), Value::Integer(b)) => Ok(a > b),
-            (Value::String(a), Value::String(b)) => Ok(a > b),
-            (Value::String(a), Value::Cons(c)) => Ok(a.as_str() > c.flatten().as_str()),
-            (Value::Cons(c), Value::String(b)) => Ok(c.flatten().as_str() > b.as_str()),
-            (Value::Cons(a), Value::Cons(b)) => Ok(a.flatten() > b.flatten()),
-            (Value::BigInt(a), Value::BigInt(b)) => Ok(a > b),
-            _ => {
-                let l = self.to_number(left)?;
-                let r = self.to_number(right)?;
-                Ok(l > r)
-            }
-        }
-    }
-
-    pub(super) fn less_than_or_equal(&self, left: &Value, right: &Value) -> Result<bool> {
-        match (left, right) {
-            (Value::Integer(a), Value::Integer(b)) => Ok(a <= b),
-            (Value::String(a), Value::String(b)) => Ok(a <= b),
-            (Value::String(a), Value::Cons(c)) => Ok(a.as_str() <= c.flatten().as_str()),
-            (Value::Cons(c), Value::String(b)) => Ok(c.flatten().as_str() <= b.as_str()),
-            (Value::Cons(a), Value::Cons(b)) => Ok(a.flatten() <= b.flatten()),
-            (Value::BigInt(a), Value::BigInt(b)) => Ok(a <= b),
-            _ => {
-                let l = self.to_number(left)?;
-                let r = self.to_number(right)?;
-                Ok(l <= r)
-            }
-        }
-    }
-
-    pub(super) fn greater_than_or_equal(&self, left: &Value, right: &Value) -> Result<bool> {
-        match (left, right) {
-            (Value::Integer(a), Value::Integer(b)) => Ok(a >= b),
-            (Value::String(a), Value::String(b)) => Ok(a >= b),
-            (Value::String(a), Value::Cons(c)) => Ok(a.as_str() >= c.flatten().as_str()),
-            (Value::Cons(c), Value::String(b)) => Ok(c.flatten().as_str() >= b.as_str()),
-            (Value::Cons(a), Value::Cons(b)) => Ok(a.flatten() >= b.flatten()),
-            (Value::BigInt(a), Value::BigInt(b)) => Ok(a >= b),
-            _ => {
-                let l = self.to_number(left)?;
-                let r = self.to_number(right)?;
-                Ok(l >= r)
-            }
-        }
-    }
+    compare_values!(less_than, <);
+    compare_values!(greater_than, >);
+    compare_values!(less_than_or_equal, <=);
+    compare_values!(greater_than_or_equal, >=);
 
     pub(super) fn to_number(&self, value: &Value) -> Result<f64> {
         match value {
