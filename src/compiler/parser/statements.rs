@@ -2,6 +2,33 @@ use super::*;
 use crate::errors::{Error, Result};
 
 impl<'a> Parser<'a> {
+    fn parse_for_in_of(
+        &mut self,
+        left: ForInLeft,
+        is_for_await: bool,
+    ) -> Result<Option<SpannedNode<Statement>>> {
+        if self.peek().token == Token::In {
+            self.advance();
+            let right = self.parse_expression()?.inner;
+            self.expect(&Token::RightParen)?;
+            let body = Box::new(self.parse_statement()?);
+            return Ok(Some(self.spanned(Statement::ForInStatement { left, right, body })));
+        }
+        if self.peek().token == Token::Of {
+            self.advance();
+            let right = self.parse_expression()?.inner;
+            self.expect(&Token::RightParen)?;
+            let body = Box::new(self.parse_statement()?);
+            return Ok(Some(self.spanned(Statement::ForOfStatement {
+                left,
+                right,
+                body,
+                is_async: is_for_await,
+            })));
+        }
+        Ok(None)
+    }
+
     pub(crate) fn parse_variable_declaration(&mut self) -> Result<SpannedNode<Statement>> {
         let kind = match self.advance().token {
             Token::Var => VarKind::Var,
@@ -371,28 +398,8 @@ impl<'a> Parser<'a> {
                 self.advance();
                 self.parse_type_annotation()?;
             }
-            if self.peek().token == Token::In {
-                self.advance();
-                let right = self.parse_expression()?.inner;
-                self.expect(&Token::RightParen)?;
-                let body = Box::new(self.parse_statement()?);
-                return Ok(self.spanned(Statement::ForInStatement {
-                    left: ForInLeft::VariableDeclaration { kind, id },
-                    right,
-                    body,
-                }));
-            }
-            if self.peek().token == Token::Of {
-                self.advance();
-                let right = self.parse_expression()?.inner;
-                self.expect(&Token::RightParen)?;
-                let body = Box::new(self.parse_statement()?);
-                return Ok(self.spanned(Statement::ForOfStatement {
-                    left: ForInLeft::VariableDeclaration { kind, id },
-                    right,
-                    body,
-                    is_async: is_for_await,
-                }));
+            if let Some(stmt) = self.parse_for_in_of(ForInLeft::VariableDeclaration { kind: kind.clone(), id: id.clone() }, is_for_await)? {
+                return Ok(stmt);
             }
             if !matches!(id, BindingPattern::Identifier(_)) {
                 return Err(Error::ParseError("Expected assignment in for-loop".into()));
@@ -437,56 +444,16 @@ impl<'a> Parser<'a> {
 
         if let Token::Identifier(id) = self.peek().token.clone() {
             self.advance();
-            if self.peek().token == Token::In {
-                self.advance();
-                let right = self.parse_expression()?.inner;
-                self.expect(&Token::RightParen)?;
-                let body = Box::new(self.parse_statement()?);
-                return Ok(self.spanned(Statement::ForInStatement {
-                    left: ForInLeft::Identifier(id),
-                    right,
-                    body,
-                }));
-            }
-            if self.peek().token == Token::Of {
-                self.advance();
-                let right = self.parse_expression()?.inner;
-                self.expect(&Token::RightParen)?;
-                let body = Box::new(self.parse_statement()?);
-                return Ok(self.spanned(Statement::ForOfStatement {
-                    left: ForInLeft::Identifier(id),
-                    right,
-                    body,
-                    is_async: is_for_await,
-                }));
+            if let Some(stmt) = self.parse_for_in_of(ForInLeft::Identifier(id), is_for_await)? {
+                return Ok(stmt);
             }
             self.pos -= 1;
         }
 
         if matches!(self.peek().token, Token::LeftBracket | Token::LeftBrace) {
             let pattern = self.parse_binding_pattern()?;
-            if self.peek().token == Token::In {
-                self.advance();
-                let right = self.parse_expression()?.inner;
-                self.expect(&Token::RightParen)?;
-                let body = Box::new(self.parse_statement()?);
-                return Ok(self.spanned(Statement::ForInStatement {
-                    left: ForInLeft::Pattern(pattern),
-                    right,
-                    body,
-                }));
-            }
-            if self.peek().token == Token::Of {
-                self.advance();
-                let right = self.parse_expression()?.inner;
-                self.expect(&Token::RightParen)?;
-                let body = Box::new(self.parse_statement()?);
-                return Ok(self.spanned(Statement::ForOfStatement {
-                    left: ForInLeft::Pattern(pattern),
-                    right,
-                    body,
-                    is_async: is_for_await,
-                }));
+            if let Some(stmt) = self.parse_for_in_of(ForInLeft::Pattern(pattern), is_for_await)? {
+                return Ok(stmt);
             }
             return Err(Error::ParseError(
                 "Expected 'in' or 'of' after destructuring pattern in for-loop".into(),
