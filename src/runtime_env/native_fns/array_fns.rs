@@ -4,6 +4,29 @@ use crate::vm::interpreter::Interpreter;
 
 use super::helpers::{get_array_elements, normalize_index, to_f64, to_string_value};
 
+macro_rules! with_array_mut {
+    ($interp:expr, $this:expr, |$idx:ident, $arr:ident| $body:block) => {{
+        let $idx = match $this {
+            Value::Array(idx) => *idx,
+            _ => return Ok(Value::Undefined),
+        };
+        match &mut $interp.heap[$idx] {
+            crate::vm::interpreter::HeapValue::Array($arr) => $body,
+            _ => Ok(Value::Undefined),
+        }
+    }};
+}
+
+macro_rules! push_array {
+    ($interp:expr, $elements:expr) => {{
+        let heap_idx = $interp.heap.len();
+        $interp.heap.push(crate::vm::interpreter::HeapValue::Array(
+            crate::vm::interpreter::JsArray { elements: $elements },
+        ));
+        Value::Array(heap_idx)
+    }};
+}
+
 pub(super) fn native_array_constructor(
     interp: &mut Interpreter,
     _this: &Value,
@@ -13,22 +36,16 @@ pub(super) fn native_array_constructor(
         0 => Vec::new(),
         1 => {
             if let Value::Float(n) = &args[0] {
-                let len = *n as usize;
-                vec![Value::Undefined; len]
+                vec![Value::Undefined; *n as usize]
             } else if let Value::Integer(n) = &args[0] {
-                let len = *n as usize;
-                vec![Value::Undefined; len]
+                vec![Value::Undefined; *n as usize]
             } else {
                 vec![args[0].clone()]
             }
         }
         _ => args.to_vec(),
     };
-    let heap_idx = interp.heap.len();
-    interp.heap.push(crate::vm::interpreter::HeapValue::Array(
-        crate::vm::interpreter::JsArray { elements },
-    ));
-    Ok(Value::Array(heap_idx))
+    Ok(push_array!(interp, elements))
 }
 
 pub(super) fn native_array_push(
@@ -36,15 +53,12 @@ pub(super) fn native_array_push(
     this: &Value,
     args: &[Value],
 ) -> Result<Value> {
-    if let Value::Array(arr_idx) = this {
-        if let crate::vm::interpreter::HeapValue::Array(arr) = &mut interp.heap[*arr_idx] {
-            for arg in args {
-                arr.elements.push(arg.clone());
-            }
-            return Ok(Value::Float(arr.elements.len() as f64));
+    with_array_mut!(interp, this, |_idx, arr| {
+        for arg in args {
+            arr.elements.push(arg.clone());
         }
-    }
-    Ok(Value::Float(0.0))
+        Ok(Value::Float(arr.elements.len() as f64))
+    })
 }
 
 pub(super) fn native_array_pop(
@@ -52,12 +66,9 @@ pub(super) fn native_array_pop(
     this: &Value,
     _args: &[Value],
 ) -> Result<Value> {
-    if let Value::Array(arr_idx) = this {
-        if let crate::vm::interpreter::HeapValue::Array(arr) = &mut interp.heap[*arr_idx] {
-            return Ok(arr.elements.pop().unwrap_or(Value::Undefined));
-        }
-    }
-    Ok(Value::Undefined)
+    with_array_mut!(interp, this, |_idx, arr| {
+        Ok(arr.elements.pop().unwrap_or(Value::Undefined))
+    })
 }
 
 pub(super) fn native_array_shift(
@@ -65,15 +76,13 @@ pub(super) fn native_array_shift(
     this: &Value,
     _args: &[Value],
 ) -> Result<Value> {
-    if let Value::Array(arr_idx) = this {
-        if let crate::vm::interpreter::HeapValue::Array(arr) = &mut interp.heap[*arr_idx] {
-            if arr.elements.is_empty() {
-                return Ok(Value::Undefined);
-            }
-            return Ok(arr.elements.remove(0));
+    with_array_mut!(interp, this, |_idx, arr| {
+        if arr.elements.is_empty() {
+            Ok(Value::Undefined)
+        } else {
+            Ok(arr.elements.remove(0))
         }
-    }
-    Ok(Value::Undefined)
+    })
 }
 
 pub(super) fn native_array_unshift(
@@ -81,15 +90,12 @@ pub(super) fn native_array_unshift(
     this: &Value,
     args: &[Value],
 ) -> Result<Value> {
-    if let Value::Array(arr_idx) = this {
-        if let crate::vm::interpreter::HeapValue::Array(arr) = &mut interp.heap[*arr_idx] {
-            for (i, arg) in args.iter().enumerate() {
-                arr.elements.insert(i, arg.clone());
-            }
-            return Ok(Value::Float(arr.elements.len() as f64));
+    with_array_mut!(interp, this, |_idx, arr| {
+        for (i, arg) in args.iter().enumerate() {
+            arr.elements.insert(i, arg.clone());
         }
-    }
-    Ok(Value::Float(0.0))
+        Ok(Value::Float(arr.elements.len() as f64))
+    })
 }
 
 pub(super) fn native_array_slice(
@@ -100,29 +106,11 @@ pub(super) fn native_array_slice(
     let elements = get_array_elements(interp, this)?;
     let start_raw = args.first().map(to_f64).unwrap_or(0.0) as i64;
     let end_raw = args.get(1).map(to_f64).unwrap_or(elements.len() as f64) as i64;
-
     let len = elements.len() as i64;
-    let start = if start_raw < 0 {
-        (len + start_raw).max(0)
-    } else {
-        start_raw.min(len)
-    } as usize;
-    let end = if end_raw < 0 {
-        (len + end_raw).max(0)
-    } else {
-        end_raw.min(len)
-    } as usize;
-
-    let sliced = if start < end {
-        elements[start..end].to_vec()
-    } else {
-        Vec::new()
-    };
-    let heap_idx = interp.heap.len();
-    interp.heap.push(crate::vm::interpreter::HeapValue::Array(
-        crate::vm::interpreter::JsArray { elements: sliced },
-    ));
-    Ok(Value::Array(heap_idx))
+    let start = if start_raw < 0 { (len + start_raw).max(0) } else { start_raw.min(len) } as usize;
+    let end = if end_raw < 0 { (len + end_raw).max(0) } else { end_raw.min(len) } as usize;
+    let sliced = if start < end { elements[start..end].to_vec() } else { Vec::new() };
+    Ok(push_array!(interp, sliced))
 }
 
 pub(super) fn native_array_splice(
@@ -130,10 +118,9 @@ pub(super) fn native_array_splice(
     this: &Value,
     args: &[Value],
 ) -> Result<Value> {
+    let start_raw = args.first().map(to_f64).unwrap_or(0.0) as i64;
+    let delete_count_raw = args.get(1).map(to_f64).unwrap_or(0.0) as i64;
     if let Value::Array(arr_idx) = this {
-        let start_raw = args.first().map(to_f64).unwrap_or(0.0) as i64;
-        let delete_count_raw = args.get(1).map(to_f64).unwrap_or(0.0) as i64;
-
         if let crate::vm::interpreter::HeapValue::Array(arr) = &mut interp.heap[*arr_idx] {
             let len = arr.elements.len() as i64;
             let start = if start_raw < 0 {
@@ -142,13 +129,11 @@ pub(super) fn native_array_splice(
                 start_raw.min(len)
             } as usize;
             let delete_count = delete_count_raw.max(0).min(len - start as i64) as usize;
-
             let removed: Vec<Value> = arr.elements.drain(start..start + delete_count).collect();
             let new_items: Vec<Value> = args[2..].to_vec();
             for (i, item) in new_items.into_iter().enumerate() {
                 arr.elements.insert(start + i, item);
             }
-
             let heap_idx = interp.heap.len();
             interp.heap.push(crate::vm::interpreter::HeapValue::Array(
                 crate::vm::interpreter::JsArray { elements: removed },
@@ -156,13 +141,7 @@ pub(super) fn native_array_splice(
             return Ok(Value::Array(heap_idx));
         }
     }
-    let heap_idx = interp.heap.len();
-    interp.heap.push(crate::vm::interpreter::HeapValue::Array(
-        crate::vm::interpreter::JsArray {
-            elements: Vec::new(),
-        },
-    ));
-    Ok(Value::Array(heap_idx))
+    Ok(push_array!(interp, Vec::new()))
 }
 
 pub(super) fn native_array_index_of(
@@ -235,14 +214,9 @@ pub(super) fn native_array_map(
     let mut results = Vec::with_capacity(elements.len());
     for (i, elem) in elements.iter().enumerate() {
         let call_args = vec![elem.clone(), Value::Integer(i as i64), this.clone()];
-        let result = interp.call_value(&callback, &Value::Undefined, &call_args)?;
-        results.push(result);
+        results.push(interp.call_value(&callback, &Value::Undefined, &call_args)?);
     }
-    let heap_idx = interp.heap.len();
-    interp.heap.push(crate::vm::interpreter::HeapValue::Array(
-        crate::vm::interpreter::JsArray { elements: results },
-    ));
-    Ok(Value::Array(heap_idx))
+    Ok(push_array!(interp, results))
 }
 
 pub(super) fn native_array_filter(
@@ -260,11 +234,7 @@ pub(super) fn native_array_filter(
             results.push(elem.clone());
         }
     }
-    let heap_idx = interp.heap.len();
-    interp.heap.push(crate::vm::interpreter::HeapValue::Array(
-        crate::vm::interpreter::JsArray { elements: results },
-    ));
-    Ok(Value::Array(heap_idx))
+    Ok(push_array!(interp, results))
 }
 
 pub(super) fn native_array_reduce(
@@ -370,12 +340,10 @@ pub(super) fn native_array_reverse(
     this: &Value,
     _args: &[Value],
 ) -> Result<Value> {
-    if let Value::Array(arr_idx) = this {
-        if let crate::vm::interpreter::HeapValue::Array(arr) = &mut interp.heap[*arr_idx] {
-            arr.elements.reverse();
-        }
-    }
-    Ok(this.clone())
+    with_array_mut!(interp, this, |_idx, arr| {
+        arr.elements.reverse();
+        Ok(this.clone())
+    })
 }
 
 pub(super) fn native_array_sort(
@@ -419,11 +387,7 @@ pub(super) fn native_array_concat(
             other => result.push(other.clone()),
         }
     }
-    let heap_idx = interp.heap.len();
-    interp.heap.push(crate::vm::interpreter::HeapValue::Array(
-        crate::vm::interpreter::JsArray { elements: result },
-    ));
-    Ok(Value::Array(heap_idx))
+    Ok(push_array!(interp, result))
 }
 
 pub(super) fn native_array_flat(
@@ -449,11 +413,7 @@ pub(super) fn native_array_flat(
     }
     let elements = get_array_elements(interp, this)?;
     let flat = flat_recursive(interp, &elements, depth);
-    let heap_idx = interp.heap.len();
-    interp.heap.push(crate::vm::interpreter::HeapValue::Array(
-        crate::vm::interpreter::JsArray { elements: flat },
-    ));
-    Ok(Value::Array(heap_idx))
+    Ok(push_array!(interp, flat))
 }
 
 pub(super) fn native_array_copy_within(
@@ -461,33 +421,28 @@ pub(super) fn native_array_copy_within(
     this: &Value,
     args: &[Value],
 ) -> Result<Value> {
-    if let Value::Array(arr_idx) = this {
-        if let crate::vm::interpreter::HeapValue::Array(arr) = &mut interp.heap[*arr_idx] {
-            let len = arr.elements.len() as i64;
-            let target = normalize_index(args.first().map(|v| to_f64(v) as i64).unwrap_or(0), len);
-            let start = normalize_index(args.get(1).map(|v| to_f64(v) as i64).unwrap_or(0), len);
-            let end = normalize_index(args.get(2).map(|v| to_f64(v) as i64).unwrap_or(len), len);
-
-            if target < start {
-                for i in start..end {
-                    if i >= 0 && i < len && target + (i - start) >= 0 && target + (i - start) < len
-                    {
-                        let val = arr.elements[i as usize].clone();
-                        arr.elements[(target + (i - start)) as usize] = val;
-                    }
+    with_array_mut!(interp, this, |_idx, arr| {
+        let len = arr.elements.len() as i64;
+        let target = normalize_index(args.first().map(|v| to_f64(v) as i64).unwrap_or(0), len);
+        let start = normalize_index(args.get(1).map(|v| to_f64(v) as i64).unwrap_or(0), len);
+        let end = normalize_index(args.get(2).map(|v| to_f64(v) as i64).unwrap_or(len), len);
+        if target < start {
+            for i in start..end {
+                if i >= 0 && i < len && target + (i - start) >= 0 && target + (i - start) < len {
+                    let val = arr.elements[i as usize].clone();
+                    arr.elements[(target + (i - start)) as usize] = val;
                 }
-            } else {
-                for i in (start..end).rev() {
-                    if i >= 0 && i < len && target + (i - start) >= 0 && target + (i - start) < len
-                    {
-                        let val = arr.elements[i as usize].clone();
-                        arr.elements[(target + (i - start)) as usize] = val;
-                    }
+            }
+        } else {
+            for i in (start..end).rev() {
+                if i >= 0 && i < len && target + (i - start) >= 0 && target + (i - start) < len {
+                    let val = arr.elements[i as usize].clone();
+                    arr.elements[(target + (i - start)) as usize] = val;
                 }
             }
         }
-    }
-    Ok(this.clone())
+        Ok(this.clone())
+    })
 }
 
 pub(super) fn native_array_fill(
@@ -496,19 +451,17 @@ pub(super) fn native_array_fill(
     args: &[Value],
 ) -> Result<Value> {
     let value = args.first().cloned().unwrap_or(Value::Undefined);
-    if let Value::Array(arr_idx) = this {
-        if let crate::vm::interpreter::HeapValue::Array(arr) = &mut interp.heap[*arr_idx] {
-            let len = arr.elements.len() as i64;
-            let start = normalize_index(args.get(1).map(|v| to_f64(v) as i64).unwrap_or(0), len);
-            let end = normalize_index(args.get(2).map(|v| to_f64(v) as i64).unwrap_or(len), len);
-            for i in start..end {
-                if i >= 0 && i < len {
-                    arr.elements[i as usize] = value.clone();
-                }
+    with_array_mut!(interp, this, |_idx, arr| {
+        let len = arr.elements.len() as i64;
+        let start = normalize_index(args.get(1).map(|v| to_f64(v) as i64).unwrap_or(0), len);
+        let end = normalize_index(args.get(2).map(|v| to_f64(v) as i64).unwrap_or(len), len);
+        for i in start..end {
+            if i >= 0 && i < len {
+                arr.elements[i as usize] = value.clone();
             }
         }
-    }
-    Ok(this.clone())
+        Ok(this.clone())
+    })
 }
 
 pub(super) fn native_array_find_last(
@@ -573,11 +526,7 @@ pub(super) fn native_array_flat_map(
         }
         result.push(mapped);
     }
-    let heap_idx = interp.heap.len();
-    interp.heap.push(crate::vm::interpreter::HeapValue::Array(
-        crate::vm::interpreter::JsArray { elements: result },
-    ));
-    Ok(Value::Array(heap_idx))
+    Ok(push_array!(interp, result))
 }
 
 pub(super) fn native_array_last_index_of(
@@ -624,7 +573,6 @@ pub(super) fn native_array_from(
     let source = args.first().cloned().unwrap_or(Value::Undefined);
     let map_fn = args.get(1).cloned();
     let mut elements = Vec::new();
-
     match &source {
         Value::Array(arr_idx) => {
             let source_elements =
@@ -661,16 +609,9 @@ pub(super) fn native_array_from(
                 }
             }
         }
-        _ => {
-            // Other types not supported directly - return empty array
-        }
+        _ => {}
     }
-
-    let heap_idx = interp.heap.len();
-    interp.heap.push(crate::vm::interpreter::HeapValue::Array(
-        crate::vm::interpreter::JsArray { elements },
-    ));
-    Ok(Value::Array(heap_idx))
+    Ok(push_array!(interp, elements))
 }
 
 pub(super) fn native_array_of(
@@ -678,10 +619,5 @@ pub(super) fn native_array_of(
     _this: &Value,
     args: &[Value],
 ) -> Result<Value> {
-    let elements = args.to_vec();
-    let heap_idx = interp.heap.len();
-    interp.heap.push(crate::vm::interpreter::HeapValue::Array(
-        crate::vm::interpreter::JsArray { elements },
-    ));
-    Ok(Value::Array(heap_idx))
+    Ok(push_array!(interp, args.to_vec()))
 }
