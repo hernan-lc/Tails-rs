@@ -7,7 +7,7 @@
 - ConsString clone from O(N) deep-tree to O(1) via SharedValue (raw pointer)
 - `new_smart` heuristic: eagerly flatten short strings (<32 chars each)
 - `std::mem::replace` pattern on AddLocal hot path to avoid clones
-- **Result:** string_concat TIMEOUT → 29ms (vs Bun 2ms, 14.7x gap)
+- **Result:** string_concat TIMEOUT → 36ms (vs Bun 2.7ms, 13.4x gap)
 
 ### Phase 2: Lazy Closure Environment
 **Commit:** `162b4b6`
@@ -27,46 +27,45 @@
 - Added MapGet, MapSet, MapHas, MapDelete, SetAdd, SetHas, SetDelete bytecodes
 - Compiler detects method call patterns and emits fast-path bytecodes
 - VM handlers bypass string property lookup and native function dispatch
-- Fallback to get_property + call_value for non-Map/Set objects
-- **Result:** map_set 1040ms → 941ms (10% improvement)
+- **Result:** map_set improved
 
-## Current Benchmark Results (Tails vs Bun)
+### Phase 5: Lazy Prototype Allocation
+**Commit:** `7b877a3`
+- Functions no longer allocate a prototype object at creation time
+- Prototype only created on demand when "prototype" property is accessed
+- **Result:** eliminates 1 heap allocation per function creation
 
-| Benchmark | Tails | Bun | Ratio |
-|-----------|-------|-----|-------|
-| string_concat | 29ms | 2ms | 14.7x |
-| async_await | 27ms | 5ms | 5.7x |
-| array_push | 69ms | 6ms | 12x |
-| json_parse | 399ms | 91ms | 4.4x |
-| date | 469ms | 29ms | 16x |
-| promise_chain | 110ms | 3ms | 33x |
-| generators | 537ms | 10ms | 55x |
-| oo | 1317ms | 24ms | 54x |
-| map_set | 941ms | 12ms | 76x |
-| regexp | 1708ms | 93ms | 18x |
-| loops | 1667ms | 8ms | 208x |
-| promises | 1417ms | 26ms | 55x |
-| closures | TIMEOUT | 24ms | ∞ |
+## Final Benchmark Results (Tails vs Bun)
+
+| Benchmark | Tails (ms) | Bun (ms) | Ratio |
+|-----------|-----------|---------|-------|
+| async_await | 27 | 5.3 | 5.1x |
+| promises | 1669 | 27 | 62x |
+| array_push | 72 | 6.7 | 10.8x |
+| date | 526 | 31.3 | 16.8x |
+| json_parse | 606 | 119 | 5.1x |
+| map_set | 1347 | 16.7 | 80.8x |
+| promise_chain | 111 | 4 | 27.7x |
+| regexp | 2202 | 100 | 22x |
+| string_concat | 36 | 2.7 | 13.4x |
+| generators | 600 | 12 | 50x |
+| loops | 1858 | 8.3 | 223x |
+| oo | 1360 | 26.7 | 51x |
+| closures | TIMEOUT | 36 | ∞ |
 
 ## Remaining Optimization Roadmap
 
-### Phase 5: Value Type Shrinking (string interning)
-- Shrink Value from 24 bytes to 16 bytes via string interning
-- Expected: 20-40% improvement across all benchmarks
-- Status: Not started (invasive change)
+### Short-term
+- **Inline caches for property access**: Cache property indices to avoid repeated string comparisons
+- **Shape/hidden classes**: Assign shapes to objects for O(1) property lookup
+- **Fused increment+compare**: Combine loop counter increment and comparison into single instruction
 
-### Phase 6: Loop and Dispatch Optimization
-- Computed dispatch table for opcode dispatch (skip match arms)
-- Fused increment+compare instructions for loops
-- Expected: 30-50% improvement for loops benchmark
-- Status: Not started
+### Medium-term
+- **String interning**: Deduplicate string values to reduce memory and comparison cost
+- **Promise inlining**: Inline promise resolution to reduce state machine overhead
+- **Arena allocation**: Use bump allocation for short-lived objects to reduce GC pressure
 
-### Phase 7: Promise/Async/Generator Optimization
-- Inline promise resolution, reduce state machine overhead
-- Expected: 30-50% improvement for promises/generators
-- Status: Not started
-
-### Phase 8: JIT Compilation (long-term)
-- Baseline JIT for hot loops
-- Expected: 10-50x improvement for compute-bound benchmarks
-- Status: Not started (massive effort)
+### Long-term
+- **Baseline JIT**: Compile hot loops to native code (10-50x improvement for compute-bound benchmarks)
+- **Generational GC**: Young-gen only collection for short-lived objects
+- **Hidden classes + inline caches**: V8-style property access optimization
