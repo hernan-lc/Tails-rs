@@ -141,12 +141,13 @@ impl Interpreter {
                 ))));
             }
             Value::Object(obj_idx) => {
-                if let HeapValue::Object(obj) = &self.heap[*obj_idx] {
+                if let HeapValue::Object(obj) = &mut self.heap[*obj_idx] {
                     let key_str = match key_to_str(key) {
                         Some(s) => s,
                         None => return Ok(Value::Undefined),
                     };
-                    if let Some(val) = obj.properties.get(&key_str) {
+                    // Phase 8.2: Use get_cached() to update inline cache
+                    if let Some(val) = obj.properties.get_cached(&key_str) {
                         return Ok(val.clone());
                     }
                     if obj.properties.has_accessors() {

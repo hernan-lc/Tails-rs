@@ -10,13 +10,14 @@ use std::rc::Rc;
 
 const INLINE_CAP: usize = 8;
 
-/// Phase 3.5 — Hybrid property storage: inline array for small objects (≤8
-/// properties), falling back to `FxHashMap` for larger ones.  Avoids hash-map
-/// overhead for the common case of short-lived, few-property objects.
+/// Phase 8.2 — Inline cache for property access.  The `last_index` field
+/// caches the slot index of the most recently looked-up property so that
+/// repeated accesses to the same key (common in OO patterns) skip the
+/// linear scan entirely.
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug, Clone)]
 pub enum PropertyStorage {
-    Inline(u8, [Option<(String, Value)>; INLINE_CAP], bool),
+    Inline(u8, [Option<(String, Value)>; INLINE_CAP], bool, u8),
     Map(FxHashMap<String, Value>),
 }
 
@@ -28,7 +29,7 @@ impl Default for PropertyStorage {
 
 impl PropertyStorage {
     pub fn new() -> Self {
-        Self::Inline(0, Default::default(), false)
+        Self::Inline(0, Default::default(), false, u8::MAX)
     }
 
     #[allow(dead_code)]
@@ -40,7 +41,7 @@ impl PropertyStorage {
     /// Used to skip the find_accessor linear scan in the common case.
     pub fn has_accessors(&self) -> bool {
         match self {
-            Self::Inline(_, _, has_acc) => *has_acc,
+            Self::Inline(_, _, has_acc, _) => *has_acc,
             Self::Map(m) => m
                 .keys()
                 .any(|k| k.starts_with("__getter_") || k.starts_with("__setter_")),
@@ -49,10 +50,54 @@ impl PropertyStorage {
 
     pub fn get(&self, key: &str) -> Option<&Value> {
         match self {
-            Self::Inline(len, slots, _has_acc) => {
-                for slot in slots.iter().take(*len as usize).flatten() {
+            Self::Inline(len, slots, _has_acc, last_idx) => {
+                let n = *len as usize;
+                // Phase 8.2: Check inline cache only for objects with >2
+                // properties — for smaller objects the linear scan is faster
+                // than the cache-probe overhead.
+                if n > 2 && *last_idx < n as u8 {
+                    if let Some((k, v)) = &slots[*last_idx as usize] {
+                        if k.as_str() == key {
+                            return Some(v);
+                        }
+                    }
+                }
+                // Linear scan
+                for slot in slots.iter().take(n).flatten() {
                     if slot.0 == key {
                         return Some(&slot.1);
+                    }
+                }
+                None
+            }
+            Self::Map(m) => m.get(key),
+        }
+    }
+
+    /// Phase 8.2: Like `get()` but updates the inline cache on hit.
+    /// Use this in hot property-access paths where the same key is
+    /// looked up repeatedly on the same object.
+    pub fn get_cached(&mut self, key: &str) -> Option<&Value> {
+        match self {
+            Self::Inline(len, slots, _has_acc, last_idx) => {
+                let n = *len as usize;
+                // Check inline cache only for larger objects
+                if n > 2 && *last_idx < n as u8 {
+                    if let Some((k, v)) = &slots[*last_idx as usize] {
+                        if k.as_str() == key {
+                            return Some(v);
+                        }
+                    }
+                }
+                // Cache miss: linear scan, then update cache
+                for i in 0..n {
+                    if let Some((k, v)) = &slots[i] {
+                        if k.as_str() == key {
+                            if n > 2 {
+                                *last_idx = i as u8;
+                            }
+                            return Some(v);
+                        }
                     }
                 }
                 None
@@ -64,13 +109,14 @@ impl PropertyStorage {
     pub fn insert(&mut self, key: String, value: Value) {
         let is_accessor = key.starts_with("__getter_") || key.starts_with("__setter_");
         match self {
-            Self::Inline(len, slots, has_acc) => {
+            Self::Inline(len, slots, has_acc, last_idx) => {
                 let n = *len as usize;
                 // Update existing
-                for slot in slots.iter_mut().take(n) {
-                    if let Some((k, _)) = slot {
+                for i in 0..n {
+                    if let Some((k, _)) = &slots[i] {
                         if *k == key {
-                            *slot = Some((key, value));
+                            slots[i] = Some((key, value));
+                            *last_idx = i as u8;
                             if is_accessor {
                                 *has_acc = true;
                             }
@@ -82,6 +128,7 @@ impl PropertyStorage {
                 if n < INLINE_CAP {
                     slots[n] = Some((key, value));
                     *len += 1;
+                    *last_idx = n as u8;
                     if is_accessor {
                         *has_acc = true;
                     }
@@ -105,7 +152,7 @@ impl PropertyStorage {
 
     pub fn remove(&mut self, key: &str) -> Option<Value> {
         match self {
-            Self::Inline(len, slots, _has_acc) => {
+            Self::Inline(len, slots, _has_acc, last_idx) => {
                 let n = *len as usize;
                 for i in 0..n {
                     if let Some((k, _)) = &slots[i] {
@@ -117,6 +164,13 @@ impl PropertyStorage {
                             }
                             slots[n - 1] = None;
                             *len -= 1;
+                            // Invalidate cache if it pointed to or past the removed slot
+                            if *last_idx as usize >= n - 1 {
+                                *last_idx = u8::MAX;
+                            } else if *last_idx as usize >= i {
+                                // The slot index shifted; invalidate to be safe
+                                *last_idx = u8::MAX;
+                            }
                             return slot.map(|(_, v)| v);
                         }
                     }
@@ -129,8 +183,17 @@ impl PropertyStorage {
 
     pub fn contains_key(&self, key: &str) -> bool {
         match self {
-            Self::Inline(len, slots, _has_acc) => {
-                for slot in slots.iter().take(*len as usize).flatten() {
+            Self::Inline(len, slots, _has_acc, last_idx) => {
+                let n = *len as usize;
+                // Phase 8.2: Check inline cache first
+                if *last_idx < n as u8 {
+                    if let Some((k, _)) = &slots[*last_idx as usize] {
+                        if k.as_str() == key {
+                            return true;
+                        }
+                    }
+                }
+                for slot in slots.iter().take(n).flatten() {
                     if slot.0 == key {
                         return true;
                     }
@@ -143,7 +206,7 @@ impl PropertyStorage {
 
     pub fn len(&self) -> usize {
         match self {
-            Self::Inline(len, _, _has_acc) => *len as usize,
+            Self::Inline(len, _, _has_acc, _) => *len as usize,
             Self::Map(m) => m.len(),
         }
     }
@@ -154,7 +217,7 @@ impl PropertyStorage {
 
     pub fn iter(&self) -> impl Iterator<Item = (&str, &Value)> {
         match self {
-            Self::Inline(len, slots, _has_acc) => {
+            Self::Inline(len, slots, _has_acc, _) => {
                 let n = *len as usize;
                 slots
                     .iter()
@@ -173,7 +236,7 @@ impl PropertyStorage {
 
     pub fn values(&self) -> impl Iterator<Item = &Value> {
         match self {
-            Self::Inline(len, slots, _has_acc) => {
+            Self::Inline(len, slots, _has_acc, _) => {
                 let n = *len as usize;
                 slots
                     .iter()
@@ -188,7 +251,7 @@ impl PropertyStorage {
 
     pub fn iter_mut(&mut self) -> impl Iterator<Item = (&str, &mut Value)> {
         match self {
-            Self::Inline(len, slots, _has_acc) => {
+            Self::Inline(len, slots, _has_acc, _) => {
                 let n = *len as usize;
                 slots
                     .iter_mut()
@@ -215,7 +278,7 @@ impl From<FxHashMap<String, Value>> for PropertyStorage {
 impl PropertyStorage {
     pub fn keys(&self) -> impl Iterator<Item = &str> {
         match self {
-            Self::Inline(len, slots, _has_acc) => {
+            Self::Inline(len, slots, _has_acc, _) => {
                 let n = *len as usize;
                 slots
                     .iter()
@@ -230,11 +293,12 @@ impl PropertyStorage {
 
     pub fn clear(&mut self) {
         match self {
-            Self::Inline(len, slots, _has_acc) => {
+            Self::Inline(len, slots, _has_acc, last_idx) => {
                 for slot in slots.iter_mut() {
                     *slot = None;
                 }
                 *len = 0;
+                *last_idx = u8::MAX;
             }
             Self::Map(m) => m.clear(),
         }
