@@ -255,6 +255,12 @@ impl CodeGenerator {
                         } else {
                             self.emit(Instruction::StoreGlobal(name.clone()));
                         }
+                    } else if matches!(
+                        target.as_ref(),
+                        Expression::ArrayLiteral { .. } | Expression::ObjectLiteral { .. }
+                    ) {
+                        self.generate_expression(value)?;
+                        self.generate_destructuring_assignment_target(target)?;
                     } else {
                         return Err(crate::errors::Error::RuntimeError(
                             "Invalid assignment target".into(),

@@ -635,3 +635,20 @@ pub(super) fn native_array_of(
 ) -> Result<Value> {
     Ok(push_array!(interp, args.to_vec()))
 }
+
+pub(super) fn native_array_at(
+    interp: &mut Interpreter,
+    this: &Value,
+    args: &[Value],
+) -> Result<Value> {
+    with_array_mut!(interp, this, |idx, arr| {
+        let len = arr.elements.len() as i64;
+        let raw_idx = args.first().map(|v| to_f64(v) as i64).unwrap_or(0);
+        let idx = normalize_index(raw_idx, len);
+        Ok(arr
+            .elements
+            .get(idx as usize)
+            .cloned()
+            .unwrap_or(Value::Undefined))
+    })
+}

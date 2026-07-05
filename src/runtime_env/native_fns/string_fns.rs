@@ -4,6 +4,15 @@ use crate::vm::interpreter::Interpreter;
 
 use super::helpers::{get_string, to_f64, to_string_value};
 
+pub(super) fn native_string_constructor(
+    interp: &mut Interpreter,
+    _this: &Value,
+    args: &[Value],
+) -> Result<Value> {
+    let value = args.first().cloned().unwrap_or(Value::Undefined);
+    Ok(Value::String(to_string_value(interp, &value)))
+}
+
 pub(super) fn native_string_char_at(
     _interp: &mut Interpreter,
     this: &Value,

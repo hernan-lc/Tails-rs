@@ -859,6 +859,31 @@ pub fn tokenize(source: &str) -> Result<Vec<SpannedToken>> {
                 col += 1;
                 push(&mut tokens, Token::BitNot, tok_line, tok_col, tok_offset);
             }
+            '#' => {
+                let tok_line = line;
+                let tok_col = col;
+                let tok_offset = pos;
+                chars.next();
+                col += 1;
+                // Private field: #name → Identifier("#name")
+                let mut ident = String::from("#");
+                while let Some(&(_, c)) = chars.peek() {
+                    if c.is_alphanumeric() || c == '_' || c == '$' {
+                        ident.push(c);
+                        chars.next();
+                        col += 1;
+                    } else {
+                        break;
+                    }
+                }
+                push(
+                    &mut tokens,
+                    Token::Identifier(ident),
+                    tok_line,
+                    tok_col,
+                    tok_offset,
+                );
+            }
             _ => {
                 chars.next();
                 col += 1;

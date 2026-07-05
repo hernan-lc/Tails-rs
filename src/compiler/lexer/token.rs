@@ -117,6 +117,7 @@ pub enum Token {
     NullishCoalescingAssign,
     Arrow,
     Ellipsis,
+    Hash,
     Eof,
 }
 

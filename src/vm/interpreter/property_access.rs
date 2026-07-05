@@ -343,6 +343,17 @@ impl Interpreter {
                         _ => {}
                     }
                 }
+                if *idx == c::NUMBER_CONSTRUCTOR {
+                    match key_str.as_str() {
+                        "isFinite" => return Ok(Value::NativeFunction(c::IS_FINITE)),
+                        "isNaN" => return Ok(Value::NativeFunction(c::IS_NAN)),
+                        "parseFloat" => return Ok(Value::NativeFunction(c::NUMBER_PARSE_FLOAT)),
+                        "parseInt" => return Ok(Value::NativeFunction(c::NUMBER_PARSE_INT)),
+                        "isInteger" => return Ok(Value::NativeFunction(c::NUMBER_IS_INTEGER)),
+                        "isSafeInteger" => return Ok(Value::NativeFunction(c::NUMBER_IS_SAFE_INTEGER)),
+                        _ => {}
+                    }
+                }
                 if *idx == c::URL_CONSTRUCTOR {
                     match key_str.as_str() {
                         "canParse" => return Ok(Value::NativeFunction(c::URL_CAN_PARSE)),
@@ -589,6 +600,7 @@ impl Interpreter {
             "findLastIndex" => 160,
             "flatMap" => 161,
             "lastIndexOf" => 162,
+            "at" => 468,
             _ => return Ok(Value::Undefined),
         };
         Ok(Value::NativeFunction(idx))

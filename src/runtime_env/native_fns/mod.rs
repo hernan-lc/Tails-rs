@@ -779,6 +779,20 @@ pub static NATIVE_TABLE: &[NativeFn] = &[
     object_fns::native_object_create,
     // Array constructor (464)
     array_fns::native_array_constructor,
+    // String constructor (465)
+    string_fns::native_string_constructor,
+    // Number constructor (466)
+    number_fns::native_number_constructor,
+    // Boolean constructor (467)
+    number_fns::native_boolean_constructor,
+    // Array.prototype.at (468)
+    array_fns::native_array_at,
+    // Math.trunc (469)
+    math_fns::native_math_trunc,
+    // Math.sign (470)
+    math_fns::native_math_sign,
+    // Math.hypot (471)
+    math_fns::native_math_hypot,
 ];
 
 #[cfg(test)]

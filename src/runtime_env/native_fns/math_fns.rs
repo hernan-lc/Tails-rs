@@ -105,3 +105,30 @@ unary_math_fn!(pub(super) fn native_math_log, |n: f64| n.ln());
 unary_math_fn!(pub(super) fn native_math_sin, |n: f64| n.sin());
 unary_math_fn!(pub(super) fn native_math_cos, |n: f64| n.cos());
 unary_math_fn!(pub(super) fn native_math_tan, |n: f64| n.tan());
+unary_math_fn!(pub(super) fn native_math_trunc, |n: f64| n.trunc());
+
+pub(super) fn native_math_sign(
+    _interp: &mut Interpreter,
+    _this: &Value,
+    args: &[Value],
+) -> Result<Value> {
+    let n = args.first().map(to_f64).unwrap_or(f64::NAN);
+    if n == 0.0 {
+        Ok(Value::Float(0.0))
+    } else {
+        Ok(Value::Float(n.signum()))
+    }
+}
+
+pub(super) fn native_math_hypot(
+    _interp: &mut Interpreter,
+    _this: &Value,
+    args: &[Value],
+) -> Result<Value> {
+    let mut sum_sq = 0.0_f64;
+    for arg in args {
+        let n = to_f64(arg);
+        sum_sq += n * n;
+    }
+    Ok(Value::Float(sum_sq.sqrt()))
+}

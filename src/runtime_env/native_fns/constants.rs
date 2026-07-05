@@ -479,6 +479,20 @@ pub const DNS_RESOLVE6: usize = 461;
 pub const DNS_RESOLVE_MX: usize = 462;
 // Array constructor (464)
 pub const ARRAY_CONSTRUCTOR: usize = 464;
+// String constructor (465)
+pub const STRING_CONSTRUCTOR: usize = 465;
+// Number constructor (466)
+pub const NUMBER_CONSTRUCTOR: usize = 466;
+// Boolean constructor (467)
+pub const BOOLEAN_CONSTRUCTOR: usize = 467;
+// Array.prototype.at (468)
+pub const ARRAY_AT: usize = 468;
+// Math.trunc (469)
+pub const MATH_TRUNC: usize = 469;
+// Math.sign (470)
+pub const MATH_SIGN: usize = 470;
+// Math.hypot (471)
+pub const MATH_HYPOT: usize = 471;
 
 #[cfg(test)]
 mod tests {

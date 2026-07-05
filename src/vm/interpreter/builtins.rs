@@ -386,6 +386,9 @@ impl Interpreter {
             "sin" => Value::NativeFunction(c::MATH_SIN),
             "cos" => Value::NativeFunction(c::MATH_COS),
             "tan" => Value::NativeFunction(c::MATH_TAN),
+            "trunc" => Value::NativeFunction(c::MATH_TRUNC),
+            "sign" => Value::NativeFunction(c::MATH_SIGN),
+            "hypot" => Value::NativeFunction(c::MATH_HYPOT),
         };
         let math_obj_idx = self.gc.allocate(
             &mut self.heap,
@@ -398,25 +401,17 @@ impl Interpreter {
         self.globals
             .insert("Math".into(), Value::Object(math_obj_idx));
 
-        // Number constructor
-        let number_props = props! {
-            "isFinite" => Value::NativeFunction(c::IS_FINITE),
-            "isNaN" => Value::NativeFunction(c::IS_NAN),
-            "parseFloat" => Value::NativeFunction(c::PARSE_FLOAT),
-            "parseInt" => Value::NativeFunction(c::PARSE_INT),
-            "isInteger" => Value::NativeFunction(c::NUMBER_IS_INTEGER),
-            "isSafeInteger" => Value::NativeFunction(c::NUMBER_IS_SAFE_INTEGER),
-        };
-        let number_obj_idx = self.gc.allocate(
-            &mut self.heap,
-            HeapValue::Object(JsObject {
-                properties: number_props,
-                prototype: None,
-                extensible: true,
-            }),
-        );
+        // Number constructor (callable as Number(), with static methods via property lookup)
         self.globals
-            .insert("Number".into(), Value::Object(number_obj_idx));
+            .insert("Number".into(), Value::NativeFunction(c::NUMBER_CONSTRUCTOR));
+
+        // String constructor
+        self.globals
+            .insert("String".into(), Value::NativeFunction(c::STRING_CONSTRUCTOR));
+
+        // Boolean constructor
+        self.globals
+            .insert("Boolean".into(), Value::NativeFunction(c::BOOLEAN_CONSTRUCTOR));
 
         // Promise constructor and prototype
         let promise_proto_props = props! {

@@ -398,6 +398,81 @@ impl CodeGenerator {
         Ok(())
     }
 
+    fn generate_destructuring_assignment_target(
+        &mut self,
+        pattern: &Expression,
+    ) -> Result<()> {
+        match pattern {
+            Expression::Identifier(id) => {
+                if let Some(local_idx) = self.resolve_local(id) {
+                    self.emit(Instruction::StoreLocal(local_idx));
+                } else {
+                    self.emit(Instruction::StoreGlobal(id.clone()));
+                }
+            }
+            Expression::Member {
+                object,
+                property,
+                computed,
+            } => {
+                self.generate_expression(object)?;
+                if *computed {
+                    self.generate_expression(property)?;
+                } else if let Expression::Identifier(name) = property.as_ref() {
+                    let idx = self.add_constant(Value::String(name.clone()));
+                    self.emit(Instruction::LoadConst(idx));
+                } else {
+                    self.generate_expression(property)?;
+                }
+                self.emit(Instruction::Rot3Right);
+                self.emit(Instruction::SetProperty);
+            }
+            Expression::ArrayLiteral { elements } => {
+                for (i, element) in elements.iter().enumerate() {
+                    match element {
+                        Expression::SpreadElement { .. } => {
+                            self.emit(Instruction::Dup);
+                            let idx = self.add_constant(Value::String("slice".to_string()));
+                            self.emit(Instruction::LoadConst(idx));
+                            let start_idx = self.add_constant(Value::Integer(i as i64));
+                            self.emit(Instruction::LoadConst(start_idx));
+                            self.emit(Instruction::CallMethod(1));
+                            self.generate_destructuring_assignment_target(element)?;
+                        }
+                        _ => {
+                            self.emit(Instruction::Dup);
+                            let idx = self.add_constant(Value::Integer(i as i64));
+                            self.emit(Instruction::LoadConst(idx));
+                            self.emit(Instruction::GetProperty);
+                            self.generate_destructuring_assignment_target(element)?;
+                        }
+                    }
+                }
+                self.emit(Instruction::Pop);
+            }
+            Expression::ObjectLiteral { properties } => {
+                for prop in properties {
+                    self.emit(Instruction::Dup);
+                    if prop.computed {
+                        if let Some(key_expr) = &prop.computed_key {
+                            self.generate_expression(key_expr)?;
+                        }
+                    } else {
+                        let key_idx = self.add_constant(Value::String(prop.key.clone()));
+                        self.emit(Instruction::LoadConst(key_idx));
+                    }
+                    self.emit(Instruction::GetProperty);
+                    self.generate_destructuring_assignment_target(&prop.value)?;
+                }
+                self.emit(Instruction::Pop);
+            }
+            _ => {
+                self.emit(Instruction::Pop);
+            }
+        }
+        Ok(())
+    }
+
     fn extract_identifier_from_pattern(pattern: &BindingPattern) -> Option<String> {
         match pattern {
             BindingPattern::Identifier(name) => Some(name.clone()),

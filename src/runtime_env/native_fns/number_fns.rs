@@ -4,6 +4,49 @@ use crate::vm::interpreter::Interpreter;
 
 use super::helpers::to_f64;
 
+pub(super) fn native_number_constructor(
+    _interp: &mut Interpreter,
+    _this: &Value,
+    args: &[Value],
+) -> Result<Value> {
+    let value = args.first().cloned().unwrap_or(Value::Undefined);
+    match value {
+        Value::Integer(n) => Ok(Value::Float(n as f64)),
+        Value::Float(_) => Ok(value),
+        Value::String(s) => match s.trim().parse::<f64>() {
+            Ok(n) => Ok(Value::Float(n)),
+            Err(_) => Ok(Value::Float(f64::NAN)),
+        },
+        Value::Boolean(b) => Ok(Value::Float(if b { 1.0 } else { 0.0 })),
+        Value::BigInt(n) => Ok(Value::Float(n as f64)),
+        Value::Null => Ok(Value::Float(0.0)),
+        Value::Undefined => Ok(Value::Float(f64::NAN)),
+        _ => Ok(Value::Float(f64::NAN)),
+    }
+}
+
+pub(super) fn native_boolean_constructor(
+    _interp: &mut Interpreter,
+    _this: &Value,
+    args: &[Value],
+) -> Result<Value> {
+    let value = args.first().cloned().unwrap_or(Value::Undefined);
+    Ok(Value::Boolean(truthy(&value)))
+}
+
+fn truthy(v: &Value) -> bool {
+    match v {
+        Value::Undefined | Value::Null => false,
+        Value::Boolean(b) => *b,
+        Value::Integer(n) => *n != 0,
+        Value::Float(n) => *n != 0.0 && !n.is_nan(),
+        Value::String(s) => !s.is_empty(),
+        Value::Cons(c) => !c.flatten().is_empty(),
+        Value::BigInt(n) => *n != 0,
+        _ => true,
+    }
+}
+
 pub(super) fn native_bigint_constructor(
     _interp: &mut Interpreter,
     _this: &Value,
