@@ -203,6 +203,12 @@ impl Interpreter {
             Value::NativeFunction(c::SYMBOL_CONSTRUCTOR),
         );
 
+        // Function constructor (for dynamic code generation, e.g. new Function(...args, body))
+        self.globals.insert(
+            "Function".into(),
+            Value::NativeFunction(c::FUNCTION_CONSTRUCTOR),
+        );
+
         // JSON
         let json_props = props! {
             "parse" => Value::NativeFunction(c::JSON_PARSE),

@@ -98,3 +98,90 @@ pub(super) fn native_function_bind(
 
     Ok(Value::Function(fn_idx))
 }
+
+/// Function constructor: new Function(...paramBodies, body)
+///
+/// The last argument is always the function body. All preceding arguments
+/// are parameter names (as strings). This compiles the body at runtime and
+/// returns a callable function value.
+pub(super) fn native_function_constructor(
+    interp: &mut Interpreter,
+    _this: &Value,
+    args: &[Value],
+) -> Result<Value> {
+    if args.is_empty() {
+        return Err(Error::TypeError(
+            "Function constructor requires at least one argument".into(),
+        ));
+    }
+
+    let body_idx = args.len() - 1;
+    let body = match &args[body_idx] {
+        Value::String(s) => s.clone(),
+        Value::Cons(c) => c.flatten(),
+        other => {
+            return Err(Error::TypeError(format!(
+                "Function body must be a string, got {:?}",
+                other
+            )))
+        }
+    };
+
+    let mut param_names: Vec<String> = Vec::new();
+    for arg in &args[..body_idx] {
+        match arg {
+            Value::String(s) => param_names.push(s.clone()),
+            Value::Cons(c) => param_names.push(c.flatten()),
+            other => {
+                return Err(Error::TypeError(format!(
+                    "Function parameter name must be a string, got {:?}",
+                    other
+                )))
+            }
+        }
+    }
+
+    // Build a source string: function __tails_anon__(...params) { body }
+    let params_str = param_names.join(", ");
+    // Ensure body ends with a semicolon so the parser doesn't choke on missing ASI
+    let body_trimmed = body.trim_end();
+    let body_with_semi = if body_trimmed.ends_with(';') || body_trimmed.ends_with('}') {
+        body_trimmed.to_string()
+    } else {
+        format!("{};", body_trimmed)
+    };
+    let source = format!("function __tails_anon__({}) {{ {} }}", params_str, body_with_semi);
+
+    // Compile the source
+    let compiler = crate::compiler::Compiler::new(false);
+    let compiled = compiler.compile(&source)?;
+
+    // Save and restore interpreter state around execution
+    let saved_module = interp.current_module.take();
+    let saved_path = interp.current_module_path.take();
+    let saved_mg = interp.module_globals.take();
+    let saved_eh = std::mem::take(&mut interp.exception_handlers);
+
+    // Execute the compiled module (defines __tails_anon__ as a global)
+    let result = interp.execute(&compiled);
+
+    interp.current_module = saved_module;
+    interp.current_module_path = saved_path;
+    interp.module_globals = saved_mg;
+    interp.exception_handlers = saved_eh;
+
+    // Check for compilation/execution errors
+    result?;
+
+    // Retrieve the function from globals
+    let func = interp
+        .globals
+        .remove("__tails_anon__")
+        .ok_or_else(|| {
+            Error::RuntimeError(
+                "Function constructor: compiled body did not produce a function".into(),
+            )
+        })?;
+
+    Ok(func)
+}

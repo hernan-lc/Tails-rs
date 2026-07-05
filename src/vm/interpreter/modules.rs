@@ -138,6 +138,7 @@ impl Interpreter {
                 || key == "require"
                 || key == "Buffer"
                 || key == "process"
+                || key == "Function"
             {
                 self.globals.insert(key.clone(), saved_globals[key].clone());
             }

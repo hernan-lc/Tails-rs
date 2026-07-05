@@ -817,6 +817,8 @@ pub static NATIVE_TABLE: &[NativeFn] = &[
     math_fns::native_math_sign,
     // Math.hypot (471)
     math_fns::native_math_hypot,
+    // Function constructor (472)
+    function_fns::native_function_constructor,
 ];
 
 #[cfg(test)]

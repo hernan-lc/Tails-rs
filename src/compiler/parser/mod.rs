@@ -213,6 +213,7 @@ pub struct ConstructorParam {
     pub name: String,
     pub type_annotation: Option<TypeAnnotation>,
     pub access_modifiers: Vec<AccessModifier>,
+    pub default: Option<Expression>,
 }
 
 #[derive(Debug, Clone)]
@@ -914,10 +915,17 @@ impl<'a> Parser<'a> {
                 } else {
                     None
                 };
+                let default = if self.peek().token == Token::Assign {
+                    self.advance();
+                    Some(self.parse_assignment()?.inner)
+                } else {
+                    None
+                };
                 params.push(ConstructorParam {
                     name: param,
                     type_annotation,
                     access_modifiers,
+                    default,
                 });
                 if self.peek().token == Token::Comma {
                     self.advance();

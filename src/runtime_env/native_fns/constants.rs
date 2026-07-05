@@ -493,6 +493,8 @@ pub const MATH_TRUNC: usize = 469;
 pub const MATH_SIGN: usize = 470;
 // Math.hypot (471)
 pub const MATH_HYPOT: usize = 471;
+// Function constructor (472)
+pub const FUNCTION_CONSTRUCTOR: usize = 472;
 
 #[cfg(test)]
 mod tests {

@@ -1,5 +1,5 @@
 use super::{ClassInfo, ClassMethodInfo, ClassMethodKind, Instruction};
-use crate::compiler::parser::{ClassMember, Expression, SpannedNode, Statement};
+use crate::compiler::parser::{BinaryOperator, ClassMember, Expression, SpannedNode, Statement};
 use crate::errors::Result;
 
 use super::CodeGenerator;
@@ -130,41 +130,68 @@ impl CodeGenerator {
         for member in body {
             if let ClassMember::Constructor { params, body } = member {
                 let param_names: Vec<String> = params.iter().map(|p| p.name.clone()).collect();
-                // If there are property initializers, we need to prepend them to the constructor body
-                if prop_inits.is_empty() {
-                    return Ok(Some(self.compile_function(
-                        Some("constructor".to_string()),
-                        &param_names,
-                        body,
-                        false,
-                    )?));
-                }
-                // Build synthetic statements for property initializations
-                let mut synthetic_body: Vec<SpannedNode<Statement>> = Vec::new();
-                for (name, init_expr) in &prop_inits {
-                    let value = if let Some(expr) = init_expr {
-                        expr.clone()
-                    } else {
-                        Expression::UndefinedLiteral
-                    };
-                    synthetic_body.push(SpannedNode {
-                        inner: Statement::Expression(Expression::Assignment {
-                            target: Box::new(Expression::Member {
-                                object: Box::new(Expression::Identifier("this".to_string())),
-                                property: Box::new(Expression::Identifier(name.clone())),
-                                computed: false,
-                            }),
-                            value: Box::new(value),
+
+                // Build synthetic statements for default parameter values
+                let mut default_stmts: Vec<SpannedNode<Statement>> = Vec::new();
+                for p in params {
+                    if let Some(ref default_expr) = p.default {
+                        // if (param === undefined) param = default;
+                        let cond = Expression::BinaryOp {
+                            op: BinaryOperator::StrictEq,
+                            left: Box::new(Expression::Identifier(p.name.clone())),
+                            right: Box::new(Expression::Identifier("undefined".to_string())),
+                        };
+                        let assign = Statement::Expression(Expression::Assignment {
+                            target: Box::new(Expression::Identifier(p.name.clone())),
+                            value: Box::new(default_expr.clone()),
                             op: None,
-                        }),
-                        span: Some(crate::errors::Span::unknown()),
-                    });
+                        });
+                        default_stmts.push(SpannedNode {
+                            inner: Statement::IfStatement {
+                                condition: cond,
+                                consequent: Box::new(SpannedNode {
+                                    inner: assign,
+                                    span: Some(crate::errors::Span::unknown()),
+                                }),
+                                alternate: None,
+                            },
+                            span: Some(crate::errors::Span::unknown()),
+                        });
+                    }
                 }
-                synthetic_body.extend(body.clone());
+
+                // Combine default stmts + prop inits + original body
+                let mut full_body: Vec<SpannedNode<Statement>> = Vec::new();
+                full_body.extend(default_stmts);
+
+                // If there are property initializers, we need to prepend them to the constructor body
+                if !prop_inits.is_empty() {
+                    for (name, init_expr) in &prop_inits {
+                        let value = if let Some(expr) = init_expr {
+                            expr.clone()
+                        } else {
+                            Expression::UndefinedLiteral
+                        };
+                        full_body.push(SpannedNode {
+                            inner: Statement::Expression(Expression::Assignment {
+                                target: Box::new(Expression::Member {
+                                    object: Box::new(Expression::Identifier("this".to_string())),
+                                    property: Box::new(Expression::Identifier(name.clone())),
+                                    computed: false,
+                                }),
+                                value: Box::new(value),
+                                op: None,
+                            }),
+                            span: Some(crate::errors::Span::unknown()),
+                        });
+                    }
+                }
+                full_body.extend(body.clone());
+
                 return Ok(Some(self.compile_function(
                     Some("constructor".to_string()),
                     &param_names,
-                    &synthetic_body,
+                    &full_body,
                     false,
                 )?));
             }
