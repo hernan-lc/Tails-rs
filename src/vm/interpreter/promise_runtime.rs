@@ -4,14 +4,22 @@ use crate::objects::Value;
 
 impl Interpreter {
     pub(crate) fn drain_microtasks(&mut self) {
-        if self.async_runtime.is_idle() {
-            return;
-        }
-        // Batch collect all pending microtasks before execution
-        // This avoids re-entrant issues and reduces overhead
-        let tasks = self.async_runtime.run_microtasks();
-        for task in tasks {
-            let _ = self.call_value(&task.callback, &Value::Undefined, &[task.arg]);
+        // Phase 8.6: Process microtasks in a tight loop until the queue is
+        // fully drained.  This avoids re-entering the outer event-loop
+        // between chain links (each .then() callback that resolves a
+        // promise enqueues new microtasks that should be processed in the
+        // same drain pass).
+        loop {
+            if self.async_runtime.is_idle() {
+                return;
+            }
+            let tasks = self.async_runtime.run_microtasks();
+            if tasks.is_empty() {
+                return;
+            }
+            for task in tasks {
+                let _ = self.call_value(&task.callback, &Value::Undefined, &[task.arg]);
+            }
         }
     }
 
