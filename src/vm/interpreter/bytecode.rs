@@ -258,15 +258,11 @@ impl Interpreter {
                 // Phase 8.3: Inline LoadGlobal / StoreGlobal on the hot path
                 // to avoid cascading dispatch for these very common instructions.
                 Instruction::LoadGlobal(name) => {
-                    let val = self
-                        .globals
-                        .get(name.as_str())
-                        .cloned()
-                        .or_else(|| {
-                            self.module_globals
-                                .as_ref()
-                                .and_then(|mg| mg.borrow().get(name.as_str()).cloned())
-                        });
+                    let val = self.globals.get(name.as_str()).cloned().or_else(|| {
+                        self.module_globals
+                            .as_ref()
+                            .and_then(|mg| mg.borrow().get(name.as_str()).cloned())
+                    });
                     match val {
                         Some(v) => {
                             self.stack.push(v);

@@ -10,8 +10,22 @@
 use std::path::Path;
 use tails::TailsRuntime;
 
+fn cdylib_present() -> bool {
+    let dist = std::env::current_dir()
+        .ok()
+        .map(|d| d.join("dist"))
+        .unwrap_or_default();
+    dist.join("libwebsocket.so").exists()
+        || dist.join("libwebsocket.dylib").exists()
+        || dist.join("websocket.dll").exists()
+}
+
 #[test]
 fn test_websocket_native_create_returns_handle() {
+    if !cdylib_present() {
+        eprintln!("skipping: no websocket cdylib in dist/");
+        return;
+    }
     let mut rt = TailsRuntime::default();
     let r = rt.eval_module(
         r#"
@@ -27,6 +41,10 @@ fn test_websocket_native_create_returns_handle() {
 
 #[test]
 fn test_websocket_native_url_returns_initial_url() {
+    if !cdylib_present() {
+        eprintln!("skipping: no websocket cdylib in dist/");
+        return;
+    }
     let mut rt = TailsRuntime::default();
     let r = rt.eval_module(
         r#"
@@ -45,6 +63,10 @@ fn test_websocket_native_url_returns_initial_url() {
 
 #[test]
 fn test_websocket_native_destroy_invalidates_handle() {
+    if !cdylib_present() {
+        eprintln!("skipping: no websocket cdylib in dist/");
+        return;
+    }
     let mut rt = TailsRuntime::default();
     let r = rt.eval_module(
         r#"
@@ -62,6 +84,10 @@ fn test_websocket_native_destroy_invalidates_handle() {
 
 #[test]
 fn test_websocket_native_connect_without_server_returns_error() {
+    if !cdylib_present() {
+        eprintln!("skipping: no websocket cdylib in dist/");
+        return;
+    }
     // We can't actually open a connection in CI, but we can verify the FFI
     // returns a JSON error payload for an unreachable host.
     let mut rt = TailsRuntime::default();
