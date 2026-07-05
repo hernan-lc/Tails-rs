@@ -143,6 +143,50 @@ impl Interpreter {
                         }
                     }
                 }
+                // Fused loop branch: increment counter, compare with limit, jump
+                Instruction::LoopBranch {
+                    counter_slot,
+                    limit_const,
+                    body_pc,
+                    step,
+                } => {
+                    if let Some(frame) = self.call_stack.last() {
+                        let idx = frame.base_pointer + *counter_slot as usize;
+                        if idx < self.stack.len() {
+                            // Increment counter
+                            match &self.stack[idx] {
+                                Value::Integer(n) => {
+                                    let new_val = n.wrapping_add(*step);
+                                    self.stack[idx] = Value::Integer(new_val);
+                                }
+                                Value::Float(n) => {
+                                    self.stack[idx] = Value::Float(n + *step as f64);
+                                }
+                                _ => {}
+                            }
+                            // Compare with limit
+                            let counter_val = &self.stack[idx];
+                            let cidx = *limit_const as usize;
+                            if let Some(limit_val) = module.constants.get(cidx) {
+                                let should_continue = match (counter_val, limit_val) {
+                                    (Value::Integer(a), Value::Integer(b)) => a < b,
+                                    (Value::Integer(a), Value::Float(b)) => (*a as f64) < *b,
+                                    (Value::Float(a), Value::Integer(b)) => *a < (*b as f64),
+                                    (Value::Float(a), Value::Float(b)) => a < b,
+                                    _ => self.less_than(counter_val, limit_val)?,
+                                };
+                                if should_continue {
+                                    pc = *body_pc as usize;
+                                    continue;
+                                } else {
+                                    pc += 1;
+                                    continue;
+                                }
+                            }
+                        }
+                    }
+                    // Cold path: fall through
+                }
                 // OPTIMIZATION (Phase 1G): Inline the most common `LoadConst`
                 // pattern (Integer / Float / small String / Null / Undefined /
                 // Boolean) directly in the dispatch so the cascading

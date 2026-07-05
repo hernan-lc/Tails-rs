@@ -235,4 +235,12 @@ pub enum Instruction {
     SetAdd,
     SetHas,
     SetDelete,
+    // Fused loop branch: increment counter, compare with limit, jump
+    // Replaces: IncLocal + LoadLocal + LoadConst + Less + JumpIfNot
+    LoopBranch {
+        counter_slot: u16,
+        limit_const: u32,
+        body_pc: u32,
+        step: i64,
+    },
 }

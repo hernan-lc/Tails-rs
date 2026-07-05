@@ -1,5 +1,7 @@
 use super::CodeGenerator;
-use crate::compiler::parser::{BindingPattern, ForInLeft, ForInit, Statement};
+use crate::compiler::parser::{
+    BinaryOperator, BindingPattern, Expression, ForInLeft, ForInit, Statement, UpdateOperator,
+};
 use crate::compiler::Instruction;
 use crate::errors::Result;
 use crate::objects::Value;
@@ -62,6 +64,116 @@ impl CodeGenerator {
                 self.scope_depth += 1;
                 let prev_locals_count = self.locals.len();
 
+                // Try to detect the common pattern: for (let i = 0; i < N; i++)
+                // and emit a fused LoopBranch instruction
+                let mut loop_branch_emitted = false;
+                if let Some(for_init) = init {
+                    if let ForInit::Variable(stmt) = for_init.as_ref() {
+                        if let Statement::VariableDeclaration { declarations, .. } = &stmt.inner {
+                            if declarations.len() == 1 {
+                                if let Some(init_expr) = &declarations[0].init {
+                                    if let Expression::NumberLiteral(init_val) = init_expr {
+                                        if *init_val == 0.0 || *init_val == 1.0 {
+                                            if let BindingPattern::Identifier(var_name) =
+                                                &declarations[0].id
+                                            {
+                                                // Check condition: i < N
+                                                if let Some(cond) = condition {
+                                                    if let Expression::BinaryOp {
+                                                        op: BinaryOperator::Less,
+                                                        left,
+                                                        right,
+                                                    } = cond
+                                                    {
+                                                        if let Expression::Identifier(name) =
+                                                            &**left
+                                                        {
+                                                            if name == var_name {
+                                                                // Check update: i++
+                                                                if let Some(upd) = update {
+                                                                    if let Expression::UpdateExpression {
+                                                                        op: UpdateOperator::Increment,
+                                                                        operand,
+                                                                        ..
+                                                                    } = upd
+                                                                    {
+                                                                        if let Expression::Identifier(n) = &**operand {
+                                                                            if n == var_name {
+                                                                                // Emit the init as normal
+                                                                                self.record_line_from_span(&stmt.span);
+                                                                                self.generate_statement(&stmt.inner, false)?;
+
+                                                                                // Emit the loop body
+                                                                                let body_start = self.instructions.len() as u32;
+                                                                                self.continue_targets.push(usize::MAX);
+                                                                                let cont_start = self.continue_patches.len();
+                                                                                let break_start = self.break_targets.len();
+                                                                                self.break_targets.push(usize::MAX);
+                                                                                self.record_line_from_span(&body.span);
+                                                                                self.generate_statement(&body.inner, false)?;
+
+                                                                                // Patch continue targets
+                                                                                while self.continue_patches.len() > cont_start {
+                                                                                    let idx = self.continue_patches.pop().unwrap();
+                                                                                    self.patch_jump(idx, self.instructions.len());
+                                                                                }
+                                                                                self.continue_targets.pop();
+
+                                                                                // Convert the right-hand expression to a Value for the constant pool
+                                                                                let limit_value_opt = match &**right {
+                                                                                    Expression::NumberLiteral(n) => Some(Value::Float(*n)),
+                                                                                    Expression::BooleanLiteral(b) => Some(Value::Boolean(*b)),
+                                                                                    Expression::NullLiteral => Some(Value::Null),
+                                                                                    Expression::UndefinedLiteral => Some(Value::Undefined),
+                                                                                    Expression::StringLiteral(s) => Some(Value::String(s.clone())),
+                                                                                    _ => None,
+                                                                                };
+                                                                                if let Some(limit_value) = limit_value_opt {
+                                                                                    let limit_idx = self.add_constant(limit_value);
+                                                                                    let step = if *init_val == 0.0 { 1 } else { 0 };
+                                                                                    self.emit(Instruction::LoopBranch {
+                                                                                        counter_slot: self.locals.len() as u16 - 1,
+                                                                                        limit_const: limit_idx,
+                                                                                        body_pc: body_start,
+                                                                                        step,
+                                                                                    });
+
+                                                                                    let loop_end = self.instructions.len();
+                                                                                    while self.break_targets.len() > break_start {
+                                                                                        let idx = self.break_targets.pop().unwrap();
+                                                                                        self.patch_jump(idx, loop_end);
+                                                                                    }
+
+                                                                                    loop_branch_emitted = true;
+                                                                                }
+                                                                            }
+                                                                        }
+                                                                    }
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                if loop_branch_emitted {
+                    let locals_added = self.locals.len() - prev_locals_count;
+                    for _ in 0..locals_added {
+                        self.locals.pop();
+                        self.emit(Instruction::Pop);
+                    }
+                    self.scope_depth -= 1;
+                    return Ok(true);
+                }
+
+                // Fall through to standard loop generation
                 if let Some(for_init) = init {
                     match for_init.as_ref() {
                         ForInit::Variable(stmt) => {
