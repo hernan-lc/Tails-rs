@@ -69,6 +69,8 @@ impl CodeGenerator {
     fn peephole_optimize(&mut self) {
         let mut optimized = Vec::with_capacity(self.instructions.len());
         let mut keep = Vec::with_capacity(self.instructions.len());
+        // old_to_new[i] = Some(new_index) if instruction i was kept, None if removed.
+        let mut old_to_new: Vec<Option<usize>> = vec![None; self.instructions.len()];
         let mut i = 0;
         while i < self.instructions.len() {
             // Pattern 1: LoadLocal(x) + LoadConst(n) + Add + StoreLocal(x) → IncLocal(x, n)
@@ -86,6 +88,7 @@ impl CodeGenerator {
                 ) {
                     if x == y {
                         if let Value::Integer(n) = self.constants[*c as usize] {
+                            old_to_new[i] = Some(optimized.len());
                             optimized.push(Instruction::IncLocal(*x, n));
                             keep.push(i);
                             i += 4;
@@ -109,6 +112,7 @@ impl CodeGenerator {
                     &self.instructions[i + 3],
                 ) {
                     if x == z && x != y {
+                        old_to_new[i] = Some(optimized.len());
                         optimized.push(Instruction::AddLocal(*x, *y));
                         keep.push(i);
                         i += 4;
@@ -132,6 +136,7 @@ impl CodeGenerator {
                     &self.instructions[i + 3],
                 ) {
                     if name == name2 {
+                        old_to_new[i] = Some(optimized.len());
                         optimized.push(Instruction::AddGlobal(name.clone(), *y));
                         keep.push(i);
                         i += 4;
@@ -160,10 +165,42 @@ impl CodeGenerator {
                 }
             }
 
+            old_to_new[i] = Some(optimized.len());
             optimized.push(self.instructions[i].clone());
             keep.push(i);
             i += 1;
         }
+
+        // Remap all jump targets to account for removed instructions.
+        for instr in &mut optimized {
+            let target = match instr {
+                Instruction::Jump(t)
+                | Instruction::JumpIf(t)
+                | Instruction::JumpIfNot(t)
+                | Instruction::JumpIfUndefined(t)
+                | Instruction::JumpIfNotUndefined(t) => Some(t),
+                _ => None,
+            };
+            if let Some(t) = target {
+                let old = *t as usize;
+                if old < old_to_new.len() {
+                    if let Some(Some(new)) = old_to_new.get(old) {
+                        *t = *new as u32;
+                    }
+                }
+            }
+        }
+
+        // Remap function bytecode_index values to account for removed instructions.
+        for func in &mut self.functions {
+            let old_idx = func.bytecode_index;
+            if old_idx < old_to_new.len() {
+                if let Some(Some(new_idx)) = old_to_new.get(old_idx) {
+                    func.bytecode_index = *new_idx;
+                }
+            }
+        }
+
         self.instructions = optimized;
         self.source_lines = keep.iter().map(|&i| self.source_lines[i]).collect();
         self.source_cols = keep.iter().map(|&i| self.source_cols[i]).collect();
