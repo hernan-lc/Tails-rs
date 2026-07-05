@@ -20,29 +20,27 @@ impl Interpreter {
     ) -> Result<bool> {
         match instruction {
             Instruction::MakeFunction(func_idx) => {
-                let func_info = module.functions[*func_idx as usize].clone();
+                let fi = &module.functions[*func_idx as usize];
                 let owner = self.current_module.clone();
                 let scope = self.module_globals_rc();
-                let src_file = self.current_module_path.clone();
-                let src_line = func_info.source_line;
                 let heap_idx = self.gc.allocate(
                     &mut self.heap,
                     HeapValue::Function(JsFunction {
-                        name: func_info.name,
-                        params: func_info.params,
-                        rest_param: func_info.rest_param,
-                        bytecode_index: func_info.bytecode_index,
+                        name: fi.name.clone(),
+                        params: fi.params.clone(),
+                        rest_param: fi.rest_param.clone(),
+                        bytecode_index: fi.bytecode_index,
                         closure: Rc::new(RefCell::new(Vec::new())),
                         prototype: None,
                         super_class: None,
                         properties: PropertyStorage::new(),
                         owner_module: owner,
                         module_scope: Some(scope),
-                        is_generator: func_info.is_generator,
-                        source_file: src_file,
-                        source_line: src_line,
-                        is_arrow: func_info.is_arrow,
-                        captured_this: if func_info.is_arrow {
+                        is_generator: fi.is_generator,
+                        source_file: self.current_module_path.clone(),
+                        source_line: fi.source_line,
+                        is_arrow: fi.is_arrow,
+                        captured_this: if fi.is_arrow {
                             self.call_stack.last().and_then(|f| f.this_value.clone())
                         } else {
                             None
@@ -52,7 +50,7 @@ impl Interpreter {
                 self.stack.push(Value::Function(heap_idx));
             }
             Instruction::MakeClosure(func_idx, _capture_slots) => {
-                let func_info = module.functions[*func_idx as usize].clone();
+                let fi = &module.functions[*func_idx as usize];
                 let base_pointer: usize =
                     self.call_stack.last().map(|f| f.base_pointer).unwrap_or(0);
                 let snapshot: Vec<Value> = _capture_slots
@@ -90,26 +88,24 @@ impl Interpreter {
                 };
                 let owner = self.current_module.clone();
                 let scope = self.module_globals_rc();
-                let src_file = self.current_module_path.clone();
-                let src_line = func_info.source_line;
                 let heap_idx = self.gc.allocate(
                     &mut self.heap,
                     HeapValue::Function(JsFunction {
-                        name: func_info.name,
-                        params: func_info.params,
-                        rest_param: func_info.rest_param,
-                        bytecode_index: func_info.bytecode_index,
+                        name: fi.name.clone(),
+                        params: fi.params.clone(),
+                        rest_param: fi.rest_param.clone(),
+                        bytecode_index: fi.bytecode_index,
                         closure: closure_vars,
                         prototype: None,
                         super_class: None,
                         properties: PropertyStorage::new(),
                         owner_module: owner,
                         module_scope: Some(scope),
-                        is_generator: func_info.is_generator,
-                        source_file: src_file,
-                        source_line: src_line,
-                        is_arrow: func_info.is_arrow,
-                        captured_this: if func_info.is_arrow {
+                        is_generator: fi.is_generator,
+                        source_file: self.current_module_path.clone(),
+                        source_line: fi.source_line,
+                        is_arrow: fi.is_arrow,
+                        captured_this: if fi.is_arrow {
                             self.call_stack.last().and_then(|f| f.this_value.clone())
                         } else {
                             None

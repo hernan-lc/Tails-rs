@@ -150,6 +150,12 @@ impl Interpreter {
 
     pub fn execute(&mut self, module: &CompiledModule) -> Result<Value> {
         self.current_module = Some(Rc::new(module.clone()));
+        // Phase 8.3: Cache module_globals_rc so MakeClosure/MakeFunction
+        // don't clone the entire globals map on every invocation.
+        if self.module_globals_rc.is_none() {
+            self.module_globals_rc =
+                Some(std::rc::Rc::new(self.globals.clone()));
+        }
         let saved_call_stack_len = self.call_stack.len();
         if self.call_stack.len() >= self.max_call_stack_depth {
             return Err(runtime_error_stack_overflow());

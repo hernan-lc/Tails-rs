@@ -73,28 +73,41 @@ impl Interpreter {
             Instruction::Return => {
                 let return_value = self.stack.pop().unwrap_or(Value::Undefined);
                 if let Some(frame) = self.call_stack.pop() {
+                    // Phase 8.3: First do an immutable borrow check to see if
+                    // anything actually changed, avoiding borrow_mut() in the
+                    // common case (read-only closures).
                     if frame.closure_var_count > 0 {
                         if let Some(heap_idx) = frame.func_heap_idx {
-                            if let HeapValue::Function(f) = &mut self.heap[heap_idx] {
-                                let mut closure = f.closure.borrow_mut();
-                                let mut changed = false;
-                                for i in 0..frame.closure_var_count {
-                                    let stack_val = self
-                                        .stack
-                                        .get(frame.base_pointer + i)
-                                        .cloned()
-                                        .unwrap_or(Value::Undefined);
-                                    if i < closure.len() {
-                                        if closure[i] != stack_val {
-                                            closure[i] = stack_val;
-                                            changed = true;
+                            if let HeapValue::Function(f) = &self.heap[heap_idx] {
+                                let mut needs_write = false;
+                                {
+                                    let closure = f.closure.borrow();
+                                    for i in 0..frame.closure_var_count {
+                                        let stack_val = self
+                                            .stack
+                                            .get(frame.base_pointer + i)
+                                            .cloned()
+                                            .unwrap_or(Value::Undefined);
+                                        if i >= closure.len() || closure[i] != stack_val {
+                                            needs_write = true;
+                                            break;
                                         }
-                                    } else {
-                                        closure.push(stack_val);
-                                        changed = true;
                                     }
                                 }
-                                if changed {
+                                if needs_write {
+                                    let mut closure = f.closure.borrow_mut();
+                                    for i in 0..frame.closure_var_count {
+                                        let stack_val = self
+                                            .stack
+                                            .get(frame.base_pointer + i)
+                                            .cloned()
+                                            .unwrap_or(Value::Undefined);
+                                        if i < closure.len() {
+                                            closure[i] = stack_val;
+                                        } else {
+                                            closure.push(stack_val);
+                                        }
+                                    }
                                     closure.truncate(frame.closure_var_count);
                                 }
                             }

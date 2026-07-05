@@ -239,6 +239,27 @@ impl Interpreter {
                     }
                     // Cold path: fall through
                 }
+                // Phase 8.3: Inline LoadGlobal / StoreGlobal on the hot path
+                // to avoid cascading dispatch for these very common instructions.
+                Instruction::LoadGlobal(name) => {
+                    let val = self
+                        .globals
+                        .get(name.as_str())
+                        .cloned()
+                        .unwrap_or(Value::Undefined);
+                    self.stack.push(val);
+                    pc += 1;
+                    continue;
+                }
+                Instruction::StoreGlobal(name) => {
+                    let value = self
+                        .stack
+                        .pop()
+                        .ok_or_else(|| Error::RuntimeError(super::ERR_STACK_UNDERFLOW.into()))?;
+                    self.globals.insert(name.clone(), value);
+                    pc += 1;
+                    continue;
+                }
                 // OPTIMIZATION (Phase 1G): Inline the most common `LoadConst`
                 // pattern (Integer / Float / small String / Null / Undefined /
                 // Boolean) directly in the dispatch so the cascading
