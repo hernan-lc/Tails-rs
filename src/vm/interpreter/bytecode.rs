@@ -176,6 +176,15 @@ impl Interpreter {
                                     _ => self.less_than(counter_val, limit_val)?,
                                 };
                                 if should_continue {
+                                    // Phase 8.10: Profile loop back-edges for
+                                    // JIT compilation.  Tick every 128
+                                    // iterations to amortize profiler overhead.
+                                    match counter_val {
+                                        Value::Integer(n) if n & 127 == 0 => {
+                                            self.jit.tick(pc, module);
+                                        }
+                                        _ => {}
+                                    }
                                     pc = *body_pc as usize;
                                     continue;
                                 } else {
