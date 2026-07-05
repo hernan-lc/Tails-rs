@@ -129,15 +129,16 @@ pub(super) fn native_generator_next(
 
             let final_result = match result {
                 Ok(yield_value) if yielded => {
-                    let result_obj = props! {
-                        "value" => yield_value,
-                        "done" => Value::Boolean(false),
-                    };
+                    // Phase 8.5: Use inline PropertyStorage for the small
+                    // 2-property result object, avoiding FxHashMap allocation.
+                    let mut props = crate::vm::interpreter::PropertyStorage::new();
+                    props.insert("value".to_string(), yield_value);
+                    props.insert("done".to_string(), Value::Boolean(false));
                     let obj_idx = interp.gc.allocate(
                         &mut interp.heap,
                         crate::vm::interpreter::HeapValue::Object(
                             crate::vm::interpreter::JsObject {
-                                properties: result_obj,
+                                properties: props,
                                 prototype: None,
                                 extensible: true,
                             },
@@ -146,15 +147,14 @@ pub(super) fn native_generator_next(
                     Ok(Value::Object(obj_idx))
                 }
                 _ => {
-                    let result_obj = props! {
-                        "value" => Value::Undefined,
-                        "done" => Value::Boolean(true),
-                    };
+                    let mut props = crate::vm::interpreter::PropertyStorage::new();
+                    props.insert("value".to_string(), Value::Undefined);
+                    props.insert("done".to_string(), Value::Boolean(true));
                     let obj_idx = interp.gc.allocate(
                         &mut interp.heap,
                         crate::vm::interpreter::HeapValue::Object(
                             crate::vm::interpreter::JsObject {
-                                properties: result_obj,
+                                properties: props,
                                 prototype: None,
                                 extensible: true,
                             },
