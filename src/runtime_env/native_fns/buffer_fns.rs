@@ -225,7 +225,9 @@ pub(super) fn native_buffer_to_string(
         let end = args.get(1).map(|v| to_i64(v) as usize).unwrap_or(buf.len());
         let end = end.min(buf.len());
         let start = start.min(end);
-        Ok(Value::String(String::from_utf8_lossy(&buf[start..end]).to_string()))
+        Ok(Value::String(
+            String::from_utf8_lossy(&buf[start..end]).to_string(),
+        ))
     })
 }
 
@@ -234,7 +236,10 @@ pub(super) fn native_buffer_write(
     _this: &Value,
     args: &[Value],
 ) -> Result<Value> {
-    let data = args.first().map(|v| to_string_value(interp, v)).unwrap_or_default();
+    let data = args
+        .first()
+        .map(|v| to_string_value(interp, v))
+        .unwrap_or_default();
     let offset = args.get(1).map(|v| to_i64(v) as usize).unwrap_or(0);
     let bytes = data.as_bytes();
     with_buffer_mut!(interp, _this, |_idx, buf| {
@@ -272,7 +277,10 @@ pub(super) fn native_buffer_copy(
             if let HeapValue::Buffer(dst) = &mut interp.heap[*dst_idx] {
                 let target_start = args.get(1).map(|v| to_i64(v) as usize).unwrap_or(0);
                 let source_start = args.get(2).map(|v| to_i64(v) as usize).unwrap_or(0);
-                let source_end = args.get(3).map(|v| to_i64(v) as usize).unwrap_or(src_clone.len());
+                let source_end = args
+                    .get(3)
+                    .map(|v| to_i64(v) as usize)
+                    .unwrap_or(src_clone.len());
                 let source_end = source_end.min(src_clone.len());
                 let source_start = source_start.min(source_end);
                 let len = source_end - source_start;
@@ -347,7 +355,10 @@ pub(super) fn native_buffer_index_of(
     args: &[Value],
 ) -> Result<Value> {
     with_buffer!(interp, _this, |_idx, buf| {
-        let search = args.first().map(|v| to_string_value(interp, v)).unwrap_or_default();
+        let search = args
+            .first()
+            .map(|v| to_string_value(interp, v))
+            .unwrap_or_default();
         let byte_offset = args.get(1).map(|v| to_i64(v) as usize).unwrap_or(0);
         let search_bytes = search.as_bytes();
         if search_bytes.is_empty() {

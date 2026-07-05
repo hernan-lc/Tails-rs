@@ -12,7 +12,11 @@ impl<'a> Parser<'a> {
             let right = self.parse_expression()?.inner;
             self.expect(&Token::RightParen)?;
             let body = Box::new(self.parse_statement()?);
-            return Ok(Some(self.spanned(Statement::ForInStatement { left, right, body })));
+            return Ok(Some(self.spanned(Statement::ForInStatement {
+                left,
+                right,
+                body,
+            })));
         }
         if self.peek().token == Token::Of {
             self.advance();
@@ -398,7 +402,13 @@ impl<'a> Parser<'a> {
                 self.advance();
                 self.parse_type_annotation()?;
             }
-            if let Some(stmt) = self.parse_for_in_of(ForInLeft::VariableDeclaration { kind: kind.clone(), id: id.clone() }, is_for_await)? {
+            if let Some(stmt) = self.parse_for_in_of(
+                ForInLeft::VariableDeclaration {
+                    kind: kind.clone(),
+                    id: id.clone(),
+                },
+                is_for_await,
+            )? {
                 return Ok(stmt);
             }
             if !matches!(id, BindingPattern::Identifier(_)) {

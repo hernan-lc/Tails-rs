@@ -25,7 +25,11 @@ fn create_headers_props(headers_raw: &str) -> PropertyStorage {
 
 fn get_string_prop(obj: &crate::vm::interpreter::JsObject, key: &str) -> Option<String> {
     obj.properties.get(key).and_then(|v| {
-        if let Value::String(s) = v { Some(s.clone()) } else { None }
+        if let Value::String(s) = v {
+            Some(s.clone())
+        } else {
+            None
+        }
     })
 }
 
@@ -141,7 +145,13 @@ where
             let raw = obj
                 .properties
                 .get("__headers")
-                .and_then(|v| if let Value::String(s) = v { Some(s.clone()) } else { None })
+                .and_then(|v| {
+                    if let Value::String(s) = v {
+                        Some(s.clone())
+                    } else {
+                        None
+                    }
+                })
                 .unwrap_or_default();
             let mut entries = parse_headers(&raw);
             f(&mut entries);

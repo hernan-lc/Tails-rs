@@ -32,7 +32,9 @@ fn register_error_subclass(
             extensible: true,
         }),
     );
-    interp.globals.insert(name.into(), Value::NativeFunction(ctor_const));
+    interp
+        .globals
+        .insert(name.into(), Value::NativeFunction(ctor_const));
 }
 
 impl Interpreter {
@@ -469,13 +471,33 @@ impl Interpreter {
         self.globals
             .insert("Error".into(), Value::NativeFunction(c::ERROR_CONSTRUCTOR));
 
-        register_error_subclass(self, "TypeError", error_proto_idx, c::TYPE_ERROR_CONSTRUCTOR);
+        register_error_subclass(
+            self,
+            "TypeError",
+            error_proto_idx,
+            c::TYPE_ERROR_CONSTRUCTOR,
+        );
 
-        register_error_subclass(self, "ReferenceError", error_proto_idx, c::REFERENCE_ERROR_CONSTRUCTOR);
+        register_error_subclass(
+            self,
+            "ReferenceError",
+            error_proto_idx,
+            c::REFERENCE_ERROR_CONSTRUCTOR,
+        );
 
-        register_error_subclass(self, "SyntaxError", error_proto_idx, c::SYNTAX_ERROR_CONSTRUCTOR);
+        register_error_subclass(
+            self,
+            "SyntaxError",
+            error_proto_idx,
+            c::SYNTAX_ERROR_CONSTRUCTOR,
+        );
 
-        register_error_subclass(self, "RangeError", error_proto_idx, c::RANGE_ERROR_CONSTRUCTOR);
+        register_error_subclass(
+            self,
+            "RangeError",
+            error_proto_idx,
+            c::RANGE_ERROR_CONSTRUCTOR,
+        );
 
         // TypedArray constructors
         let typed_array_constructors = [

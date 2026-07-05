@@ -37,7 +37,15 @@ macro_rules! error_constructor {
 }
 
 error_constructor!(native_error_constructor, "Error", find_error_ctor_proto);
-error_constructor!(native_type_error_constructor, "TypeError", |i| find_error_proto(i, "TypeError"));
-error_constructor!(native_reference_error_constructor, "ReferenceError", |i| find_error_proto(i, "ReferenceError"));
-error_constructor!(native_syntax_error_constructor, "SyntaxError", |i| find_error_proto(i, "SyntaxError"));
-error_constructor!(native_range_error_constructor, "RangeError", |i| find_error_proto(i, "RangeError"));
+error_constructor!(native_type_error_constructor, "TypeError", |i| {
+    find_error_proto(i, "TypeError")
+});
+error_constructor!(native_reference_error_constructor, "ReferenceError", |i| {
+    find_error_proto(i, "ReferenceError")
+});
+error_constructor!(native_syntax_error_constructor, "SyntaxError", |i| {
+    find_error_proto(i, "SyntaxError")
+});
+error_constructor!(native_range_error_constructor, "RangeError", |i| {
+    find_error_proto(i, "RangeError")
+});

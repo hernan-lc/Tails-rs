@@ -1,6 +1,6 @@
+use super::helpers::is_user_visible_key;
 use crate::errors::{Error, Result};
 use crate::objects::Value;
-use super::helpers::is_user_visible_key;
 use crate::vm::interpreter::{Interpreter, PropertyStorage};
 
 use super::reflect_fns::native_reflect_get_own_property_descriptor;
@@ -16,8 +16,7 @@ pub(super) fn native_object_keys(
             if let crate::vm::interpreter::HeapValue::Object(obj) = &interp.heap[*obj_idx] {
                 let mut keys = Vec::with_capacity(obj.properties.len());
                 for k in obj.properties.keys() {
-                    if !is_user_visible_key(k)
-                    {
+                    if !is_user_visible_key(k) {
                         continue;
                     }
                     keys.push(Value::String(k.to_string()));

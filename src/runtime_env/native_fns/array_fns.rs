@@ -21,7 +21,9 @@ macro_rules! push_array {
     ($interp:expr, $elements:expr) => {{
         let heap_idx = $interp.heap.len();
         $interp.heap.push(crate::vm::interpreter::HeapValue::Array(
-            crate::vm::interpreter::JsArray { elements: $elements },
+            crate::vm::interpreter::JsArray {
+                elements: $elements,
+            },
         ));
         Value::Array(heap_idx)
     }};
@@ -107,9 +109,21 @@ pub(super) fn native_array_slice(
     let start_raw = args.first().map(to_f64).unwrap_or(0.0) as i64;
     let end_raw = args.get(1).map(to_f64).unwrap_or(elements.len() as f64) as i64;
     let len = elements.len() as i64;
-    let start = if start_raw < 0 { (len + start_raw).max(0) } else { start_raw.min(len) } as usize;
-    let end = if end_raw < 0 { (len + end_raw).max(0) } else { end_raw.min(len) } as usize;
-    let sliced = if start < end { elements[start..end].to_vec() } else { Vec::new() };
+    let start = if start_raw < 0 {
+        (len + start_raw).max(0)
+    } else {
+        start_raw.min(len)
+    } as usize;
+    let end = if end_raw < 0 {
+        (len + end_raw).max(0)
+    } else {
+        end_raw.min(len)
+    } as usize;
+    let sliced = if start < end {
+        elements[start..end].to_vec()
+    } else {
+        Vec::new()
+    };
     Ok(push_array!(interp, sliced))
 }
 

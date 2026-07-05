@@ -34,7 +34,9 @@ macro_rules! date_getter {
             this: &Value,
             _args: &[Value],
         ) -> Result<Value> {
-            with_date!(interp, this, |date: &JsDate| Ok(Value::Float(date.$method())))
+            with_date!(interp, this, |date: &JsDate| Ok(Value::Float(
+                date.$method()
+            )))
         }
     };
 }
@@ -150,41 +152,7 @@ pub(super) fn native_date_get_time(
     with_date!(interp, this, |date: &JsDate| Ok(Value::Float(date.utc_ms)))
 }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 // UTC getters
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 // Setters
 
@@ -374,18 +342,6 @@ pub(super) fn native_date_set_milliseconds(
 }
 
 // String conversion methods
-
-
-
-
-
-
-
-
-
-
-
-
 
 macro_rules! date_to_string_fn {
     ($name:ident, $method:ident) => {

@@ -196,7 +196,8 @@ pub(super) fn native_map_for_each(
     with_map!(interp, this, |_idx, map| {
         let callback = args.first().cloned().unwrap_or(Value::Undefined);
         let this_arg = args.get(1).cloned().unwrap_or(Value::Undefined);
-        let entries: Vec<(Value, Value)> = map.keys
+        let entries: Vec<(Value, Value)> = map
+            .keys
             .iter()
             .zip(map.values.iter())
             .map(|(k, v)| (k.clone(), v.clone()))

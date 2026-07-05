@@ -96,7 +96,12 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_nullish(&mut self) -> Result<SpannedNode<Expression>> {
-        parse_left_assoc!(self, parse_or, Token::NullishCoalescing, BinaryOperator::NullishCoalescing)
+        parse_left_assoc!(
+            self,
+            parse_or,
+            Token::NullishCoalescing,
+            BinaryOperator::NullishCoalescing
+        )
     }
 
     fn parse_and(&mut self) -> Result<SpannedNode<Expression>> {
@@ -133,15 +138,30 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_bitwise_xor(&mut self) -> Result<SpannedNode<Expression>> {
-        parse_left_assoc!(self, parse_bitwise_and, Token::BitXor, BinaryOperator::BitXor)
+        parse_left_assoc!(
+            self,
+            parse_bitwise_and,
+            Token::BitXor,
+            BinaryOperator::BitXor
+        )
     }
 
     fn parse_bitwise_and(&mut self) -> Result<SpannedNode<Expression>> {
-        parse_left_assoc!(self, parse_instanceof, Token::BitAnd, BinaryOperator::BitAnd)
+        parse_left_assoc!(
+            self,
+            parse_instanceof,
+            Token::BitAnd,
+            BinaryOperator::BitAnd
+        )
     }
 
     fn parse_instanceof(&mut self) -> Result<SpannedNode<Expression>> {
-        parse_left_assoc!(self, parse_in, Token::Instanceof, BinaryOperator::Instanceof)
+        parse_left_assoc!(
+            self,
+            parse_in,
+            Token::Instanceof,
+            BinaryOperator::Instanceof
+        )
     }
 
     fn parse_in(&mut self) -> Result<SpannedNode<Expression>> {
@@ -492,7 +512,10 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn parse_member_chain(&mut self, mut expr: SpannedNode<Expression>) -> Result<SpannedNode<Expression>> {
+    fn parse_member_chain(
+        &mut self,
+        mut expr: SpannedNode<Expression>,
+    ) -> Result<SpannedNode<Expression>> {
         loop {
             if self.peek().token == Token::LeftParen {
                 self.advance();
@@ -569,7 +592,10 @@ impl<'a> Parser<'a> {
                 continue;
             }
             let next = self.peek().token.clone();
-            if !matches!(next, Token::LeftParen | Token::QuestionDot | Token::Dot | Token::LeftBracket) {
+            if !matches!(
+                next,
+                Token::LeftParen | Token::QuestionDot | Token::Dot | Token::LeftBracket
+            ) {
                 break;
             }
             expr = self.parse_member_chain(expr)?;

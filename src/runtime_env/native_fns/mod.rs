@@ -782,7 +782,4 @@ pub static NATIVE_TABLE: &[NativeFn] = &[
 ];
 
 #[cfg(test)]
-const _: () = assert!(
-    !NATIVE_TABLE.is_empty(),
-    "NATIVE_TABLE must not be empty"
-);
+const _: () = assert!(!NATIVE_TABLE.is_empty(), "NATIVE_TABLE must not be empty");
