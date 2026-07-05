@@ -398,10 +398,7 @@ impl CodeGenerator {
         Ok(())
     }
 
-    fn generate_destructuring_assignment_target(
-        &mut self,
-        pattern: &Expression,
-    ) -> Result<()> {
+    fn generate_destructuring_assignment_target(&mut self, pattern: &Expression) -> Result<()> {
         match pattern {
             Expression::Identifier(id) => {
                 if let Some(local_idx) = self.resolve_local(id) {

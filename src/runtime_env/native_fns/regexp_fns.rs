@@ -117,7 +117,7 @@ pub(super) fn native_regexp_exec(
         None => return Err(Error::TypeError("Not a RegExp".into())),
     };
 
-    let matches = if let HeapValue::RegExp(ref mut regexp) = interp.heap[idx] {
+    if let HeapValue::RegExp(ref mut regexp) = interp.heap[idx] {
         if regexp.global || regexp.sticky {
             let start = regexp.last_index as usize;
             if start > input.len() {
@@ -131,36 +131,66 @@ pub(super) fn native_regexp_exec(
                     } else {
                         regexp.last_index = end as f64;
                     }
-                    caps
+                    let mut elements: Vec<Value> = Vec::with_capacity(caps.len());
+                    for s in caps {
+                        elements.push(Value::String(s));
+                    }
+                    let arr_idx = interp.heap.len();
+                    interp
+                        .heap
+                        .push(HeapValue::Array(crate::vm::interpreter::JsArray {
+                            elements,
+                        }));
+                    Ok(Value::Array(arr_idx))
                 }
                 None => {
                     regexp.last_index = 0.0;
-                    return Ok(Value::Null);
+                    Ok(Value::Null)
                 }
             }
         } else {
-            match regexp.exec(input) {
-                Some(m) => m,
-                None => return Ok(Value::Null),
+            match regexp.exec_with_groups(input) {
+                Some((captures, named_groups, match_start)) => {
+                    let mut props = rustc_hash::FxHashMap::default();
+                    for (i, cap) in captures.iter().enumerate() {
+                        props.insert(i.to_string(), Value::String(cap.clone()));
+                    }
+                    props.insert("length".to_string(), Value::Float(captures.len() as f64));
+                    props.insert("index".to_string(), Value::Float(match_start as f64));
+                    props.insert("input".to_string(), Value::String(input.to_string()));
+                    if named_groups.is_empty() {
+                        props.insert("groups".to_string(), Value::Undefined);
+                    } else {
+                        let mut group_props = rustc_hash::FxHashMap::default();
+                        for (k, v) in named_groups {
+                            group_props.insert(k, Value::String(v));
+                        }
+                        let groups_idx = interp.heap.len();
+                        interp
+                            .heap
+                            .push(HeapValue::Object(crate::vm::interpreter::JsObject {
+                                properties: group_props.into(),
+                                prototype: None,
+                                extensible: true,
+                            }));
+                        props.insert("groups".to_string(), Value::Object(groups_idx));
+                    }
+                    let obj_idx = interp.heap.len();
+                    interp
+                        .heap
+                        .push(HeapValue::Object(crate::vm::interpreter::JsObject {
+                            properties: props.into(),
+                            prototype: None,
+                            extensible: true,
+                        }));
+                    Ok(Value::Object(obj_idx))
+                }
+                None => Ok(Value::Null),
             }
         }
     } else {
-        return Err(Error::TypeError("Not a RegExp".into()));
-    };
-
-    // Phase 7B + Phase 3.4 (RegExp lazy result): build the result array
-    // in-place by pre-allocating the `elements` Vec with the exact capacity.
-    let mut elements: Vec<Value> = Vec::with_capacity(matches.len());
-    for s in matches {
-        elements.push(Value::String(s));
+        Err(Error::TypeError("Not a RegExp".into()))
     }
-    let arr_idx = interp.heap.len();
-    interp
-        .heap
-        .push(HeapValue::Array(crate::vm::interpreter::JsArray {
-            elements,
-        }));
-    Ok(Value::Array(arr_idx))
 }
 
 pub(super) fn native_regexp_to_string(
@@ -285,31 +315,63 @@ pub(super) fn native_string_match(
         _ => return Ok(Value::Null),
     };
 
-    let (is_global, matches) = if let HeapValue::RegExp(ref regexp) = interp.heap[regexp_idx] {
+    if let HeapValue::RegExp(ref regexp) = interp.heap[regexp_idx] {
         if regexp.global {
-            (true, regexp.find_all(&input))
+            let matches = regexp.find_all(&input);
+            if matches.is_empty() {
+                return Ok(Value::Null);
+            }
+            let elements: Vec<Value> = matches.into_iter().map(Value::String).collect();
+            let arr_idx = interp.heap.len();
+            interp
+                .heap
+                .push(HeapValue::Array(crate::vm::interpreter::JsArray {
+                    elements,
+                }));
+            Ok(Value::Array(arr_idx))
         } else {
-            match regexp.exec(&input) {
-                Some(m) => (false, m),
-                None => return Ok(Value::Null),
+            match regexp.exec_with_groups(&input) {
+                Some((captures, named_groups, match_start)) => {
+                    let mut props = rustc_hash::FxHashMap::default();
+                    for (i, cap) in captures.iter().enumerate() {
+                        props.insert(i.to_string(), Value::String(cap.clone()));
+                    }
+                    props.insert("length".to_string(), Value::Float(captures.len() as f64));
+                    props.insert("index".to_string(), Value::Float(match_start as f64));
+                    props.insert("input".to_string(), Value::String(input));
+                    if named_groups.is_empty() {
+                        props.insert("groups".to_string(), Value::Undefined);
+                    } else {
+                        let mut group_props = rustc_hash::FxHashMap::default();
+                        for (k, v) in named_groups {
+                            group_props.insert(k, Value::String(v));
+                        }
+                        let groups_idx = interp.heap.len();
+                        interp
+                            .heap
+                            .push(HeapValue::Object(crate::vm::interpreter::JsObject {
+                                properties: group_props.into(),
+                                prototype: None,
+                                extensible: true,
+                            }));
+                        props.insert("groups".to_string(), Value::Object(groups_idx));
+                    }
+                    let obj_idx = interp.heap.len();
+                    interp
+                        .heap
+                        .push(HeapValue::Object(crate::vm::interpreter::JsObject {
+                            properties: props.into(),
+                            prototype: None,
+                            extensible: true,
+                        }));
+                    Ok(Value::Object(obj_idx))
+                }
+                None => Ok(Value::Null),
             }
         }
     } else {
-        return Err(Error::TypeError("Not a RegExp".into()));
-    };
-
-    if is_global && matches.is_empty() {
-        return Ok(Value::Null);
+        Err(Error::TypeError("Not a RegExp".into()))
     }
-
-    let elements: Vec<Value> = matches.into_iter().map(Value::String).collect();
-    let arr_idx = interp.heap.len();
-    interp
-        .heap
-        .push(HeapValue::Array(crate::vm::interpreter::JsArray {
-            elements,
-        }));
-    Ok(Value::Array(arr_idx))
 }
 
 pub(super) fn native_string_replace(

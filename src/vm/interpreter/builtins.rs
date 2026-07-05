@@ -402,16 +402,22 @@ impl Interpreter {
             .insert("Math".into(), Value::Object(math_obj_idx));
 
         // Number constructor (callable as Number(), with static methods via property lookup)
-        self.globals
-            .insert("Number".into(), Value::NativeFunction(c::NUMBER_CONSTRUCTOR));
+        self.globals.insert(
+            "Number".into(),
+            Value::NativeFunction(c::NUMBER_CONSTRUCTOR),
+        );
 
         // String constructor
-        self.globals
-            .insert("String".into(), Value::NativeFunction(c::STRING_CONSTRUCTOR));
+        self.globals.insert(
+            "String".into(),
+            Value::NativeFunction(c::STRING_CONSTRUCTOR),
+        );
 
         // Boolean constructor
-        self.globals
-            .insert("Boolean".into(), Value::NativeFunction(c::BOOLEAN_CONSTRUCTOR));
+        self.globals.insert(
+            "Boolean".into(),
+            Value::NativeFunction(c::BOOLEAN_CONSTRUCTOR),
+        );
 
         // Promise constructor and prototype
         let promise_proto_props = props! {

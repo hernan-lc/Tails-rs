@@ -1,7 +1,7 @@
 class Vec {
   #x;
   #y;
-  constructor(x, y) {
+  constructor(x: number, y: number) {
     this.#x = x;
     this.#y = y;
   }
@@ -9,7 +9,7 @@ class Vec {
     return Math.hypot(this.#x, this.#y);
   }
 }
-const audited = [];
+const audited: string[] = [];
 const v = new Proxy(new Vec(3, 4), {
   get(t, k) {
     audited.push(String(k));
@@ -17,4 +17,4 @@ const v = new Proxy(new Vec(3, 4), {
   },
 });
 console.log("length = " + v.length);
-"audited keys: " + audited.join(", ");
+console.log("audited keys: " + audited.join(", "));

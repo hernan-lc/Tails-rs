@@ -484,6 +484,9 @@ fn has_advanced_features(pattern: &str) -> bool {
         if bytes[i] == b'\\' && i + 1 < len && bytes[i + 1].is_ascii_digit() {
             return true; // backreference
         }
+        if bytes[i] == b'\\' && i + 1 < len && (bytes[i + 1] == b'p' || bytes[i + 1] == b'P') {
+            return true; // Unicode property escape
+        }
         i += 1;
     }
     false
@@ -657,6 +660,59 @@ impl JsRegExp {
             };
         }
         self.exec_at(input, 0).map(|(v, _)| v)
+    }
+
+    /// Like `exec`, but also extracts named capture groups.
+    /// Returns `(positional_groups, named_groups, match_start)`.
+    pub fn exec_with_groups(
+        &self,
+        input: &str,
+    ) -> Option<(Vec<String>, FxHashMap<String, String>, usize)> {
+        if self.is_literal_pattern() {
+            return self.exec(input).map(|v| (v, FxHashMap::default(), 0));
+        }
+
+        let tail = input;
+        match self.compiled.as_ref()? {
+            JsCompiledRegex::Simple(re) => {
+                let caps = re.captures(tail)?;
+                let match_start = caps.get(0).map(|m| m.start()).unwrap_or(0);
+                let mut results = Vec::with_capacity(caps.len());
+                for i in 0..caps.len() {
+                    results.push(
+                        caps.get(i)
+                            .map(|m| m.as_str().to_string())
+                            .unwrap_or_default(),
+                    );
+                }
+                let mut groups = FxHashMap::default();
+                for name in re.capture_names().flatten() {
+                    if let Some(m) = caps.name(name) {
+                        groups.insert(name.to_string(), m.as_str().to_string());
+                    }
+                }
+                Some((results, groups, match_start))
+            }
+            JsCompiledRegex::Advanced(re) => {
+                let caps = re.captures(tail).ok()??;
+                let match_start = caps.get(0).map(|m| m.start()).unwrap_or(0);
+                let mut results = Vec::with_capacity(caps.len());
+                for i in 0..caps.len() {
+                    results.push(
+                        caps.get(i)
+                            .map(|m| m.as_str().to_string())
+                            .unwrap_or_default(),
+                    );
+                }
+                let mut groups = FxHashMap::default();
+                for name in re.capture_names().flatten() {
+                    if let Some(m) = caps.name(name) {
+                        groups.insert(name.to_string(), m.as_str().to_string());
+                    }
+                }
+                Some((results, groups, match_start))
+            }
+        }
     }
 
     pub fn find_all(&self, input: &str) -> Vec<String> {

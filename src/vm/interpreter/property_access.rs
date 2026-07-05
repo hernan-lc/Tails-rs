@@ -8,6 +8,8 @@ fn key_to_str(key: &Value) -> Option<String> {
     match key {
         Value::String(s) => Some(s.clone()),
         Value::Cons(c) => Some(c.flatten()),
+        Value::Integer(n) => Some(n.to_string()),
+        Value::Float(n) => Some(((*n) as i64).to_string()),
         _ => None,
     }
 }
@@ -350,7 +352,9 @@ impl Interpreter {
                         "parseFloat" => return Ok(Value::NativeFunction(c::NUMBER_PARSE_FLOAT)),
                         "parseInt" => return Ok(Value::NativeFunction(c::NUMBER_PARSE_INT)),
                         "isInteger" => return Ok(Value::NativeFunction(c::NUMBER_IS_INTEGER)),
-                        "isSafeInteger" => return Ok(Value::NativeFunction(c::NUMBER_IS_SAFE_INTEGER)),
+                        "isSafeInteger" => {
+                            return Ok(Value::NativeFunction(c::NUMBER_IS_SAFE_INTEGER))
+                        }
                         _ => {}
                     }
                 }
@@ -635,6 +639,8 @@ impl Interpreter {
             "repeat" => 65,
             "padStart" => 66,
             "padEnd" => 67,
+            "match" => 227,
+            "search" => 229,
             "matchAll" => 393,
             _ => return Ok(Value::Undefined),
         };

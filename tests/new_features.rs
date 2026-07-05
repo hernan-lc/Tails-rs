@@ -287,6 +287,144 @@ fn test_private_field_with_getter() {
     assert_eq!(result, tails::Value::Float(5.0));
 }
 
+// ============================================================================
+// RegExp named groups and Unicode property escapes
+// ============================================================================
+
+#[test]
+fn test_regexp_named_groups_exec() {
+    let mut rt = TailsRuntime::default();
+    let result = rt
+        .eval(
+            r#"
+        const re = /(?<year>\d{4})-(?<month>\d{2})/;
+        const m = "2026-07".match(re);
+        m.groups.year;
+    "#,
+        )
+        .unwrap();
+    assert_eq!(result.to_string(), "2026");
+}
+
+#[test]
+fn test_regexp_named_groups_month() {
+    let mut rt = TailsRuntime::default();
+    let result = rt
+        .eval(
+            r#"
+        const re = /(?<year>\d{4})-(?<month>\d{2})/;
+        const m = "2026-07".match(re);
+        m.groups.month;
+    "#,
+        )
+        .unwrap();
+    assert_eq!(result.to_string(), "07");
+}
+
+#[test]
+fn test_regexp_named_groups_index() {
+    let mut rt = TailsRuntime::default();
+    let result = rt
+        .eval(
+            r#"
+        const re = /(?<year>\d{4})-(?<month>\d{2})/;
+        const m = "released 2026-07".match(re);
+        m.index;
+    "#,
+        )
+        .unwrap();
+    assert_eq!(result, tails::Value::Float(9.0));
+}
+
+#[test]
+fn test_regexp_named_groups_input() {
+    let mut rt = TailsRuntime::default();
+    let result = rt
+        .eval(
+            r#"
+        const re = /(?<year>\d{4})-(?<month>\d{2})/;
+        const m = "released 2026-07".match(re);
+        m.input;
+    "#,
+        )
+        .unwrap();
+    assert_eq!(result.to_string(), "released 2026-07");
+}
+
+#[test]
+fn test_regexp_no_named_groups() {
+    let mut rt = TailsRuntime::default();
+    let result = rt
+        .eval(
+            r#"
+        const re = /(\d{4})-(\d{2})/;
+        const m = "2026-07".match(re);
+        m.groups;
+    "#,
+        )
+        .unwrap();
+    assert_eq!(result, tails::Value::Undefined);
+}
+
+#[test]
+fn test_regexp_match_global() {
+    let mut rt = TailsRuntime::default();
+    let result = rt
+        .eval(
+            r#"
+        const re = /\d+/g;
+        const m = "abc 123 def 456".match(m);
+        "global";
+    "#,
+        )
+        .unwrap();
+    // Just verify global match doesn't crash
+    assert_eq!(result.to_string(), "global");
+}
+
+#[test]
+fn test_regexp_unicode_property_escape() {
+    let mut rt = TailsRuntime::default();
+    let result = rt
+        .eval(
+            r#"
+        const greek = [..."αβγ".matchAll(/\p{Script=Greek}/gu)];
+        greek.length;
+    "#,
+        )
+        .unwrap();
+    assert_eq!(result, tails::Value::Float(3.0));
+}
+
+#[test]
+fn test_regexp_exec_named_groups() {
+    let mut rt = TailsRuntime::default();
+    let result = rt
+        .eval(
+            r#"
+        const re = /(?<city>\w+), (?<state>\w+)/;
+        const m = re.exec("Portland, OR");
+        m.groups.city;
+    "#,
+        )
+        .unwrap();
+    assert_eq!(result.to_string(), "Portland");
+}
+
+#[test]
+fn test_string_match_basic() {
+    let mut rt = TailsRuntime::default();
+    let result = rt
+        .eval(
+            r#"
+        const m = "hello world".match(/(\w+) (\w+)/);
+        m[0];
+    "#,
+        )
+        .unwrap();
+    assert_eq!(result.to_string(), "hello world");
+}
+
 #[test]
 fn test_private_field_multiple_instances() {
     let mut rt = TailsRuntime::default();
