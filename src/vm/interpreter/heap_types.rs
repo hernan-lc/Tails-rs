@@ -16,7 +16,7 @@ const INLINE_CAP: usize = 8;
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug, Clone)]
 pub enum PropertyStorage {
-    Inline(u8, [Option<(String, Value)>; INLINE_CAP]),
+    Inline(u8, [Option<(String, Value)>; INLINE_CAP], bool),
     Map(FxHashMap<String, Value>),
 }
 
@@ -28,7 +28,7 @@ impl Default for PropertyStorage {
 
 impl PropertyStorage {
     pub fn new() -> Self {
-        Self::Inline(0, Default::default())
+        Self::Inline(0, Default::default(), false)
     }
 
     #[allow(dead_code)]
@@ -36,9 +36,20 @@ impl PropertyStorage {
         Self::Map(map)
     }
 
+    /// Returns true if this property storage contains any getter/setter accessors.
+    /// Used to skip the find_accessor linear scan in the common case.
+    pub fn has_accessors(&self) -> bool {
+        match self {
+            Self::Inline(_, _, has_acc) => *has_acc,
+            Self::Map(m) => m
+                .keys()
+                .any(|k| k.starts_with("__getter_") || k.starts_with("__setter_")),
+        }
+    }
+
     pub fn get(&self, key: &str) -> Option<&Value> {
         match self {
-            Self::Inline(len, slots) => {
+            Self::Inline(len, slots, _has_acc) => {
                 for slot in slots.iter().take(*len as usize).flatten() {
                     if slot.0 == key {
                         return Some(&slot.1);
@@ -51,14 +62,18 @@ impl PropertyStorage {
     }
 
     pub fn insert(&mut self, key: String, value: Value) {
+        let is_accessor = key.starts_with("__getter_") || key.starts_with("__setter_");
         match self {
-            Self::Inline(len, slots) => {
+            Self::Inline(len, slots, has_acc) => {
                 let n = *len as usize;
                 // Update existing
                 for slot in slots.iter_mut().take(n) {
                     if let Some((k, _)) = slot {
                         if *k == key {
                             *slot = Some((key, value));
+                            if is_accessor {
+                                *has_acc = true;
+                            }
                             return;
                         }
                     }
@@ -67,6 +82,9 @@ impl PropertyStorage {
                 if n < INLINE_CAP {
                     slots[n] = Some((key, value));
                     *len += 1;
+                    if is_accessor {
+                        *has_acc = true;
+                    }
                 } else {
                     // Upgrade to map
                     let mut map = FxHashMap::default();
@@ -87,7 +105,7 @@ impl PropertyStorage {
 
     pub fn remove(&mut self, key: &str) -> Option<Value> {
         match self {
-            Self::Inline(len, slots) => {
+            Self::Inline(len, slots, _has_acc) => {
                 let n = *len as usize;
                 for i in 0..n {
                     if let Some((k, _)) = &slots[i] {
@@ -111,7 +129,7 @@ impl PropertyStorage {
 
     pub fn contains_key(&self, key: &str) -> bool {
         match self {
-            Self::Inline(len, slots) => {
+            Self::Inline(len, slots, _has_acc) => {
                 for slot in slots.iter().take(*len as usize).flatten() {
                     if slot.0 == key {
                         return true;
@@ -125,7 +143,7 @@ impl PropertyStorage {
 
     pub fn len(&self) -> usize {
         match self {
-            Self::Inline(len, _) => *len as usize,
+            Self::Inline(len, _, _has_acc) => *len as usize,
             Self::Map(m) => m.len(),
         }
     }
@@ -136,7 +154,7 @@ impl PropertyStorage {
 
     pub fn iter(&self) -> impl Iterator<Item = (&str, &Value)> {
         match self {
-            Self::Inline(len, slots) => {
+            Self::Inline(len, slots, _has_acc) => {
                 let n = *len as usize;
                 slots
                     .iter()
@@ -155,7 +173,7 @@ impl PropertyStorage {
 
     pub fn values(&self) -> impl Iterator<Item = &Value> {
         match self {
-            Self::Inline(len, slots) => {
+            Self::Inline(len, slots, _has_acc) => {
                 let n = *len as usize;
                 slots
                     .iter()
@@ -170,7 +188,7 @@ impl PropertyStorage {
 
     pub fn iter_mut(&mut self) -> impl Iterator<Item = (&str, &mut Value)> {
         match self {
-            Self::Inline(len, slots) => {
+            Self::Inline(len, slots, _has_acc) => {
                 let n = *len as usize;
                 slots
                     .iter_mut()
@@ -197,7 +215,7 @@ impl From<FxHashMap<String, Value>> for PropertyStorage {
 impl PropertyStorage {
     pub fn keys(&self) -> impl Iterator<Item = &str> {
         match self {
-            Self::Inline(len, slots) => {
+            Self::Inline(len, slots, _has_acc) => {
                 let n = *len as usize;
                 slots
                     .iter()
@@ -212,7 +230,7 @@ impl PropertyStorage {
 
     pub fn clear(&mut self) {
         match self {
-            Self::Inline(len, slots) => {
+            Self::Inline(len, slots, _has_acc) => {
                 for slot in slots.iter_mut() {
                     *slot = None;
                 }

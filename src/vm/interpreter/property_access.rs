@@ -149,9 +149,12 @@ impl Interpreter {
                     if let Some(val) = obj.properties.get(&key_str) {
                         return Ok(val.clone());
                     }
-                    if let Some(getter_val) = find_accessor(&obj.properties, "__getter_", &key_str)
-                    {
-                        return self.call_value(&getter_val, this, &[]);
+                    if obj.properties.has_accessors() {
+                        if let Some(getter_val) =
+                            find_accessor(&obj.properties, "__getter_", &key_str)
+                        {
+                            return self.call_value(&getter_val, this, &[]);
+                        }
                     }
                     if let Some(proto_idx) = obj.prototype {
                         let proto_val = Value::Object(proto_idx);
@@ -759,8 +762,9 @@ impl Interpreter {
                     if obj.properties.contains_key(&key_str) {
                         return Ok(Value::Boolean(true));
                     }
-                    if find_accessor(&obj.properties, "__getter_", &key_str).is_some()
-                        || find_accessor(&obj.properties, "__setter_", &key_str).is_some()
+                    if obj.properties.has_accessors()
+                        && (find_accessor(&obj.properties, "__getter_", &key_str).is_some()
+                            || find_accessor(&obj.properties, "__setter_", &key_str).is_some())
                     {
                         return Ok(Value::Boolean(true));
                     }

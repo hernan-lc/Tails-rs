@@ -448,10 +448,16 @@ impl Interpreter {
                         }
                         Value::Object(obj_idx) => {
                             if let HeapValue::Object(obj) = &mut self.heap[*obj_idx] {
-                                let setter_key = format!("{}{}", SETTER_PREFIX, key_str);
-                                if let Some(setter_val) = obj.properties.get(&setter_key).cloned() {
-                                    let _ = obj;
-                                    self.call_value(&setter_val, &object, &[value])?;
+                                if obj.properties.has_accessors() {
+                                    let setter_key = format!("{}{}", SETTER_PREFIX, key_str);
+                                    if let Some(setter_val) =
+                                        obj.properties.get(&setter_key).cloned()
+                                    {
+                                        let _ = obj;
+                                        self.call_value(&setter_val, &object, &[value])?;
+                                    } else {
+                                        obj.properties.insert(key_str.to_string(), value);
+                                    }
                                 } else {
                                     obj.properties.insert(key_str.to_string(), value);
                                 }
