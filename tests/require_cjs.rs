@@ -81,7 +81,8 @@ fn test_require_native_path() {
         path.join("a", "b", "c")
     "#;
     let result = runtime.eval(source).unwrap();
-    assert_eq!(result, tails::Value::String("a/b/c".to_string()));
+    let sep = std::path::MAIN_SEPARATOR;
+    assert_eq!(result, tails::Value::String(format!("a{sep}b{sep}c")));
 }
 
 #[test]
