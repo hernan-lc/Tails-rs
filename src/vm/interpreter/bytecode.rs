@@ -192,13 +192,8 @@ impl Interpreter {
                     if let Some(frame) = self.call_stack.last() {
                         let local_idx = frame.base_pointer + *local_slot as usize;
                         if local_idx < self.stack.len() {
-                            let left = self
-                                .globals
-                                .get(name.as_str())
-                                .cloned()
-                                .unwrap_or(Value::Undefined);
-                            let right = self.stack[local_idx].clone();
-                            match (&left, &right) {
+                            let right = &self.stack[local_idx];
+                            match (&self.globals.get(name.as_str()).cloned().unwrap_or(Value::Undefined), right) {
                                 (Value::Integer(a), Value::Integer(b)) => {
                                     if let Some(result) = a.checked_add(*b) {
                                         self.globals.insert(name.clone(), Value::Integer(result));
@@ -229,7 +224,12 @@ impl Interpreter {
                                     continue;
                                 }
                                 _ => {
-                                    let result = self.add(left, right)?;
+                                    let left = self
+                                        .globals
+                                        .get(name.as_str())
+                                        .cloned()
+                                        .unwrap_or(Value::Undefined);
+                                    let result = self.add(left, right.clone())?;
                                     self.globals.insert(name.clone(), result);
                                     pc += 1;
                                     continue;

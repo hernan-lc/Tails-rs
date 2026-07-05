@@ -568,7 +568,9 @@ impl Interpreter {
                 let array = self.stack_pop()?;
                 if let Value::Array(arr_idx) = array {
                     if let HeapValue::Array(arr) = &mut self.heap[arr_idx] {
-                        arr.elements.push(value.clone());
+                        arr.elements.push(value);
+                        self.stack.push(array);
+                        return Ok(true);
                     }
                 }
                 self.stack.push(array);
