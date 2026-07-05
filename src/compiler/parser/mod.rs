@@ -710,7 +710,19 @@ impl<'a> Parser<'a> {
     pub(crate) fn parse_statement(&mut self) -> Result<SpannedNode<Statement>> {
         match self.peek().token.clone() {
             Token::Const | Token::Let | Token::Var => self.parse_variable_declaration(),
-            Token::Function | Token::Async => self.parse_function_declaration(),
+            Token::Function => self.parse_function_declaration(),
+            Token::Async => {
+                let next_is_function = self
+                    .tokens
+                    .get(self.pos + 1)
+                    .map(|t| t.token == Token::Function)
+                    .unwrap_or(false);
+                if next_is_function {
+                    self.parse_function_declaration()
+                } else {
+                    self.parse_expression_statement()
+                }
+            }
             Token::Return => self.parse_return_statement(),
             Token::Yield => self.parse_yield_statement(),
             Token::If => self.parse_if_statement(),

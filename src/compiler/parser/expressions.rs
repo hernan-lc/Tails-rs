@@ -777,68 +777,97 @@ impl<'a> Parser<'a> {
                 }))
             }
             Token::Async => {
-                self.advance();
-                if self.peek().token == Token::Function {
+                let next_is_function = self
+                    .tokens
+                    .get(self.pos + 1)
+                    .map(|t| t.token == Token::Function)
+                    .unwrap_or(false);
+                let next_is_paren = self
+                    .tokens
+                    .get(self.pos + 1)
+                    .map(|t| t.token == Token::LeftParen)
+                    .unwrap_or(false);
+                if next_is_function || next_is_paren {
                     self.advance();
-                    let is_generator = self.peek().token == Token::Star;
-                    if is_generator {
+                    if self.peek().token == Token::Function {
                         self.advance();
-                    }
-                    let name = if let Token::Identifier(_) = self.peek().token.clone() {
-                        match self.advance().token {
-                            Token::Identifier(n) => Some(n),
-                            _ => unreachable!(),
+                        let is_generator = self.peek().token == Token::Star;
+                        if is_generator {
+                            self.advance();
                         }
-                    } else {
-                        None
-                    };
-                    self.expect(&Token::LeftParen)?;
-                    let (params, param_types, defaults, rest_param) = self.parse_typed_params()?;
-                    self.expect(&Token::RightParen)?;
-                    let return_type = if self.peek().token == Token::Colon {
-                        self.advance();
-                        Some(self.parse_type_annotation()?)
-                    } else {
-                        None
-                    };
-                    self.expect(&Token::LeftBrace)?;
-                    let body = self.parse_block_body()?;
-                    self.expect(&Token::RightBrace)?;
-                    Ok(self.spanned(Expression::FunctionExpression {
-                        name,
-                        params,
-                        param_types: Some(param_types),
-                        defaults,
-                        rest_param,
-                        return_type,
-                        body,
-                        is_async: true,
-                        is_generator,
-                    }))
-                } else {
-                    self.expect(&Token::LeftParen)?;
-                    let (params, param_types, defaults, rest_param) = self.parse_typed_params()?;
-                    self.expect(&Token::RightParen)?;
-                    let return_type = if self.peek().token == Token::Colon {
-                        self.advance();
-                        Some(self.parse_type_annotation()?)
-                    } else {
-                        None
-                    };
-                    if self.peek().token == Token::Arrow {
-                        self.advance();
-                        self.parse_arrow_body(
+                        let name = if let Token::Identifier(_) = self.peek().token.clone() {
+                            match self.advance().token {
+                                Token::Identifier(n) => Some(n),
+                                _ => unreachable!(),
+                            }
+                        } else {
+                            None
+                        };
+                        self.expect(&Token::LeftParen)?;
+                        let (params, param_types, defaults, rest_param) =
+                            self.parse_typed_params()?;
+                        self.expect(&Token::RightParen)?;
+                        let return_type = if self.peek().token == Token::Colon {
+                            self.advance();
+                            Some(self.parse_type_annotation()?)
+                        } else {
+                            None
+                        };
+                        self.expect(&Token::LeftBrace)?;
+                        let body = self.parse_block_body()?;
+                        self.expect(&Token::RightBrace)?;
+                        Ok(self.spanned(Expression::FunctionExpression {
+                            name,
                             params,
-                            Some(param_types),
+                            param_types: Some(param_types),
                             defaults,
                             rest_param,
                             return_type,
-                            true,
+                            body,
+                            is_async: true,
+                            is_generator,
+                        }))
+                    } else {
+                        self.expect(&Token::LeftParen)?;
+                        let (params, param_types, defaults, rest_param) =
+                            self.parse_typed_params()?;
+                        self.expect(&Token::RightParen)?;
+                        let return_type = if self.peek().token == Token::Colon {
+                            self.advance();
+                            Some(self.parse_type_annotation()?)
+                        } else {
+                            None
+                        };
+                        if self.peek().token == Token::Arrow {
+                            self.advance();
+                            self.parse_arrow_body(
+                                params,
+                                Some(param_types),
+                                defaults,
+                                rest_param,
+                                return_type,
+                                true,
+                            )
+                        } else {
+                            Err(Error::ParseError(
+                                "Expected '=>' after async parameters".into(),
+                            ))
+                        }
+                    }
+                } else {
+                    self.advance();
+                    if self.peek().token == Token::Arrow {
+                        self.advance();
+                        self.parse_arrow_body(
+                            vec!["async".to_string()],
+                            None,
+                            vec![],
+                            None,
+                            None,
+                            false,
                         )
                     } else {
-                        Err(Error::ParseError(
-                            "Expected '=>' after async parameters".into(),
-                        ))
+                        Ok(self.spanned(Expression::Identifier("async".to_string())))
                     }
                 }
             }
@@ -916,6 +945,10 @@ impl<'a> Parser<'a> {
                             self.advance();
                             let argument = Box::new(self.parse_expression()?.inner);
                             elements.push(Expression::SpreadElement { argument });
+                        } else if self.peek().token == Token::Comma {
+                            elements.push(Expression::UndefinedLiteral);
+                        } else if self.peek().token == Token::RightBracket {
+                            break;
                         } else {
                             elements.push(self.parse_expression()?.inner);
                         }
