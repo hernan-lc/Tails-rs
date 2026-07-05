@@ -1,6 +1,5 @@
 use crate::errors::{Error, Result};
 use crate::objects::Value;
-use crate::props;
 use crate::vm::interpreter::Interpreter;
 
 pub(super) fn native_generator_next(

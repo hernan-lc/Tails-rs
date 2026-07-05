@@ -230,7 +230,8 @@ impl Interpreter {
                                     self.heap.push(HeapValue::Array(JsArray {
                                         elements: Vec::with_capacity(2),
                                     }));
-                                    if let HeapValue::Iterator(iter_mut) = &mut self.heap[*iter_idx] {
+                                    if let HeapValue::Iterator(iter_mut) = &mut self.heap[*iter_idx]
+                                    {
                                         iter_mut.data = Some(Value::Array(idx));
                                     }
                                     idx

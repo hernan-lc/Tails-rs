@@ -202,7 +202,14 @@ impl Interpreter {
                         let local_idx = frame.base_pointer + *local_slot as usize;
                         if local_idx < self.stack.len() {
                             let right = &self.stack[local_idx];
-                            match (&self.globals.get(name.as_str()).cloned().unwrap_or(Value::Undefined), right) {
+                            match (
+                                &self
+                                    .globals
+                                    .get(name.as_str())
+                                    .cloned()
+                                    .unwrap_or(Value::Undefined),
+                                right,
+                            ) {
                                 (Value::Integer(a), Value::Integer(b)) => {
                                     if let Some(result) = a.checked_add(*b) {
                                         self.globals.insert(name.clone(), Value::Integer(result));
@@ -278,9 +285,10 @@ impl Interpreter {
                         })?);
                     }
                     args.reverse();
-                    let object = self.stack.pop().ok_or_else(|| {
-                        Error::RuntimeError(super::ERR_STACK_UNDERFLOW.into())
-                    })?;
+                    let object = self
+                        .stack
+                        .pop()
+                        .ok_or_else(|| Error::RuntimeError(super::ERR_STACK_UNDERFLOW.into()))?;
                     if let Value::Map(map_idx) = &object {
                         let key = args.first().cloned().unwrap_or(Value::Undefined);
                         let value = args.get(1).cloned().unwrap_or(Value::Undefined);
@@ -298,12 +306,14 @@ impl Interpreter {
                     continue;
                 }
                 Instruction::MapGet => {
-                    let key = self.stack.pop().ok_or_else(|| {
-                        Error::RuntimeError(super::ERR_STACK_UNDERFLOW.into())
-                    })?;
-                    let object = self.stack.pop().ok_or_else(|| {
-                        Error::RuntimeError(super::ERR_STACK_UNDERFLOW.into())
-                    })?;
+                    let key = self
+                        .stack
+                        .pop()
+                        .ok_or_else(|| Error::RuntimeError(super::ERR_STACK_UNDERFLOW.into()))?;
+                    let object = self
+                        .stack
+                        .pop()
+                        .ok_or_else(|| Error::RuntimeError(super::ERR_STACK_UNDERFLOW.into()))?;
                     if let Value::Map(map_idx) = &object {
                         let result = if let HeapValue::Map(map) = &self.heap[*map_idx] {
                             map.get(&key).cloned().unwrap_or(Value::Undefined)

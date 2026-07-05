@@ -90,8 +90,8 @@ impl PropertyStorage {
                     }
                 }
                 // Cache miss: linear scan, then update cache
-                for i in 0..n {
-                    if let Some((k, v)) = &slots[i] {
+                for (i, slot) in slots.iter().enumerate().take(n) {
+                    if let Some((k, v)) = slot {
                         if k.as_str() == key {
                             if n > 2 {
                                 *last_idx = i as u8;
@@ -112,10 +112,10 @@ impl PropertyStorage {
             Self::Inline(len, slots, has_acc, last_idx) => {
                 let n = *len as usize;
                 // Update existing
-                for i in 0..n {
-                    if let Some((k, _)) = &slots[i] {
+                for (i, slot) in slots.iter_mut().enumerate().take(n) {
+                    if let Some((k, _)) = slot {
                         if *k == key {
-                            slots[i] = Some((key, value));
+                            *slot = Some((key, value));
                             *last_idx = i as u8;
                             if is_accessor {
                                 *has_acc = true;
