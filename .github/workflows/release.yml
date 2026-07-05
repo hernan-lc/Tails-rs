@@ -1,0 +1,160 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to release (e.g. v0.1.0)"
+        required: true
+
+permissions:
+  contents: write
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: short
+
+jobs:
+  build:
+    name: Build (${{ matrix.target }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            archive: tar.gz
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            archive: zip
+          - os: macos-13
+            target: x86_64-apple-darwin
+            archive: tar.gz
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Cache cargo registry & target
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            . -> target
+            modules/abi -> target
+            modules/native-macros -> target
+            modules/tails-validator -> target
+            modules/fs -> target
+            modules/fs-promises -> target
+            modules/path -> target
+            modules/process -> target
+            modules/os -> target
+            modules/websocket -> target
+            modules/http -> target
+            modules/net -> target
+
+      - name: Install Linux dependencies
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y pkg-config libssl-dev
+
+      - name: Build
+        run: cargo build --release --locked --all-features --package tails-rs
+
+      - name: Determine archive name
+        id: archive
+        shell: bash
+        run: |
+          name="tails-${{ matrix.target }}"
+          echo "name=${name}" >> "$GITHUB_OUTPUT"
+
+      - name: Package (unix)
+        if: runner.os != 'Windows'
+        run: |
+          cd target/release
+          tar czf "../../${{ steps.archive.outputs.name }}.tar.gz" tails
+
+      - name: Package (windows)
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          cd target/release
+          7z a "../../${{ steps.archive.outputs.name }}.zip" tails.exe
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.archive.outputs.name }}
+          path: ${{ steps.archive.outputs.name }}.${{ matrix.archive }}
+
+  release:
+    name: Create Release
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Determine tag
+        id: tag
+        shell: bash
+        run: |
+          if [ -n "${{ github.event.inputs.tag }}" ]; then
+            echo "tag=${{ github.event.inputs.tag }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=${GITHUB_REF#refs/tags/}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Generate changelog
+        id: changelog
+        shell: bash
+        run: |
+          tag="${{ steps.tag.outputs.tag }}"
+          prev=$(git tag --sort=-version:refname | grep '^v' | head -2 | tail -1)
+          if [ -n "$prev" ] && [ "$prev" != "$tag" ]; then
+            echo "body<<EOF" >> "$GITHUB_OUTPUT"
+            git log --pretty=format:"- %s (%h)" "$prev".."$tag" >> "$GITHUB_OUTPUT"
+            echo "" >> "$GITHUB_OUTPUT"
+            echo "EOF" >> "$GITHUB_OUTPUT"
+          else
+            echo "body=Initial release" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: List artifacts
+        run: ls -lh artifacts/
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.tag.outputs.tag }}
+          name: ${{ steps.tag.outputs.tag }}
+          body: |
+            ${{ steps.changelog.outputs.body }}
+
+            ## Downloads
+
+            | Platform | Archive |
+            |----------|---------|
+            | Linux x86_64 | `tails-x86_64-unknown-linux-gnu.tar.gz` |
+            | Windows x86_64 | `tails-x86_64-pc-windows-msvc.zip` |
+            | macOS x86_64 | `tails-x86_64-apple-darwin.tar.gz` |
+          files: artifacts/*
+          draft: false
+          prerelease: false
