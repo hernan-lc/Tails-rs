@@ -243,4 +243,7 @@ pub enum Instruction {
         body_pc: u32,
         step: i64,
     },
+    // Fused global add: x = x + local
+    // Replaces: LoadGlobal + LoadLocal + Add + StoreGlobal
+    AddGlobal(String, u16),
 }

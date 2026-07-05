@@ -7,7 +7,7 @@ mod control_flow;
 mod error_format;
 mod exception_handling;
 mod function_ops;
-mod heap_types;
+pub mod heap_types;
 mod instructions;
 mod iterators;
 mod modules;
@@ -103,6 +103,8 @@ pub struct Interpreter {
     /// during their listen/connect calls. Drained by the event loop in
     /// [`TailsRuntime::run_event_loop`] after script execution finishes.
     pub(crate) pending_event_sources: Vec<Box<dyn EventSource>>,
+    /// Baseline JIT compiler for hot loops.
+    pub(crate) jit: crate::vm::jit::JitCompiler,
 }
 
 impl Interpreter {
@@ -140,6 +142,7 @@ impl Interpreter {
             native_object_methods: HashMap::new(),
             native_class_registry: HashMap::new(),
             pending_event_sources: Vec::new(),
+            jit: crate::vm::jit::JitCompiler::new(),
         };
         interp.init_builtins();
         Ok(interp)

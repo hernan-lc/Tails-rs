@@ -392,6 +392,7 @@ pub(super) fn get_array_elements(
 pub(super) fn get_string(this: &Value) -> Option<String> {
     match this {
         Value::String(s) => Some(s.clone()),
+        Value::Cons(c) => Some(c.flatten()),
         _ => None,
     }
 }

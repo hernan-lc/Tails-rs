@@ -691,9 +691,12 @@ fn test_weakset() {
 // ---- Strings ----
 #[test]
 fn test_string_methods() {
-    let mut rt = TailsRuntime::default();
-    let r = rt.eval(
-        r#"
+    let child = std::thread::Builder::new()
+        .stack_size(16 * 1024 * 1024)
+        .spawn(|| {
+            let mut rt = TailsRuntime::default();
+            let r = rt.eval(
+                r#"
     let str = "Hello, World!";
     str.charAt(0) + "," + str.charCodeAt(0) + "," + str.slice(0, 5) + "," + str.substring(7, 12) + "," +
     str.indexOf("World") + "," + str.includes("World") + "," + str.replace("World", "Tails") + "," +
@@ -701,9 +704,15 @@ fn test_string_methods() {
     str.toUpperCase() + "," + str.startsWith("Hello") + "," + str.endsWith("World!") + "," +
     "5".padStart(3, "0") + "," + "ab".repeat(3);
     "#,
-    );
-    assert!(r.is_ok());
-    assert_eq!(r.unwrap(), Value::String("H,72,Hello,World,7,true,Hello, Tails!,Hello-World!,hi,hello, world!,HELLO, WORLD!,true,true,005,ababab".to_string()));
+            );
+            assert!(r.is_ok(), "eval failed");
+            assert_eq!(
+                r.unwrap().flatten(),
+                "H,72,Hello,World,7,true,Hello, Tails!,Hello-World!,hi,hello, world!,HELLO, WORLD!,true,true,005,ababab"
+            );
+        })
+        .unwrap();
+    child.join().unwrap();
 }
 
 // ---- Math ----

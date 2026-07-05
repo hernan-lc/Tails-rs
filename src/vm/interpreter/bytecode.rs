@@ -176,9 +176,69 @@ impl Interpreter {
                                     _ => self.less_than(counter_val, limit_val)?,
                                 };
                                 if should_continue {
+                                    // JIT profiling: check if this loop is hot.
+                                    if let Some(_native_fn) = self.jit.tick(pc, module) {
+                                        // For now, log that JIT compilation
+                                        // was triggered but don't execute.
+                                        // Full integration comes after the
+                                        // profiler is proven correct.
+                                        log::debug!("JIT: compiled loop at pc={}", pc);
+                                    }
                                     pc = *body_pc as usize;
                                     continue;
                                 } else {
+                                    pc += 1;
+                                    continue;
+                                }
+                            }
+                        }
+                    }
+                    // Cold path: fall through
+                }
+                // Fused global add: x = x + local
+                Instruction::AddGlobal(name, local_slot) => {
+                    if let Some(frame) = self.call_stack.last() {
+                        let local_idx = frame.base_pointer + *local_slot as usize;
+                        if local_idx < self.stack.len() {
+                            let left = self
+                                .globals
+                                .get(name.as_str())
+                                .cloned()
+                                .unwrap_or(Value::Undefined);
+                            let right = self.stack[local_idx].clone();
+                            match (&left, &right) {
+                                (Value::Integer(a), Value::Integer(b)) => {
+                                    if let Some(result) = a.checked_add(*b) {
+                                        self.globals.insert(name.clone(), Value::Integer(result));
+                                    } else {
+                                        self.globals.insert(
+                                            name.clone(),
+                                            Value::Float(*a as f64 + *b as f64),
+                                        );
+                                    }
+                                    pc += 1;
+                                    continue;
+                                }
+                                (Value::Float(a), Value::Float(b)) => {
+                                    self.globals.insert(name.clone(), Value::Float(a + b));
+                                    pc += 1;
+                                    continue;
+                                }
+                                (Value::Integer(a), Value::Float(b)) => {
+                                    self.globals
+                                        .insert(name.clone(), Value::Float(*a as f64 + *b));
+                                    pc += 1;
+                                    continue;
+                                }
+                                (Value::Float(a), Value::Integer(b)) => {
+                                    self.globals
+                                        .insert(name.clone(), Value::Float(*a + *b as f64));
+                                    pc += 1;
+                                    continue;
+                                }
+                                _ => {
+                                    let result = self.add(left, right)?;
+                                    self.globals.insert(name.clone(), result);
                                     pc += 1;
                                     continue;
                                 }
@@ -1188,18 +1248,22 @@ impl Interpreter {
                             let object = self.stack.pop().ok_or_else(|| {
                                 Error::RuntimeError(super::ERR_STACK_UNDERFLOW.into())
                             })?;
-                            // Inline the fast path for Object properties
+                            // Inline the fast path for Object properties, but
+                            // only when no accessors (getters/setters) exist.
                             if let Value::Object(obj_idx) = &object {
                                 if let Value::String(key_str) = &key {
                                     if let HeapValue::Object(obj) = &mut self.heap[*obj_idx] {
-                                        obj.properties.insert(key_str.to_string(), value);
-                                        self.stack.push(object);
-                                        pc += 1;
-                                        continue;
+                                        if !obj.properties.has_accessors() {
+                                            obj.properties.insert(key_str.to_string(), value);
+                                            self.stack.push(object);
+                                            pc += 1;
+                                            continue;
+                                        }
                                     }
                                 }
                             }
-                            // Fall through to full handler for other types
+                            // Fall through to full handler for setters/getters
+                            // and non-Object types
                             self.stack.push(object);
                             self.stack.push(key);
                             self.stack.push(value);
