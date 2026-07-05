@@ -31,7 +31,7 @@ impl Interpreter {
                 let value = self.globals.get(name).cloned().or_else(|| {
                     self.module_globals
                         .as_ref()
-                        .and_then(|mg| mg.get(name).cloned())
+                        .and_then(|mg| mg.borrow().get(name).cloned())
                 });
                 match value {
                     Some(v) => self.stack.push(v),
@@ -51,7 +51,7 @@ impl Interpreter {
                     .or_else(|| {
                         self.module_globals
                             .as_ref()
-                            .and_then(|mg| mg.get(name).cloned())
+                            .and_then(|mg| mg.borrow().get(name).cloned())
                     })
                     .unwrap_or(Value::Undefined);
                 self.stack.push(value);
@@ -64,7 +64,7 @@ impl Interpreter {
                     .or_else(|| {
                         self.module_globals
                             .as_ref()
-                            .and_then(|mg| mg.get(name).cloned())
+                            .and_then(|mg| mg.borrow().get(name).cloned())
                     })
                     .unwrap_or(Value::Undefined);
                 let type_str = match &value {
@@ -97,7 +97,14 @@ impl Interpreter {
                     .stack
                     .pop()
                     .ok_or_else(|| Error::RuntimeError(super::ERR_STACK_UNDERFLOW.into()))?;
-                self.globals.insert(name.clone(), value);
+                if self.module_globals.is_some() {
+                    if let Some(ref mg) = self.module_globals {
+                        mg.borrow_mut().insert(name.clone(), value.clone());
+                    }
+                    self.globals.insert(name.clone(), value);
+                } else {
+                    self.globals.insert(name.clone(), value);
+                }
             }
             Instruction::LoadLocal(slot) => {
                 // Hot path: avoid `.cloned().unwrap_or(...)` which always

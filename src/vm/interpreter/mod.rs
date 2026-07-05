@@ -82,8 +82,8 @@ pub struct Interpreter {
     pub(crate) module_registry: HashMap<String, FxHashMap<String, Value>>,
     pub(crate) module_exports: FxHashMap<String, Value>,
     pub(crate) current_module_path: Option<String>,
-    pub(crate) module_globals: Option<FxHashMap<String, Value>>,
-    pub(crate) module_globals_rc: Option<Rc<FxHashMap<String, Value>>>,
+    pub(crate) module_globals: Option<Rc<RefCell<FxHashMap<String, Value>>>>,
+    pub(crate) module_globals_rc: Option<Rc<RefCell<FxHashMap<String, Value>>>>,
     pub(crate) require_cache: FxHashMap<String, Value>,
     pub(crate) block_scope_stack: Vec<usize>,
     pub(crate) next_symbol_id: u64,
@@ -150,11 +150,6 @@ impl Interpreter {
 
     pub fn execute(&mut self, module: &CompiledModule) -> Result<Value> {
         self.current_module = Some(Rc::new(module.clone()));
-        // Phase 8.3: Cache module_globals_rc so MakeClosure/MakeFunction
-        // don't clone the entire globals map on every invocation.
-        if self.module_globals_rc.is_none() {
-            self.module_globals_rc = Some(std::rc::Rc::new(self.globals.clone()));
-        }
         let saved_call_stack_len = self.call_stack.len();
         if self.call_stack.len() >= self.max_call_stack_depth {
             return Err(runtime_error_stack_overflow());
@@ -291,11 +286,12 @@ impl Interpreter {
     }
 
     pub(crate) fn collect_garbage(&mut self) {
-        let globals_snapshot = self.module_globals_rc.clone().unwrap_or_else(|| {
+        let globals_ref = self.module_globals_rc.clone().unwrap_or_else(|| {
             let mut map = self.globals.clone();
             self.add_proto_roots(&mut map);
-            std::rc::Rc::new(map)
+            std::rc::Rc::new(std::cell::RefCell::new(map))
         });
+        let globals_snapshot = globals_ref.borrow();
         // Phase 1.5: reserve the destination's capacity to the source's
         // length. The previous `self.stack.clone()` /
         // `self.call_stack.clone()` would grow a fresh `Vec` from capacity

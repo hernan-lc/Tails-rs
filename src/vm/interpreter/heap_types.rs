@@ -388,7 +388,7 @@ pub struct JsFunction {
     pub super_class: Option<Value>,
     pub properties: PropertyStorage,
     pub owner_module: Option<Rc<CompiledModule>>,
-    pub module_scope: Option<Rc<FxHashMap<String, Value>>>,
+    pub module_scope: Option<Rc<RefCell<FxHashMap<String, Value>>>>,
     pub is_generator: bool,
     pub source_file: Option<String>,
     pub source_line: Option<usize>,

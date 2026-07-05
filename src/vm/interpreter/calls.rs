@@ -76,7 +76,7 @@ impl Interpreter {
 
                         let saved_mg = self.module_globals.take();
                         if let Some(ref scope) = module_scope {
-                            self.module_globals = Some((**scope).clone());
+                            self.module_globals = Some(scope.clone());
                         }
 
                         let saved_module = self.current_module.clone();

@@ -6,10 +6,11 @@ use crate::objects::Value;
 use rustc_hash::FxHashMap;
 
 impl Interpreter {
-    fn module_globals_rc(&self) -> std::rc::Rc<FxHashMap<String, Value>> {
+    fn module_globals_rc(&mut self) -> std::rc::Rc<std::cell::RefCell<FxHashMap<String, Value>>> {
         self.module_globals_rc
             .clone()
-            .unwrap_or_else(|| std::rc::Rc::new(self.globals.clone()))
+            .get_or_insert_with(|| std::rc::Rc::new(std::cell::RefCell::new(self.globals.clone())))
+            .clone()
     }
 
     pub(crate) fn exec_make_function(

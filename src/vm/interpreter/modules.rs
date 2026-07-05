@@ -203,7 +203,9 @@ impl Interpreter {
             self.module_globals_rc = None;
             self.execute(module)
         };
-        self.module_globals_rc = Some(std::rc::Rc::new(self.globals.clone()));
+        self.module_globals_rc = Some(std::rc::Rc::new(std::cell::RefCell::new(
+            self.globals.clone(),
+        )));
         let module_globals = std::mem::replace(&mut self.globals, saved_globals.clone());
         let exec_exports = std::mem::replace(&mut self.module_exports, prev_exports);
         for (k, v) in &exec_exports {
@@ -221,13 +223,10 @@ impl Interpreter {
         // These are globals that exist in module_globals but not in the original saved_globals
         for (k, v) in &module_globals {
             if !saved_globals.contains_key(k) {
-                // This is a new global added by the module (import or local)
-                // Only preserve it if it was an import (i.e., the value exists in a module registry)
-                // For simplicity, we check if the value is a function or came from a module
-                // We keep it if it's a function (imported functions) or if it was explicitly imported
-                // Module-local variables like `const x = 1` should NOT be preserved
-                // But imported functions like `validatePlugin` SHOULD be preserved
-                // We use a heuristic: if it's a function or if the key was already in module_exports
+                // Preserve functions and imports from the module.
+                // Module-level variables (let/const/var) are NOT preserved here to avoid
+                // polluting the global scope. They remain accessible via module_globals_rc
+                // which is set before the module executes and used by LoadGlobal/StoreGlobal.
                 if matches!(v, Value::Function(_) | Value::NativeFunction(_))
                     || exec_exports.contains_key(k)
                 {

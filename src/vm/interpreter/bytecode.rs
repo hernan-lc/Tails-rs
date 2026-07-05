@@ -262,6 +262,11 @@ impl Interpreter {
                         .globals
                         .get(name.as_str())
                         .cloned()
+                        .or_else(|| {
+                            self.module_globals
+                                .as_ref()
+                                .and_then(|mg| mg.borrow().get(name.as_str()).cloned())
+                        })
                         .unwrap_or(Value::Undefined);
                     self.stack.push(val);
                     pc += 1;
@@ -272,7 +277,14 @@ impl Interpreter {
                         .stack
                         .pop()
                         .ok_or_else(|| Error::RuntimeError(super::ERR_STACK_UNDERFLOW.into()))?;
-                    self.globals.insert(name.clone(), value);
+                    if self.module_globals.is_some() {
+                        if let Some(ref mg) = self.module_globals {
+                            mg.borrow_mut().insert(name.clone(), value.clone());
+                        }
+                        self.globals.insert(name.clone(), value);
+                    } else {
+                        self.globals.insert(name.clone(), value);
+                    }
                     pc += 1;
                     continue;
                 }
