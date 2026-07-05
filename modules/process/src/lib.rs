@@ -1,5 +1,3 @@
-use std::io::Write;
-
 use tails_native_macros::{tails_function, tails_module};
 
 // ============================================================================
@@ -15,8 +13,10 @@ pub fn chdir(dir: &str) -> std::io::Result<()> {
 }
 
 pub fn stdout_write(data: &str) -> std::io::Result<usize> {
+    use std::io::Write;
     let mut stdout = std::io::stdout();
     stdout.write_all(data.as_bytes())?;
+    stdout.flush()?;
     Ok(data.len())
 }
 

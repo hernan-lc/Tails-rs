@@ -59,8 +59,8 @@ for script in "$ROOT"/benchmarks/suites/*/*.js; do
       rc=0
       set +e
       if [[ "$runtime" == "tails" ]]; then
-        out=$(timeout "$TIMEOUT" $TAILS_BIN run "$script" 2>/dev/null)
-        rc=$?
+        out=$(timeout "$TIMEOUT" $TAILS_BIN run "$script" 2>/dev/null | grep -v '^\[tails\]' | head -1)
+        rc=${PIPESTATUS[0]}
       elif [[ "$runtime" == "deno" ]]; then
         out=$(timeout "$TIMEOUT" deno run --allow-read --allow-net "$script" 2>/dev/null)
         rc=$?

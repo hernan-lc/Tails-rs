@@ -351,21 +351,28 @@ macro_rules! console_output_fn {
                 .map(|a| format_value_no_colors(interp, a))
                 .collect();
             let msg = parts.join(" ");
-            if use_colors {
+            let line = if use_colors {
                 let colored = $color(&msg);
-                $stream!("{}{}{}", timestamp, indent, colored);
+                format!("{}{}{}\n", timestamp, indent, colored)
             } else {
-                $stream!("{}{}{}", timestamp, indent, msg);
-            }
+                format!("{}{}{}\n", timestamp, indent, msg)
+            };
+            let _ = tails_process::stdout_write(&line);
             Ok(Value::Undefined)
         }
     };
 }
 
-console_output_fn!(native_console_log, println, |_msg: &str| String::new());
-console_output_fn!(native_console_warn, eprintln, |msg: &str| msg.yellow().to_string());
-console_output_fn!(native_console_error, eprintln, |msg: &str| msg.red().to_string());
-console_output_fn!(native_console_info, println, |msg: &str| msg.blue().to_string());
+console_output_fn!(native_console_log, eprintln, |_msg: &str| _msg.to_string());
+console_output_fn!(native_console_warn, eprintln, |msg: &str| msg
+    .yellow()
+    .to_string());
+console_output_fn!(native_console_error, eprintln, |msg: &str| msg
+    .red()
+    .to_string());
+console_output_fn!(native_console_info, eprintln, |msg: &str| msg
+    .blue()
+    .to_string());
 
 pub(super) fn native_console_table(
     interp: &mut Interpreter,
@@ -396,8 +403,7 @@ pub(super) fn native_console_table(
                             &interp.heap[*obj_idx]
                         {
                             for key in obj.properties.keys() {
-                                if !is_user_visible_key(key)
-                                {
+                                if !is_user_visible_key(key) {
                                     continue;
                                 }
                                 if !all_keys.iter().any(|k| k == key) {
@@ -483,9 +489,7 @@ pub(super) fn native_console_table(
                 let mut props: Vec<(&str, &Value)> = obj
                     .properties
                     .iter()
-                    .filter(|(k, _)| {
-                        is_user_visible_key(k)
-                    })
+                    .filter(|(k, _)| is_user_visible_key(k))
                     .collect();
                 props.sort_by(|a, b| a.0.cmp(b.0));
 
@@ -605,7 +609,13 @@ fn console_group_impl(interp: &mut Interpreter, args: &[Value], prefix: &str) {
 
     if !parts.is_empty() {
         if get_use_colors() {
-            println!("{}{}{}{}", timestamp, indent, prefix, parts.join(" ").bold());
+            println!(
+                "{}{}{}{}",
+                timestamp,
+                indent,
+                prefix,
+                parts.join(" ").bold()
+            );
         } else {
             println!("{}{}{}{}", timestamp, indent, prefix, parts.join(" "));
         }
@@ -706,9 +716,9 @@ pub(super) fn native_console_assert(
         };
         let msg = parts.join(" ");
         if use_colors {
-            eprintln!("{}{}{}", timestamp, indent, msg.red());
+            println!("{}{}{}", timestamp, indent, msg.red());
         } else {
-            eprintln!("{}{}{}", timestamp, indent, msg);
+            println!("{}{}{}", timestamp, indent, msg);
         }
     }
 
