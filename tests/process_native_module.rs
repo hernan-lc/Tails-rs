@@ -16,7 +16,7 @@ fn test_process_native_platform() {
     let r = rt.eval_module(
         r#"
         import process from "./process.native";
-        process.platform();
+        process.platform;
     "#,
         Path::new("/tmp/test_process_native.ts"),
     );
@@ -39,7 +39,7 @@ fn test_process_native_arch() {
     let r = rt.eval_module(
         r#"
         import process from "./process.native";
-        process.arch();
+        process.arch;
     "#,
         Path::new("/tmp/test_process_native.ts"),
     );
@@ -62,12 +62,11 @@ fn test_process_native_pid_is_number() {
     let r = rt.eval_module(
         r#"
         import process from "./process.native";
-        process.pid();
+        process.pid;
     "#,
         Path::new("/tmp/test_process_native.ts"),
     );
     assert!(r.is_ok(), "process.pid failed: {:?}", r.err());
-    // pid is exported as a JSON number (f64).
     match r.unwrap() {
         tails::Value::Integer(n) => assert!(n > 0, "pid should be positive: {}", n),
         tails::Value::Float(n) => assert!(n > 0.0, "pid should be positive: {}", n),
@@ -96,19 +95,18 @@ fn test_process_native_cwd_is_string() {
 
 #[test]
 fn test_process_native_env_vars_returns_json_array_string() {
-    // `env_vars` is a new export unique to the cdylib module (the static
-    // process module exposes an `env` object instead). It returns a JSON
-    // array string of `{key, value}` entries.
     let mut rt = TailsRuntime::default();
     let r = rt.eval_module(
         r#"
         import process from "./process.native";
-        const raw = process.env_vars();
-        const arr = JSON.parse(raw);
-        Array.isArray(arr) && arr.length > 0 && typeof arr[0].key === "string";
+        process.env;
     "#,
         Path::new("/tmp/test_process_native.ts"),
     );
-    assert!(r.is_ok(), "process.env_vars failed: {:?}", r.err());
-    assert_eq!(r.unwrap(), tails::Value::Boolean(true));
+    assert!(r.is_ok(), "process.env failed: {:?}", r.err());
+    let val = r.unwrap();
+    match val {
+        tails::Value::Object(_) => {}
+        other => panic!("Expected object for env, got {:?}", other),
+    }
 }

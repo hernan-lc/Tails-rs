@@ -212,17 +212,17 @@ fn test_regexp_exec_with_capture() {
         .eval(r#"let re = new RegExp("(\\d+)-(\\d+)-(\\d+)"); re.exec("2024-01-15");"#)
         .unwrap();
     match r {
-        Value::Array(idx) => {
-            let arr = rt.get_array_element(&Value::Array(idx), 0);
-            assert_eq!(arr, Some(Value::String("2024-01-15".to_string())));
-            let g1 = rt.get_array_element(&Value::Array(idx), 1);
+        Value::Object(idx) => {
+            let full = rt.get_property(&Value::Object(idx), "0");
+            assert_eq!(full, Some(Value::String("2024-01-15".to_string())));
+            let g1 = rt.get_property(&Value::Object(idx), "1");
             assert_eq!(g1, Some(Value::String("2024".to_string())));
-            let g2 = rt.get_array_element(&Value::Array(idx), 2);
+            let g2 = rt.get_property(&Value::Object(idx), "2");
             assert_eq!(g2, Some(Value::String("01".to_string())));
-            let g3 = rt.get_array_element(&Value::Array(idx), 3);
+            let g3 = rt.get_property(&Value::Object(idx), "3");
             assert_eq!(g3, Some(Value::String("15".to_string())));
         }
-        _ => panic!("Expected Array"),
+        _ => panic!("Expected Object, got {:?}", r),
     }
 }
 

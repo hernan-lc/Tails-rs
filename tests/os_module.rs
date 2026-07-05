@@ -143,7 +143,7 @@ fn test_os_type() {
     let r = rt.eval_module(
         r#"
         import os from "os";
-        os.os_type();
+        os.type();
     "#,
         Path::new("/tmp/test_os_module.ts"),
     );
