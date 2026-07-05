@@ -117,6 +117,29 @@ impl CodeGenerator {
                 }
             }
 
+            // Pattern 2b: LoadGlobal(name) + LoadLocal(y) + Add + StoreGlobal(name)
+            //              → AddGlobal(name, y)
+            if i + 3 < self.instructions.len() {
+                if let (
+                    Instruction::LoadGlobal(name),
+                    Instruction::LoadLocal(y),
+                    Instruction::Add,
+                    Instruction::StoreGlobal(name2),
+                ) = (
+                    &self.instructions[i],
+                    &self.instructions[i + 1],
+                    &self.instructions[i + 2],
+                    &self.instructions[i + 3],
+                ) {
+                    if name == name2 {
+                        optimized.push(Instruction::AddGlobal(name.clone(), *y));
+                        keep.push(i);
+                        i += 4;
+                        continue;
+                    }
+                }
+            }
+
             // Pattern 3: Pop after side-effect-free instruction → remove both
             if i + 1 < self.instructions.len() {
                 if let Instruction::Pop = &self.instructions[i + 1] {
