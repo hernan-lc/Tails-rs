@@ -81,7 +81,49 @@ mod platform {
     }
 }
 
-#[cfg(not(any(target_os = "windows", target_os = "linux")))]
+#[cfg(target_os = "macos")]
+mod platform {
+    use libc::{
+        mmap, mprotect, munmap, MAP_ANONYMOUS, MAP_FAILED, MAP_JIT, MAP_PRIVATE, PROT_EXEC,
+        PROT_READ, PROT_WRITE,
+    };
+    use std::ptr;
+
+    extern "C" {
+        fn pthread_jit_write_protect_np(enable: libc::c_int);
+    }
+
+    pub unsafe fn alloc_executable(size: usize) -> *mut u8 {
+        let buf = mmap(
+            ptr::null_mut(),
+            size,
+            PROT_READ | PROT_WRITE,
+            MAP_ANONYMOUS | MAP_PRIVATE | MAP_JIT,
+            -1,
+            0,
+        );
+        if buf == MAP_FAILED {
+            panic!("JIT: mmap failed on macOS");
+        }
+        buf as *mut u8
+    }
+
+    pub unsafe fn free(ptr: *mut u8, size: usize) {
+        munmap(ptr as *mut libc::c_void, size);
+    }
+
+    pub unsafe fn make_executable(ptr: *mut u8, size: usize) {
+        // Enable write access for JIT compilation
+        pthread_jit_write_protect_np(0);
+        let rc = mprotect(ptr as *mut libc::c_void, size, PROT_READ | PROT_EXEC);
+        pthread_jit_write_protect_np(1);
+        if rc != 0 {
+            panic!("JIT: mprotect to RX failed on macOS");
+        }
+    }
+}
+
+#[cfg(not(any(target_os = "windows", target_os = "linux", target_os = "macos")))]
 mod platform {
     pub unsafe fn alloc_executable(size: usize) -> *mut u8 {
         panic!("JIT: unsupported platform");
