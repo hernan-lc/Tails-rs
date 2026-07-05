@@ -266,9 +266,18 @@ impl Interpreter {
                             self.module_globals
                                 .as_ref()
                                 .and_then(|mg| mg.borrow().get(name.as_str()).cloned())
-                        })
-                        .unwrap_or(Value::Undefined);
-                    self.stack.push(val);
+                        });
+                    match val {
+                        Some(v) => {
+                            self.stack.push(v);
+                        }
+                        None => {
+                            return Err(self.err_at_location(Error::ReferenceError(format!(
+                                "{} is not defined",
+                                name
+                            ))));
+                        }
+                    }
                     pc += 1;
                     continue;
                 }

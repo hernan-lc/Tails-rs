@@ -373,7 +373,7 @@ fn test_regexp_match_global() {
         .eval(
             r#"
         const re = /\d+/g;
-        const m = "abc 123 def 456".match(m);
+        const m = "abc 123 def 456".match(re);
         "global";
     "#,
         )
