@@ -176,14 +176,6 @@ impl Interpreter {
                                     _ => self.less_than(counter_val, limit_val)?,
                                 };
                                 if should_continue {
-                                    // JIT profiling: check if this loop is hot.
-                                    if let Some(_native_fn) = self.jit.tick(pc, module) {
-                                        // For now, log that JIT compilation
-                                        // was triggered but don't execute.
-                                        // Full integration comes after the
-                                        // profiler is proven correct.
-                                        log::debug!("JIT: compiled loop at pc={}", pc);
-                                    }
                                     pc = *body_pc as usize;
                                     continue;
                                 } else {
