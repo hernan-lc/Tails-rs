@@ -21,9 +21,6 @@ impl Interpreter {
         match instruction {
             Instruction::MakeFunction(func_idx) => {
                 let func_info = module.functions[*func_idx as usize].clone();
-                let proto_obj_idx = self
-                    .gc
-                    .allocate(&mut self.heap, HeapValue::Object(JsObject::new()));
                 let owner = self.current_module.clone();
                 let scope = self.module_globals_rc();
                 let src_file = self.current_module_path.clone();
@@ -36,7 +33,7 @@ impl Interpreter {
                         rest_param: func_info.rest_param,
                         bytecode_index: func_info.bytecode_index,
                         closure: Rc::new(RefCell::new(Vec::new())),
-                        prototype: Some(proto_obj_idx),
+                        prototype: None,
                         super_class: None,
                         properties: PropertyStorage::new(),
                         owner_module: owner,
@@ -91,9 +88,6 @@ impl Interpreter {
                         }
                     }
                 };
-                let proto_obj_idx = self
-                    .gc
-                    .allocate(&mut self.heap, HeapValue::Object(JsObject::new()));
                 let owner = self.current_module.clone();
                 let scope = self.module_globals_rc();
                 let src_file = self.current_module_path.clone();
@@ -106,7 +100,7 @@ impl Interpreter {
                         rest_param: func_info.rest_param,
                         bytecode_index: func_info.bytecode_index,
                         closure: closure_vars,
-                        prototype: Some(proto_obj_idx),
+                        prototype: None,
                         super_class: None,
                         properties: PropertyStorage::new(),
                         owner_module: owner,

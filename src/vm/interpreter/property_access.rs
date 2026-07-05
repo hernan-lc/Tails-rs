@@ -1,4 +1,4 @@
-use super::{HeapValue, Interpreter, PropertyStorage};
+use super::{HeapValue, Interpreter, JsObject, PropertyStorage};
 use crate::errors::{Error, Result};
 use crate::objects::js_promise::PromiseState;
 use crate::objects::Value;
@@ -231,6 +231,14 @@ impl Interpreter {
                             return Ok(Value::Object(proto_idx));
                         }
                     }
+                    // Lazy allocation: prototype is None, allocate on demand
+                    let proto_obj_idx = self
+                        .gc
+                        .allocate(&mut self.heap, HeapValue::Object(JsObject::new()));
+                    if let HeapValue::Function(f) = &mut self.heap[*func_idx] {
+                        f.prototype = Some(proto_obj_idx);
+                    }
+                    return Ok(Value::Object(proto_obj_idx));
                 }
                 if let HeapValue::Function(f) = &self.heap[*func_idx] {
                     if let Some(val) = f.properties.get(&key_str) {
