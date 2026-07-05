@@ -1081,8 +1081,87 @@ impl Interpreter {
                         _ => {}
                     }
                 }
-                _ =>
-                {
+                _ => {
+                    // Phase 6: Inline hottest instructions to avoid
+                    // cascading dispatch overhead (each avoided function
+                    // call saves ~5ns per instruction × millions of calls)
+                    match instruction {
+                        Instruction::Add => {
+                            let right = self.stack.pop().ok_or_else(|| {
+                                Error::RuntimeError(super::ERR_STACK_UNDERFLOW.into())
+                            })?;
+                            let left = self.stack.pop().ok_or_else(|| {
+                                Error::RuntimeError(super::ERR_STACK_UNDERFLOW.into())
+                            })?;
+                            let result = self.add(left, right)?;
+                            self.stack.push(result);
+                            pc += 1;
+                            continue;
+                        }
+                        Instruction::Sub => {
+                            let right = self.stack.pop().ok_or_else(|| {
+                                Error::RuntimeError(super::ERR_STACK_UNDERFLOW.into())
+                            })?;
+                            let left = self.stack.pop().ok_or_else(|| {
+                                Error::RuntimeError(super::ERR_STACK_UNDERFLOW.into())
+                            })?;
+                            let result = self.sub(left, right)?;
+                            self.stack.push(result);
+                            pc += 1;
+                            continue;
+                        }
+                        Instruction::Eq => {
+                            let right = self.stack.pop().ok_or_else(|| {
+                                Error::RuntimeError(super::ERR_STACK_UNDERFLOW.into())
+                            })?;
+                            let left = self.stack.pop().ok_or_else(|| {
+                                Error::RuntimeError(super::ERR_STACK_UNDERFLOW.into())
+                            })?;
+                            self.stack
+                                .push(Value::Boolean(self.is_equal(&left, &right)));
+                            pc += 1;
+                            continue;
+                        }
+                        Instruction::GetProperty => {
+                            let key = self.stack.pop().ok_or_else(|| {
+                                Error::RuntimeError(super::ERR_STACK_UNDERFLOW.into())
+                            })?;
+                            let object = self.stack.pop().ok_or_else(|| {
+                                Error::RuntimeError(super::ERR_STACK_UNDERFLOW.into())
+                            })?;
+                            let result = self.get_property(&object, &key)?;
+                            self.stack.push(result);
+                            pc += 1;
+                            continue;
+                        }
+                        Instruction::SetProperty => {
+                            let value = self.stack.pop().ok_or_else(|| {
+                                Error::RuntimeError(super::ERR_STACK_UNDERFLOW.into())
+                            })?;
+                            let key = self.stack.pop().ok_or_else(|| {
+                                Error::RuntimeError(super::ERR_STACK_UNDERFLOW.into())
+                            })?;
+                            let object = self.stack.pop().ok_or_else(|| {
+                                Error::RuntimeError(super::ERR_STACK_UNDERFLOW.into())
+                            })?;
+                            // Inline the fast path for Object properties
+                            if let Value::Object(obj_idx) = &object {
+                                if let Value::String(key_str) = &key {
+                                    if let HeapValue::Object(obj) = &mut self.heap[*obj_idx] {
+                                        obj.properties.insert(key_str.to_string(), value);
+                                        self.stack.push(object);
+                                        pc += 1;
+                                        continue;
+                                    }
+                                }
+                            }
+                            // Fall through to full handler for other types
+                            self.stack.push(object);
+                            self.stack.push(key);
+                            self.stack.push(value);
+                        }
+                        _ => {}
+                    }
                     #[allow(clippy::if_same_then_else)]
                     if self.exec_load_store(instruction, module)? {
                     } else if self.exec_arithmetic(instruction)? {
