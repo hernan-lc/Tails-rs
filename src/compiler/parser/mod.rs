@@ -628,7 +628,7 @@ impl<'a> Parser<'a> {
             span: self.current_span,
         });
         self.current_span = st.span;
-        if self.pos < self.tokens.len() - 1 {
+        if self.pos < self.tokens.len() {
             self.pos += 1;
         }
         st

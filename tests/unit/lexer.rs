@@ -174,8 +174,12 @@ fn test_template_string() {
             }
             match &parts[1] {
                 TemplatePart::Expression(tokens) => {
-                    assert_eq!(tokens.len(), 1); // Just Identifier (Eof is filtered)
+                    // Identifier followed by the trailing Eof kept by the lexer
+                    // (removing it caused infinite loops in the parser; see
+                    // `tokenize_template_literal`).
+                    assert_eq!(tokens.len(), 2);
                     assert_eq!(tokens[0].token, Token::Identifier("name".to_string()));
+                    assert_eq!(tokens[1].token, Token::Eof);
                 }
                 _ => panic!("Expected expression part"),
             }

@@ -1115,7 +1115,9 @@ impl Interpreter {
                     }
                 }
                 Instruction::ImportModule(source) => {
+                    eprintln!("[MEM_DBG] ImportModule({}) stack={} heap={} allocs={}", source, self.stack.len(), self.heap.len(), self.gc.allocation_count);
                     let module_obj = self.exec_import_module(source)?.unwrap_or(Value::Undefined);
+                    eprintln!("[MEM_DBG] ImportModule({}) done stack={} heap={}", source, self.stack.len(), self.heap.len());
                     self.stack.push(module_obj);
                 }
                 Instruction::ImportNamed(source, imported_name, local_name) => {
@@ -1125,7 +1127,9 @@ impl Interpreter {
                     let _ = self.exec_import_default(source, local_name)?;
                 }
                 Instruction::ImportAll(source, local_name) => {
+                    eprintln!("[MEM_DBG] ImportAll({}, {}) heap={}", source, local_name, self.heap.len());
                     let _ = self.exec_import_all(source, local_name)?;
+                    eprintln!("[MEM_DBG] ImportAll({}, {}) done heap={} globals={}", source, local_name, self.heap.len(), self.globals.len());
                 }
                 Instruction::NativeImport(source, local_name) => {
                     self.exec_native_import(source, local_name)?;
@@ -1140,7 +1144,9 @@ impl Interpreter {
                     self.exec_store_module_export(name)?;
                 }
                 Instruction::ReExportAll(source) => {
+                    eprintln!("[MEM_DBG] ReExportAll({}) heap={}", source, self.heap.len());
                     self.exec_reexport_all(source)?;
+                    eprintln!("[MEM_DBG] ReExportAll({}) done heap={} exports={}", source, self.heap.len(), self.module_exports.len());
                 }
                 Instruction::PopModuleExports => {
                     self.module_exports.clear();

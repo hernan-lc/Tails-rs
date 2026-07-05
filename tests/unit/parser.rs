@@ -339,6 +339,31 @@ fn test_return_without_value() {
 }
 
 #[test]
+fn test_template_literal_with_postfix_increment() {
+    // Regression: a template expression whose last token is `++` used to
+    // spin the parser forever because the lexer stripped the trailing Eof
+    // and `advance` clamped pos at the last index, so `parse_postfix` kept
+    // matching Token::Increment and never advanced.
+    let source = r#"
+        let counter = 0;
+        for (const key of obj) {
+            ids[key] = `key_${counter++}`;
+        }
+    "#;
+    let mut tokens = tokenize(source).unwrap();
+    let ast = parse(&mut tokens).unwrap();
+
+    match ast {
+        AstNode::Program(stmts) => {
+            // `let counter = 0;` + the for-of statement
+            assert_eq!(stmts.len(), 2);
+            assert!(matches!(stmts[1].inner, Statement::ForOfStatement { .. }));
+        }
+        _ => panic!("Expected program"),
+    }
+}
+
+#[test]
 fn test_complex_program() {
     let source = r#"
         const x = 42;

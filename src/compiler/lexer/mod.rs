@@ -49,11 +49,12 @@ fn tokenize_template_literal(
                         }
                     }
                     let inner_tokens = tokenize(&expr_src)?;
-                    let filtered: Vec<SpannedToken> = inner_tokens
-                        .into_iter()
-                        .filter(|t| t.token != Token::Eof)
-                        .collect();
-                    parts.push(TemplatePart::Expression(filtered));
+                    // Keep the trailing Eof: the parser's `advance` relies on a
+                    // final non-repeatable token to terminate loops. Removing
+                    // it (as we previously did) causes infinite loops on
+                    // template expressions whose last token is a loop-matched
+                    // one like `++` (e.g. `` `key_${counter++}` ``).
+                    parts.push(TemplatePart::Expression(inner_tokens));
                 } else {
                     text_buf.push('$');
                 }
