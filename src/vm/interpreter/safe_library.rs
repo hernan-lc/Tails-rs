@@ -133,11 +133,11 @@ mod tests {
         let lib_path = "libc.so.6";
         let lib = Arc::new(SafeLibrary::new(lib_path).expect("failed to load libc"));
 
-        unsafe {
-            let abs_fn = SafeFunction::<unsafe extern "C" fn(i32) -> i32>::new(lib, "abs")
-                .expect("failed to create SafeFunction");
-            let result = (abs_fn.as_ptr())(-10);
-            assert_eq!(result, 10);
-        }
+            unsafe {
+                let abs_fn = SafeFunction::<unsafe extern "C" fn(i32) -> i32>::new(lib, "abs")
+                    .expect("failed to create SafeFunction");
+                let result: i32 = (*abs_fn.as_ptr())(-10);
+                assert_eq!(result, 10);
+            }
     }
 }

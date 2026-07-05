@@ -69,11 +69,6 @@ object_store = "0.14.0"
 
 # FFI Support
 libc = "0.2"
-
-[target.'cfg(target_os = "windows")'.dependencies]
-windows-sys = { version = "0.60", features = ["Win32_System_Memory"] }
-
-# Dynamic loading
 libloading = "0.8"
 
 # HTTP
@@ -99,6 +94,9 @@ hickory-resolver = { version = "0.24", optional = true }
 
 # Terminal colors
 colored = "2"
+
+[target.'cfg(target_os = "windows")'.dependencies]
+windows-sys = { version = "0.60", features = ["Win32_System_Memory"] }
 
 [dev-dependencies]
 criterion = { version = "0.5", features = ["html_reports"] }

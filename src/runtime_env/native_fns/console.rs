@@ -3,7 +3,7 @@ use crate::objects::Value;
 use crate::vm::interpreter::Interpreter;
 
 use super::helpers::{is_user_visible_key, to_display_string};
-use colored::*;
+use colored::Colorize;
 use rustc_hash::FxHashMap;
 use std::cell::RefCell;
 

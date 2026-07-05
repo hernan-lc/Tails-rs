@@ -48,31 +48,33 @@ mod platform {
 
 #[cfg(target_os = "linux")]
 mod platform {
+    use libc::{
+        mmap, mprotect, munmap, MAP_ANONYMOUS, MAP_FAILED, MAP_PRIVATE, PROT_EXEC, PROT_READ,
+        PROT_WRITE,
+    };
+    use std::ptr;
+
     pub unsafe fn alloc_executable(size: usize) -> *mut u8 {
-        let buf = libc::mmap(
+        let buf = mmap(
             ptr::null_mut(),
             size,
-            libc::PROT_READ | libc::PROT_WRITE,
-            libc::MAP_ANONYMOUS | libc::MAP_PRIVATE,
+            PROT_READ | PROT_WRITE,
+            MAP_ANONYMOUS | MAP_PRIVATE,
             -1,
             0,
         );
-        if buf == libc::MAP_FAILED {
+        if buf == MAP_FAILED {
             panic!("JIT: mmap failed");
         }
         buf as *mut u8
     }
 
     pub unsafe fn free(ptr: *mut u8, size: usize) {
-        libc::munmap(ptr as *mut libc::c_void, size);
+        munmap(ptr as *mut libc::c_void, size);
     }
 
     pub unsafe fn make_executable(ptr: *mut u8, size: usize) {
-        let rc = libc::mprotect(
-            ptr as *mut libc::c_void,
-            size,
-            libc::PROT_READ | libc::PROT_EXEC,
-        );
+        let rc = mprotect(ptr as *mut libc::c_void, size, PROT_READ | PROT_EXEC);
         if rc != 0 {
             panic!("JIT: mprotect to RX failed");
         }
