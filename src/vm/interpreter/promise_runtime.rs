@@ -1,11 +1,12 @@
-use super::{HeapValue, Interpreter, JsFunction, JsObject, PropertyStorage};
+use super::{HeapValue, Interpreter};
 use crate::objects::js_promise::PromiseState;
 use crate::objects::Value;
-use std::cell::RefCell;
-use std::rc::Rc;
 
 impl Interpreter {
     pub(crate) fn drain_microtasks(&mut self) {
+        if self.async_runtime.is_idle() {
+            return;
+        }
         // Batch collect all pending microtasks before execution
         // This avoids re-entrant issues and reduces overhead
         let tasks = self.async_runtime.run_microtasks();
@@ -15,56 +16,16 @@ impl Interpreter {
     }
 
     pub(crate) fn create_resolve_fn(&mut self, promise_idx: usize) -> Value {
-        let proto_idx = self
+        let heap_idx = self
             .gc
-            .allocate(&mut self.heap, HeapValue::Object(JsObject::new()));
-        let heap_idx = self.gc.allocate(
-            &mut self.heap,
-            HeapValue::Function(JsFunction {
-                name: Some("resolve".into()),
-                params: vec!["value".into()],
-                rest_param: None,
-                bytecode_index: usize::MAX,
-                closure: Rc::new(RefCell::new(vec![Value::Promise(promise_idx)])),
-                prototype: Some(proto_idx),
-                super_class: None,
-                properties: PropertyStorage::new(),
-                owner_module: None,
-                module_scope: None,
-                is_generator: false,
-                source_file: None,
-                source_line: None,
-                is_arrow: false,
-                captured_this: None,
-            }),
-        );
+            .allocate(&mut self.heap, HeapValue::DeferredResolve(promise_idx));
         Value::Function(heap_idx)
     }
 
     pub(crate) fn create_reject_fn(&mut self, promise_idx: usize) -> Value {
-        let proto_idx = self
+        let heap_idx = self
             .gc
-            .allocate(&mut self.heap, HeapValue::Object(JsObject::new()));
-        let heap_idx = self.gc.allocate(
-            &mut self.heap,
-            HeapValue::Function(JsFunction {
-                name: Some("reject".into()),
-                params: vec!["reason".into()],
-                rest_param: None,
-                bytecode_index: usize::MAX,
-                closure: Rc::new(RefCell::new(vec![Value::Promise(promise_idx)])),
-                prototype: Some(proto_idx),
-                super_class: None,
-                properties: PropertyStorage::new(),
-                owner_module: None,
-                module_scope: None,
-                is_generator: false,
-                source_file: None,
-                source_line: None,
-                is_arrow: false,
-                captured_this: None,
-            }),
-        );
+            .allocate(&mut self.heap, HeapValue::DeferredReject(promise_idx));
         Value::Function(heap_idx)
     }
 

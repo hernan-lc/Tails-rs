@@ -79,7 +79,10 @@ impl AsyncRuntime {
     }
 
     pub fn run_microtasks(&mut self) -> Vec<Microtask> {
-        let mut tasks = Vec::new();
+        if self.microtask_queue.is_empty() {
+            return Vec::new();
+        }
+        let mut tasks = Vec::with_capacity(self.microtask_queue.len());
         while let Some(task) = self.microtask_queue.pop_front() {
             tasks.push(task);
         }

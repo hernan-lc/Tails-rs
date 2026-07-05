@@ -8,145 +8,150 @@ impl Interpreter {
     pub fn call_value(&mut self, callee: &Value, this: &Value, args: &[Value]) -> Result<Value> {
         match callee {
             Value::Function(func_idx) => {
-                if let HeapValue::Function(f) = &self.heap[*func_idx] {
-                    // Quick path: resolve/reject promise callbacks
-                    if f.bytecode_index == usize::MAX {
-                        let promise_idx = {
-                            let closure = f.closure.borrow();
-                            closure.first().and_then(|v| {
-                                if let Value::Promise(idx) = v {
-                                    Some(*idx)
-                                } else {
-                                    None
+                match &self.heap[*func_idx] {
+                    HeapValue::DeferredResolve(promise_idx) => {
+                        let value = args.first().cloned().unwrap_or(Value::Undefined);
+                        self.resolve_promise(*promise_idx, value);
+                        #[allow(clippy::needless_return)]
+                        return Ok(Value::Undefined);
+                    }
+                    HeapValue::DeferredReject(promise_idx) => {
+                        let reason = args.first().cloned().unwrap_or(Value::Undefined);
+                        self.reject_promise(*promise_idx, reason);
+                        #[allow(clippy::needless_return)]
+                        return Ok(Value::Undefined);
+                    }
+                    HeapValue::Function(f) => {
+                        // Quick path: resolve/reject promise callbacks
+                        if f.bytecode_index == usize::MAX {
+                            let promise_idx = {
+                                let closure = f.closure.borrow();
+                                closure.first().and_then(|v| {
+                                    if let Value::Promise(idx) = v {
+                                        Some(*idx)
+                                    } else {
+                                        None
+                                    }
+                                })
+                            };
+                            if let Some(promise_idx) = promise_idx {
+                                let value = args.first().cloned().unwrap_or(Value::Undefined);
+                                if f.name.as_deref() == Some("resolve") {
+                                    self.resolve_promise(promise_idx, value);
+                                } else if f.name.as_deref() == Some("reject") {
+                                    self.reject_promise(promise_idx, value);
                                 }
-                            })
-                        };
-                        if let Some(promise_idx) = promise_idx {
-                            let value = args.first().cloned().unwrap_or(Value::Undefined);
-                            if f.name.as_deref() == Some("resolve") {
-                                self.resolve_promise(promise_idx, value);
-                            } else if f.name.as_deref() == Some("reject") {
-                                self.reject_promise(promise_idx, value);
+                                return Ok(Value::Undefined);
                             }
-                            return Ok(Value::Undefined);
                         }
-                    }
 
-                    // Extract only the fields we need (avoids cloning entire JsFunction)
-                    let bytecode_index = f.bytecode_index;
-                    let closure = if f.closure.borrow().is_empty() {
-                        Rc::new(RefCell::new(Vec::new()))
-                    } else {
-                        f.closure.clone()
-                    };
-                    let owner_module = f.owner_module.clone();
-                    let module_scope = f.module_scope.clone();
-                    let is_arrow = f.is_arrow;
-                    let captured_this = if is_arrow {
-                        f.captured_this.clone()
-                    } else {
-                        None
-                    };
-                    let source_file = f.source_file.clone();
-                    let source_line = f.source_line;
-                    let rest_param = f.rest_param.is_some();
-                    let param_count = f.params.len();
+                        // Extract only the fields we need (avoids cloning entire JsFunction)
+                        let bytecode_index = f.bytecode_index;
+                        let closure = if f.closure.borrow().is_empty() {
+                            Rc::new(RefCell::new(Vec::new()))
+                        } else {
+                            f.closure.clone()
+                        };
+                        let owner_module = f.owner_module.clone();
+                        let module_scope = f.module_scope.clone();
+                        let is_arrow = f.is_arrow;
+                        let captured_this = if is_arrow {
+                            f.captured_this.clone()
+                        } else {
+                            None
+                        };
+                        let source_file = f.source_file.clone();
+                        let source_line = f.source_line;
+                        let rest_param = f.rest_param.is_some();
+                        let param_count = f.params.len();
 
-                    let func_module: Option<Rc<CompiledModule>> =
-                        owner_module.or_else(|| self.current_module.clone());
-                    let return_address = func_module
-                        .as_ref()
-                        .map(|m| m.instructions.len())
-                        .unwrap_or(0);
-                    let base_pointer = self.stack.len();
-                    let closure_count = closure.borrow().len();
+                        let func_module: Option<Rc<CompiledModule>> =
+                            owner_module.or_else(|| self.current_module.clone());
+                        let return_address = func_module
+                            .as_ref()
+                            .map(|m| m.instructions.len())
+                            .unwrap_or(0);
+                        let base_pointer = self.stack.len();
+                        let closure_count = closure.borrow().len();
 
-                    let saved_mg = self.module_globals.take();
-                    if let Some(ref scope) = module_scope {
-                        self.module_globals = Some((**scope).clone());
-                    }
-
-                    let saved_module = self.current_module.clone();
-                    let saved_path = self.current_module_path.clone();
-                    // Phase 2C (de-duplicated): the saved state and the
-                    // per-frame snapshot are identical, so compute once and
-                    // share the (possibly empty) Vec between the two.
-                    let saved_exception_handlers = if self.exception_handlers.is_empty() {
-                        Vec::new()
-                    } else {
-                        self.exception_handlers.clone()
-                    };
-                    let exception_handlers_snapshot = saved_exception_handlers.clone();
-                    if let Some(ref mod_ref) = func_module {
-                        self.current_module = Some(mod_ref.clone());
-                    }
-                    if source_file.is_some() {
-                        self.current_module_path = source_file.clone();
-                    }
-
-                    let this_for_frame = if is_arrow {
-                        captured_this.unwrap_or_else(|| this.clone())
-                    } else {
-                        this.clone()
-                    };
-                    if self.call_stack.len() >= self.max_call_stack_depth {
-                        let msg = "Maximum call stack size exceeded".to_string();
-                        return Err(crate::errors::Error::RuntimeError(msg));
-                    }
-                    self.call_stack.push(CallFrame {
-                        return_address,
-                        base_pointer,
-                        closure_var_count: closure_count,
-                        func_heap_idx: Some(*func_idx),
-                        this_value: Some(this_for_frame),
-                        is_construct: false,
-                        source_name: source_file.or_else(|| self.current_module_path.clone()),
-                        generator_heap_idx: None,
-                        source_line,
-                        source_col: None,
-                        exception_handlers_snapshot,
-                        shared_closure_env: None,
-                    });
-
-                    for closure_var in closure.borrow().iter().cloned() {
-                        self.stack.push(closure_var);
-                    }
-                    if rest_param {
-                        for arg in args.iter().take(param_count) {
-                            self.stack.push(arg.clone());
+                        let saved_mg = self.module_globals.take();
+                        if let Some(ref scope) = module_scope {
+                            self.module_globals = Some((**scope).clone());
                         }
-                        let rest_args: Vec<Value> = args[param_count..].to_vec();
-                        let rest_arr_idx = self.gc.allocate(
-                            &mut self.heap,
-                            HeapValue::Array(JsArray {
-                                elements: rest_args,
-                            }),
-                        );
-                        self.stack.push(Value::Array(rest_arr_idx));
-                    } else {
-                        for arg in args {
-                            self.stack.push(arg.clone());
+
+                        let saved_module = self.current_module.clone();
+                        let saved_path = self.current_module_path.clone();
+                        let saved_exception_handlers = if self.exception_handlers.is_empty() {
+                            Vec::new()
+                        } else {
+                            self.exception_handlers.clone()
+                        };
+                        let exception_handlers_snapshot = saved_exception_handlers.clone();
+                        if let Some(ref mod_ref) = func_module {
+                            self.current_module = Some(mod_ref.clone());
                         }
+                        if source_file.is_some() {
+                            self.current_module_path = source_file.clone();
+                        }
+
+                        let this_for_frame = if is_arrow {
+                            captured_this.unwrap_or_else(|| this.clone())
+                        } else {
+                            this.clone()
+                        };
+                        if self.call_stack.len() >= self.max_call_stack_depth {
+                            let msg = "Maximum call stack size exceeded".to_string();
+                            return Err(crate::errors::Error::RuntimeError(msg));
+                        }
+                        self.call_stack.push(CallFrame {
+                            return_address,
+                            base_pointer,
+                            closure_var_count: closure_count,
+                            func_heap_idx: Some(*func_idx),
+                            this_value: Some(this_for_frame),
+                            is_construct: false,
+                            source_name: source_file.or_else(|| self.current_module_path.clone()),
+                            generator_heap_idx: None,
+                            source_line,
+                            source_col: None,
+                            exception_handlers_snapshot,
+                            shared_closure_env: None,
+                        });
+
+                        for closure_var in closure.borrow().iter().cloned() {
+                            self.stack.push(closure_var);
+                        }
+                        if rest_param {
+                            for arg in args.iter().take(param_count) {
+                                self.stack.push(arg.clone());
+                            }
+                            let rest_args: Vec<Value> = args[param_count..].to_vec();
+                            let rest_arr_idx = self.gc.allocate(
+                                &mut self.heap,
+                                HeapValue::Array(JsArray {
+                                    elements: rest_args,
+                                }),
+                            );
+                            self.stack.push(Value::Array(rest_arr_idx));
+                        } else {
+                            for arg in args {
+                                self.stack.push(arg.clone());
+                            }
+                        }
+
+                        let result = if let Some(module) = func_module {
+                            self.execute_from(&module, bytecode_index)
+                        } else {
+                            Ok(Value::Undefined)
+                        };
+
+                        self.current_module = saved_module;
+                        self.current_module_path = saved_path;
+                        self.module_globals = saved_mg;
+                        self.exception_handlers = saved_exception_handlers;
+                        result
                     }
-
-                    let result = if let Some(module) = func_module {
-                        self.execute_from(&module, bytecode_index)
-                    } else {
-                        Ok(Value::Undefined)
-                    };
-
-                    self.current_module = saved_module;
-                    self.current_module_path = saved_path;
-                    self.module_globals = saved_mg;
-                    // Restore any exception handlers pushed during the call
-                    // back to what they were at entry. (The per-frame
-                    // snapshot goes into the CallFrame; this is the post-call
-                    // restore so subsequent sibling calls don't see the
-                    // callee's try/catch handlers.)
-                    self.exception_handlers = saved_exception_handlers;
-                    result
-                } else {
-                    Err(self.err_at_location(Error::TypeError("Not a function".into())))
+                    _ => Err(self.err_at_location(Error::TypeError("Not a function".into()))),
                 }
             }
             Value::NativeFunction(native_idx) => self.call_native(*native_idx, this, args),

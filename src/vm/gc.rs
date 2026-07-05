@@ -316,6 +316,13 @@ impl GarbageCollector {
                     HeapValue::Date(_) => {}
                     HeapValue::RegExp(_) => {}
                     HeapValue::Buffer(_) => {}
+                    HeapValue::DeferredResolve(promise_idx)
+                    | HeapValue::DeferredReject(promise_idx) => {
+                        if *promise_idx < heap.len() && !self.is_marked(*promise_idx, heap.len()) {
+                            self.mark(*promise_idx, heap.len());
+                            worklist.push(*promise_idx);
+                        }
+                    }
                     HeapValue::Iterator(iter) => {
                         if let Some(ref target) = iter.target {
                             if let Some(child_idx) = heap_value_to_index(target) {

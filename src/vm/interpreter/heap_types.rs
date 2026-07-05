@@ -359,6 +359,8 @@ pub enum HeapValue {
     RegExp(JsRegExp),
     Buffer(Vec<u8>),
     Iterator(JsIterator),
+    DeferredResolve(usize),
+    DeferredReject(usize),
 }
 
 #[derive(Debug, Clone)]
