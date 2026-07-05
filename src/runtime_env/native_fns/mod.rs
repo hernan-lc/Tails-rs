@@ -135,6 +135,10 @@ mod object_fns;
 mod os_fns;
 #[cfg(not(feature = "os"))]
 mod os_fns {
+    use crate::errors::{Error, Result};
+    use crate::objects::Value;
+    use crate::vm::interpreter::Interpreter;
+
     disabled_module_stub!(
         "os",
         native_os_platform,
@@ -154,6 +158,10 @@ mod os_fns {
 mod path_fns;
 #[cfg(not(feature = "path"))]
 mod path_fns {
+    use crate::errors::{Error, Result};
+    use crate::objects::Value;
+    use crate::vm::interpreter::Interpreter;
+
     disabled_module_stub!(
         "path",
         native_path_join,
@@ -170,6 +178,10 @@ mod path_fns {
 mod process_fns;
 #[cfg(not(feature = "process"))]
 mod process_fns {
+    use crate::errors::{Error, Result};
+    use crate::objects::Value;
+    use crate::vm::interpreter::Interpreter;
+
     disabled_module_stub!(
         "process",
         native_process_exit,
@@ -203,6 +215,10 @@ mod websocket_fns;
 mod zlib_fns;
 #[cfg(not(feature = "zlib"))]
 mod zlib_fns {
+    use crate::errors::{Error, Result};
+    use crate::objects::Value;
+    use crate::vm::interpreter::Interpreter;
+
     disabled_module_stub!(
         "zlib",
         native_zlib_gzip_sync,
@@ -221,6 +237,10 @@ mod zlib_fns {
 mod tls_fns;
 #[cfg(not(feature = "tls"))]
 mod tls_fns {
+    use crate::errors::{Error, Result};
+    use crate::objects::Value;
+    use crate::vm::interpreter::Interpreter;
+
     disabled_module_stub!(
         "tls",
         native_tls_connect,
@@ -234,6 +254,10 @@ mod tls_fns {
 mod dns_fns;
 #[cfg(not(feature = "dns"))]
 mod dns_fns {
+    use crate::errors::{Error, Result};
+    use crate::objects::Value;
+    use crate::vm::interpreter::Interpreter;
+
     disabled_module_stub!(
         "dns",
         native_dns_resolve,

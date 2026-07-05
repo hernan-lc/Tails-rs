@@ -357,7 +357,10 @@ macro_rules! console_output_fn {
             } else {
                 format!("{}{}{}\n", timestamp, indent, msg)
             };
-            let _ = tails_process::stdout_write(&line);
+            let _ = {
+                use std::io::Write;
+                std::io::stdout().write_all(line.as_bytes())
+            };
             Ok(Value::Undefined)
         }
     };
