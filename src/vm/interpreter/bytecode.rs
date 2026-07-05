@@ -297,10 +297,9 @@ impl Interpreter {
                         }
                         self.stack.push(object);
                     } else {
-                        self.stack.push(object);
-                        for arg in args.into_iter().rev() {
-                            self.stack.push(arg);
-                        }
+                        let method = self.get_property(&object, &Value::String("set".into()))?;
+                        let result = self.call_value(&method, &object, &args)?;
+                        self.stack.push(result);
                     }
                     pc += 1;
                     continue;
@@ -322,8 +321,9 @@ impl Interpreter {
                         };
                         self.stack.push(result);
                     } else {
-                        self.stack.push(object);
-                        self.stack.push(key);
+                        let method = self.get_property(&object, &Value::String("get".into()))?;
+                        let result = self.call_value(&method, &object, &[key])?;
+                        self.stack.push(result);
                     }
                     pc += 1;
                     continue;
