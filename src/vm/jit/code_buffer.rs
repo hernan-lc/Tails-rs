@@ -12,25 +12,91 @@ pub struct CodeBuffer {
 unsafe impl Send for CodeBuffer {}
 unsafe impl Sync for CodeBuffer {}
 
+#[cfg(target_os = "windows")]
+mod platform {
+    use std::ptr;
+    use windows_sys::Win32::System::Memory::{
+        VirtualAlloc, VirtualFree, VirtualProtect, MEM_COMMIT, MEM_RELEASE, MEM_RESERVE,
+        PAGE_EXECUTE_READ, PAGE_READWRITE,
+    };
+
+    pub unsafe fn alloc_executable(size: usize) -> *mut u8 {
+        let ptr = VirtualAlloc(
+            ptr::null_mut(),
+            size,
+            MEM_COMMIT | MEM_RESERVE,
+            PAGE_READWRITE,
+        );
+        if ptr.is_null() {
+            panic!("JIT: VirtualAlloc failed");
+        }
+        ptr as *mut u8
+    }
+
+    pub unsafe fn free(ptr: *mut u8, size: usize) {
+        VirtualFree(ptr as *mut _, size, MEM_RELEASE);
+    }
+
+    pub unsafe fn make_executable(ptr: *mut u8, size: usize) {
+        let mut old_protect = 0u32;
+        let rc = VirtualProtect(ptr as *mut _, size, PAGE_EXECUTE_READ, &mut old_protect);
+        if rc == 0 {
+            panic!("JIT: VirtualProtect to RX failed");
+        }
+    }
+}
+
+#[cfg(target_os = "linux")]
+mod platform {
+    pub unsafe fn alloc_executable(size: usize) -> *mut u8 {
+        let buf = libc::mmap(
+            ptr::null_mut(),
+            size,
+            libc::PROT_READ | libc::PROT_WRITE,
+            libc::MAP_ANONYMOUS | libc::MAP_PRIVATE,
+            -1,
+            0,
+        );
+        if buf == libc::MAP_FAILED {
+            panic!("JIT: mmap failed");
+        }
+        buf as *mut u8
+    }
+
+    pub unsafe fn free(ptr: *mut u8, size: usize) {
+        libc::munmap(ptr as *mut libc::c_void, size);
+    }
+
+    pub unsafe fn make_executable(ptr: *mut u8, size: usize) {
+        let rc = libc::mprotect(
+            ptr as *mut libc::c_void,
+            size,
+            libc::PROT_READ | libc::PROT_EXEC,
+        );
+        if rc != 0 {
+            panic!("JIT: mprotect to RX failed");
+        }
+    }
+}
+
+#[cfg(not(any(target_os = "windows", target_os = "linux")))]
+mod platform {
+    pub unsafe fn alloc_executable(size: usize) -> *mut u8 {
+        panic!("JIT: unsupported platform");
+    }
+    pub unsafe fn free(_ptr: *mut u8, _size: usize) {}
+    pub unsafe fn make_executable(_ptr: *mut u8, _size: usize) {
+        panic!("JIT: unsupported platform");
+    }
+}
+
 impl CodeBuffer {
     /// Allocate a new buffer with at least `initial_capacity` bytes.
     pub fn new(initial_capacity: usize) -> Self {
         let capacity = initial_capacity.max(4096);
-        let buf = unsafe {
-            libc::mmap(
-                ptr::null_mut(),
-                capacity,
-                libc::PROT_READ | libc::PROT_WRITE,
-                libc::MAP_ANONYMOUS | libc::MAP_PRIVATE,
-                -1,
-                0,
-            )
-        };
-        if buf == libc::MAP_FAILED {
-            panic!("JIT: mmap failed");
-        }
+        let buf = unsafe { platform::alloc_executable(capacity) };
         Self {
-            buf: buf as *mut u8,
+            buf,
             len: 0,
             capacity,
         }
@@ -87,24 +153,12 @@ impl CodeBuffer {
             return;
         }
         let new_cap = (self.capacity * 2).max(needed).max(4096);
-        let new_buf = unsafe {
-            libc::mmap(
-                ptr::null_mut(),
-                new_cap,
-                libc::PROT_READ | libc::PROT_WRITE,
-                libc::MAP_ANONYMOUS | libc::MAP_PRIVATE,
-                -1,
-                0,
-            )
-        };
-        if new_buf == libc::MAP_FAILED {
-            panic!("JIT: mmap grow failed");
-        }
+        let new_buf = unsafe { platform::alloc_executable(new_cap) };
         unsafe {
-            ptr::copy_nonoverlapping(self.buf, new_buf as *mut u8, self.len);
-            libc::munmap(self.buf as *mut libc::c_void, self.capacity);
+            ptr::copy_nonoverlapping(self.buf, new_buf, self.len);
+            platform::free(self.buf, self.capacity);
         }
-        self.buf = new_buf as *mut u8;
+        self.buf = new_buf;
         self.capacity = new_cap;
     }
 
@@ -113,15 +167,8 @@ impl CodeBuffer {
     pub fn finalize(&mut self) -> *const u8 {
         let page_size = 4096usize;
         let aligned_cap = (self.capacity + page_size - 1) & !(page_size - 1);
-        let rc = unsafe {
-            libc::mprotect(
-                self.buf as *mut libc::c_void,
-                aligned_cap,
-                libc::PROT_READ | libc::PROT_EXEC,
-            )
-        };
-        if rc != 0 {
-            panic!("JIT: mprotect to RX failed");
+        unsafe {
+            platform::make_executable(self.buf, aligned_cap);
         }
         self.buf as *const u8
     }
@@ -136,7 +183,7 @@ impl Drop for CodeBuffer {
     fn drop(&mut self) {
         if !self.buf.is_null() && self.capacity > 0 {
             unsafe {
-                libc::munmap(self.buf as *mut libc::c_void, self.capacity);
+                platform::free(self.buf, self.capacity);
             }
         }
     }

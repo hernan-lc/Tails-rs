@@ -883,68 +883,75 @@ fn test_buffer() {
     );
 }
 
-// ---- process (native module) ----
+// ---- process (built-in module) ----
 #[test]
 #[cfg(feature = "process")]
 fn test_process_globals() {
     let mut rt = TailsRuntime::default();
     let r = rt.eval_module(
         r#"
-    import process from "./process.native";
-    typeof process.platform() + "," + typeof process.arch() + "," +
-    typeof process.pid() + "," + typeof process.cwd() + "," + typeof process.env_vars;
+    import process from "process";
+    typeof process.platform + "," + typeof process.arch + "," +
+    typeof process.pid + "," + typeof process.cwd + "," + typeof process.env;
     "#,
         std::path::Path::new("/tmp/test_module.ts"),
     );
     assert!(r.is_ok());
     assert_eq!(
         r.unwrap(),
-        Value::String("string,string,number,string,function".to_string())
+        Value::String("string,string,number,function,object".to_string())
     );
 }
 
-// ---- path (native module) ----
+// ---- path (built-in module) ----
 #[test]
 #[cfg(feature = "path")]
 fn test_path_module() {
     let mut rt = TailsRuntime::default();
-    let r = rt.eval(
+    let sep = std::path::MAIN_SEPARATOR;
+    let r = rt.eval(&format!(
         r#"
-    import path from "./path.native";
-    path.join('["/foo","bar","baz"]') + "," +
+    import path from "path";
+    path.join("/foo", "bar", "baz") + "," +
     path.basename("/foo/bar.txt", "") + "," +
     path.dirname("/foo/bar.txt") + "," +
     path.extname("/foo/bar.txt") + "," +
-    path.is_absolute("/foo") + "," +
+    path.isAbsolute("{abs_path}") + "," +
     path.normalize("/foo/../bar") + "," +
-    (path.sep() === "/" || path.sep() === "\\");
+    (path.sep === "/" || path.sep === "\\");
     "#,
-    );
+        abs_path = if sep == '\\' { "C:\\foo" } else { "/foo" },
+    ));
     assert!(r.is_ok(), "path test failed: {:?}", r.err());
-    assert!(r.is_ok());
     assert_eq!(
         r.unwrap(),
-        Value::String("/foo/bar/baz,bar.txt,/foo,.txt,true,/bar,true".to_string())
+        Value::String(format!(
+            "/foo{sep}bar{sep}baz,bar.txt,/foo,.txt,true,/bar,true",
+            sep = sep
+        ))
     );
 }
 
-// ---- fs (native module) ----
+// ---- fs (built-in module) ----
 #[test]
 #[cfg(feature = "fs")]
 fn test_fs_module() {
+    let tmp = std::env::temp_dir().to_string_lossy().to_string();
+    let path = format!("{}/tails_test.txt", tmp);
     let mut rt = TailsRuntime::default();
-    let r = rt.eval(
+    let r = rt.eval(&format!(
         r#"
-    import fs from "./fs.native";
-    fs.write_file("/tmp/tails_test.txt", "Hello from Tails!");
-    let read = fs.read_file("/tmp/tails_test.txt");
-    let exists1 = fs.exists("/tmp/tails_test.txt");
-    fs.unlink("/tmp/tails_test.txt");
-    let exists2 = fs.exists("/tmp/tails_test.txt");
+    import fs from "fs";
+    fs.writeFileSync("{path}", "Hello from Tails!");
+    let read = fs.readFileSync("{path}");
+    let exists1 = fs.existsSync("{path}");
+    fs.unlinkSync("{path}");
+    let exists2 = fs.existsSync("{path}");
     read + "," + exists1 + "," + exists2;
     "#,
-    );
-    assert!(r.is_ok());
+        path = path,
+    ));
+    assert!(r.is_ok(), "fs test failed: {:?}", r.err());
     assert_eq!(
         r.unwrap(),
         Value::String("Hello from Tails!,true,false".to_string())
