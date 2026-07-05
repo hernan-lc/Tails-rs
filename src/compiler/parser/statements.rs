@@ -1104,7 +1104,28 @@ impl<'a> Parser<'a> {
             self.advance();
             // export default can be followed by a declaration or an expression
             let decl = match self.peek().token {
-                Token::Function | Token::Class | Token::Const | Token::Let | Token::Var => {
+                Token::Function => {
+                    // Check if the function is anonymous: `export default function () {}`
+                    // by looking ahead past optional `*` (generator) to see if next is `(`
+                    let mut look_ahead = self.pos + 1;
+                    if self.tokens.get(look_ahead).map(|t| t.token == Token::Star).unwrap_or(false) {
+                        look_ahead += 1;
+                    }
+                    if self.tokens.get(look_ahead).map(|t| t.token == Token::LeftParen).unwrap_or(false)
+                        || self.tokens.get(look_ahead).map(|t| t.token == Token::LeftBrace).unwrap_or(false)
+                    {
+                        // Anonymous function: parse as expression
+                        let expr = self.parse_expression()?;
+                        if self.peek().token == Token::Semicolon {
+                            self.advance();
+                        }
+                        self.spanned(Statement::Expression(expr.inner))
+                    } else {
+                        // Named function: parse as declaration
+                        self.parse_statement()?
+                    }
+                }
+                Token::Class | Token::Const | Token::Let | Token::Var => {
                     self.parse_statement()?
                 }
                 _ => {

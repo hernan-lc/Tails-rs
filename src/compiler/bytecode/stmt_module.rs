@@ -81,9 +81,13 @@ impl CodeGenerator {
                 ExportDeclarationKind::ReExport { specifiers, source } => {
                     if source.is_empty() {
                         for spec in specifiers {
-                            let _exported_name = spec.exported.as_ref().unwrap_or(&spec.local);
                             let local_name = &spec.local;
-                            self.emit(Instruction::StoreModuleExport(local_name.clone()));
+                            let exported_name = spec.exported.as_ref().unwrap_or(&spec.local);
+                            if exported_name != local_name {
+                                self.emit(Instruction::LoadGlobal(local_name.clone()));
+                                self.emit(Instruction::StoreGlobal(exported_name.clone()));
+                            }
+                            self.emit(Instruction::StoreModuleExport(exported_name.clone()));
                         }
                     } else if specifiers.len() == 1
                         && specifiers[0].local == "*"
@@ -97,14 +101,14 @@ impl CodeGenerator {
                     } else {
                         self.emit(Instruction::ImportModule(source.clone()));
                         for spec in specifiers {
-                            let imported_name = spec.exported.as_ref().unwrap_or(&spec.local);
-                            let local_name = &spec.local;
+                            let imported_name = &spec.local;
+                            let exported_name = spec.exported.as_ref().unwrap_or(&spec.local);
                             self.emit(Instruction::ImportNamed(
                                 source.clone(),
                                 imported_name.clone(),
-                                local_name.clone(),
+                                exported_name.clone(),
                             ));
-                            self.emit(Instruction::StoreModuleExport(local_name.clone()));
+                            self.emit(Instruction::StoreModuleExport(exported_name.clone()));
                         }
                     }
                     Ok(true)

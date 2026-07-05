@@ -208,3 +208,153 @@ fn test_missing_module_throws_error() {
     let err = result.unwrap_err();
     assert!(err.message().contains("Cannot find module"));
 }
+
+#[test]
+fn test_reexport_default_as() {
+    let mut runtime = TailsRuntime::default();
+    let source = r#"
+        import { myGreet } from "./tests/fixtures/modules/reexport_default_as.ts";
+        myGreet("World")
+    "#;
+    let result = runtime.eval(source).unwrap();
+    assert_eq!(result, tails::Value::String("Default: World".to_string()));
+}
+
+#[test]
+fn test_reexport_named_as() {
+    let mut runtime = TailsRuntime::default();
+    let source = r#"
+        import { sayHello, APP_VERSION } from "./tests/fixtures/modules/reexport_named_as.ts";
+        sayHello("Tails")
+    "#;
+    let result = runtime.eval(source).unwrap();
+    assert_eq!(result, tails::Value::String("Hello, Tails!".to_string()));
+
+    let source2 = r#"
+        import { APP_VERSION } from "./tests/fixtures/modules/reexport_named_as.ts";
+        APP_VERSION
+    "#;
+    let result2 = runtime.eval(source2).unwrap();
+    assert_eq!(result2, tails::Value::String("1.0.0".to_string()));
+}
+
+#[test]
+fn test_reexport_star_as() {
+    let mut runtime = TailsRuntime::default();
+    let source = r#"
+        import { values } from "./tests/fixtures/modules/reexport_star_as.ts";
+        values.greet("X")
+    "#;
+    let result = runtime.eval(source).unwrap();
+    assert_eq!(result, tails::Value::String("Hello, X!".to_string()));
+}
+
+#[test]
+fn test_anonymous_default_export() {
+    let mut runtime = TailsRuntime::default();
+    let source = r#"
+        import fn from "./tests/fixtures/modules/anonymous_default.ts";
+        fn("test")
+    "#;
+    let result = runtime.eval(source).unwrap();
+    assert_eq!(
+        result,
+        tails::Value::String("Anonymous: test".to_string())
+    );
+}
+
+#[test]
+fn test_multi_reexport() {
+    let mut runtime = TailsRuntime::default();
+    let source = r#"
+        import { ver, hi, main } from "./tests/fixtures/modules/multi_reexport.ts";
+        ver
+    "#;
+    let result = runtime.eval(source).unwrap();
+    assert_eq!(result, tails::Value::String("1.0.0".to_string()));
+
+    let source2 = r#"
+        import { hi } from "./tests/fixtures/modules/multi_reexport.ts";
+        hi("World")
+    "#;
+    let result2 = runtime.eval(source2).unwrap();
+    assert_eq!(result2, tails::Value::String("Hello, World!".to_string()));
+
+    let source3 = r#"
+        import { main } from "./tests/fixtures/modules/multi_reexport.ts";
+        main("test")
+    "#;
+    let result3 = runtime.eval(source3).unwrap();
+    assert_eq!(result3, tails::Value::String("Default: test".to_string()));
+}
+
+#[test]
+fn test_reexport_default_as_via_eval_module() {
+    let mut runtime = TailsRuntime::default();
+    let source = r#"
+        import { myGreet } from "./tests/fixtures/modules/reexport_default_as.ts";
+        myGreet('Tails')
+    "#;
+    let result = runtime.eval(source).unwrap();
+    assert_eq!(result, tails::Value::String("Default: Tails".to_string()));
+}
+
+#[test]
+fn test_anonymous_default_via_eval_module() {
+    let mut runtime = TailsRuntime::default();
+    let source = r#"
+        import fn from "./tests/fixtures/modules/anonymous_default.ts";
+        fn('Tails')
+    "#;
+    let result = runtime.eval(source).unwrap();
+    assert_eq!(
+        result,
+        tails::Value::String("Anonymous: Tails".to_string())
+    );
+}
+
+#[test]
+fn test_import_named_default_from_reexport() {
+    let mut runtime = TailsRuntime::default();
+    let source = r#"
+        import defaultGreet from "./tests/fixtures/modules/base_values.ts";
+        defaultGreet("Direct")
+    "#;
+    let result = runtime.eval(source).unwrap();
+    assert_eq!(
+        result,
+        tails::Value::String("Default: Direct".to_string())
+    );
+}
+
+#[test]
+fn test_reexport_with_empty_source_local_export() {
+    let mut runtime = TailsRuntime::default();
+    let source = r#"
+        const x = 42;
+        export { x as y };
+    "#;
+    let dir = module_dir();
+    runtime.eval_module(source, &dir).unwrap();
+
+    let result = runtime.eval("y").unwrap();
+    assert_eq!(result, tails::Value::Float(42.0));
+}
+
+#[test]
+fn test_import_default_from_named_default_reexport() {
+    let mut runtime = TailsRuntime::default();
+    let source = r#"
+        import { myGreet } from "./tests/fixtures/modules/reexport_default_as.ts";
+        myGreet("A")
+    "#;
+    let result = runtime.eval(source).unwrap();
+    assert_eq!(result, tails::Value::String("Default: A".to_string()));
+
+    let source2 = r#"
+        import defaultGreet from "./tests/fixtures/modules/base_values.ts";
+        defaultGreet("B")
+    "#;
+    let result2 = runtime.eval(source2).unwrap();
+    assert_eq!(result2, tails::Value::String("Default: B".to_string()));
+}
