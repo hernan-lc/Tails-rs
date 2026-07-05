@@ -186,7 +186,10 @@ fn test_os_homedir() {
     assert!(r.is_ok(), "os.homedir() failed: {:?}", r.err());
     if let tails::Value::String(s) = r.unwrap() {
         assert!(!s.is_empty(), "homedir should not be empty");
-        assert!(Path::new(&s).is_absolute(), "homedir should be absolute path");
+        assert!(
+            Path::new(&s).is_absolute(),
+            "homedir should be absolute path"
+        );
     } else {
         panic!("Expected string for homedir");
     }
