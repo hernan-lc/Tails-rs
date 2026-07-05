@@ -26,7 +26,7 @@ fn test_child_process_exec_sync_output() {
     let r = rt.eval_module(
         r#"
         import child_process from "child_process";
-        const result = child_process.execSync("echo -n tails-test");
+        const result = child_process.execSync("printf '%s' tails-test");
         result;
     "#,
         Path::new("/tmp/test_child_process_module.ts"),
