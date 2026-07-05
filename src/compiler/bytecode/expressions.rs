@@ -270,6 +270,54 @@ impl CodeGenerator {
                     computed,
                 } = callee.as_ref()
                 {
+                    // Phase 4: fast-path for Map/Set method calls
+                    if !computed {
+                        if let Expression::Identifier(name) = property.as_ref() {
+                            match name.as_str() {
+                                "set" if args.len() == 2 => {
+                                    self.generate_expression(object)?;
+                                    for arg in args {
+                                        self.generate_expression(arg)?;
+                                    }
+                                    self.emit(Instruction::MapSet(args.len() as u16));
+                                    return Ok(());
+                                }
+                                "get" if args.len() == 1 => {
+                                    self.generate_expression(object)?;
+                                    for arg in args {
+                                        self.generate_expression(arg)?;
+                                    }
+                                    self.emit(Instruction::MapGet);
+                                    return Ok(());
+                                }
+                                "has" if args.len() == 1 => {
+                                    self.generate_expression(object)?;
+                                    for arg in args {
+                                        self.generate_expression(arg)?;
+                                    }
+                                    self.emit(Instruction::MapHas);
+                                    return Ok(());
+                                }
+                                "delete" if args.len() == 1 => {
+                                    self.generate_expression(object)?;
+                                    for arg in args {
+                                        self.generate_expression(arg)?;
+                                    }
+                                    self.emit(Instruction::MapDelete);
+                                    return Ok(());
+                                }
+                                "add" if args.len() == 1 => {
+                                    self.generate_expression(object)?;
+                                    for arg in args {
+                                        self.generate_expression(arg)?;
+                                    }
+                                    self.emit(Instruction::SetAdd);
+                                    return Ok(());
+                                }
+                                _ => {}
+                            }
+                        }
+                    }
                     self.generate_expression(object)?;
                     if *computed {
                         self.generate_expression(property)?;

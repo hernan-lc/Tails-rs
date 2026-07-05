@@ -227,4 +227,12 @@ pub enum Instruction {
     AsyncIteratorNext(u32),
     IteratorClose,
     ReExportAll(String),
+    // Map/Set fast-path bytecodes
+    MapGet,
+    MapSet(u16),
+    MapHas,
+    MapDelete,
+    SetAdd,
+    SetHas,
+    SetDelete,
 }

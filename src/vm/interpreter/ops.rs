@@ -229,6 +229,166 @@ impl Interpreter {
                 let result = self.in_check_mut(&left, &right)?;
                 self.stack.push(result);
             }
+            // Map/Set fast-path bytecodes
+            Instruction::MapSet(argc) => {
+                let mut args = Vec::with_capacity(usize::from(*argc));
+                for _ in 0..*argc {
+                    args.push(self.stack_pop()?);
+                }
+                args.reverse();
+                let object = self.stack_pop()?;
+                match &object {
+                    Value::Map(map_idx) => {
+                        let key = args.first().cloned().unwrap_or(Value::Undefined);
+                        let value = args.get(1).cloned().unwrap_or(Value::Undefined);
+                        if let HeapValue::Map(map) = &mut self.heap[*map_idx] {
+                            map.set(key, value);
+                        }
+                        self.stack.push(object);
+                    }
+                    _ => {
+                        let method = self.get_property(&object, &Value::String("set".into()))?;
+                        let result = self.call_value(&method, &object, &args)?;
+                        self.stack.push(result);
+                    }
+                }
+            }
+            Instruction::MapGet => {
+                let key = self.stack_pop()?;
+                let object = self.stack_pop()?;
+                match &object {
+                    Value::Map(map_idx) => {
+                        let result = if let HeapValue::Map(map) = &self.heap[*map_idx] {
+                            map.get(&key).cloned().unwrap_or(Value::Undefined)
+                        } else {
+                            Value::Undefined
+                        };
+                        self.stack.push(result);
+                    }
+                    _ => {
+                        let method = self.get_property(&object, &Value::String("get".into()))?;
+                        let result = self.call_value(&method, &object, &[key])?;
+                        self.stack.push(result);
+                    }
+                }
+            }
+            Instruction::MapHas => {
+                let key = self.stack_pop()?;
+                let object = self.stack_pop()?;
+                match &object {
+                    Value::Map(map_idx) => {
+                        let result = if let HeapValue::Map(map) = &self.heap[*map_idx] {
+                            Value::Boolean(map.has(&key))
+                        } else {
+                            Value::Boolean(false)
+                        };
+                        self.stack.push(result);
+                    }
+                    Value::Set(set_idx) => {
+                        let result = if let HeapValue::Set(set) = &self.heap[*set_idx] {
+                            Value::Boolean(set.has(&key))
+                        } else {
+                            Value::Boolean(false)
+                        };
+                        self.stack.push(result);
+                    }
+                    _ => {
+                        let method = self.get_property(&object, &Value::String("has".into()))?;
+                        let result = self.call_value(&method, &object, &[key])?;
+                        self.stack.push(result);
+                    }
+                }
+            }
+            Instruction::MapDelete => {
+                let key = self.stack_pop()?;
+                let object = self.stack_pop()?;
+                match &object {
+                    Value::Map(map_idx) => {
+                        let result = if let HeapValue::Map(map) = &mut self.heap[*map_idx] {
+                            Value::Boolean(map.delete(&key))
+                        } else {
+                            Value::Boolean(false)
+                        };
+                        self.stack.push(result);
+                    }
+                    Value::Set(set_idx) => {
+                        let result = if let HeapValue::Set(set) = &mut self.heap[*set_idx] {
+                            Value::Boolean(set.delete(&key))
+                        } else {
+                            Value::Boolean(false)
+                        };
+                        self.stack.push(result);
+                    }
+                    _ => {
+                        let method = self.get_property(&object, &Value::String("delete".into()))?;
+                        let result = self.call_value(&method, &object, &[key])?;
+                        self.stack.push(result);
+                    }
+                }
+            }
+            Instruction::SetAdd => {
+                let value = self.stack_pop()?;
+                let object = self.stack_pop()?;
+                match &object {
+                    Value::Set(set_idx) => {
+                        if let HeapValue::Set(set) = &mut self.heap[*set_idx] {
+                            set.add(value);
+                        }
+                        self.stack.push(object);
+                    }
+                    _ => {
+                        let method = self.get_property(&object, &Value::String("add".into()))?;
+                        let result = self.call_value(&method, &object, &[value])?;
+                        self.stack.push(result);
+                    }
+                }
+            }
+            Instruction::SetHas => {
+                let value = self.stack_pop()?;
+                let object = self.stack_pop()?;
+                match &object {
+                    Value::Set(set_idx) => {
+                        let result = if let HeapValue::Set(set) = &self.heap[*set_idx] {
+                            Value::Boolean(set.has(&value))
+                        } else {
+                            Value::Boolean(false)
+                        };
+                        self.stack.push(result);
+                    }
+                    Value::Map(map_idx) => {
+                        let result = if let HeapValue::Map(map) = &self.heap[*map_idx] {
+                            Value::Boolean(map.has(&value))
+                        } else {
+                            Value::Boolean(false)
+                        };
+                        self.stack.push(result);
+                    }
+                    _ => {
+                        let method = self.get_property(&object, &Value::String("has".into()))?;
+                        let result = self.call_value(&method, &object, &[value])?;
+                        self.stack.push(result);
+                    }
+                }
+            }
+            Instruction::SetDelete => {
+                let value = self.stack_pop()?;
+                let object = self.stack_pop()?;
+                match &object {
+                    Value::Set(set_idx) => {
+                        let result = if let HeapValue::Set(set) = &mut self.heap[*set_idx] {
+                            Value::Boolean(set.delete(&value))
+                        } else {
+                            Value::Boolean(false)
+                        };
+                        self.stack.push(result);
+                    }
+                    _ => {
+                        let method = self.get_property(&object, &Value::String("delete".into()))?;
+                        let result = self.call_value(&method, &object, &[value])?;
+                        self.stack.push(result);
+                    }
+                }
+            }
             _ => return Ok(false),
         }
         Ok(true)
