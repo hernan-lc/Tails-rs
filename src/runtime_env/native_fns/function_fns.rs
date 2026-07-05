@@ -150,7 +150,10 @@ pub(super) fn native_function_constructor(
     } else {
         format!("{};", body_trimmed)
     };
-    let source = format!("function __tails_anon__({}) {{ {} }}", params_str, body_with_semi);
+    let source = format!(
+        "function __tails_anon__({}) {{ {} }}",
+        params_str, body_with_semi
+    );
 
     // Compile the source
     let compiler = crate::compiler::Compiler::new(false);
@@ -174,14 +177,9 @@ pub(super) fn native_function_constructor(
     result?;
 
     // Retrieve the function from globals
-    let func = interp
-        .globals
-        .remove("__tails_anon__")
-        .ok_or_else(|| {
-            Error::RuntimeError(
-                "Function constructor: compiled body did not produce a function".into(),
-            )
-        })?;
+    let func = interp.globals.remove("__tails_anon__").ok_or_else(|| {
+        Error::RuntimeError("Function constructor: compiled body did not produce a function".into())
+    })?;
 
     Ok(func)
 }

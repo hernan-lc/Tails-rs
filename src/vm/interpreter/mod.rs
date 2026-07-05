@@ -286,7 +286,14 @@ impl Interpreter {
     }
 
     pub(crate) fn collect_garbage(&mut self) {
-        eprintln!("[GC] BEFORE heap={} globals={} stack={} allocs={} threshold={}", self.heap.len(), self.globals.len(), self.stack.len(), self.gc.allocation_count, self.gc.threshold);
+        eprintln!(
+            "[GC] BEFORE heap={} globals={} stack={} allocs={} threshold={}",
+            self.heap.len(),
+            self.globals.len(),
+            self.stack.len(),
+            self.gc.allocation_count,
+            self.gc.threshold
+        );
         let globals_ref = self.module_globals_rc.clone().unwrap_or_else(|| {
             let mut map = self.globals.clone();
             self.add_proto_roots(&mut map);
@@ -310,7 +317,12 @@ impl Interpreter {
             &stack_snapshot,
             &call_stack_snapshot,
         );
-        eprintln!("[GC] AFTER heap={} freed={} live={}", self.heap.len(), freed, self.gc.live_count(self.heap.len()));
+        eprintln!(
+            "[GC] AFTER heap={} freed={} live={}",
+            self.heap.len(),
+            freed,
+            self.gc.live_count(self.heap.len())
+        );
     }
 
     pub(crate) fn current_source_line(&self, pc: usize) -> Option<usize> {

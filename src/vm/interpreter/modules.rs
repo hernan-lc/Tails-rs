@@ -240,7 +240,6 @@ impl Interpreter {
     }
 
     pub(crate) fn load_and_run_module(&mut self, source: &str) -> Result<Option<String>> {
-        eprintln!("[MEM_DBG] load_and_run_module({}) globals={} registry_entries={}", source, self.globals.len(), self.module_registry.len());
         if source.ends_with(".native") {
             // Try the full source as the module name first (e.g.
             // `import fs from "fs/promises"` registers the module
@@ -425,23 +424,14 @@ impl Interpreter {
         }
         let source_code = std::fs::read_to_string(&module_path)
             .map_err(|e| Error::RuntimeError(format!("Cannot read module '{}': {}", source, e)))?;
-        eprintln!("[TIMING] Compiling {} ({} bytes, {} lines)", source, source_code.len(), source_code.lines().count());
-        let compile_start = std::time::Instant::now();
         let mut tokens = crate::compiler::lexer::tokenize(&source_code)?;
-        eprintln!("[TIMING] Lexing took {:?} ({} tokens)", compile_start.elapsed(), tokens.len());
-        let parse_start = std::time::Instant::now();
         let ast = crate::compiler::parser::parse(&mut tokens)?;
-        eprintln!("[TIMING] Parsing took {:?} (node count ~check)", parse_start.elapsed());
-        let codegen_start = std::time::Instant::now();
         let compiled = crate::compiler::bytecode::generate(&ast)?;
-        eprintln!("[TIMING] Codegen took {:?} ({} instrs, {} consts, {} funcs, {} classes)", codegen_start.elapsed(), compiled.instructions.len(), compiled.constants.len(), compiled.functions.len(), compiled.class_infos.len());
         let prev_path = self.current_module_path.take();
         self.current_module_path = Some(module_path.clone());
         self.module_registry
             .insert(module_path.clone(), FxHashMap::default());
-        let exec_start = std::time::Instant::now();
         let result = self.execute_module(&compiled);
-        eprintln!("[TIMING] Execution of {} took {:?} heap={}", source, exec_start.elapsed(), self.heap.len());
         let exports = std::mem::take(&mut self.module_exports);
         *self.module_registry.entry(module_path.clone()).or_default() = exports;
         self.current_module_path = prev_path;
