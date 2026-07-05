@@ -99,6 +99,11 @@ fn target_triple_uses_rust_target_lexicon() {
         assert!(triple.contains("linux"));
     } else if os == "windows" {
         assert!(triple.contains("windows"));
+    } else if os == "macos" {
+        assert!(
+            triple.contains("darwin"),
+            "triple {triple:?} must contain 'darwin' on macOS"
+        );
     } else {
         assert!(triple.contains(os));
     }
