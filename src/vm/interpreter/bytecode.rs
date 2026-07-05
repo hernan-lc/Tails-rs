@@ -260,6 +260,55 @@ impl Interpreter {
                     pc += 1;
                     continue;
                 }
+                // Phase 8.4: Inline MapSet/MapGet on the hot path
+                Instruction::MapSet(argc) => {
+                    let mut args = Vec::with_capacity(usize::from(*argc));
+                    for _ in 0..*argc {
+                        args.push(self.stack.pop().ok_or_else(|| {
+                            Error::RuntimeError(super::ERR_STACK_UNDERFLOW.into())
+                        })?);
+                    }
+                    args.reverse();
+                    let object = self.stack.pop().ok_or_else(|| {
+                        Error::RuntimeError(super::ERR_STACK_UNDERFLOW.into())
+                    })?;
+                    if let Value::Map(map_idx) = &object {
+                        let key = args.first().cloned().unwrap_or(Value::Undefined);
+                        let value = args.get(1).cloned().unwrap_or(Value::Undefined);
+                        if let HeapValue::Map(map) = &mut self.heap[*map_idx] {
+                            map.set(key, value);
+                        }
+                        self.stack.push(object);
+                    } else {
+                        self.stack.push(object);
+                        for arg in args.into_iter().rev() {
+                            self.stack.push(arg);
+                        }
+                    }
+                    pc += 1;
+                    continue;
+                }
+                Instruction::MapGet => {
+                    let key = self.stack.pop().ok_or_else(|| {
+                        Error::RuntimeError(super::ERR_STACK_UNDERFLOW.into())
+                    })?;
+                    let object = self.stack.pop().ok_or_else(|| {
+                        Error::RuntimeError(super::ERR_STACK_UNDERFLOW.into())
+                    })?;
+                    if let Value::Map(map_idx) = &object {
+                        let result = if let HeapValue::Map(map) = &self.heap[*map_idx] {
+                            map.get(&key).cloned().unwrap_or(Value::Undefined)
+                        } else {
+                            Value::Undefined
+                        };
+                        self.stack.push(result);
+                    } else {
+                        self.stack.push(object);
+                        self.stack.push(key);
+                    }
+                    pc += 1;
+                    continue;
+                }
                 // OPTIMIZATION (Phase 1G): Inline the most common `LoadConst`
                 // pattern (Integer / Float / small String / Null / Undefined /
                 // Boolean) directly in the dispatch so the cascading

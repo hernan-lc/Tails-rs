@@ -218,11 +218,29 @@ impl Interpreter {
                                 if index >= m.keys.len() {
                                     return Ok(ControlFlowOutcome::Jump(target));
                                 }
-                                let pair_idx = self.heap.len();
-                                self.heap.push(HeapValue::Array(JsArray {
-                                    elements: vec![m.keys[index].clone(), m.values[index].clone()],
-                                }));
-                                self.stack.push(Value::Array(pair_idx));
+                                let key_clone = m.keys[index].clone();
+                                let val_clone = m.values[index].clone();
+                                // Phase 8.4: Reuse a single pair-array
+                                // heap slot across iterations instead of
+                                // allocating a fresh HeapValue::Array each time.
+                                let reuse_idx = if let Some(Value::Array(idx)) = &data_val {
+                                    *idx
+                                } else {
+                                    let idx = self.heap.len();
+                                    self.heap.push(HeapValue::Array(JsArray {
+                                        elements: Vec::with_capacity(2),
+                                    }));
+                                    if let HeapValue::Iterator(iter_mut) = &mut self.heap[*iter_idx] {
+                                        iter_mut.data = Some(Value::Array(idx));
+                                    }
+                                    idx
+                                };
+                                if let HeapValue::Array(arr) = &mut self.heap[reuse_idx] {
+                                    arr.elements.clear();
+                                    arr.elements.push(key_clone);
+                                    arr.elements.push(val_clone);
+                                }
+                                self.stack.push(Value::Array(reuse_idx));
                                 if let HeapValue::Iterator(iter_mut) = &mut self.heap[*iter_idx] {
                                     iter_mut.index = index + 1;
                                 }
