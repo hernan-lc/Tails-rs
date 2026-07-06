@@ -962,7 +962,6 @@ impl CodeGenerator {
                     for elem in elements {
                         match elem {
                             Expression::SpreadElement { argument } => {
-                                self.emit(Instruction::Dup);
                                 self.generate_expression(argument)?;
                                 self.emit(Instruction::SpreadArray);
                             }
@@ -990,7 +989,6 @@ impl CodeGenerator {
                             && matches!(prop.value, Expression::SpreadElement { .. })
                         {
                             if let Expression::SpreadElement { argument } = &prop.value {
-                                self.emit(Instruction::Dup);
                                 self.generate_expression(argument)?;
                                 self.emit(Instruction::SpreadObject);
                             }
