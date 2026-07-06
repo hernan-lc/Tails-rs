@@ -8,8 +8,13 @@ use rustc_hash::FxHashMap;
 impl Interpreter {
     fn module_globals_rc(&mut self) -> std::rc::Rc<std::cell::RefCell<FxHashMap<String, Value>>> {
         self.module_globals_rc
-            .clone()
-            .get_or_insert_with(|| std::rc::Rc::new(std::cell::RefCell::new(self.globals.clone())))
+            .get_or_insert_with(|| {
+                if let Some(ref mg) = self.module_globals {
+                    mg.clone()
+                } else {
+                    std::rc::Rc::new(std::cell::RefCell::new(self.globals.clone()))
+                }
+            })
             .clone()
     }
 

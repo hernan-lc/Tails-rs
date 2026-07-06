@@ -109,6 +109,8 @@ pub(super) fn native_require(
     let saved_path = interp.current_module_path.take();
     let prev_exports = std::mem::take(&mut interp.module_exports);
     let saved_globals = std::mem::take(&mut interp.globals);
+    let saved_module_globals = interp.module_globals.take();
+    let saved_module_globals_rc = interp.module_globals_rc.take();
 
     // 8. Restore built-in globals + CJS globals
     for key in saved_globals.keys() {
@@ -187,6 +189,10 @@ pub(super) fn native_require(
         .insert("__dirname".to_string(), Value::String(dirname));
 
     // 12. Execute the module
+    let module_scope_rc: std::rc::Rc<std::cell::RefCell<rustc_hash::FxHashMap<String, Value>>> =
+        std::rc::Rc::new(std::cell::RefCell::new(interp.globals.clone()));
+    interp.module_globals = Some(module_scope_rc.clone());
+    interp.module_globals_rc = Some(module_scope_rc);
     let result = interp.execute(&compiled);
 
     // 13. Read module.exports (may have been reassigned by the module)
@@ -209,6 +215,8 @@ pub(super) fn native_require(
 
     // Restore parent globals
     interp.globals = saved_globals;
+    interp.module_globals = saved_module_globals;
+    interp.module_globals_rc = saved_module_globals_rc;
 
     // 16. Merge sub-module exports into parent module_exports
     for (k, v) in &exec_exports {

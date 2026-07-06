@@ -200,13 +200,18 @@ impl Interpreter {
             self.globals.insert("exports".to_string(), exports_obj);
         }
 
-        let result = {
-            self.module_globals_rc = None;
-            self.execute(module)
-        };
-        self.module_globals_rc = Some(std::rc::Rc::new(std::cell::RefCell::new(
-            self.globals.clone(),
-        )));
+        let module_globals_cell = std::rc::Rc::new(std::cell::RefCell::new(self.globals.clone()));
+        let saved_mg = self.module_globals.clone();
+        let saved_mg_rc = self.module_globals_rc.clone();
+
+        self.module_globals = Some(module_globals_cell.clone());
+        self.module_globals_rc = Some(module_globals_cell.clone());
+
+        let result = self.execute(module);
+
+        self.module_globals = saved_mg;
+        self.module_globals_rc = saved_mg_rc;
+
         let module_globals = std::mem::replace(&mut self.globals, saved_globals.clone());
         let exec_exports = std::mem::replace(&mut self.module_exports, prev_exports);
         // Do NOT merge exec_exports back into module_exports. Each module's
@@ -730,7 +735,7 @@ impl Interpreter {
                     .get(imported_name)
                     .cloned()
                     .unwrap_or(Value::Undefined);
-                self.globals.insert(local_name.to_string(), val);
+                self.set_global(local_name, val);
                 Ok(Value::Undefined)
             }
             None => Err(Error::RuntimeError(format!(
@@ -755,7 +760,7 @@ impl Interpreter {
                 } else {
                     Value::Undefined
                 };
-                self.globals.insert(local_name.to_string(), val);
+                self.set_global(local_name, val);
                 Ok(Value::Undefined)
             }
             None => Err(Error::RuntimeError(format!(
@@ -779,7 +784,7 @@ impl Interpreter {
                 self.current_module_path = Some(module_path.clone());
                 let module_obj = self.build_module_object_from_exports(&exports);
                 self.current_module_path = prev_path;
-                self.globals.insert(local_name.to_string(), module_obj);
+                self.set_global(local_name, module_obj);
                 Ok(Value::Undefined)
             }
             None => Err(Error::RuntimeError(format!(
@@ -801,7 +806,7 @@ impl Interpreter {
                     .get("default")
                     .cloned()
                     .unwrap_or_else(|| self.build_module_object_from_exports(&exports));
-                self.globals.insert(local_name.to_string(), val);
+                self.set_global(local_name, val);
                 Ok(Value::Undefined)
             }
             None => Err(Error::RuntimeError(format!(

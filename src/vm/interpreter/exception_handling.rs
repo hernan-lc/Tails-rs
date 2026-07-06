@@ -34,7 +34,7 @@ impl Interpreter {
                 }
                 return Err(Error::RuntimeError(format!(
                     "Thrown: {}",
-                    self.value_to_string(&value)
+                    self.format_rejection_reason(&value)
                 )));
             }
             Instruction::TryJump(catch_pc, finally_pc) => {
@@ -66,7 +66,7 @@ impl Interpreter {
                     let exc = self.pending_exception.take().unwrap_or(Value::Undefined);
                     return Err(Error::RuntimeError(format!(
                         "Thrown: {}",
-                        self.value_to_string(&exc)
+                        self.format_rejection_reason(&exc)
                     )));
                 }
             }
@@ -94,7 +94,7 @@ impl Interpreter {
                     let exc = self.pending_exception.take().unwrap_or(Value::Undefined);
                     return Err(Error::RuntimeError(format!(
                         "Thrown: {}",
-                        self.value_to_string(&exc)
+                        self.format_rejection_reason(&exc)
                     )));
                 }
             }

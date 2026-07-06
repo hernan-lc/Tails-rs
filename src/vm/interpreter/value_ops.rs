@@ -1,7 +1,7 @@
 use super::Interpreter;
 use crate::errors::{Error, Result};
 use crate::objects::{ConsString, Value};
-
+use crate::vm::interpreter::HeapValue;
 macro_rules! compare_values {
     ($name:ident, $op:tt) => {
         pub(super) fn $name(&self, left: &Value, right: &Value) -> Result<bool> {
@@ -453,7 +453,7 @@ impl Interpreter {
             Value::Symbol(id) => format!("Symbol({})", id),
             Value::Function(idx) => self.format_function(idx),
             Value::NativeFunction(_) => "[NativeFunction]".to_string(),
-            Value::Object(_) => "[Object]".to_string(),
+            Value::Object(idx) => self.format_object_value(*idx),
             Value::Array(_) => "[Array]".to_string(),
             Value::Promise(_) => "[Promise]".to_string(),
             Value::Proxy(_) => "[Proxy]".to_string(),
@@ -468,5 +468,18 @@ impl Interpreter {
             Value::Buffer(_) => "[Buffer]".to_string(),
             Value::NativeObject(_) => "[NativeObject]".to_string(),
         }
+    }
+
+    /// Format an object value for display. Error objects (with `name` and
+    /// `message` properties, or an `Error`-like prototype) get formatted as
+    /// `"ErrorName: message"`. All other objects return `"[Object]"`.
+    fn format_object_value(&self, idx: usize) -> String {
+        if let HeapValue::Object(obj) = &self.heap[idx] {
+            // Check if this looks like an Error object
+            if obj.properties.contains_key("message") || obj.properties.contains_key("name") {
+                return self.format_rejection_reason(&Value::Object(idx));
+            }
+        }
+        "[Object]".to_string()
     }
 }

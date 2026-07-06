@@ -359,6 +359,9 @@ impl Interpreter {
     }
 
     pub fn set_global(&mut self, name: &str, value: Value) {
+        if let Some(ref mg) = self.module_globals {
+            mg.borrow_mut().insert(name.to_string(), value.clone());
+        }
         self.globals.insert(name.to_string(), value);
     }
 }

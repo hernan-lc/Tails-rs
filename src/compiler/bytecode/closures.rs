@@ -1,8 +1,7 @@
 use super::CodeGenerator;
-use crate::compiler::parser::{Expression, ForInit, SpannedNode, Statement};
+use crate::compiler::parser::{BindingPattern, ExportDeclarationKind, Expression, ForInit, SpannedNode, Statement};
 use crate::compiler::CompiledFunction;
 use crate::errors::Result;
-use std::collections::HashSet;
 
 impl CodeGenerator {
     pub(crate) fn compile_function(
@@ -90,9 +89,9 @@ pub(crate) fn find_outer_refs(
     let mut names = Vec::new();
     collect_identifiers_body(body, &mut names);
 
-    let params_set: HashSet<&str> = inner_params.iter().map(|s| s.as_str()).collect();
+    let params_set: std::collections::HashSet<&str> = inner_params.iter().map(|s| s.as_str()).collect();
     let mut result = Vec::new();
-    let mut seen = HashSet::new();
+    let mut seen = std::collections::HashSet::new();
 
     for name in &names {
         if params_set.contains(name.as_str()) {
@@ -120,6 +119,58 @@ pub(crate) fn collect_identifiers_body(body: &[SpannedNode<Statement>], out: &mu
     }
 }
 
+fn collect_identifiers_pattern(pat: &BindingPattern, out: &mut Vec<String>) {
+    match pat {
+        BindingPattern::Identifier(_) => {}
+        BindingPattern::Array(elements) => {
+            for elem in elements {
+                match elem {
+                    crate::compiler::parser::ArrayBindingElement::Pattern(p, default_opt) => {
+                        collect_identifiers_pattern(p, out);
+                        if let Some(expr) = default_opt.as_ref() {
+                            collect_identifiers_expr(expr, out);
+                        }
+                    }
+                    crate::compiler::parser::ArrayBindingElement::Rest(p) => {
+                        collect_identifiers_pattern(p, out);
+                    }
+                    crate::compiler::parser::ArrayBindingElement::Skip => {}
+                }
+            }
+        }
+        BindingPattern::Object(elements) => {
+            for elem in elements {
+                collect_identifiers_pattern(&elem.value, out);
+                if let Some(expr) = &elem.default_value {
+                    collect_identifiers_expr(expr, out);
+                }
+            }
+        }
+    }
+}
+
+fn collect_identifiers_class_member(member: &crate::compiler::parser::ClassMember, out: &mut Vec<String>) {
+    match member {
+        crate::compiler::parser::ClassMember::Method { body, .. } => {
+            collect_identifiers_body(body, out);
+        }
+        crate::compiler::parser::ClassMember::Property { init, .. } => {
+            if let Some(expr) = init {
+                collect_identifiers_expr(expr, out);
+            }
+        }
+        crate::compiler::parser::ClassMember::Constructor { body, .. } => {
+            collect_identifiers_body(body, out);
+        }
+        crate::compiler::parser::ClassMember::Getter { body, .. } => {
+            collect_identifiers_body(body, out);
+        }
+        crate::compiler::parser::ClassMember::Setter { body, .. } => {
+            collect_identifiers_body(body, out);
+        }
+    }
+}
+
 fn collect_identifiers_stmt(stmt: &Statement, out: &mut Vec<String>) {
     match stmt {
         Statement::Expression(expr) => collect_identifiers_expr(expr, out),
@@ -128,10 +179,25 @@ fn collect_identifiers_stmt(stmt: &Statement, out: &mut Vec<String>) {
                 if let Some(init) = &decl.init {
                     collect_identifiers_expr(init, out);
                 }
+                collect_identifiers_pattern(&decl.id, out);
             }
+        }
+        Statement::FunctionDeclaration {
+            body,
+            defaults,
+            ..
+        } => {
+            for def in defaults {
+                if let Some(expr) = def {
+                    collect_identifiers_expr(expr, out);
+                }
+            }
+            collect_identifiers_body(body, out);
         }
         Statement::ReturnStatement(Some(expr)) => collect_identifiers_expr(expr, out),
         Statement::ReturnStatement(None) => {}
+        Statement::YieldStatement(Some(expr)) => collect_identifiers_expr(expr, out),
+        Statement::YieldStatement(None) => {}
         Statement::IfStatement {
             condition,
             consequent,
@@ -172,8 +238,13 @@ fn collect_identifiers_stmt(stmt: &Statement, out: &mut Vec<String>) {
             }
             collect_identifiers_stmt(&body.inner, out);
         }
-        Statement::ForInStatement { right, body, .. }
-        | Statement::ForOfStatement { right, body, .. } => {
+        Statement::ForInStatement { right, body, left }
+        | Statement::ForOfStatement { right, body, left, .. } => {
+            match left {
+                crate::compiler::parser::ForInLeft::Identifier(_) => {}
+                crate::compiler::parser::ForInLeft::Pattern(pat) => collect_identifiers_pattern(pat, out),
+                crate::compiler::parser::ForInLeft::VariableDeclaration { id, .. } => collect_identifiers_pattern(id, out),
+            }
             collect_identifiers_expr(right, out);
             collect_identifiers_stmt(&body.inner, out);
         }
@@ -207,6 +278,27 @@ fn collect_identifiers_stmt(stmt: &Statement, out: &mut Vec<String>) {
                 collect_identifiers_body(f, out);
             }
         }
+        Statement::ClassDeclaration {
+            superclass,
+            body,
+            ..
+        } => {
+            if let Some(sc) = superclass {
+                collect_identifiers_expr(sc, out);
+            }
+            for member in body {
+                collect_identifiers_class_member(member, out);
+            }
+        }
+        Statement::ExportDeclaration { kind } => {
+            match kind {
+                ExportDeclarationKind::Local(stmt) => collect_identifiers_stmt(&stmt.inner, out),
+                _ => {}
+            }
+        }
+        Statement::ExportDefaultDeclaration { declaration } => {
+            collect_identifiers_stmt(&declaration.inner, out);
+        }
         _ => {}
     }
 }
@@ -232,16 +324,20 @@ fn collect_identifiers_expr(expr: &Expression, out: &mut Vec<String>) {
             }
         }
         Expression::Member {
-            object, property, ..
+            object, property, computed
         } => {
             collect_identifiers_expr(object, out);
-            collect_identifiers_expr(property, out);
+            if *computed {
+                collect_identifiers_expr(property, out);
+            }
         }
         Expression::OptionalMember {
-            object, property, ..
+            object, property, computed
         } => {
             collect_identifiers_expr(object, out);
-            collect_identifiers_expr(property, out);
+            if *computed {
+                collect_identifiers_expr(property, out);
+            }
         }
         Expression::OptionalCall { callee, args } => {
             collect_identifiers_expr(callee, out);
@@ -261,14 +357,29 @@ fn collect_identifiers_expr(expr: &Expression, out: &mut Vec<String>) {
         Expression::UpdateExpression { operand, .. } => {
             collect_identifiers_expr(operand, out);
         }
-        Expression::ArrowFunction { body, .. } => match body.as_ref() {
-            crate::compiler::parser::ArrowFunctionBody::Expression(expr) => {
-                collect_identifiers_expr(expr, out)
+        Expression::ArrowFunction { body, defaults, .. } => {
+            for def in defaults {
+                if let Some(expr) = def {
+                    collect_identifiers_expr(expr, out);
+                }
             }
-            crate::compiler::parser::ArrowFunctionBody::Block(stmts) => {
-                collect_identifiers_body(stmts, out)
+            match body.as_ref() {
+                crate::compiler::parser::ArrowFunctionBody::Expression(expr) => {
+                    collect_identifiers_expr(expr, out)
+                }
+                crate::compiler::parser::ArrowFunctionBody::Block(stmts) => {
+                    collect_identifiers_body(stmts, out)
+                }
             }
-        },
+        }
+        Expression::FunctionExpression { body, defaults, .. } => {
+            for def in defaults {
+                if let Some(expr) = def {
+                    collect_identifiers_expr(expr, out);
+                }
+            }
+            collect_identifiers_body(body, out);
+        }
         Expression::NewExpression { callee, args } => {
             collect_identifiers_expr(callee, out);
             for arg in args {
@@ -280,8 +391,48 @@ fn collect_identifiers_expr(expr: &Expression, out: &mut Vec<String>) {
                 collect_identifiers_expr(expr, out);
             }
         }
+        Expression::ClassExpression { superclass, body, .. } => {
+            if let Some(sc) = superclass {
+                collect_identifiers_expr(sc, out);
+            }
+            for member in body {
+                collect_identifiers_class_member(member, out);
+            }
+        }
         Expression::AwaitExpression { argument } => {
             collect_identifiers_expr(argument, out);
+        }
+        Expression::ImportExpression { source } => {
+            collect_identifiers_expr(source, out);
+        }
+        Expression::SuperCall { args } => {
+            for arg in args {
+                collect_identifiers_expr(arg, out);
+            }
+        }
+        Expression::SuperMember { property, computed } => {
+            if *computed {
+                collect_identifiers_expr(property, out);
+            }
+        }
+        Expression::ArrayLiteral { elements } => {
+            for elem in elements {
+                collect_identifiers_expr(elem, out);
+            }
+        }
+        Expression::ObjectLiteral { properties } => {
+            for prop in properties {
+                collect_identifiers_expr(&prop.value, out);
+                if let Some(comp_key) = &prop.computed_key {
+                    collect_identifiers_expr(comp_key, out);
+                }
+            }
+        }
+        Expression::SpreadElement { argument } => {
+            collect_identifiers_expr(argument, out);
+        }
+        Expression::TypeAssertion { expression, .. } => {
+            collect_identifiers_expr(expression, out);
         }
         _ => {}
     }

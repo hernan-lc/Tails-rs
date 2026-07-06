@@ -4,7 +4,7 @@ impl Interpreter {
     pub(crate) fn exec_call(
         &mut self,
         argc: &u16,
-        module: &CompiledModule,
+        _module: &CompiledModule,
         pc: &mut usize,
     ) -> Result<bool> {
         let callee = self
@@ -418,7 +418,7 @@ impl Interpreter {
     pub(crate) fn exec_construct(
         &mut self,
         argc: &u16,
-        module: &CompiledModule,
+        _module: &CompiledModule,
         pc: &mut usize,
     ) -> Result<bool> {
         let mut args = Vec::new();

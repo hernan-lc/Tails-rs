@@ -75,8 +75,10 @@ impl Interpreter {
                         let closure_count = closure.borrow().len();
 
                         let saved_mg = self.module_globals.take();
+                        let saved_mg_rc = self.module_globals_rc.take();
                         if let Some(ref scope) = module_scope {
                             self.module_globals = Some(scope.clone());
+                            self.module_globals_rc = Some(scope.clone());
                         }
 
                         let saved_module = self.current_module.clone();
@@ -148,6 +150,7 @@ impl Interpreter {
                         self.current_module = saved_module;
                         self.current_module_path = saved_path;
                         self.module_globals = saved_mg;
+                        self.module_globals_rc = saved_mg_rc;
                         self.exception_handlers = saved_exception_handlers;
                         result
                     }
