@@ -327,8 +327,26 @@ impl CodeGenerator {
                 self.scope_depth += 1;
                 let prev_locals_count = self.locals.len();
                 self.emit(Instruction::BlockEnter);
+                // JavaScript hoisting: pre-register all function names first
+                for stmt in stmts.iter() {
+                    if let Statement::FunctionDeclaration { name, .. } = &stmt.inner {
+                        self.locals.push(name.clone());
+                    }
+                }
+                // JavaScript hoisting: compile function declarations first
+                for stmt in stmts.iter() {
+                    if let Statement::FunctionDeclaration { .. } = &stmt.inner {
+                        self.record_line_from_span(&stmt.span);
+                        self.generate_statement(&stmt.inner, false)?;
+                    }
+                }
+                // Then compile non-function statements
                 for (i, stmt) in stmts.iter().enumerate() {
-                    let is_last = i == stmts.len() - 1;
+                    if matches!(&stmt.inner, Statement::FunctionDeclaration { .. }) {
+                        continue;
+                    }
+                    let remaining = &stmts[i..];
+                    let is_last = remaining.iter().all(|s| matches!(&s.inner, Statement::FunctionDeclaration { .. }));
                     self.record_line_from_span(&stmt.span);
                     self.generate_statement(&stmt.inner, is_last)?;
                 }
@@ -350,8 +368,26 @@ impl CodeGenerator {
                 self.scope_depth += 1;
                 let prev_locals_count = self.locals.len();
                 self.emit(Instruction::BlockEnter);
+                // JavaScript hoisting: pre-register all function names first
+                for stmt in stmts.iter() {
+                    if let Statement::FunctionDeclaration { name, .. } = &stmt.inner {
+                        self.locals.push(name.clone());
+                    }
+                }
+                // JavaScript hoisting: compile function declarations first
+                for stmt in stmts.iter() {
+                    if let Statement::FunctionDeclaration { .. } = &stmt.inner {
+                        self.record_line_from_span(&stmt.span);
+                        self.generate_statement(&stmt.inner, false)?;
+                    }
+                }
+                // Then compile non-function statements
                 for (i, stmt) in stmts.iter().enumerate() {
-                    let is_last = i == stmts.len() - 1;
+                    if matches!(&stmt.inner, Statement::FunctionDeclaration { .. }) {
+                        continue;
+                    }
+                    let remaining = &stmts[i..];
+                    let is_last = remaining.iter().all(|s| matches!(&s.inner, Statement::FunctionDeclaration { .. }));
                     self.record_line_from_span(&stmt.span);
                     self.generate_statement(&stmt.inner, is_last)?;
                 }

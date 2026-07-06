@@ -47,7 +47,24 @@ impl CodeGenerator {
             self.locals.push(param.clone());
         }
 
+        // JavaScript hoisting: pre-register all function names first
         for stmt in body {
+            if let Statement::FunctionDeclaration { name, .. } = &stmt.inner {
+                self.locals.push(name.clone());
+            }
+        }
+        // JavaScript hoisting: compile function declarations first
+        for stmt in body {
+            if let Statement::FunctionDeclaration { .. } = &stmt.inner {
+                self.record_line_from_span(&stmt.span);
+                self.generate_statement(&stmt.inner, false)?;
+            }
+        }
+        // Then compile non-function statements
+        for stmt in body {
+            if matches!(&stmt.inner, Statement::FunctionDeclaration { .. }) {
+                continue;
+            }
             self.record_line_from_span(&stmt.span);
             self.generate_statement(&stmt.inner, false)?;
         }
@@ -97,7 +114,7 @@ pub(crate) fn find_outer_refs(
     result
 }
 
-fn collect_identifiers_body(body: &[SpannedNode<Statement>], out: &mut Vec<String>) {
+pub(crate) fn collect_identifiers_body(body: &[SpannedNode<Statement>], out: &mut Vec<String>) {
     for stmt in body {
         collect_identifiers_stmt(&stmt.inner, out);
     }

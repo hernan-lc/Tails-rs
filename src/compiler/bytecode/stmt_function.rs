@@ -1,4 +1,4 @@
-use crate::compiler::parser::Statement;
+use crate::compiler::parser::{SpannedNode, Statement};
 use crate::compiler::{CompiledFunction, Instruction};
 use crate::errors::Result;
 
@@ -63,7 +63,66 @@ impl CodeGenerator {
             self.locals.push(rp.clone());
         }
 
+        // JavaScript hoisting: pre-register all function names
+        for stmt in body.iter() {
+            if let Statement::FunctionDeclaration { name, .. } = &stmt.inner {
+                self.locals.push(name.clone());
+            }
+        }
+        // Sort function declarations: non-capturing siblings first, then capturing.
+        // This ensures that when MakeClosure snapshots a sibling's value, that
+        // sibling has already been stored on the stack.
+        let sibling_names: Vec<&str> = body
+            .iter()
+            .filter_map(|stmt| {
+                if let Statement::FunctionDeclaration { name, .. } = &stmt.inner {
+                    Some(name.as_str())
+                } else {
+                    None
+                }
+            })
+            .collect();
+        let mut func_stmts: Vec<&SpannedNode<Statement>> = body
+            .iter()
+            .filter(|s| matches!(&s.inner, Statement::FunctionDeclaration { .. }))
+            .collect();
+        func_stmts.sort_by_key(|stmt| {
+            if let Statement::FunctionDeclaration {
+                params,
+                body: func_body,
+                rest_param,
+                ..
+            } = &stmt.inner
+            {
+                let mut all_params = params.clone();
+                if let Some(rp) = rest_param {
+                    all_params.push(rp.clone());
+                }
+                let mut idents = Vec::new();
+                closures::collect_identifiers_body(func_body, &mut idents);
+                let captures_sibling = idents.iter().any(|ident| {
+                    sibling_names.contains(&ident.as_str()) && !all_params.contains(ident)
+                });
+                if captures_sibling {
+                    1
+                } else {
+                    0
+                }
+            } else {
+                0
+            }
+        });
+        // Compile function declarations first (function objects exist before other code runs)
+        for stmt in func_stmts {
+            self.record_line_from_span(&stmt.span);
+            self.generate_statement(&stmt.inner, false)?;
+        }
+
+        // Then compile non-function statements
         for stmt in body {
+            if matches!(&stmt.inner, Statement::FunctionDeclaration { .. }) {
+                continue;
+            }
             self.record_line_from_span(&stmt.span);
             self.generate_statement(&stmt.inner, false)?;
         }
@@ -86,6 +145,9 @@ impl CodeGenerator {
         }
         if self.scope_depth == 0 {
             self.emit(Instruction::StoreGlobal(name.clone()));
+        } else if let Some(slot) = self.resolve_local(name) {
+            // Name was already hoisted, use the existing slot
+            self.emit(Instruction::StoreLocal(slot));
         } else {
             self.locals.push(name.clone());
             let slot = self.last_local_slot();
