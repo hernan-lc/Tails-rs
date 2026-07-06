@@ -2,6 +2,7 @@ mod builtins;
 mod bytecode;
 mod call_frame;
 mod calls;
+mod exec_calls;
 mod class_ops;
 mod control_flow;
 mod error_format;
