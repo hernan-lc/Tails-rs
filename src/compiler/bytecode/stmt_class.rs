@@ -160,9 +160,32 @@ impl CodeGenerator {
                     }
                 }
 
-                // Combine default stmts + prop inits + original body
+                // Combine default stmts + prop inits + access-modifier assignments + original body
                 let mut full_body: Vec<SpannedNode<Statement>> = Vec::new();
                 full_body.extend(default_stmts);
+
+                // Emit this.param = param for constructor params with access modifiers
+                for p in params {
+                    if p.access_modifiers.iter().any(|m| matches!(
+                        m,
+                        crate::compiler::parser::AccessModifier::Public
+                            | crate::compiler::parser::AccessModifier::Private
+                            | crate::compiler::parser::AccessModifier::Protected
+                    )) {
+                        full_body.push(SpannedNode {
+                            inner: Statement::Expression(Expression::Assignment {
+                                target: Box::new(Expression::Member {
+                                    object: Box::new(Expression::Identifier("this".to_string())),
+                                    property: Box::new(Expression::Identifier(p.name.clone())),
+                                    computed: false,
+                                }),
+                                value: Box::new(Expression::Identifier(p.name.clone())),
+                                op: None,
+                            }),
+                            span: Some(crate::errors::Span::unknown()),
+                        });
+                    }
+                }
 
                 // If there are property initializers, we need to prepend them to the constructor body
                 if !prop_inits.is_empty() {

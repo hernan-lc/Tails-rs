@@ -180,7 +180,59 @@ pub(super) fn native_object_define_property(
     };
     let descriptor = args.get(2).cloned().unwrap_or(Value::Undefined);
 
-    let value = match &descriptor {
+    if let Value::Object(obj_idx) = &descriptor {
+        if let crate::vm::interpreter::HeapValue::Object(desc) = &interp.heap[*obj_idx] {
+            let getter = desc.properties.get("get").cloned();
+            let setter = desc.properties.get("set").cloned();
+            let value = desc.properties.get("value").cloned();
+
+            match &target {
+                Value::Object(tgt_idx) => {
+                    if let crate::vm::interpreter::HeapValue::Object(tgt) =
+                        &mut interp.heap[*tgt_idx]
+                    {
+                        if let Some(getter_fn) = getter {
+                            if !matches!(getter_fn, Value::Undefined) {
+                                tgt.properties
+                                    .insert(format!("__getter_{}", property), getter_fn);
+                            }
+                        }
+                        if let Some(setter_fn) = setter {
+                            if !matches!(setter_fn, Value::Undefined) {
+                                tgt.properties
+                                    .insert(format!("__setter_{}", property), setter_fn);
+                            }
+                        }
+                        if let Some(val) = value {
+                            tgt.properties.insert(property, val);
+                        }
+                    }
+                }
+                Value::Function(func_idx) => {
+                    if let crate::vm::interpreter::HeapValue::Function(f) =
+                        &mut interp.heap[*func_idx]
+                    {
+                        if let Some(getter_fn) = getter {
+                            if !matches!(getter_fn, Value::Undefined) {
+                                f.properties
+                                    .insert(format!("__getter_{}", property), getter_fn);
+                            }
+                        }
+                        if let Some(setter_fn) = setter {
+                            if !matches!(setter_fn, Value::Undefined) {
+                                f.properties
+                                    .insert(format!("__setter_{}", property), setter_fn);
+                            }
+                        }
+                        if let Some(val) = value {
+                            f.properties.insert(property, val);
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+    } else if let Some(val) = match &descriptor {
         Value::Object(obj_idx) => {
             if let crate::vm::interpreter::HeapValue::Object(obj) = &interp.heap[*obj_idx] {
                 obj.properties.get("value").cloned()
@@ -189,17 +241,18 @@ pub(super) fn native_object_define_property(
             }
         }
         _ => None,
-    };
-
-    if let Some(val) = value {
+    } {
         match &target {
             Value::Object(obj_idx) => {
-                if let crate::vm::interpreter::HeapValue::Object(obj) = &mut interp.heap[*obj_idx] {
+                if let crate::vm::interpreter::HeapValue::Object(obj) =
+                    &mut interp.heap[*obj_idx]
+                {
                     obj.properties.insert(property, val);
                 }
             }
             Value::Function(func_idx) => {
-                if let crate::vm::interpreter::HeapValue::Function(f) = &mut interp.heap[*func_idx]
+                if let crate::vm::interpreter::HeapValue::Function(f) =
+                    &mut interp.heap[*func_idx]
                 {
                     f.properties.insert(property, val);
                 }
