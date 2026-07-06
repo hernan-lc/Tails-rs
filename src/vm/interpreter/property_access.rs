@@ -148,6 +148,21 @@ impl Interpreter {
                         Some(s) => s,
                         None => return Ok(Value::Undefined),
                     };
+                    // Live binding for module namespaces: if tagged with
+                    // __module_path, read from the registry so circular
+                    // dependency imports see exports defined so far.
+                    if key_str != "__module_path" {
+                        if let Some(path_val) = obj.properties.get("__module_path") {
+                            if let Value::String(module_path) = path_val {
+                                if let Some(exports) = self.module_registry.get(module_path) {
+                                    if let Some(val) = exports.get(&key_str) {
+                                        return Ok(val.clone());
+                                    }
+                                    return Ok(Value::Undefined);
+                                }
+                            }
+                        }
+                    }
                     // Phase 8.2: Use get_cached() to update inline cache
                     if let Some(val) = obj.properties.get_cached(&key_str) {
                         return Ok(val.clone());

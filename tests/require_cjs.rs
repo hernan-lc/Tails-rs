@@ -15,30 +15,40 @@ fn fixture_file(name: &str) -> std::path::PathBuf {
     fixture_dir().join(name)
 }
 
+fn eval_fixture(runtime: &mut TailsRuntime, name: &str) -> tails::Value {
+    let source = run_fixture(name);
+    let base = fixture_file(name);
+    runtime.eval_module(&source, &base).unwrap()
+}
+
+// ── CJS named exports (exports.x = ...) ─────────────────────────────────────
+
 #[test]
 #[allow(clippy::approx_constant)]
 fn test_require_exports_object() {
     let mut runtime = TailsRuntime::default();
-    let source = run_fixture("main_exports.ts");
-    let base = fixture_file("main_exports.ts");
-    let result = runtime.eval_module(&source, &base).unwrap();
+    let result = eval_fixture(&mut runtime, "main_exports.ts");
 
-    // result should be the math.cjs exports object
     let greeting = runtime.get_property(&result, "greeting").unwrap();
     assert_eq!(greeting, tails::Value::String("hello from CJS".to_string()));
 
     let pi = runtime.get_property(&result, "PI").unwrap();
     assert_eq!(pi, tails::Value::Float(3.14159));
+
+    let add = runtime.get_property(&result, "add").unwrap();
+    assert!(
+        matches!(add, tails::Value::Function(_)),
+        "add should be a function"
+    );
 }
+
+// ── CJS default function export (module.exports = fn) ───────────────────────
 
 #[test]
 fn test_require_exports_function() {
     let mut runtime = TailsRuntime::default();
-    let source = run_fixture("main_function.ts");
-    let base = fixture_file("main_function.ts");
-    let result = runtime.eval_module(&source, &base).unwrap();
+    let result = eval_fixture(&mut runtime, "main_function.ts");
 
-    // result should be the greeter function
     let output = runtime
         .call_function(
             &result,
@@ -49,21 +59,21 @@ fn test_require_exports_function() {
     assert_eq!(output, tails::Value::String("Hello, World!".to_string()));
 }
 
+// ── CJS require caching (identity preservation) ──────────────────────────────
+
 #[test]
 fn test_require_caching() {
     let mut runtime = TailsRuntime::default();
-    let source = run_fixture("main_cache.ts");
-    let base = fixture_file("main_cache.ts");
-    let result = runtime.eval_module(&source, &base).unwrap();
+    let result = eval_fixture(&mut runtime, "main_cache.ts");
     assert_eq!(result, tails::Value::Boolean(true));
 }
+
+// ── CJS circular dependencies ────────────────────────────────────────────────
 
 #[test]
 fn test_require_circular_deps() {
     let mut runtime = TailsRuntime::default();
-    let source = run_fixture("main_circular.ts");
-    let base = fixture_file("main_circular.ts");
-    let result = runtime.eval_module(&source, &base).unwrap();
+    let result = eval_fixture(&mut runtime, "main_circular.ts");
 
     let a_x = runtime.get_property(&result, "a_x").unwrap();
     assert_eq!(a_x, tails::Value::Float(10.0));
@@ -71,6 +81,61 @@ fn test_require_circular_deps() {
     let b_y = runtime.get_property(&result, "b_y").unwrap();
     assert_eq!(b_y, tails::Value::Float(20.0));
 }
+
+// ── CJS chained dependencies (a → b → c) ────────────────────────────────────
+
+#[test]
+fn test_require_chain() {
+    let mut runtime = TailsRuntime::default();
+    let result = eval_fixture(&mut runtime, "main_chain.ts");
+
+    let from_a = runtime.get_property(&result, "from_a").unwrap();
+    assert_eq!(from_a, tails::Value::String("A".to_string()));
+
+    let b_from_b = runtime.get_property(&result, "b_from_b").unwrap();
+    assert_eq!(b_from_b, tails::Value::String("B".to_string()));
+
+    // chain_c exports module.exports = 42
+    let b_c_val = runtime.get_property(&result, "b_c_val").unwrap();
+    assert_eq!(b_c_val, tails::Value::Float(42.0));
+}
+
+// ── CJS module.exports reassignment to object literal ────────────────────────
+
+#[test]
+fn test_require_obj_literal() {
+    let mut runtime = TailsRuntime::default();
+    let result = eval_fixture(&mut runtime, "main_obj_literal.ts");
+
+    let color = runtime.get_property(&result, "color").unwrap();
+    assert_eq!(color, tails::Value::String("red".to_string()));
+
+    let size = runtime.get_property(&result, "size").unwrap();
+    assert_eq!(size, tails::Value::Float(42.0));
+
+    let deep = runtime.get_property(&result, "deep").unwrap();
+    assert_eq!(deep, tails::Value::Boolean(true));
+}
+
+// ── Using CJS exports in ESM (calling functions, accessing properties) ───────
+
+#[test]
+#[allow(clippy::approx_constant)]
+fn test_require_use_exports() {
+    let mut runtime = TailsRuntime::default();
+    let result = eval_fixture(&mut runtime, "main_use_exports.ts");
+
+    let sum = runtime.get_property(&result, "sum").unwrap();
+    assert_eq!(sum, tails::Value::Float(5.0));
+
+    let product = runtime.get_property(&result, "product").unwrap();
+    assert_eq!(product, tails::Value::Float(20.0));
+
+    let pi = runtime.get_property(&result, "pi").unwrap();
+    assert_eq!(pi, tails::Value::Float(3.14159));
+}
+
+// ── Native module require (path) ─────────────────────────────────────────────
 
 #[test]
 #[cfg(feature = "path")]
@@ -84,6 +149,8 @@ fn test_require_native_path() {
     let sep = std::path::MAIN_SEPARATOR;
     assert_eq!(result, tails::Value::String(format!("a{sep}b{sep}c")));
 }
+
+// ── __dirname and __filename ─────────────────────────────────────────────────
 
 #[test]
 fn test_require_dirname_filename() {
@@ -103,6 +170,8 @@ fn test_require_dirname_filename() {
     assert!(s.contains("test.ts"), "Expected test.ts in result: {}", s);
 }
 
+// ── Missing module error ─────────────────────────────────────────────────────
+
 #[test]
 fn test_require_missing_module() {
     let mut runtime = TailsRuntime::default();
@@ -112,6 +181,8 @@ fn test_require_missing_module() {
     let err = result.unwrap_err();
     assert!(err.message().contains("Cannot find module"));
 }
+
+// ── Invalid argument error ───────────────────────────────────────────────────
 
 #[test]
 fn test_require_invalid_argument() {

@@ -219,10 +219,15 @@ pub(super) fn native_require(
     result?;
 
     // If module.exports was reassigned to a non-object (function, string, etc.), return it directly
+    // Temporarily set current_module_path so build_module_object_from_exports tags the
+    // result with the correct module path (not the parent's).
+    let saved_mp = interp.current_module_path.take();
+    interp.current_module_path = Some(module_path.clone());
     let result = match &final_exports {
         Value::Object(_) => interp.build_module_object_from_exports(&export_map),
         other => other.clone(),
     };
+    interp.current_module_path = saved_mp;
     interp
         .require_cache
         .insert(module_path.clone(), result.clone());

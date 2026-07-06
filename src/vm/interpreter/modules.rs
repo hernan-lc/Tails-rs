@@ -209,9 +209,10 @@ impl Interpreter {
         )));
         let module_globals = std::mem::replace(&mut self.globals, saved_globals.clone());
         let exec_exports = std::mem::replace(&mut self.module_exports, prev_exports);
-        for (k, v) in &exec_exports {
-            self.module_exports.insert(k.clone(), v.clone());
-        }
+        // Do NOT merge exec_exports back into module_exports. Each module's
+        // exports are tracked separately via exec_store_module_export and
+        // exec_reexport_all which update module_registry directly. Merging
+        // would pollute the parent module's exports with nested module exports.
         // Restore exported values
         for (k, v) in &exec_exports {
             if let Some(mv) = module_globals.get(k) {
@@ -432,8 +433,8 @@ impl Interpreter {
         self.module_registry
             .insert(module_path.clone(), FxHashMap::default());
         let result = self.execute_module(&compiled);
-        let exports = std::mem::take(&mut self.module_exports);
-        *self.module_registry.entry(module_path.clone()).or_default() = exports;
+        // Registry is already updated during execution via exec_store_module_export
+        // and exec_reexport_all. No need to overwrite with module_exports here.
         self.current_module_path = prev_path;
         result?;
         Ok(Some(module_path))
@@ -659,6 +660,10 @@ impl Interpreter {
         for (k, v) in exports {
             props.insert(k.clone(), v.clone());
         }
+        // Tag as module namespace for live binding support.
+        if let Some(path) = &self.current_module_path {
+            props.insert("__module_path".to_string(), Value::String(path.clone()));
+        }
         self.heap.push(HeapValue::Object(JsObject {
             properties: PropertyStorage::Map(props),
             prototype: None,
@@ -768,7 +773,12 @@ impl Interpreter {
                     .get(&module_path)
                     .cloned()
                     .unwrap_or_default();
+                // Temporarily set current_module_path so the namespace object
+                // is tagged with the correct module path for live binding.
+                let prev_path = self.current_module_path.take();
+                self.current_module_path = Some(module_path.clone());
                 let module_obj = self.build_module_object_from_exports(&exports);
+                self.current_module_path = prev_path;
                 self.globals.insert(local_name.to_string(), module_obj);
                 Ok(Value::Undefined)
             }
@@ -805,6 +815,11 @@ impl Interpreter {
         for name in names {
             if let Some(val) = self.globals.get(name) {
                 self.module_exports.insert(name.clone(), val.clone());
+                if let Some(path) = &self.current_module_path {
+                    if let Some(exports) = self.module_registry.get_mut(path) {
+                        exports.insert(name.clone(), val.clone());
+                    }
+                }
             }
         }
         Ok(())
@@ -812,13 +827,23 @@ impl Interpreter {
 
     pub(crate) fn exec_export_default(&mut self) -> Result<()> {
         let val = self.stack.last().cloned().unwrap_or(Value::Undefined);
-        self.module_exports.insert("default".to_string(), val);
+        self.module_exports.insert("default".to_string(), val.clone());
+        if let Some(path) = &self.current_module_path {
+            if let Some(exports) = self.module_registry.get_mut(path) {
+                exports.insert("default".to_string(), val);
+            }
+        }
         Ok(())
     }
 
     pub(crate) fn exec_store_module_export(&mut self, name: &str) -> Result<()> {
         if let Some(val) = self.globals.get(name) {
             self.module_exports.insert(name.to_string(), val.clone());
+            if let Some(path) = &self.current_module_path {
+                if let Some(exports) = self.module_registry.get_mut(path) {
+                    exports.insert(name.to_string(), val.clone());
+                }
+            }
         }
         Ok(())
     }
@@ -834,6 +859,11 @@ impl Interpreter {
                 for (k, v) in &exports {
                     if k != "default" {
                         self.module_exports.insert(k.clone(), v.clone());
+                        if let Some(path) = &self.current_module_path {
+                            if let Some(current_exports) = self.module_registry.get_mut(path) {
+                                current_exports.insert(k.clone(), v.clone());
+                            }
+                        }
                     }
                 }
                 Ok(())
