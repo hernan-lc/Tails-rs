@@ -367,6 +367,22 @@ impl<'a> Parser<'a> {
                             if self.peek().token == Token::RightParen {
                                 break;
                             }
+                            if self.peek().token == Token::This {
+                                self.advance();
+                                if self.peek().token == Token::Colon {
+                                    self.advance();
+                                    let _ = self.parse_type_annotation()?;
+                                }
+                                if self.peek().token == Token::Comma {
+                                    self.advance();
+                                    if self.peek().token == Token::RightParen {
+                                        break;
+                                    }
+                                } else {
+                                    break;
+                                }
+                                continue;
+                            }
                             if self.peek().token == Token::Ellipsis {
                                 self.advance();
                             }
