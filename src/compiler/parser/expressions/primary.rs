@@ -317,17 +317,65 @@ impl<'a> Parser<'a> {
                     self.advance();
                     let key_expr = self.parse_expression()?.inner;
                     self.expect(&Token::RightBracket)?;
-                    self.expect(&Token::Colon)?;
-                    let value = self.parse_expression()?.inner;
-                    properties.push(ObjectProperty {
-                        key: String::new(),
-                        value,
-                        shorthand: false,
-                        computed: true,
-                        computed_key: Some(key_expr),
-                        is_getter: false,
-                        is_setter: false,
-                    });
+                    if self.peek().token == Token::LeftParen
+                        || self.peek().token == Token::Async
+                        || self.peek().token == Token::Star
+                    {
+                        let mut is_async = false;
+                        let mut is_generator = false;
+                        if self.peek().token == Token::Async {
+                            is_async = true;
+                            self.advance();
+                        }
+                        if self.peek().token == Token::Star {
+                            is_generator = true;
+                            self.advance();
+                        }
+                        self.expect(&Token::LeftParen)?;
+                        let (params, param_types, defaults, rest_param) =
+                            self.parse_typed_params()?;
+                        self.expect(&Token::RightParen)?;
+                        let return_type = if self.peek().token == Token::Colon {
+                            self.advance();
+                            Some(self.parse_type_annotation()?)
+                        } else {
+                            None
+                        };
+                        self.expect(&Token::LeftBrace)?;
+                        let body = self.parse_block_body()?;
+                        self.expect(&Token::RightBrace)?;
+                        properties.push(ObjectProperty {
+                            key: String::new(),
+                            value: Expression::FunctionExpression {
+                                name: None,
+                                params,
+                                param_types: Some(param_types),
+                                defaults,
+                                rest_param,
+                                return_type,
+                                body,
+                                is_async,
+                                is_generator,
+                            },
+                            shorthand: false,
+                            computed: true,
+                            computed_key: Some(key_expr),
+                            is_getter: false,
+                            is_setter: false,
+                        });
+                    } else {
+                        self.expect(&Token::Colon)?;
+                        let value = self.parse_expression()?.inner;
+                        properties.push(ObjectProperty {
+                            key: String::new(),
+                            value,
+                            shorthand: false,
+                            computed: true,
+                            computed_key: Some(key_expr),
+                            is_getter: false,
+                            is_setter: false,
+                        });
+                    }
                 } else {
                     let saved = self.pos;
                     let mut is_async = false;

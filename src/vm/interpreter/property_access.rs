@@ -10,6 +10,7 @@ fn key_to_str(key: &Value) -> Option<String> {
         Value::Cons(c) => Some(c.flatten()),
         Value::Integer(n) => Some(n.to_string()),
         Value::Float(n) => Some(((*n) as i64).to_string()),
+        Value::Symbol(id) => Some(format!("__sym_{}", id)),
         _ => None,
     }
 }

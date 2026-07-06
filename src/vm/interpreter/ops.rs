@@ -416,8 +416,18 @@ impl Interpreter {
                     }
                     _ => "",
                 };
-                if key_str.is_empty() && !matches!(&key, Value::String(_)) {
+                if key_str.is_empty() && !matches!(&key, Value::String(_) | Value::Symbol(_)) {
                 } else {
+                    let resolved_key = if key_str.is_empty() {
+                        match &key {
+                            Value::Symbol(id) => format!("__sym_{}", id),
+                            Value::Integer(n) => n.to_string(),
+                            Value::Float(n) => ((*n) as i64).to_string(),
+                            _ => key_str.to_string(),
+                        }
+                    } else {
+                        key_str.to_string()
+                    };
                     match &object {
                         Value::Proxy(proxy_idx) => {
                             if let HeapValue::Proxy(proxy) = &self.heap[*proxy_idx] {
@@ -440,7 +450,7 @@ impl Interpreter {
                                         if let HeapValue::Object(obj) =
                                             &mut self.heap[*target_obj_idx]
                                         {
-                                            obj.properties.insert(key_str.to_string(), value);
+                                            obj.properties.insert(resolved_key, value);
                                         }
                                     }
                                 }
@@ -449,23 +459,23 @@ impl Interpreter {
                         Value::Object(obj_idx) => {
                             if let HeapValue::Object(obj) = &mut self.heap[*obj_idx] {
                                 if obj.properties.has_accessors() {
-                                    let setter_key = format!("{}{}", SETTER_PREFIX, key_str);
+                                    let setter_key = format!("{}{}", SETTER_PREFIX, resolved_key);
                                     if let Some(setter_val) =
                                         obj.properties.get(&setter_key).cloned()
                                     {
                                         let _ = obj;
                                         self.call_value(&setter_val, &object, &[value])?;
                                     } else {
-                                        obj.properties.insert(key_str.to_string(), value);
+                                        obj.properties.insert(resolved_key, value);
                                     }
                                 } else {
-                                    obj.properties.insert(key_str.to_string(), value);
+                                    obj.properties.insert(resolved_key, value);
                                 }
                             }
                         }
                         Value::Function(func_idx) => {
                             if let HeapValue::Function(f) = &mut self.heap[*func_idx] {
-                                f.properties.insert(key_str.to_string(), value);
+                                f.properties.insert(resolved_key, value);
                             }
                         }
                         _ => {}

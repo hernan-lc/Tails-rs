@@ -981,44 +981,46 @@ impl CodeGenerator {
                 Ok(())
             }
             Expression::ObjectLiteral { properties } => {
-                let has_spread = properties.iter().any(|p| p.key.is_empty());
+                let has_spread = properties
+                    .iter()
+                    .any(|p| matches!(p.value, Expression::SpreadElement { .. }));
                 if has_spread {
                     self.emit(Instruction::NewObject);
                     for prop in properties {
-                        if prop.key.is_empty()
-                            && matches!(prop.value, Expression::SpreadElement { .. })
-                        {
+                        if matches!(prop.value, Expression::SpreadElement { .. }) {
                             if let Expression::SpreadElement { argument } = &prop.value {
                                 self.generate_expression(argument)?;
                                 self.emit(Instruction::SpreadObject);
                             }
-                        } else {
-                            if prop.computed {
-                                if let Some(key_expr) = &prop.computed_key {
-                                    self.generate_expression(key_expr)?;
-                                }
-                            } else {
-                                let actual_key = if prop.is_getter {
-                                    format!("__getter_{}", prop.key)
-                                } else if prop.is_setter {
-                                    format!("__setter_{}", prop.key)
-                                } else {
-                                    prop.key.clone()
-                                };
-                                let key_idx = self.add_constant(Value::String(actual_key));
-                                self.emit(Instruction::LoadConst(key_idx));
+                        } else if prop.computed {
+                            self.emit(Instruction::Dup);
+                            if let Some(key_expr) = &prop.computed_key {
+                                self.generate_expression(key_expr)?;
                             }
+                            self.generate_expression(&prop.value)?;
+                            self.emit(Instruction::SetProperty);
+                        } else {
+                            let actual_key = if prop.is_getter {
+                                format!("__getter_{}", prop.key)
+                            } else if prop.is_setter {
+                                format!("__setter_{}", prop.key)
+                            } else {
+                                prop.key.clone()
+                            };
+                            let key_idx = self.add_constant(Value::String(actual_key));
+                            self.emit(Instruction::Dup);
+                            self.emit(Instruction::LoadConst(key_idx));
                             self.generate_expression(&prop.value)?;
                             self.emit(Instruction::SetProperty);
                         }
                     }
+                    self.emit(Instruction::Pop);
                 } else {
                     self.emit(Instruction::NewObject);
                     for prop in properties {
                         if prop.computed {
                             if let Some(key_expr) = &prop.computed_key {
                                 self.generate_expression(key_expr)?;
-                                self.emit(Instruction::ToString);
                             }
                         } else {
                             let actual_key = if prop.is_getter {

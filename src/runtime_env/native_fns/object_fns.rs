@@ -176,6 +176,7 @@ pub(super) fn native_object_define_property(
     let property = match args.get(1) {
         Some(Value::String(s)) => s.clone(),
         Some(Value::Cons(c)) => c.flatten(),
+        Some(Value::Symbol(id)) => format!("__sym_{}", id),
         _ => return Ok(target),
     };
     let descriptor = args.get(2).cloned().unwrap_or(Value::Undefined);
