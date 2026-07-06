@@ -337,8 +337,7 @@ impl CodeGenerator {
                     if matches!(&stmt.inner, Statement::FunctionDeclaration { .. }) {
                         continue;
                     }
-                    let remaining = &stmts[i..];
-                    let is_last = remaining.iter().all(|s| matches!(&s.inner, Statement::FunctionDeclaration { .. }));
+                    let is_last = stmts[i + 1..].iter().all(|s| matches!(&s.inner, Statement::FunctionDeclaration { .. }));
                     self.record_line_from_span(&stmt.span);
                     self.generate_statement(&stmt.inner, is_last)?;
                 }
@@ -370,8 +369,7 @@ impl CodeGenerator {
                     if matches!(&stmt.inner, Statement::FunctionDeclaration { .. }) {
                         continue;
                     }
-                    let remaining = &stmts[i..];
-                    let is_last = remaining.iter().all(|s| matches!(&s.inner, Statement::FunctionDeclaration { .. }));
+                    let is_last = stmts[i + 1..].iter().all(|s| matches!(&s.inner, Statement::FunctionDeclaration { .. }));
                     self.record_line_from_span(&stmt.span);
                     self.generate_statement(&stmt.inner, is_last)?;
                 }

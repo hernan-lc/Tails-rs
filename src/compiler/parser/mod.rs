@@ -2,7 +2,7 @@ mod expressions;
 mod statements;
 mod types;
 
-use crate::compiler::lexer::{SpannedToken, TemplatePart, Token};
+use crate::compiler::lexer::{SpannedToken, Token};
 use crate::errors::{Error, Result, Span};
 
 #[derive(Debug, Clone)]
