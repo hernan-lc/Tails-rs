@@ -46,6 +46,7 @@ pub enum TypeAnnotation {
         ty: Box<TypeAnnotation>,
     },
     Typeof(Box<TypeAnnotation>),
+    Keyof(Box<TypeAnnotation>),
 }
 
 #[derive(Debug, Clone, PartialEq)]

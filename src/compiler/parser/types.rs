@@ -47,6 +47,10 @@ impl<'a> Parser<'a> {
                     "unknown" => Ok(TypeAnnotation::Unknown),
                     "never" => Ok(TypeAnnotation::Never),
                     _ => {
+                        if name == "keyof" {
+                            let inner = self.parse_primary_type()?;
+                            return Ok(TypeAnnotation::Keyof(Box::new(inner)));
+                        }
                         // Handle dotted type names like v.InferInput or A.B.C
                         let mut full_name = name;
                         while self.peek().token == Token::Dot {
@@ -174,20 +178,54 @@ impl<'a> Parser<'a> {
                                     }
                                 }
                             }
-                            // Expect `: Type`
-                            if self.peek().token == Token::Colon {
+                            // Handle `?` for optional
+                            if self.peek().token == Token::Question {
+                                self.advance();
+                            }
+                            // Expect `: Type` or `(params): ReturnType`
+                            if self.peek().token == Token::LeftParen {
+                                // Computed method signature: [key](param): Type
+                                self.advance();
+                                let mut param_types = Vec::new();
+                                if self.peek().token != Token::RightParen {
+                                    loop {
+                                        if matches!(self.peek().token, Token::Identifier(_)) {
+                                            self.advance();
+                                            if self.peek().token == Token::Colon {
+                                                self.advance();
+                                                param_types.push(self.parse_type_annotation()?);
+                                            } else {
+                                                param_types.push(TypeAnnotation::Any);
+                                            }
+                                        } else {
+                                            param_types.push(self.parse_type_annotation()?);
+                                        }
+                                        if self.peek().token == Token::Comma {
+                                            self.advance();
+                                            if self.peek().token == Token::RightParen {
+                                                break;
+                                            }
+                                        } else {
+                                            break;
+                                        }
+                                    }
+                                }
+                                self.expect(&Token::RightParen)?;
+                                if self.peek().token == Token::Colon {
+                                    self.advance();
+                                    let _return_type = self.parse_type_annotation()?;
+                                }
+                            } else if self.peek().token == Token::Colon {
                                 self.advance();
                                 let _ty = self.parse_type_annotation()?;
                             }
-                            if self.peek().token == Token::Semicolon {
+                            // Consume separator (, or ;)
+                            if self.peek().token == Token::Semicolon
+                                || self.peek().token == Token::Comma
+                            {
                                 self.advance();
                             }
-                            if self.peek().token == Token::Comma {
-                                self.advance();
-                                if self.peek().token == Token::RightBrace {
-                                    break;
-                                }
-                            } else {
+                            if self.peek().token == Token::RightBrace {
                                 break;
                             }
                             continue;

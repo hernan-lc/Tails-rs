@@ -265,6 +265,7 @@ impl TypeChecker {
             }
             TypeAnnotation::TypePredicate { ty, .. } => self.resolve_annotation(ty),
             TypeAnnotation::Typeof(inner) => self.resolve_annotation(inner),
+            TypeAnnotation::Keyof(inner) => self.resolve_annotation(inner),
         }
     }
 }

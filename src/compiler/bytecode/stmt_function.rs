@@ -1,8 +1,32 @@
-use crate::compiler::parser::{SpannedNode, Statement};
+use crate::compiler::parser::{BindingPattern, SpannedNode, Statement};
 use crate::compiler::{CompiledFunction, Instruction};
 use crate::errors::Result;
 
 use super::{closures, CodeGenerator};
+
+fn collect_binding_names(pattern: &BindingPattern, out: &mut Vec<String>) {
+    match pattern {
+        BindingPattern::Identifier(name) => out.push(name.clone()),
+        BindingPattern::Array(elements) => {
+            for elem in elements {
+                match elem {
+                    crate::compiler::parser::ArrayBindingElement::Pattern(pat, _) => {
+                        collect_binding_names(pat, out);
+                    }
+                    crate::compiler::parser::ArrayBindingElement::Rest(pat) => {
+                        collect_binding_names(pat, out);
+                    }
+                    crate::compiler::parser::ArrayBindingElement::Skip => {}
+                }
+            }
+        }
+        BindingPattern::Object(elements) => {
+            for elem in elements {
+                collect_binding_names(&elem.value, out);
+            }
+        }
+    }
+}
 
 struct HoistedFunc {
     func_idx: u32,
@@ -75,6 +99,21 @@ impl CodeGenerator {
         for stmt in body.iter() {
             if let Statement::FunctionDeclaration { name, .. } = &stmt.inner {
                 self.locals.push(name.clone());
+            }
+        }
+
+        // Pre-register let/const/var declarations so closure analysis can find them
+        for stmt in body.iter() {
+            if let Statement::VariableDeclaration { declarations, .. } = &stmt.inner {
+                for decl in declarations {
+                    let mut names = Vec::new();
+                    collect_binding_names(&decl.id, &mut names);
+                    for name in names {
+                        if !self.locals.iter().any(|l| l == &name) {
+                            self.locals.push(name);
+                        }
+                    }
+                }
             }
         }
 

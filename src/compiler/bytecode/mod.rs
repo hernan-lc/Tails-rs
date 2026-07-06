@@ -291,8 +291,10 @@ impl CodeGenerator {
                                 if self.scope_depth == 0 {
                                     self.emit(Instruction::StoreGlobal(id.clone()));
                                 } else {
-                                    self.locals.push(id.clone());
-                                    let slot = self.last_local_slot();
+                                    if !self.locals.iter().any(|l| l == id) {
+                                        self.locals.push(id.clone());
+                                    }
+                                    let slot = self.resolve_local(id).unwrap_or_else(|| self.last_local_slot());
                                     self.emit(Instruction::StoreLocal(slot));
                                 }
                             }
@@ -394,8 +396,10 @@ impl CodeGenerator {
                 if self.scope_depth == 0 {
                     self.emit(Instruction::StoreGlobal(id.clone()));
                 } else {
-                    self.locals.push(id.clone());
-                    let slot = self.last_local_slot();
+                    if !self.locals.iter().any(|l| l == id) {
+                        self.locals.push(id.clone());
+                    }
+                    let slot = self.resolve_local(id).unwrap_or_else(|| self.last_local_slot());
                     self.emit(Instruction::StoreLocal(slot));
                 }
             }
