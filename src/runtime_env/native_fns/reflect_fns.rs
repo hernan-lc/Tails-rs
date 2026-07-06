@@ -4,6 +4,18 @@ use crate::objects::Value;
 use crate::props;
 use crate::vm::interpreter::Interpreter;
 
+/// Converts an internal property key string back to the appropriate Value.
+/// Keys like `"__sym_123"` are converted to `Value::Symbol(123)`.
+/// All other keys remain as `Value::String(key)`.
+fn prop_key_to_value(key: &str) -> Value {
+    if let Some(id_str) = key.strip_prefix("__sym_") {
+        if let Ok(id) = id_str.parse::<u64>() {
+            return Value::Symbol(id);
+        }
+    }
+    Value::String(key.to_string())
+}
+
 pub(super) fn native_reflect_get(
     interp: &mut Interpreter,
     _this: &Value,
@@ -195,7 +207,7 @@ pub(super) fn native_reflect_own_keys(
                     if !is_user_visible_key(k) {
                         continue;
                     }
-                    keys.push(Value::String(k.to_string()));
+                    keys.push(prop_key_to_value(k));
                 }
             }
         }
@@ -213,7 +225,7 @@ pub(super) fn native_reflect_own_keys(
                     if !is_user_visible_key(k) {
                         continue;
                     }
-                    keys.push(Value::String(k.to_string()));
+                    keys.push(prop_key_to_value(k));
                 }
             }
         }

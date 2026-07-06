@@ -760,6 +760,32 @@ impl Interpreter {
                     match method {
                         Value::Function(func_idx) => {
                             if let HeapValue::Function(f) = &self.heap[func_idx] {
+                                // Handle bound functions (bytecode_index == usize::MAX
+                                // and name == "bound") — same logic as Call.
+                                if f.bytecode_index == usize::MAX
+                                    && f.name.as_deref() == Some("bound")
+                                    && f.closure.borrow().len() >= 2
+                                {
+                                    let (original_fn, bound_this, bound_args) = {
+                                        let closure = f.closure.borrow();
+                                        (
+                                            closure[0].clone(),
+                                            closure[1].clone(),
+                                            closure[2..].to_vec(),
+                                        )
+                                    };
+                                    let mut combined_args = bound_args;
+                                    combined_args.extend(args);
+                                    let result = self.call_value(
+                                        &original_fn,
+                                        &bound_this,
+                                        &combined_args,
+                                    )?;
+                                    self.stack.push(result);
+                                    pc += 1;
+                                    continue;
+                                }
+
                                 let closure_rc = if f.closure.borrow().is_empty() {
                                     Rc::new(RefCell::new(Vec::new()))
                                 } else {

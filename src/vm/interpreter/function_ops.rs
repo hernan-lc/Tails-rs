@@ -65,27 +65,18 @@ impl Interpreter {
                     })
                     .collect();
                 let closure_vars: Rc<RefCell<Vec<Value>>> = {
-                    let cached: Option<Rc<RefCell<Vec<Value>>>> =
-                        if let Some(frame) = self.call_stack.last() {
-                            frame
-                                .shared_closure_env
-                                .as_ref()
-                                .and_then(|env| env.get(func_idx).cloned())
-                        } else {
-                            None
-                        };
-                    match cached {
-                        Some(shared) => shared,
-                        None => {
-                            let rc = Rc::new(RefCell::new(snapshot));
-                            if let Some(frame) = self.call_stack.last_mut() {
-                                frame
-                                    .get_or_init_closure_env()
-                                    .insert(*func_idx, rc.clone());
-                            }
-                            rc
-                        }
+                    // Each closure gets its own copy of the captured values.
+                    // The shared_closure_env optimization was causing closures
+                    // created in a loop body to share the same environment,
+                    // meaning all closures captured only the first iteration's
+                    // values instead of their respective per-iteration values.
+                    let rc = Rc::new(RefCell::new(snapshot));
+                    if let Some(frame) = self.call_stack.last_mut() {
+                        frame
+                            .get_or_init_closure_env()
+                            .insert(*func_idx, rc.clone());
                     }
+                    rc
                 };
                 let owner = self.current_module.clone();
                 let scope = self.module_globals_rc();

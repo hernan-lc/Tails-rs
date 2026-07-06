@@ -5,6 +5,12 @@ use crate::vm::interpreter::{Interpreter, PropertyStorage};
 
 use super::reflect_fns::native_reflect_get_own_property_descriptor;
 
+/// Returns true if the key is a string property key (not internal or symbol).
+/// Per ECMAScript spec, Object.keys/values/entries only return string keys.
+fn is_string_property_key(k: &str) -> bool {
+    is_user_visible_key(k) && !k.starts_with("__sym_")
+}
+
 pub(super) fn native_object_keys(
     interp: &mut Interpreter,
     _this: &Value,
@@ -16,7 +22,7 @@ pub(super) fn native_object_keys(
             if let crate::vm::interpreter::HeapValue::Object(obj) = &interp.heap[*obj_idx] {
                 let mut keys = Vec::with_capacity(obj.properties.len());
                 for k in obj.properties.keys() {
-                    if !is_user_visible_key(k) {
+                    if !is_string_property_key(k) {
                         continue;
                     }
                     keys.push(Value::String(k.to_string()));
@@ -56,7 +62,10 @@ pub(super) fn native_object_values(
         Value::Object(obj_idx) => {
             if let crate::vm::interpreter::HeapValue::Object(obj) = &interp.heap[*obj_idx] {
                 let mut vals = Vec::with_capacity(obj.properties.len());
-                for v in obj.properties.values() {
+                for (k, v) in obj.properties.iter() {
+                    if !is_string_property_key(k) {
+                        continue;
+                    }
                     vals.push(v.clone());
                 }
                 vals
@@ -93,6 +102,9 @@ pub(super) fn native_object_entries(
             if let crate::vm::interpreter::HeapValue::Object(obj) = &interp.heap[*obj_idx] {
                 let mut pairs = Vec::with_capacity(obj.properties.len());
                 for (k, v) in obj.properties.iter() {
+                    if !is_string_property_key(k) {
+                        continue;
+                    }
                     pairs.push((k.to_string(), v.clone()));
                 }
                 pairs
