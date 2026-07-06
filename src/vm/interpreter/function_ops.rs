@@ -115,6 +115,26 @@ impl Interpreter {
                 );
                 self.stack.push(Value::Function(heap_idx));
             }
+            Instruction::SnapshotClosure(local_slot, capture_slots) => {
+                let base_pointer: usize =
+                    self.call_stack.last().map(|f| f.base_pointer).unwrap_or(0);
+                let abs_slot = base_pointer + *local_slot as usize;
+                if let Some(Value::Function(heap_idx)) = self.stack.get(abs_slot).cloned() {
+                    if let HeapValue::Function(f) = &mut self.heap[heap_idx] {
+                        let new_values: Vec<Value> = capture_slots
+                            .iter()
+                            .map(|slot| {
+                                let s = base_pointer + *slot as usize;
+                                self.stack
+                                    .get(s)
+                                    .cloned()
+                                    .unwrap_or(Value::Undefined)
+                            })
+                            .collect();
+                        *f.closure.borrow_mut() = new_values;
+                    }
+                }
+            }
             _ => return Ok(false),
         }
         Ok(true)

@@ -327,20 +327,12 @@ impl CodeGenerator {
                 self.scope_depth += 1;
                 let prev_locals_count = self.locals.len();
                 self.emit(Instruction::BlockEnter);
-                // JavaScript hoisting: pre-register all function names first
                 for stmt in stmts.iter() {
                     if let Statement::FunctionDeclaration { name, .. } = &stmt.inner {
                         self.locals.push(name.clone());
                     }
                 }
-                // JavaScript hoisting: compile function declarations first
-                for stmt in stmts.iter() {
-                    if let Statement::FunctionDeclaration { .. } = &stmt.inner {
-                        self.record_line_from_span(&stmt.span);
-                        self.generate_statement(&stmt.inner, false)?;
-                    }
-                }
-                // Then compile non-function statements
+                self.compile_hoisted_functions(stmts)?;
                 for (i, stmt) in stmts.iter().enumerate() {
                     if matches!(&stmt.inner, Statement::FunctionDeclaration { .. }) {
                         continue;
@@ -368,20 +360,12 @@ impl CodeGenerator {
                 self.scope_depth += 1;
                 let prev_locals_count = self.locals.len();
                 self.emit(Instruction::BlockEnter);
-                // JavaScript hoisting: pre-register all function names first
                 for stmt in stmts.iter() {
                     if let Statement::FunctionDeclaration { name, .. } = &stmt.inner {
                         self.locals.push(name.clone());
                     }
                 }
-                // JavaScript hoisting: compile function declarations first
-                for stmt in stmts.iter() {
-                    if let Statement::FunctionDeclaration { .. } = &stmt.inner {
-                        self.record_line_from_span(&stmt.span);
-                        self.generate_statement(&stmt.inner, false)?;
-                    }
-                }
-                // Then compile non-function statements
+                self.compile_hoisted_functions(stmts)?;
                 for (i, stmt) in stmts.iter().enumerate() {
                     if matches!(&stmt.inner, Statement::FunctionDeclaration { .. }) {
                         continue;

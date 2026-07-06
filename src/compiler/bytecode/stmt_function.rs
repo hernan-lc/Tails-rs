@@ -4,6 +4,14 @@ use crate::errors::Result;
 
 use super::{closures, CodeGenerator};
 
+struct HoistedFunc {
+    func_idx: u32,
+    slot: u16,
+    body: Vec<SpannedNode<Statement>>,
+    params: Vec<String>,
+    rest_param: Option<String>,
+}
+
 impl CodeGenerator {
     pub(super) fn generate_function_statement(&mut self, stmt: &Statement) -> Result<bool> {
         let Statement::FunctionDeclaration {
@@ -69,56 +77,9 @@ impl CodeGenerator {
                 self.locals.push(name.clone());
             }
         }
-        // Sort function declarations: non-capturing siblings first, then capturing.
-        // This ensures that when MakeClosure snapshots a sibling's value, that
-        // sibling has already been stored on the stack.
-        let sibling_names: Vec<&str> = body
-            .iter()
-            .filter_map(|stmt| {
-                if let Statement::FunctionDeclaration { name, .. } = &stmt.inner {
-                    Some(name.as_str())
-                } else {
-                    None
-                }
-            })
-            .collect();
-        let mut func_stmts: Vec<&SpannedNode<Statement>> = body
-            .iter()
-            .filter(|s| matches!(&s.inner, Statement::FunctionDeclaration { .. }))
-            .collect();
-        func_stmts.sort_by_key(|stmt| {
-            if let Statement::FunctionDeclaration {
-                params,
-                body: func_body,
-                rest_param,
-                ..
-            } = &stmt.inner
-            {
-                let mut all_params = params.clone();
-                if let Some(rp) = rest_param {
-                    all_params.push(rp.clone());
-                }
-                let mut idents = Vec::new();
-                closures::collect_identifiers_body(func_body, &mut idents);
-                let captures_sibling = idents.iter().any(|ident| {
-                    sibling_names.contains(&ident.as_str()) && !all_params.contains(ident)
-                });
-                if captures_sibling {
-                    1
-                } else {
-                    0
-                }
-            } else {
-                0
-            }
-        });
-        // Compile function declarations first (function objects exist before other code runs)
-        for stmt in func_stmts {
-            self.record_line_from_span(&stmt.span);
-            self.generate_statement(&stmt.inner, false)?;
-        }
 
-        // Then compile non-function statements
+        self.compile_hoisted_functions(body)?;
+
         for stmt in body {
             if matches!(&stmt.inner, Statement::FunctionDeclaration { .. }) {
                 continue;
@@ -146,7 +107,6 @@ impl CodeGenerator {
         if self.scope_depth == 0 {
             self.emit(Instruction::StoreGlobal(name.clone()));
         } else if let Some(slot) = self.resolve_local(name) {
-            // Name was already hoisted, use the existing slot
             self.emit(Instruction::StoreLocal(slot));
         } else {
             self.locals.push(name.clone());
@@ -154,5 +114,139 @@ impl CodeGenerator {
             self.emit(Instruction::StoreLocal(slot));
         }
         Ok(true)
+    }
+
+    pub(crate) fn compile_hoisted_functions(
+        &mut self,
+        body: &[SpannedNode<Statement>],
+    ) -> Result<()> {
+        let mut hoisted: Vec<HoistedFunc> = Vec::new();
+
+        for stmt in body.iter() {
+            if let Statement::FunctionDeclaration {
+                name: hname,
+                params: hparams,
+                body: hbody,
+                rest_param: hrp,
+                ..
+            } = &stmt.inner
+            {
+                let mut all_p = hparams.clone();
+                if let Some(rp) = hrp {
+                    all_p.push(rp.clone());
+                }
+                let orefs = closures::find_outer_refs(hbody, &all_p, &self.locals);
+
+                let slot = self.resolve_local(hname).unwrap_or_else(|| {
+                    self.locals.push(hname.clone());
+                    self.last_local_slot()
+                });
+
+                let func_idx = self.functions.len() as u32;
+                hoisted.push(HoistedFunc {
+                    func_idx,
+                    slot,
+                    body: hbody.clone(),
+                    params: hparams.clone(),
+                    rest_param: hrp.clone(),
+                });
+
+                self.functions.push(CompiledFunction {
+                    name: Some(hname.clone()),
+                    params: hparams.clone(),
+                    rest_param: hrp.clone(),
+                    bytecode_index: 0,
+                    param_count: hparams.len(),
+                    closure_var_count: orefs.len(),
+                    is_generator: false,
+                    source_line: self.current_source_line,
+                    is_arrow: false,
+                });
+
+                let jump_over = self.instructions.len();
+                self.emit(Instruction::Jump(0));
+
+                let func_start = self.instructions.len();
+                self.functions[func_idx as usize].bytecode_index = func_start;
+
+                let saved_scope = self.scope_depth;
+                let saved_locals_len = self.locals.len();
+                let saved_captured2 = std::mem::take(&mut self.captured_var_names);
+                let saved_start2 = self.local_start_idx;
+
+                self.scope_depth += 1;
+                self.captured_var_names = orefs.iter().map(|(n, _)| n.clone()).collect();
+                self.local_start_idx = self.locals.len();
+
+                for param in hparams {
+                    self.locals.push(param.clone());
+                }
+                if let Some(rp) = hrp {
+                    self.locals.push(rp.clone());
+                }
+
+                self.generate_body_statements(hbody)?;
+
+                self.emit(Instruction::LoadUndefined);
+                self.emit(Instruction::Return);
+
+                self.scope_depth = saved_scope;
+                self.locals.truncate(saved_locals_len);
+                self.captured_var_names = saved_captured2;
+                self.local_start_idx = saved_start2;
+
+                self.patch_jump(jump_over, self.instructions.len());
+            }
+        }
+
+        // Phase 2: Create each function object and store it immediately
+        for h in &hoisted {
+            self.emit(Instruction::MakeFunction(h.func_idx));
+            self.emit(Instruction::StoreLocal(h.slot));
+        }
+
+        // Phase 3: For functions needing captures, use SnapshotClosure to
+        // update their closure Rc in-place after all siblings are stored.
+        for h in &hoisted {
+            let mut all_p = h.params.clone();
+            if let Some(rp) = &h.rest_param {
+                all_p.push(rp.clone());
+            }
+            let orefs = closures::find_outer_refs(&h.body, &all_p, &self.locals);
+            if !orefs.is_empty() {
+                let capture_slots: Vec<u16> = orefs.iter().map(|(_, s)| *s).collect();
+                self.emit(Instruction::SnapshotClosure(
+                    h.slot,
+                    Box::new(capture_slots),
+                ));
+            }
+        }
+
+        Ok(())
+    }
+
+    fn generate_body_statements(
+        &mut self,
+        body: &[SpannedNode<Statement>],
+    ) -> Result<()> {
+        for stmt in body.iter() {
+            if let Statement::FunctionDeclaration { name, .. } = &stmt.inner {
+                self.locals.push(name.clone());
+            }
+        }
+        for stmt in body.iter() {
+            if let Statement::FunctionDeclaration { .. } = &stmt.inner {
+                self.record_line_from_span(&stmt.span);
+                self.generate_statement(&stmt.inner, false)?;
+            }
+        }
+        for stmt in body {
+            if matches!(&stmt.inner, Statement::FunctionDeclaration { .. }) {
+                continue;
+            }
+            self.record_line_from_span(&stmt.span);
+            self.generate_statement(&stmt.inner, false)?;
+        }
+        Ok(())
     }
 }

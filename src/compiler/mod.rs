@@ -246,4 +246,9 @@ pub enum Instruction {
     // Fused global add: x = x + local
     // Replaces: LoadGlobal + LoadLocal + Add + StoreGlobal
     AddGlobal(String, u16),
+    // SnapshotClosure(local_slot, capture_slots): update an existing function
+    // object's closure Rc with current stack values at the given capture slots.
+    // Used for hoisted function declarations where siblings must be captured
+    // after all are stored.
+    SnapshotClosure(u16, Box<Vec<u16>>),
 }
