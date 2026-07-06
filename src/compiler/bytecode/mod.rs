@@ -334,7 +334,8 @@ impl CodeGenerator {
                         self.locals.push(name.clone());
                     }
                 }
-                self.compile_hoisted_functions(stmts)?;
+                let mut deferred_snapshots: Vec<(u16, Box<Vec<u16>>)> = Vec::new();
+                self.compile_hoisted_functions(stmts, &mut deferred_snapshots)?;
                 for (i, stmt) in stmts.iter().enumerate() {
                     if matches!(&stmt.inner, Statement::FunctionDeclaration { .. }) {
                         continue;
@@ -342,6 +343,9 @@ impl CodeGenerator {
                     let is_last = stmts[i + 1..].iter().all(|s| matches!(&s.inner, Statement::FunctionDeclaration { .. }));
                     self.record_line_from_span(&stmt.span);
                     self.generate_statement(&stmt.inner, is_last)?;
+                }
+                for (local_slot, capture_slots) in deferred_snapshots {
+                    self.emit(Instruction::SnapshotClosure(local_slot, capture_slots));
                 }
                 let locals_added = self.locals.len() - prev_locals_count;
                 for _ in 0..locals_added {
@@ -366,7 +370,8 @@ impl CodeGenerator {
                         self.locals.push(name.clone());
                     }
                 }
-                self.compile_hoisted_functions(stmts)?;
+                let mut deferred_snapshots: Vec<(u16, Box<Vec<u16>>)> = Vec::new();
+                self.compile_hoisted_functions(stmts, &mut deferred_snapshots)?;
                 for (i, stmt) in stmts.iter().enumerate() {
                     if matches!(&stmt.inner, Statement::FunctionDeclaration { .. }) {
                         continue;
@@ -374,6 +379,9 @@ impl CodeGenerator {
                     let is_last = stmts[i + 1..].iter().all(|s| matches!(&s.inner, Statement::FunctionDeclaration { .. }));
                     self.record_line_from_span(&stmt.span);
                     self.generate_statement(&stmt.inner, is_last)?;
+                }
+                for (local_slot, capture_slots) in deferred_snapshots {
+                    self.emit(Instruction::SnapshotClosure(local_slot, capture_slots));
                 }
                 let locals_added = self.locals.len() - prev_locals_count;
                 for _ in 0..locals_added {

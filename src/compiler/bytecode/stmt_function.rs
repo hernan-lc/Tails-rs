@@ -117,10 +117,33 @@ impl CodeGenerator {
             }
         }
 
-        self.compile_hoisted_functions(body)?;
+        let mut deferred_snapshots: Vec<(u16, Box<Vec<u16>>)> = Vec::new();
+        self.compile_hoisted_functions(body, &mut deferred_snapshots)?;
 
+        // First compile variable declarations so captured vars are initialized
+        // before SnapshotClosure runs.
         for stmt in body {
             if matches!(&stmt.inner, Statement::FunctionDeclaration { .. }) {
+                continue;
+            }
+            if !matches!(&stmt.inner, Statement::VariableDeclaration { .. }) {
+                continue;
+            }
+            self.record_line_from_span(&stmt.span);
+            self.generate_statement(&stmt.inner, false)?;
+        }
+
+        // Now emit SnapshotClosure - captured variables have their values.
+        for (local_slot, capture_slots) in deferred_snapshots {
+            self.emit(Instruction::SnapshotClosure(local_slot, capture_slots));
+        }
+
+        // Then compile remaining non-function, non-variable statements.
+        for stmt in body {
+            if matches!(&stmt.inner, Statement::FunctionDeclaration { .. }) {
+                continue;
+            }
+            if matches!(&stmt.inner, Statement::VariableDeclaration { .. }) {
                 continue;
             }
             self.record_line_from_span(&stmt.span);
@@ -158,6 +181,7 @@ impl CodeGenerator {
     pub(crate) fn compile_hoisted_functions(
         &mut self,
         body: &[SpannedNode<Statement>],
+        deferred_snapshots: &mut Vec<(u16, Box<Vec<u16>>)>,
     ) -> Result<()> {
         let mut hoisted: Vec<HoistedFunc> = Vec::new();
 
@@ -244,8 +268,8 @@ impl CodeGenerator {
             self.emit(Instruction::StoreLocal(h.slot));
         }
 
-        // Phase 3: For functions needing captures, use SnapshotClosure to
-        // update their closure Rc in-place after all siblings are stored.
+        // Phase 3: For functions needing captures, defer SnapshotClosure so it
+        // runs after variable initializers in the calling function.
         for h in &hoisted {
             let mut all_p = h.params.clone();
             if let Some(rp) = &h.rest_param {
@@ -254,10 +278,7 @@ impl CodeGenerator {
             let orefs = closures::find_outer_refs(&h.body, &all_p, &self.locals);
             if !orefs.is_empty() {
                 let capture_slots: Vec<u16> = orefs.iter().map(|(_, s)| *s).collect();
-                self.emit(Instruction::SnapshotClosure(
-                    h.slot,
-                    Box::new(capture_slots),
-                ));
+                deferred_snapshots.push((h.slot, Box::new(capture_slots)));
             }
         }
 
