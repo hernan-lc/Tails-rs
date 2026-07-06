@@ -1009,7 +1009,12 @@ impl<'a> Parser<'a> {
                                 self.advance();
                             }
                             if let Ok(key) = self.token_to_key_string() {
-                                if self.peek().token == Token::LeftParen {
+                                // Treat `get`/`set` followed by `this` as a method, not a getter/setter.
+                                // e.g. `get(this: T) { ... }` inside Object.defineProperty
+                                let is_method_like = self.peek().token == Token::LeftParen
+                                    || (self.peek().token == Token::This
+                                        && (key == "get" || key == "set"));
+                                if is_method_like {
                                     self.advance();
                                     let (params, param_types, defaults, rest_param) =
                                         self.parse_typed_params()?;

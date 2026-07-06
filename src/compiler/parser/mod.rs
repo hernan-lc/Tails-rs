@@ -790,6 +790,23 @@ impl<'a> Parser<'a> {
         let mut rest_param = None;
         if self.peek().token != Token::RightParen {
             loop {
+                // TypeScript `this: Type` pseudo-parameter — skip it (type-only)
+                if self.peek().token == Token::This {
+                    self.advance();
+                    if self.peek().token == Token::Colon {
+                        self.advance();
+                        let _ = self.parse_type_annotation()?;
+                    }
+                    if self.peek().token == Token::Comma {
+                        self.advance();
+                        if self.peek().token == Token::RightParen {
+                            break;
+                        }
+                    } else {
+                        break;
+                    }
+                    continue;
+                }
                 if self.peek().token == Token::Ellipsis {
                     self.advance();
                     let param = match self.advance().token {
