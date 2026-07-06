@@ -1,6 +1,9 @@
 mod expressions;
+mod program;
 mod statements;
 mod types;
+
+pub use types::{TypeAnnotation, TypeLiteral, TypedParams};
 
 use crate::compiler::lexer::{SpannedToken, Token};
 use crate::errors::{Error, Result, Span};
@@ -9,51 +12,6 @@ use crate::errors::{Error, Result, Span};
 pub struct SpannedNode<T> {
     pub inner: T,
     pub span: Option<Span>,
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub enum TypeAnnotation {
-    Number,
-    String,
-    Boolean,
-    Null,
-    Undefined,
-    Void,
-    Any,
-    Unknown,
-    Never,
-    Named(String),
-    Array(Box<TypeAnnotation>),
-    Tuple(Vec<TypeAnnotation>),
-    Union(Vec<TypeAnnotation>),
-    Intersection(Vec<TypeAnnotation>),
-    Object(Vec<(String, TypeAnnotation, bool)>),
-    Function {
-        params: Vec<TypeAnnotation>,
-        return_type: Box<TypeAnnotation>,
-    },
-    Constructor {
-        params: Vec<TypeAnnotation>,
-        return_type: Box<TypeAnnotation>,
-    },
-    Literal(TypeLiteral),
-    Generic {
-        name: String,
-        args: Vec<TypeAnnotation>,
-    },
-    TypePredicate {
-        param_name: String,
-        ty: Box<TypeAnnotation>,
-    },
-    Typeof(Box<TypeAnnotation>),
-    Keyof(Box<TypeAnnotation>),
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub enum TypeLiteral {
-    Number(f64),
-    String(String),
-    Boolean(bool),
 }
 
 #[derive(Debug, Clone)]
@@ -508,13 +466,6 @@ pub enum UnaryOperator {
     UnaryPlus,
 }
 
-pub type TypedParams = (
-    Vec<String>,
-    Vec<Option<TypeAnnotation>>,
-    Vec<Option<Expression>>,
-    Option<String>,
-);
-
 pub fn parse(tokens: &mut [SpannedToken]) -> Result<AstNode> {
     let mut parser = Parser::new(tokens);
     parser.parse_program()
@@ -701,73 +652,6 @@ impl<'a> Parser<'a> {
         next_pos < self.tokens.len() && matches!(self.tokens[next_pos].token, Token::Arrow)
     }
 
-    fn parse_program(&mut self) -> Result<AstNode> {
-        let mut statements = Vec::new();
-        while self.peek().token != Token::Eof {
-            statements.push(self.parse_statement()?);
-        }
-        Ok(AstNode::Program(statements))
-    }
-
-    pub(crate) fn parse_statement(&mut self) -> Result<SpannedNode<Statement>> {
-        match self.peek().token.clone() {
-            Token::Const | Token::Let | Token::Var => self.parse_variable_declaration(),
-            Token::Function => self.parse_function_declaration(),
-            Token::Async => {
-                let next_is_function = self
-                    .tokens
-                    .get(self.pos + 1)
-                    .map(|t| t.token == Token::Function)
-                    .unwrap_or(false);
-                if next_is_function {
-                    self.parse_function_declaration()
-                } else {
-                    self.parse_expression_statement()
-                }
-            }
-            Token::Return => self.parse_return_statement(),
-            Token::Yield => self.parse_yield_statement(),
-            Token::If => self.parse_if_statement(),
-            Token::While => self.parse_while_statement(),
-            Token::LeftBrace => self.parse_block_statement(),
-            Token::For => self.parse_for_statement(),
-            Token::Do => self.parse_do_while_statement(),
-            Token::Switch => self.parse_switch_statement(),
-            Token::Break => {
-                self.advance();
-                self.expect(&Token::Semicolon)?;
-                Ok(self.spanned(Statement::BreakStatement))
-            }
-            Token::Continue => {
-                self.advance();
-                self.expect(&Token::Semicolon)?;
-                Ok(self.spanned(Statement::ContinueStatement))
-            }
-            Token::Try => self.parse_try_statement(),
-            Token::Throw => self.parse_throw_statement(),
-            Token::Class => self.parse_class_declaration(),
-            Token::Import => self.parse_import_declaration(),
-            Token::Export => self.parse_export_declaration(),
-            Token::Interface => self.parse_interface_declaration(),
-            Token::Enum => self.parse_enum_declaration(),
-            Token::Identifier(ref s) if s == "type" => {
-                // Look ahead: `type Foo = ...` is a type alias,
-                // but `type = ...` or `type;` uses `type` as a variable name.
-                let next_is_ident = self
-                    .tokens
-                    .get(self.pos + 1)
-                    .map(|t| matches!(t.token, Token::Identifier(_)))
-                    .unwrap_or(false);
-                if next_is_ident {
-                    self.parse_type_alias_declaration()
-                } else {
-                    self.parse_expression_statement()
-                }
-            }
-            _ => self.parse_expression_statement(),
-        }
-    }
-
     pub(crate) fn parse_block_body(&mut self) -> Result<Vec<SpannedNode<Statement>>> {
         let mut statements = Vec::new();
         while self.peek().token != Token::RightBrace && self.peek().token != Token::Eof {
@@ -791,7 +675,6 @@ impl<'a> Parser<'a> {
         let mut rest_param = None;
         if self.peek().token != Token::RightParen {
             loop {
-                // TypeScript `this: Type` pseudo-parameter — skip it (type-only)
                 if self.peek().token == Token::This {
                     self.advance();
                     if self.peek().token == Token::Colon {
@@ -819,7 +702,6 @@ impl<'a> Parser<'a> {
                             )))
                         }
                     };
-                    // Consume optional type annotation for rest param
                     if self.peek().token == Token::Colon {
                         self.advance();
                         let _ = self.parse_type_annotation()?;
@@ -833,7 +715,6 @@ impl<'a> Parser<'a> {
                         _ => unreachable!(),
                     },
                     Token::LeftBracket | Token::LeftBrace => {
-                        // Destructured parameter: consume the binding pattern
                         let _pattern = self.parse_binding_pattern()?;
                         format!("__destr_{}", params.len())
                     }
@@ -922,7 +803,6 @@ impl<'a> Parser<'a> {
                     self.advance();
                     Some(self.parse_type_annotation()?)
                 } else if self.peek().token == Token::Question {
-                    // Optional parameter
                     self.advance();
                     if self.peek().token == Token::Colon {
                         self.advance();
@@ -983,9 +863,6 @@ impl<'a> Parser<'a> {
         }
     }
 
-    /// Skip optional TypeScript generic type parameters `<T, U extends Foo, ...>`.
-    /// Used after parsing a declaration name to consume type parameters that
-    /// are erased at runtime.
     pub(crate) fn skip_type_parameters(&mut self) {
         if self.peek().token == Token::Less {
             let mut depth = 1u32;
@@ -1005,12 +882,10 @@ impl<'a> Parser<'a> {
                         self.advance();
                     }
                     Token::ShiftRight => {
-                        // `>>` is two `>` — each reduces depth by 1
                         if depth >= 2 {
                             depth -= 2;
                             self.advance();
                         } else {
-                            // depth == 1: first `>` closes, second `>` remains
                             depth = 0;
                             self.peek_token_mut().token = Token::Greater;
                         }
@@ -1023,8 +898,6 @@ impl<'a> Parser<'a> {
         }
     }
 
-    /// Convert any token to an identifier string. Used where JS allows
-    /// keywords as identifiers (export names, import names, etc.)
     pub(crate) fn advance_as_ident(&mut self) -> String {
         let st = self.advance();
         match st.token {

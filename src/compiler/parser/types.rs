@@ -1,6 +1,58 @@
 use super::*;
 use crate::errors::{Error, Result};
 
+#[derive(Debug, Clone, PartialEq)]
+pub enum TypeAnnotation {
+    Number,
+    String,
+    Boolean,
+    Null,
+    Undefined,
+    Void,
+    Any,
+    Unknown,
+    Never,
+    Named(String),
+    Array(Box<TypeAnnotation>),
+    Tuple(Vec<TypeAnnotation>),
+    Union(Vec<TypeAnnotation>),
+    Intersection(Vec<TypeAnnotation>),
+    Object(Vec<(String, TypeAnnotation, bool)>),
+    Function {
+        params: Vec<TypeAnnotation>,
+        return_type: Box<TypeAnnotation>,
+    },
+    Constructor {
+        params: Vec<TypeAnnotation>,
+        return_type: Box<TypeAnnotation>,
+    },
+    Literal(TypeLiteral),
+    Generic {
+        name: String,
+        args: Vec<TypeAnnotation>,
+    },
+    TypePredicate {
+        param_name: String,
+        ty: Box<TypeAnnotation>,
+    },
+    Typeof(Box<TypeAnnotation>),
+    Keyof(Box<TypeAnnotation>),
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum TypeLiteral {
+    Number(f64),
+    String(String),
+    Boolean(bool),
+}
+
+pub type TypedParams = (
+    Vec<String>,
+    Vec<Option<TypeAnnotation>>,
+    Vec<Option<Expression>>,
+    Option<String>,
+);
+
 impl<'a> Parser<'a> {
     pub(crate) fn parse_type_annotation(&mut self) -> Result<TypeAnnotation> {
         self.parse_union_type()
@@ -51,10 +103,9 @@ impl<'a> Parser<'a> {
                             let inner = self.parse_primary_type()?;
                             return Ok(TypeAnnotation::Keyof(Box::new(inner)));
                         }
-                        // Handle dotted type names like v.InferInput or A.B.C
                         let mut full_name = name;
                         while self.peek().token == Token::Dot {
-                            self.advance(); // consume '.'
+                            self.advance();
                             if let Token::Identifier(ref prop) = self.peek().token {
                                 let prop = prop.clone();
                                 self.advance();
@@ -78,7 +129,6 @@ impl<'a> Parser<'a> {
                                     self.advance();
                                 }
                                 Token::ShiftRight => {
-                                    // `>>` is two `>` - consume one, leave the other
                                     self.peek_token_mut().token = Token::Greater;
                                 }
                                 _ => {
@@ -149,12 +199,10 @@ impl<'a> Parser<'a> {
                 let mut properties = Vec::new();
                 if self.peek().token != Token::RightBrace {
                     loop {
-                        // Skip optional modifiers like 'readonly'
                         while matches!(&self.peek().token, Token::Identifier(s) if s == "readonly")
                         {
                             self.advance();
                         }
-                        // Handle indexed signatures [key: string] and mapped types [K in keyof T]
                         if self.peek().token == Token::LeftBracket {
                             self.advance();
                             let mut depth = 1u32;
@@ -178,13 +226,10 @@ impl<'a> Parser<'a> {
                                     }
                                 }
                             }
-                            // Handle `?` for optional
                             if self.peek().token == Token::Question {
                                 self.advance();
                             }
-                            // Expect `: Type` or `(params): ReturnType`
                             if self.peek().token == Token::LeftParen {
-                                // Computed method signature: [key](param): Type
                                 self.advance();
                                 let mut param_types = Vec::new();
                                 if self.peek().token != Token::RightParen {
@@ -219,7 +264,6 @@ impl<'a> Parser<'a> {
                                 self.advance();
                                 let _ty = self.parse_type_annotation()?;
                             }
-                            // Consume separator (, or ;)
                             if self.peek().token == Token::Semicolon
                                 || self.peek().token == Token::Comma
                             {
@@ -239,15 +283,11 @@ impl<'a> Parser<'a> {
                                 )))
                             }
                         };
-                        // Handle optional method signature: method?(): void
-                        // If ? is followed by (, it's an optional method — skip the ?
                         if self.peek().token == Token::Question {
                             let saved = self.pos;
-                            self.advance(); // skip ?
+                            self.advance();
                             if self.peek().token == Token::LeftParen {
-                                // It's an optional method, ? already skipped
                             } else {
-                                // It's an optional property, restore position
                                 self.pos = saved;
                             }
                         }
@@ -303,7 +343,6 @@ impl<'a> Parser<'a> {
                             let ty = self.parse_type_annotation()?;
                             properties.push((name, ty, optional));
                         }
-                        // Handle both ',' and ';' as property separators
                         if self.peek().token == Token::Comma
                             || self.peek().token == Token::Semicolon
                         {
@@ -366,7 +405,6 @@ impl<'a> Parser<'a> {
                 }
             }
             Token::New => {
-                // Constructor type: new (params) => ReturnType
                 self.advance();
                 self.expect(&Token::LeftParen)?;
                 let mut param_types = Vec::new();
@@ -410,7 +448,6 @@ impl<'a> Parser<'a> {
             _ => Ok(TypeAnnotation::Any),
         }?;
         if self.peek().token == Token::LeftBracket {
-            // Check if this is T[] (array type) or T["key"] (indexed access type)
             if self.pos + 1 < self.tokens.len()
                 && self.tokens[self.pos + 1].token == Token::RightBracket
             {
@@ -418,7 +455,6 @@ impl<'a> Parser<'a> {
                 self.expect(&Token::RightBracket)?;
                 Ok(TypeAnnotation::Array(Box::new(base)))
             } else {
-                // Indexed access type like T["_input"] - skip the brackets and content
                 self.advance();
                 while self.peek().token != Token::RightBracket && self.peek().token != Token::Eof {
                     self.advance();

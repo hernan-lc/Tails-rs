@@ -1,0 +1,10 @@
+mod async_;
+mod classes;
+mod control_flow;
+mod errors_globals;
+mod functions;
+mod iterators_generators;
+mod modules;
+mod objects_collections;
+mod strings_math_json;
+mod variables;
