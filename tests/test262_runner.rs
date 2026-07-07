@@ -6,6 +6,7 @@ use fancy_regex::Regex;
 #[derive(Debug, Default)]
 struct Test262Metadata {
     #[allow(dead_code)]
+    description: Option<String>,
     flags: Vec<String>,
     includes: Vec<String>,
     negative: Option<NegativeMetadata>,
@@ -39,9 +40,17 @@ impl Test262Runner {
             for line in inner.lines() {
                 let trimmed = line.trim();
                 if trimmed.starts_with("flags: [") {
-                    metadata.flags = trimmed[8..trimmed.len()-1].split(',').map(|s| s.trim().to_string()).collect();
+                    metadata.flags = trimmed[8..trimmed.len() - 1]
+                        .split(',')
+                        .map(|s| s.trim().to_string())
+                        .collect();
                 } else if trimmed.starts_with("includes: [") {
-                    metadata.includes = trimmed[11..trimmed.len()-1].split(',').map(|s| s.trim().to_string()).collect();
+                    metadata.includes = trimmed[11..trimmed.len() - 1]
+                        .split(',')
+                        .map(|s| s.trim().to_string())
+                        .collect();
+                } else if trimmed.starts_with("description: ") {
+                    metadata.description = Some(trimmed[13..].to_string());
                 }
             }
 
@@ -75,8 +84,14 @@ impl Test262Runner {
             rt.eval(&include_source).map_err(|e| format!("Failed to eval harness {}: {}", include, e))?;
         }
 
+        // Apply flags
+        let mut final_source = source;
+        if metadata.flags.iter().any(|f| f == "onlyStrict") {
+            final_source = format!("\"use strict\";\n{}", final_source);
+        }
+
         // Run the actual test
-        let result = rt.eval(&source);
+        let result = rt.eval(&final_source);
 
         match (result, metadata.negative) {
             (Ok(_), None) => Ok(()),
@@ -117,17 +132,31 @@ impl Redactor {
 }
 
 #[test]
-fn test_test262_basic_run() {
+fn test_test262_all_fixtures() {
     let runner = Test262Runner::new(PathBuf::from("tests/fixtures/test262/harness"));
     let redactor = Redactor::new();
-    let test_path = Path::new("tests/fixtures/test262/test/basic.js");
+    let test_dir = Path::new("tests/fixtures/test262/test");
 
-    if test_path.exists() && !redactor.should_skip("basic.js") {
-        let result = runner.run_test(test_path);
-        if let Err(e) = &result {
-            println!("Error: {}", redactor.redact_output(e));
+    if !test_dir.exists() {
+        return;
+    }
+
+    for entry in fs::read_dir(test_dir).unwrap() {
+        let entry = entry.unwrap();
+        let path = entry.path();
+        if path.extension().map_or(false, |ext| ext == "js") {
+            let name = path.file_name().unwrap().to_str().unwrap();
+            if redactor.should_skip(name) {
+                continue;
+            }
+            let result = runner.run_test(&path);
+            if let Err(e) = &result {
+                println!("FAIL {}: {}", name, redactor.redact_output(e));
+            } else {
+                println!("PASS {}", name);
+            }
+            assert!(result.is_ok(), "Test {} failed", name);
         }
-        assert!(result.is_ok());
     }
 }
 

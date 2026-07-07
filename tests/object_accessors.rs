@@ -1,4 +1,5 @@
-use tails::TailsRuntime;
+mod common;
+use common::TailsTestHarness;
 use tails::Value;
 
 // ============================================
@@ -7,9 +8,8 @@ use tails::Value;
 
 #[test]
 fn test_object_getter_basic() {
-    let mut rt = TailsRuntime::default();
-    let result = rt
-        .eval(
+    let mut h = TailsTestHarness::new();
+    let result = h.eval(
             r#"
         const obj = {
             _x: 10,
@@ -17,32 +17,28 @@ fn test_object_getter_basic() {
         };
         obj.x;
     "#,
-        )
-        .unwrap();
-    assert_eq!(result, Value::Integer(10));
+        );
+    h.assert_eq(result, Value::Integer(10));
 }
 
 #[test]
 fn test_object_getter_computed() {
-    let mut rt = TailsRuntime::default();
-    let result = rt
-        .eval(
+    let mut h = TailsTestHarness::new();
+    let result = h.eval(
             r#"
         const obj = {
             get "computed-key"() { return 42; }
         };
         obj["computed-key"];
     "#,
-        )
-        .unwrap();
-    assert_eq!(result, Value::Integer(42));
+        );
+    h.assert_eq(result, Value::Integer(42));
 }
 
 #[test]
 fn test_object_getter_calls_function() {
-    let mut rt = TailsRuntime::default();
-    let result = rt
-        .eval(
+    let mut h = TailsTestHarness::new();
+    let result = h.eval(
             r#"
         const obj = {
             _val: 5,
@@ -50,15 +46,14 @@ fn test_object_getter_calls_function() {
         };
         obj.doubled;
     "#,
-        )
-        .unwrap();
-    assert_eq!(result, Value::Integer(10));
+        );
+    h.assert_eq(result, Value::Integer(10));
 }
 
 #[test]
 fn test_object_getter_not_function() {
-    let mut rt = TailsRuntime::default();
-    let result = rt.eval(
+    let mut h = TailsTestHarness::new();
+    let result = h.eval(
         r#"
         const obj = {
             get x() { return 42; }
@@ -66,8 +61,7 @@ fn test_object_getter_not_function() {
         typeof obj.x;
     "#,
     );
-    assert!(result.is_ok());
-    assert_eq!(result.unwrap(), Value::String("number".to_string()));
+    h.assert_eq(result, Value::String("number".to_string()));
 }
 
 // ============================================
@@ -76,9 +70,8 @@ fn test_object_getter_not_function() {
 
 #[test]
 fn test_object_setter_basic() {
-    let mut rt = TailsRuntime::default();
-    let result = rt
-        .eval(
+    let mut h = TailsTestHarness::new();
+    let result = h.eval(
             r#"
         const obj = {
             _val: 0,
@@ -88,16 +81,14 @@ fn test_object_setter_basic() {
         obj.x = 99;
         obj.x;
     "#,
-        )
-        .unwrap();
-    assert_eq!(result, Value::Integer(99));
+        );
+    h.assert_eq(result, Value::Integer(99));
 }
 
 #[test]
 fn test_object_setter_only() {
-    let mut rt = TailsRuntime::default();
-    let result = rt
-        .eval(
+    let mut h = TailsTestHarness::new();
+    let result = h.eval(
             r#"
         const obj = {
             _log: [],
@@ -107,9 +98,8 @@ fn test_object_setter_only() {
         obj.data = "world";
         obj._log.length;
     "#,
-        )
-        .unwrap();
-    assert_eq!(result, Value::Integer(2));
+        );
+    h.assert_eq(result, Value::Integer(2));
 }
 
 // ============================================
@@ -118,9 +108,8 @@ fn test_object_setter_only() {
 
 #[test]
 fn test_rest_params_basic() {
-    let mut rt = TailsRuntime::default();
-    let result = rt
-        .eval(
+    let mut h = TailsTestHarness::new();
+    let result = h.eval(
             r#"
         function sum(...args) {
             let s = 0;
@@ -131,47 +120,42 @@ fn test_rest_params_basic() {
         }
         sum(1, 2, 3);
     "#,
-        )
-        .unwrap();
-    assert_eq!(result, Value::Integer(6));
+        );
+    h.assert_eq(result, Value::Integer(6));
 }
 
 #[test]
 fn test_rest_params_with_normal() {
-    let mut rt = TailsRuntime::default();
-    let result = rt
-        .eval(
+    let mut h = TailsTestHarness::new();
+    let result = h.eval(
             r#"
         function log(level, ...msgs) {
             return level + ":" + msgs.join(",");
         }
         log("info", "a", "b", "c");
     "#,
-        )
-        .unwrap();
-    assert_eq!(result, Value::String("info:a,b,c".to_string()));
+        );
+    h.assert_eq(result, Value::String("info:a,b,c".to_string()));
 }
 
 #[test]
 fn test_rest_params_empty() {
-    let mut rt = TailsRuntime::default();
-    let result = rt
-        .eval(
+    let mut h = TailsTestHarness::new();
+    let result = h.eval(
             r#"
         function fn(...args) {
             return args.length;
         }
         fn();
     "#,
-        )
-        .unwrap();
-    assert_eq!(result, Value::Integer(0));
+        );
+    h.assert_eq(result, Value::Integer(0));
 }
 
 #[test]
 fn test_rest_params_typed() {
-    let mut rt = TailsRuntime::default();
-    let result = rt.eval(
+    let mut h = TailsTestHarness::new();
+    let result = h.eval(
         r#"
         function sum(...args: number[]) {
             let s = 0;
@@ -183,12 +167,7 @@ fn test_rest_params_typed() {
         sum(1, 2, 3);
     "#,
     );
-    assert!(
-        result.is_ok(),
-        "typed rest params should parse: {:?}",
-        result.err()
-    );
-    assert_eq!(result.unwrap(), Value::Integer(6));
+    h.assert_eq(result, Value::Integer(6));
 }
 
 // ============================================
@@ -197,9 +176,8 @@ fn test_rest_params_typed() {
 
 #[test]
 fn test_rest_params_arrow() {
-    let mut rt = TailsRuntime::default();
-    let result = rt
-        .eval(
+    let mut h = TailsTestHarness::new();
+    let result = h.eval(
             r#"
         const sum = (...args) => {
             let s = 0;
@@ -210,9 +188,8 @@ fn test_rest_params_arrow() {
         };
         sum(10, 20, 30);
     "#,
-        )
-        .unwrap();
-    assert_eq!(result, Value::Integer(60));
+        );
+    h.assert_eq(result, Value::Integer(60));
 }
 
 // ============================================
@@ -221,9 +198,8 @@ fn test_rest_params_arrow() {
 
 #[test]
 fn test_forin_object_literal() {
-    let mut rt = TailsRuntime::default();
-    let result = rt
-        .eval(
+    let mut h = TailsTestHarness::new();
+    let result = h.eval(
             r#"
         const obj = { a: 1, b: 2, c: 3 };
         let keys = [];
@@ -232,9 +208,8 @@ fn test_forin_object_literal() {
         }
         keys.sort().join(",");
     "#,
-        )
-        .unwrap();
-    assert_eq!(result, Value::String("a,b,c".to_string()));
+        );
+    h.assert_eq(result, Value::String("a,b,c".to_string()));
 }
 
 // ============================================
@@ -243,9 +218,8 @@ fn test_forin_object_literal() {
 
 #[test]
 fn test_object_method_shorthand() {
-    let mut rt = TailsRuntime::default();
-    let result = rt
-        .eval(
+    let mut h = TailsTestHarness::new();
+    let result = h.eval(
             r#"
         const obj = {
             greet(name) {
@@ -254,16 +228,14 @@ fn test_object_method_shorthand() {
         };
         obj.greet("World");
     "#,
-        )
-        .unwrap();
-    assert_eq!(result, Value::String("Hello, World".to_string()));
+        );
+    h.assert_eq(result, Value::String("Hello, World".to_string()));
 }
 
 #[test]
 fn test_object_method_with_rest() {
-    let mut rt = TailsRuntime::default();
-    let result = rt
-        .eval(
+    let mut h = TailsTestHarness::new();
+    let result = h.eval(
             r#"
         const obj = {
             sum(...args) {
@@ -276,9 +248,8 @@ fn test_object_method_with_rest() {
         };
         obj.sum(1, 2, 3, 4);
     "#,
-        )
-        .unwrap();
-    assert_eq!(result, Value::Integer(10));
+        );
+    h.assert_eq(result, Value::Integer(10));
 }
 
 // ============================================
@@ -287,17 +258,15 @@ fn test_object_method_with_rest() {
 
 #[test]
 fn test_computed_property() {
-    let mut rt = TailsRuntime::default();
-    let result = rt
-        .eval(
+    let mut h = TailsTestHarness::new();
+    let result = h.eval(
             r#"
         const key = "myKey";
         const obj = { [key]: 42 };
         obj.myKey;
     "#,
-        )
-        .unwrap();
-    assert_eq!(result, Value::Integer(42));
+        );
+    h.assert_eq(result, Value::Integer(42));
 }
 
 // ============================================
@@ -306,16 +275,14 @@ fn test_computed_property() {
 
 #[test]
 fn test_spread_object() {
-    let mut rt = TailsRuntime::default();
-    let result = rt
-        .eval(
+    let mut h = TailsTestHarness::new();
+    let result = h.eval(
             r#"
         const a = { x: 1 };
         const b = { y: 2 };
         const c = { ...a, ...b, z: 3 };
         c.x + c.y + c.z;
     "#,
-        )
-        .unwrap();
-    assert_eq!(result, Value::Integer(6));
+        );
+    h.assert_eq(result, Value::Integer(6));
 }
