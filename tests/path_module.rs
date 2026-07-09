@@ -182,7 +182,7 @@ fn test_path_sep() {
         path.sep();
         "#);
     if let tails::Value::String(s) = val {
-        assert!(s == "/" || s == "\\");
+        assert!(s.as_ref() == "/" || s.as_ref() == "\\");
     } else {
         panic!("Expected string for sep");
     }
@@ -199,7 +199,7 @@ fn test_path_delimiter() {
         path.delimiter();
         "#);
     if let tails::Value::String(s) = val {
-        assert!(s == ":" || s == ";");
+        assert!(s.as_ref() == ":" || s.as_ref() == ";");
     } else {
         panic!("Expected string for delimiter");
     }

@@ -50,7 +50,7 @@ fn test_process_platform() {
     let val = run("process.platform;");
     if let tails::Value::String(s) = val {
         assert!(
-            s == "linux" || s == "darwin" || s == "win32",
+            s.as_ref() == "linux" || s.as_ref() == "darwin" || s.as_ref() == "win32",
             "Unexpected platform: {}",
             s
         );
@@ -65,7 +65,7 @@ fn test_process_arch() {
     let val = run("process.arch;");
     if let tails::Value::String(s) = val {
         assert!(
-            s == "x64" || s == "arm64" || s == "unknown",
+            s.as_ref() == "x64" || s.as_ref() == "arm64" || s.as_ref() == "unknown",
             "Unexpected arch: {}",
             s
         );

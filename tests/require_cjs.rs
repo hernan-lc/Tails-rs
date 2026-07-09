@@ -162,7 +162,7 @@ fn test_require_dirname_filename() {
         .eval_module(source, Path::new("/tmp/test.ts"))
         .unwrap();
     let s = match result {
-        tails::Value::String(s) => s,
+        tails::Value::String(s) => s.to_string(),
         tails::Value::Cons(c) => c.flatten(),
         other => panic!("Expected string, got {:?}", other),
     };

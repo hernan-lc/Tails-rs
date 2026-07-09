@@ -16,7 +16,7 @@ fn test_os_platform() {
     assert!(r.is_ok(), "os.platform() failed: {:?}", r.err());
     if let tails::Value::String(s) = r.unwrap() {
         assert!(
-            s == "linux" || s == "darwin" || s == "win32",
+            s.as_ref() == "linux" || s.as_ref() == "darwin" || s.as_ref() == "win32",
             "Unexpected platform: {}",
             s
         );
@@ -38,7 +38,7 @@ fn test_os_arch() {
     assert!(r.is_ok(), "os.arch() failed: {:?}", r.err());
     if let tails::Value::String(s) = r.unwrap() {
         assert!(
-            s == "x64" || s == "arm64" || s == "unknown",
+            s.as_ref() == "x64" || s.as_ref() == "arm64" || s.as_ref() == "unknown",
             "Unexpected arch: {}",
             s
         );
@@ -187,7 +187,7 @@ fn test_os_homedir() {
     if let tails::Value::String(s) = r.unwrap() {
         assert!(!s.is_empty(), "homedir should not be empty");
         assert!(
-            Path::new(&s).is_absolute(),
+            Path::new(s.as_ref()).is_absolute(),
             "homedir should be absolute path"
         );
     } else {

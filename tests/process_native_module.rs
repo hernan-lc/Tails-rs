@@ -24,7 +24,7 @@ fn test_process_native_platform() {
     let val = r.unwrap();
     if let tails::Value::String(s) = val {
         assert!(
-            s == "linux" || s == "darwin" || s == "win32",
+            s.as_ref() == "linux" || s.as_ref() == "darwin" || s.as_ref() == "win32",
             "Unexpected platform: {}",
             s
         );
@@ -47,7 +47,10 @@ fn test_process_native_arch() {
     let val = r.unwrap();
     if let tails::Value::String(s) = val {
         assert!(
-            s == "x64" || s == "arm64" || s == "x86" || s == "unknown",
+            s.as_ref() == "x64"
+                || s.as_ref() == "arm64"
+                || s.as_ref() == "x86"
+                || s.as_ref() == "unknown",
             "Unexpected arch: {}",
             s
         );
