@@ -1,15 +1,12 @@
-use super::helpers::is_user_visible_key;
+use super::helpers::{
+    collect_own_enumerable_keys, getter_key, is_user_visible_key, setter_key, ACCESSOR_GETTER,
+    ACCESSOR_SETTER,
+};
 use crate::errors::{Error, Result};
 use crate::objects::Value;
 use crate::vm::interpreter::{Interpreter, PropertyStorage};
 
 use super::reflect_fns::native_reflect_get_own_property_descriptor;
-
-/// Returns true if the key is a string property key (not internal or symbol).
-/// Per ECMAScript spec, Object.keys/values/entries only return string keys.
-fn is_string_property_key(k: &str) -> bool {
-    is_user_visible_key(k) && !k.starts_with("__sym_")
-}
 
 pub(super) fn native_object_keys(
     interp: &mut Interpreter,
@@ -20,14 +17,10 @@ pub(super) fn native_object_keys(
     let keys = match &obj_val {
         Value::Object(obj_idx) => {
             if let crate::vm::interpreter::HeapValue::Object(obj) = &interp.heap[*obj_idx] {
-                let mut keys = Vec::with_capacity(obj.properties.len());
-                for k in obj.properties.keys() {
-                    if !is_string_property_key(k) {
-                        continue;
-                    }
-                    keys.push(Value::String(k.to_string()));
-                }
-                keys
+                collect_own_enumerable_keys(&obj.properties)
+                    .into_iter()
+                    .map(Value::String)
+                    .collect()
             } else {
                 Vec::new()
             }
@@ -111,18 +104,21 @@ pub(super) fn native_object_values(
     let obj_val = args.first().cloned().unwrap_or(Value::Undefined);
     let vals = match &obj_val {
         Value::Object(obj_idx) => {
-            if let crate::vm::interpreter::HeapValue::Object(obj) = &interp.heap[*obj_idx] {
-                let mut vals = Vec::with_capacity(obj.properties.len());
-                for (k, v) in obj.properties.iter() {
-                    if !is_string_property_key(k) {
-                        continue;
-                    }
-                    vals.push(v.clone());
-                }
-                vals
+            let keys = if let crate::vm::interpreter::HeapValue::Object(obj) =
+                &interp.heap[*obj_idx]
+            {
+                collect_own_enumerable_keys(&obj.properties)
             } else {
                 Vec::new()
+            };
+            let mut vals = Vec::with_capacity(keys.len());
+            for k in keys {
+                let v = interp
+                    .get_property_str(&obj_val, &k)
+                    .unwrap_or(Value::Undefined);
+                vals.push(v);
             }
+            vals
         }
         Value::Array(arr_idx) => {
             if let crate::vm::interpreter::HeapValue::Array(arr) = &interp.heap[*arr_idx] {
@@ -150,18 +146,21 @@ pub(super) fn native_object_entries(
     let obj_val = args.first().cloned().unwrap_or(Value::Undefined);
     let pairs: Vec<(String, Value)> = match &obj_val {
         Value::Object(obj_idx) => {
-            if let crate::vm::interpreter::HeapValue::Object(obj) = &interp.heap[*obj_idx] {
-                let mut pairs = Vec::with_capacity(obj.properties.len());
-                for (k, v) in obj.properties.iter() {
-                    if !is_string_property_key(k) {
-                        continue;
-                    }
-                    pairs.push((k.to_string(), v.clone()));
-                }
-                pairs
+            let keys = if let crate::vm::interpreter::HeapValue::Object(obj) =
+                &interp.heap[*obj_idx]
+            {
+                collect_own_enumerable_keys(&obj.properties)
             } else {
                 Vec::new()
+            };
+            let mut pairs = Vec::with_capacity(keys.len());
+            for k in keys {
+                let v = interp
+                    .get_property_str(&obj_val, &k)
+                    .unwrap_or(Value::Undefined);
+                pairs.push((k, v));
             }
+            pairs
         }
         Value::Array(arr_idx) => {
             if let crate::vm::interpreter::HeapValue::Array(arr) = &interp.heap[*arr_idx] {
@@ -236,82 +235,115 @@ fn define_property_on(
     property: &str,
     descriptor: &Value,
 ) -> Result<()> {
-    if let Value::Object(obj_idx) = descriptor {
-        if let crate::vm::interpreter::HeapValue::Object(desc) = &interp.heap[*obj_idx] {
-            let getter = desc.properties.get("get").cloned();
-            let setter = desc.properties.get("set").cloned();
-            let value = desc.properties.get("value").cloned();
+    let Value::Object(desc_idx) = descriptor else {
+        return Ok(());
+    };
+    let (getter, setter, value, has_get, has_set, has_value) =
+        if let crate::vm::interpreter::HeapValue::Object(desc) = &interp.heap[*desc_idx] {
+            let has_get = desc.properties.contains_key("get");
+            let has_set = desc.properties.contains_key("set");
+            let has_value = desc.properties.contains_key("value");
+            (
+                desc.properties.get("get").cloned(),
+                desc.properties.get("set").cloned(),
+                desc.properties.get("value").cloned(),
+                has_get,
+                has_set,
+                has_value,
+            )
+        } else {
+            return Ok(());
+        };
 
-            match target {
-                Value::Object(tgt_idx) => {
-                    if let crate::vm::interpreter::HeapValue::Object(tgt) =
-                        &mut interp.heap[*tgt_idx]
-                    {
-                        if let Some(getter_fn) = getter {
-                            if !matches!(getter_fn, Value::Undefined) {
-                                tgt.properties
-                                    .insert(format!("__getter_{}", property), getter_fn);
-                            }
-                        }
-                        if let Some(setter_fn) = setter {
-                            if !matches!(setter_fn, Value::Undefined) {
-                                tgt.properties
-                                    .insert(format!("__setter_{}", property), setter_fn);
-                            }
-                        }
-                        if let Some(val) = value {
-                            tgt.properties.insert(property.to_string(), val);
+    let is_accessor = has_get || has_set;
+    let g_key = getter_key(property);
+    let s_key = setter_key(property);
+
+    match target {
+        Value::Object(tgt_idx) => {
+            if let crate::vm::interpreter::HeapValue::Object(tgt) = &mut interp.heap[*tgt_idx] {
+                if is_accessor {
+                    // Accessor descriptor replaces any data property.
+                    tgt.properties.remove(property);
+                    if let Some(getter_fn) = getter {
+                        if !matches!(getter_fn, Value::Undefined) {
+                            tgt.properties.insert(g_key, getter_fn);
+                        } else {
+                            tgt.properties.remove(&g_key);
                         }
                     }
-                }
-                Value::Function(func_idx) => {
-                    if let crate::vm::interpreter::HeapValue::Function(f) =
-                        &mut interp.heap[*func_idx]
-                    {
-                        if let Some(getter_fn) = getter {
-                            if !matches!(getter_fn, Value::Undefined) {
-                                f.properties
-                                    .insert(format!("__getter_{}", property), getter_fn);
-                            }
-                        }
-                        if let Some(setter_fn) = setter {
-                            if !matches!(setter_fn, Value::Undefined) {
-                                f.properties
-                                    .insert(format!("__setter_{}", property), setter_fn);
-                            }
-                        }
-                        if let Some(val) = value {
-                            f.properties.insert(property.to_string(), val);
+                    if let Some(setter_fn) = setter {
+                        if !matches!(setter_fn, Value::Undefined) {
+                            tgt.properties.insert(s_key, setter_fn);
+                        } else {
+                            tgt.properties.remove(&s_key);
                         }
                     }
-                }
-                _ => {}
-            }
-        }
-    } else if let Some(val) = match descriptor {
-        Value::Object(obj_idx) => {
-            if let crate::vm::interpreter::HeapValue::Object(obj) = &interp.heap[*obj_idx] {
-                obj.properties.get("value").cloned()
-            } else {
-                None
-            }
-        }
-        _ => None,
-    } {
-        match target {
-            Value::Object(obj_idx) => {
-                if let crate::vm::interpreter::HeapValue::Object(obj) = &mut interp.heap[*obj_idx] {
-                    obj.properties.insert(property.to_string(), val);
+                } else if has_value {
+                    // Data descriptor replaces any existing accessor.
+                    tgt.properties.remove(&g_key);
+                    tgt.properties.remove(&s_key);
+                    if let Some(val) = value {
+                        tgt.properties.insert(property.to_string(), val);
+                    }
                 }
             }
-            Value::Function(func_idx) => {
-                if let crate::vm::interpreter::HeapValue::Function(f) = &mut interp.heap[*func_idx]
+        }
+        Value::Function(func_idx) => {
+            if let crate::vm::interpreter::HeapValue::Function(f) = &mut interp.heap[*func_idx] {
+                if is_accessor {
+                    f.properties.remove(property);
+                    if let Some(getter_fn) = getter {
+                        if !matches!(getter_fn, Value::Undefined) {
+                            f.properties.insert(g_key, getter_fn);
+                        } else {
+                            f.properties.remove(&g_key);
+                        }
+                    }
+                    if let Some(setter_fn) = setter {
+                        if !matches!(setter_fn, Value::Undefined) {
+                            f.properties.insert(s_key, setter_fn);
+                        } else {
+                            f.properties.remove(&s_key);
+                        }
+                    }
+                } else if has_value {
+                    f.properties.remove(&g_key);
+                    f.properties.remove(&s_key);
+                    if let Some(val) = value {
+                        f.properties.insert(property.to_string(), val);
+                    }
+                }
+            }
+        }
+        Value::Array(arr_idx) => {
+            if let crate::vm::interpreter::HeapValue::Array(arr) = &mut interp.heap[*arr_idx] {
+                if property == "length" {
+                    if let Some(val) = value {
+                        let new_len = match &val {
+                            Value::Integer(n) => (*n).max(0) as usize,
+                            Value::Float(n) => (*n as i64).max(0) as usize,
+                            _ => 0,
+                        };
+                        if new_len < arr.elements.len() {
+                            arr.elements.truncate(new_len);
+                        } else if new_len > arr.elements.len() {
+                            arr.elements.resize(new_len, Value::Undefined);
+                        }
+                    }
+                } else if let Some(index) =
+                    crate::vm::interpreter::property_access::parse_array_index(property)
                 {
-                    f.properties.insert(property.to_string(), val);
+                    if let Some(val) = value {
+                        if index >= arr.elements.len() {
+                            arr.elements.resize(index + 1, Value::Undefined);
+                        }
+                        arr.elements[index] = val;
+                    }
                 }
             }
-            _ => {}
         }
+        _ => {}
     }
     Ok(())
 }
@@ -326,6 +358,14 @@ pub(super) fn native_object_define_property(
         Some(Value::String(s)) => s.clone(),
         Some(Value::Cons(c)) => c.flatten(),
         Some(Value::Symbol(id)) => format!("__sym_{}", id),
+        Some(Value::Integer(n)) => n.to_string(),
+        Some(Value::Float(n)) => {
+            if *n == (*n as i64) as f64 {
+                (*n as i64).to_string()
+            } else {
+                n.to_string()
+            }
+        }
         _ => return Ok(target),
     };
     let descriptor = args.get(2).cloned().unwrap_or(Value::Undefined);
@@ -371,6 +411,9 @@ pub(super) fn native_object_get_own_property_descriptors(
     let obj_val = args.first().cloned().unwrap_or(Value::Undefined);
 
     // Collect (key, value, getter, setter) for every own property.
+    // Accessor-only properties (stored as __getter_/__setter_ without a data
+    // slot) must still appear — Object.getOwnPropertyDescriptors is how Zod
+    // merges schema defs.
     let mut entries: Vec<(String, Value, Option<Value>, Option<Value>)> = Vec::new();
     match &obj_val {
         Value::Object(obj_idx) => {
@@ -379,20 +422,41 @@ pub(super) fn native_object_get_own_property_descriptors(
                     std::collections::HashMap::new();
                 let mut setters: std::collections::HashMap<String, Value> =
                     std::collections::HashMap::new();
+                let mut data_keys: Vec<(String, Value)> = Vec::new();
+                let mut accessor_names: std::collections::HashSet<String> =
+                    std::collections::HashSet::new();
+
                 for (k, v) in obj.properties.iter() {
-                    if let Some(real) = k.strip_prefix("__getter_") {
+                    if let Some(real) = k.strip_prefix(ACCESSOR_GETTER) {
                         getters.insert(real.to_string(), v.clone());
-                    } else if let Some(real) = k.strip_prefix("__setter_") {
+                        accessor_names.insert(real.to_string());
+                    } else if let Some(real) = k.strip_prefix(ACCESSOR_SETTER) {
                         setters.insert(real.to_string(), v.clone());
+                        accessor_names.insert(real.to_string());
+                    } else if is_user_visible_key(k) && !k.starts_with("__sym_") {
+                        data_keys.push((k.to_string(), v.clone()));
                     }
                 }
-                for (k, v) in obj.properties.iter() {
-                    if k.starts_with("__getter_") || k.starts_with("__setter_") {
+
+                // Data properties: if a key still has a getter/setter alongside
+                // a data value, prefer the data descriptor (defineProperty with
+                // value should have removed accessors; keep data if both exist).
+                let mut seen: std::collections::HashSet<String> = std::collections::HashSet::new();
+                for (k, v) in data_keys {
+                    seen.insert(k.clone());
+                    // If this key is only present as data (accessors already
+                    // removed), emit a data descriptor. If somehow both remain,
+                    // prefer data so assignProp self-caching works.
+                    entries.push((k, v, None, None));
+                }
+                // Accessor-only properties (no data slot)
+                for name in accessor_names {
+                    if seen.contains(&name) {
                         continue;
                     }
-                    let getter = getters.get(k).cloned();
-                    let setter = setters.get(k).cloned();
-                    entries.push((k.to_string(), v.clone(), getter, setter));
+                    let getter = getters.get(&name).cloned();
+                    let setter = setters.get(&name).cloned();
+                    entries.push((name, Value::Undefined, getter, setter));
                 }
             }
         }
@@ -617,10 +681,26 @@ pub(super) fn native_object_has_own_property(
     match this {
         Value::Object(obj_idx) => {
             if let crate::vm::interpreter::HeapValue::Object(obj) = &interp.heap[*obj_idx] {
-                Ok(Value::Boolean(obj.properties.contains_key(&prop)))
+                let has = obj.properties.contains_key(&prop)
+                    || obj.properties.contains_key(&getter_key(&prop))
+                    || obj.properties.contains_key(&setter_key(&prop));
+                Ok(Value::Boolean(has))
             } else {
                 Ok(Value::Boolean(false))
             }
+        }
+        Value::Array(arr_idx) => {
+            if let crate::vm::interpreter::HeapValue::Array(arr) = &interp.heap[*arr_idx] {
+                if prop == "length" {
+                    return Ok(Value::Boolean(true));
+                }
+                if let Some(index) =
+                    crate::vm::interpreter::property_access::parse_array_index(&prop)
+                {
+                    return Ok(Value::Boolean(index < arr.elements.len()));
+                }
+            }
+            Ok(Value::Boolean(false))
         }
         _ => Ok(Value::Boolean(false)),
     }

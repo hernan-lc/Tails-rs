@@ -43,6 +43,48 @@ pub(super) fn is_user_visible_key(k: &str) -> bool {
     !k.starts_with("__getter_") && !k.starts_with("__setter_") && !k.starts_with("__method_")
 }
 
+const GETTER_PREFIX: &str = "__getter_";
+const SETTER_PREFIX: &str = "__setter_";
+const METHOD_PREFIX: &str = "__method_";
+
+/// Collect own enumerable string property names, including accessor properties.
+/// Internal storage keys (`__getter_X`, `__setter_X`, `__method_X`, `__sym_*`)
+/// are never returned as-is; accessors contribute their logical name once.
+pub(super) fn collect_own_enumerable_keys(
+    properties: &crate::vm::interpreter::PropertyStorage,
+) -> Vec<String> {
+    let mut keys = Vec::new();
+    let mut seen = std::collections::HashSet::new();
+
+    for k in properties.keys() {
+        if let Some(real) = k.strip_prefix(GETTER_PREFIX) {
+            if !real.is_empty() && seen.insert(real.to_string()) {
+                keys.push(real.to_string());
+            }
+        } else if let Some(real) = k.strip_prefix(SETTER_PREFIX) {
+            if !real.is_empty() && seen.insert(real.to_string()) {
+                keys.push(real.to_string());
+            }
+        } else if k.starts_with(METHOD_PREFIX) || k.starts_with("__sym_") {
+            continue;
+        } else if is_user_visible_key(k) && seen.insert(k.to_string()) {
+            keys.push(k.to_string());
+        }
+    }
+    keys
+}
+
+pub(super) fn getter_key(name: &str) -> String {
+    format!("{}{}", GETTER_PREFIX, name)
+}
+
+pub(super) fn setter_key(name: &str) -> String {
+    format!("{}{}", SETTER_PREFIX, name)
+}
+
+pub(super) const ACCESSOR_GETTER: &str = GETTER_PREFIX;
+pub(super) const ACCESSOR_SETTER: &str = SETTER_PREFIX;
+
 pub(super) fn to_i64(v: &Value) -> i64 {
     match v {
         Value::Integer(n) => *n,

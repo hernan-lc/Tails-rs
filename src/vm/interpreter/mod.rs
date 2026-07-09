@@ -15,7 +15,7 @@ mod modules;
 pub(crate) mod native_loader;
 mod ops;
 mod promise_runtime;
-mod property_access;
+pub(crate) mod property_access;
 pub mod safe_function;
 pub mod safe_library;
 mod value_ops;

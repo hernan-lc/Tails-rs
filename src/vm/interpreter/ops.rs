@@ -17,6 +17,33 @@ const TYPE_BIGINT: &str = "bigint";
 const TYPE_SYMBOL: &str = "symbol";
 const TYPE_FUNCTION: &str = "function";
 
+/// Own enumerable string keys, including accessor properties (getters/setters).
+/// Internal storage prefixes are not returned as keys; instead the logical
+/// property name is returned once.
+fn collect_enumerable_keys(properties: &PropertyStorage) -> Vec<String> {
+    let mut keys = Vec::new();
+    let mut seen = std::collections::HashSet::new();
+
+    for k in properties.keys() {
+        if k.starts_with(GETTER_PREFIX) {
+            let real = &k[GETTER_PREFIX.len()..];
+            if !real.is_empty() && seen.insert(real.to_string()) {
+                keys.push(real.to_string());
+            }
+        } else if k.starts_with(SETTER_PREFIX) {
+            let real = &k[SETTER_PREFIX.len()..];
+            if !real.is_empty() && seen.insert(real.to_string()) {
+                keys.push(real.to_string());
+            }
+        } else if k.starts_with(METHOD_PREFIX) || k.starts_with("__sym_") {
+            continue;
+        } else if seen.insert(k.to_string()) {
+            keys.push(k.to_string());
+        }
+    }
+    keys
+}
+
 impl Interpreter {
     fn stack_pop(&mut self) -> Result<Value> {
         self.stack
@@ -407,27 +434,16 @@ impl Interpreter {
                 let key = self.stack_pop()?;
                 let object = self.stack_pop()?;
 
-                let key_owned;
-                let key_str: &str = match &key {
-                    Value::String(s) => s.as_str(),
-                    Value::Cons(c) => {
-                        key_owned = c.flatten();
-                        &key_owned
-                    }
-                    _ => "",
+                let resolved_key: Option<String> = match &key {
+                    Value::String(s) => Some(s.clone()),
+                    Value::Cons(c) => Some(c.flatten()),
+                    Value::Symbol(id) => Some(format!("__sym_{}", id)),
+                    Value::Integer(n) => Some(n.to_string()),
+                    Value::Float(n) => Some(((*n) as i64).to_string()),
+                    Value::Boolean(b) => Some(b.to_string()),
+                    _ => None,
                 };
-                if key_str.is_empty() && !matches!(&key, Value::String(_) | Value::Symbol(_)) {
-                } else {
-                    let resolved_key = if key_str.is_empty() {
-                        match &key {
-                            Value::Symbol(id) => format!("__sym_{}", id),
-                            Value::Integer(n) => n.to_string(),
-                            Value::Float(n) => ((*n) as i64).to_string(),
-                            _ => key_str.to_string(),
-                        }
-                    } else {
-                        key_str.to_string()
-                    };
+                if let Some(resolved_key) = resolved_key {
                     match &object {
                         Value::Proxy(proxy_idx) => {
                             if let HeapValue::Proxy(proxy) = &self.heap[*proxy_idx] {
@@ -466,6 +482,11 @@ impl Interpreter {
                                         let _ = obj;
                                         self.call_value(&setter_val, &object, &[value])?;
                                     } else {
+                                        // Data write replaces any existing getter for this key.
+                                        let getter_key =
+                                            format!("{}{}", GETTER_PREFIX, resolved_key);
+                                        obj.properties.remove(&getter_key);
+                                        obj.properties.remove(&setter_key);
                                         obj.properties.insert(resolved_key, value);
                                     }
                                 } else {
@@ -473,8 +494,37 @@ impl Interpreter {
                                 }
                             }
                         }
+                        Value::Array(arr_idx) => {
+                            if let HeapValue::Array(arr) = &mut self.heap[*arr_idx] {
+                                if resolved_key == "length" {
+                                    let new_len = match &value {
+                                        Value::Integer(n) => (*n).max(0) as usize,
+                                        Value::Float(n) => (*n as i64).max(0) as usize,
+                                        _ => 0,
+                                    };
+                                    if new_len < arr.elements.len() {
+                                        arr.elements.truncate(new_len);
+                                    } else if new_len > arr.elements.len() {
+                                        arr.elements.resize(new_len, Value::Undefined);
+                                    }
+                                } else if let Some(index) =
+                                    super::property_access::parse_array_index(&resolved_key)
+                                {
+                                    if index >= arr.elements.len() {
+                                        arr.elements.resize(index + 1, Value::Undefined);
+                                    }
+                                    arr.elements[index] = value;
+                                }
+                            }
+                        }
                         Value::Function(func_idx) => {
                             if let HeapValue::Function(f) = &mut self.heap[*func_idx] {
+                                if f.properties.has_accessors() {
+                                    f.properties
+                                        .remove(&format!("{}{}", GETTER_PREFIX, resolved_key));
+                                    f.properties
+                                        .remove(&format!("{}{}", SETTER_PREFIX, resolved_key));
+                                }
                                 f.properties.insert(resolved_key, value);
                             }
                         }
@@ -657,14 +707,9 @@ impl Interpreter {
                 let keys: Vec<Value> = match &obj {
                     Value::Object(idx) => {
                         if let HeapValue::Object(o) = &self.heap[*idx] {
-                            o.properties
-                                .keys()
-                                .filter(|k| {
-                                    !k.starts_with(GETTER_PREFIX)
-                                        && !k.starts_with(SETTER_PREFIX)
-                                        && !k.starts_with(METHOD_PREFIX)
-                                })
-                                .map(|k| Value::String(k.to_string()))
+                            collect_enumerable_keys(&o.properties)
+                                .into_iter()
+                                .map(Value::String)
                                 .collect()
                         } else {
                             vec![]

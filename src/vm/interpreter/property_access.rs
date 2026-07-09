@@ -94,20 +94,33 @@ impl Interpreter {
         match object {
             Value::Object(obj_idx) => {
                 if let HeapValue::Object(obj) = &mut self.heap[*obj_idx] {
+                    // Defining a data property replaces any existing accessor.
+                    obj.properties.remove(&format!("__getter_{}", key_str));
+                    obj.properties.remove(&format!("__setter_{}", key_str));
                     obj.properties.insert(key_str.to_string(), value);
                 }
             }
             Value::Array(arr_idx) => {
                 if let HeapValue::Array(arr) = &mut self.heap[*arr_idx] {
-                    if let Ok(index) = key_str.parse::<usize>() {
-                        if index < arr.elements.len() {
-                            arr.elements[index] = value;
+                    if key_str == "length" {
+                        let new_len = to_i64_value(&value).max(0) as usize;
+                        if new_len < arr.elements.len() {
+                            arr.elements.truncate(new_len);
+                        } else if new_len > arr.elements.len() {
+                            arr.elements.resize(new_len, Value::Undefined);
                         }
+                    } else if let Some(index) = parse_array_index(&key_str) {
+                        if index >= arr.elements.len() {
+                            arr.elements.resize(index + 1, Value::Undefined);
+                        }
+                        arr.elements[index] = value;
                     }
                 }
             }
             Value::Function(func_idx) => {
                 if let HeapValue::Function(f) = &mut self.heap[*func_idx] {
+                    f.properties.remove(&format!("__getter_{}", key_str));
+                    f.properties.remove(&format!("__setter_{}", key_str));
                     f.properties.insert(key_str.to_string(), value);
                 }
             }
@@ -923,4 +936,26 @@ fn to_i64_value(v: &Value) -> i64 {
         Value::Null => 0,
         _ => 0,
     }
+}
+
+/// Parse a canonical array index string ("0", "1", …). Rejects leading zeros
+/// like "01" so they remain ordinary property keys per the ES spec.
+pub(crate) fn parse_array_index(key: &str) -> Option<usize> {
+    if key.is_empty() {
+        return None;
+    }
+    // Reject leading zeros except for "0" itself.
+    if key.len() > 1 && key.starts_with('0') {
+        return None;
+    }
+    let index: usize = key.parse().ok()?;
+    // Array indices are uint32 values < 2^32 - 1.
+    if index as u64 >= 0xFFFF_FFFF {
+        return None;
+    }
+    // Ensure the string is the canonical decimal representation.
+    if index.to_string() != key {
+        return None;
+    }
+    Some(index)
 }

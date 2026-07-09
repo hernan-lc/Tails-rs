@@ -1,4 +1,3 @@
-use super::helpers::is_user_visible_key;
 use crate::errors::{Error, Result};
 use crate::objects::Value;
 use crate::props;
@@ -37,26 +36,11 @@ pub(super) fn native_reflect_set(
     let value = args.get(2).cloned().unwrap_or(Value::Undefined);
     let _receiver = args.get(3).cloned().unwrap_or(target.clone());
 
-    match &target {
-        Value::Object(obj_idx) => {
-            if let crate::vm::interpreter::HeapValue::Object(obj) = &mut interp.heap[*obj_idx] {
-                if let Value::String(key_str) = &property {
-                    obj.properties.insert(key_str.clone(), value);
-                    return Ok(Value::Boolean(true));
-                }
-            }
-            Ok(Value::Boolean(false))
-        }
-        Value::Function(func_idx) => {
-            if let crate::vm::interpreter::HeapValue::Function(f) = &mut interp.heap[*func_idx] {
-                if let Value::String(key_str) = &property {
-                    f.properties.insert(key_str.clone(), value);
-                    return Ok(Value::Boolean(true));
-                }
-            }
-            Ok(Value::Boolean(false))
-        }
-        _ => Ok(Value::Boolean(false)),
+    // Delegate to the shared set_property path so arrays, accessors, and
+    // length updates all behave consistently.
+    match interp.set_property(&target, &property, value) {
+        Ok(()) => Ok(Value::Boolean(true)),
+        Err(_) => Ok(Value::Boolean(false)),
     }
 }
 
@@ -203,11 +187,8 @@ pub(super) fn native_reflect_own_keys(
     match &target {
         Value::Object(obj_idx) => {
             if let crate::vm::interpreter::HeapValue::Object(obj) = &interp.heap[*obj_idx] {
-                for k in obj.properties.keys() {
-                    if !is_user_visible_key(k) {
-                        continue;
-                    }
-                    keys.push(prop_key_to_value(k));
+                for k in super::helpers::collect_own_enumerable_keys(&obj.properties) {
+                    keys.push(prop_key_to_value(&k));
                 }
             }
         }
@@ -221,11 +202,8 @@ pub(super) fn native_reflect_own_keys(
         }
         Value::Function(func_idx) => {
             if let crate::vm::interpreter::HeapValue::Function(f) = &interp.heap[*func_idx] {
-                for k in f.properties.keys() {
-                    if !is_user_visible_key(k) {
-                        continue;
-                    }
-                    keys.push(prop_key_to_value(k));
+                for k in super::helpers::collect_own_enumerable_keys(&f.properties) {
+                    keys.push(prop_key_to_value(&k));
                 }
             }
         }
@@ -252,9 +230,50 @@ pub(super) fn native_reflect_get_own_property_descriptor(
     match &target {
         Value::Object(obj_idx) => {
             if let crate::vm::interpreter::HeapValue::Object(obj) = &interp.heap[*obj_idx] {
-                if let Some(val) = obj.properties.get(&property) {
+                let getter_key = format!("__getter_{}", property);
+                let setter_key = format!("__setter_{}", property);
+                let getter = obj.properties.get(&getter_key).cloned();
+                let setter = obj.properties.get(&setter_key).cloned();
+                let data = obj.properties.get(&property).cloned();
+
+                if data.is_some() && getter.is_none() && setter.is_none() {
                     let descriptor = props! {
-                        "value" => val.clone(),
+                        "value" => data.unwrap(),
+                        "writable" => Value::Boolean(true),
+                        "enumerable" => Value::Boolean(true),
+                        "configurable" => Value::Boolean(true),
+                    };
+                    let desc_idx = interp.heap.len();
+                    interp.heap.push(crate::vm::interpreter::HeapValue::Object(
+                        crate::vm::interpreter::JsObject {
+                            properties: descriptor,
+                            prototype: None,
+                            extensible: true,
+                        },
+                    ));
+                    return Ok(Value::Object(desc_idx));
+                }
+                if getter.is_some() || setter.is_some() {
+                    let descriptor = props! {
+                        "get" => getter.unwrap_or(Value::Undefined),
+                        "set" => setter.unwrap_or(Value::Undefined),
+                        "enumerable" => Value::Boolean(true),
+                        "configurable" => Value::Boolean(true),
+                    };
+                    let desc_idx = interp.heap.len();
+                    interp.heap.push(crate::vm::interpreter::HeapValue::Object(
+                        crate::vm::interpreter::JsObject {
+                            properties: descriptor,
+                            prototype: None,
+                            extensible: true,
+                        },
+                    ));
+                    return Ok(Value::Object(desc_idx));
+                }
+                // Data property even if somehow accessors linger — prefer data.
+                if let Some(val) = data {
+                    let descriptor = props! {
+                        "value" => val,
                         "writable" => Value::Boolean(true),
                         "enumerable" => Value::Boolean(true),
                         "configurable" => Value::Boolean(true),
