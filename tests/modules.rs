@@ -257,10 +257,7 @@ fn test_anonymous_default_export() {
         fn("test")
     "#;
     let result = runtime.eval(source).unwrap();
-    assert_eq!(
-        result,
-        tails::Value::String("Anonymous: test".to_string())
-    );
+    assert_eq!(result, tails::Value::String("Anonymous: test".to_string()));
 }
 
 #[test]
@@ -307,10 +304,7 @@ fn test_anonymous_default_via_eval_module() {
         fn('Tails')
     "#;
     let result = runtime.eval(source).unwrap();
-    assert_eq!(
-        result,
-        tails::Value::String("Anonymous: Tails".to_string())
-    );
+    assert_eq!(result, tails::Value::String("Anonymous: Tails".to_string()));
 }
 
 #[test]
@@ -321,10 +315,7 @@ fn test_import_named_default_from_reexport() {
         defaultGreet("Direct")
     "#;
     let result = runtime.eval(source).unwrap();
-    assert_eq!(
-        result,
-        tails::Value::String("Default: Direct".to_string())
-    );
+    assert_eq!(result, tails::Value::String("Default: Direct".to_string()));
 }
 
 #[test]

@@ -1,5 +1,7 @@
 use super::CodeGenerator;
-use crate::compiler::parser::{BindingPattern, ExportDeclarationKind, Expression, ForInit, SpannedNode, Statement};
+use crate::compiler::parser::{
+    BindingPattern, ExportDeclarationKind, Expression, ForInit, SpannedNode, Statement,
+};
 use crate::compiler::CompiledFunction;
 use crate::errors::Result;
 
@@ -88,7 +90,8 @@ pub(crate) fn find_outer_refs(
     let mut names = Vec::new();
     collect_identifiers_body(body, &mut names);
 
-    let params_set: std::collections::HashSet<&str> = inner_params.iter().map(|s| s.as_str()).collect();
+    let params_set: std::collections::HashSet<&str> =
+        inner_params.iter().map(|s| s.as_str()).collect();
     let mut result = Vec::new();
     let mut seen = std::collections::HashSet::new();
 
@@ -148,7 +151,10 @@ fn collect_identifiers_pattern(pat: &BindingPattern, out: &mut Vec<String>) {
     }
 }
 
-fn collect_identifiers_class_member(member: &crate::compiler::parser::ClassMember, out: &mut Vec<String>) {
+fn collect_identifiers_class_member(
+    member: &crate::compiler::parser::ClassMember,
+    out: &mut Vec<String>,
+) {
     match member {
         crate::compiler::parser::ClassMember::Method { body, .. } => {
             collect_identifiers_body(body, out);
@@ -181,15 +187,9 @@ fn collect_identifiers_stmt(stmt: &Statement, out: &mut Vec<String>) {
                 collect_identifiers_pattern(&decl.id, out);
             }
         }
-        Statement::FunctionDeclaration {
-            body,
-            defaults,
-            ..
-        } => {
-            for def in defaults {
-                if let Some(expr) = def {
-                    collect_identifiers_expr(expr, out);
-                }
+        Statement::FunctionDeclaration { body, defaults, .. } => {
+            for expr in defaults.iter().flatten() {
+                collect_identifiers_expr(expr, out);
             }
             collect_identifiers_body(body, out);
         }
@@ -238,11 +238,17 @@ fn collect_identifiers_stmt(stmt: &Statement, out: &mut Vec<String>) {
             collect_identifiers_stmt(&body.inner, out);
         }
         Statement::ForInStatement { right, body, left }
-        | Statement::ForOfStatement { right, body, left, .. } => {
+        | Statement::ForOfStatement {
+            right, body, left, ..
+        } => {
             match left {
                 crate::compiler::parser::ForInLeft::Identifier(_) => {}
-                crate::compiler::parser::ForInLeft::Pattern(pat) => collect_identifiers_pattern(pat, out),
-                crate::compiler::parser::ForInLeft::VariableDeclaration { id, .. } => collect_identifiers_pattern(id, out),
+                crate::compiler::parser::ForInLeft::Pattern(pat) => {
+                    collect_identifiers_pattern(pat, out)
+                }
+                crate::compiler::parser::ForInLeft::VariableDeclaration { id, .. } => {
+                    collect_identifiers_pattern(id, out)
+                }
             }
             collect_identifiers_expr(right, out);
             collect_identifiers_stmt(&body.inner, out);
@@ -278,9 +284,7 @@ fn collect_identifiers_stmt(stmt: &Statement, out: &mut Vec<String>) {
             }
         }
         Statement::ClassDeclaration {
-            superclass,
-            body,
-            ..
+            superclass, body, ..
         } => {
             if let Some(sc) = superclass {
                 collect_identifiers_expr(sc, out);
@@ -289,12 +293,9 @@ fn collect_identifiers_stmt(stmt: &Statement, out: &mut Vec<String>) {
                 collect_identifiers_class_member(member, out);
             }
         }
-        Statement::ExportDeclaration { kind } => {
-            match kind {
-                ExportDeclarationKind::Local(stmt) => collect_identifiers_stmt(&stmt.inner, out),
-                _ => {}
-            }
-        }
+        Statement::ExportDeclaration {
+            kind: ExportDeclarationKind::Local(stmt),
+        } => collect_identifiers_stmt(&stmt.inner, out),
         Statement::ExportDefaultDeclaration { declaration } => {
             collect_identifiers_stmt(&declaration.inner, out);
         }
@@ -323,7 +324,9 @@ fn collect_identifiers_expr(expr: &Expression, out: &mut Vec<String>) {
             }
         }
         Expression::Member {
-            object, property, computed
+            object,
+            property,
+            computed,
         } => {
             collect_identifiers_expr(object, out);
             if *computed {
@@ -331,7 +334,9 @@ fn collect_identifiers_expr(expr: &Expression, out: &mut Vec<String>) {
             }
         }
         Expression::OptionalMember {
-            object, property, computed
+            object,
+            property,
+            computed,
         } => {
             collect_identifiers_expr(object, out);
             if *computed {
@@ -357,10 +362,8 @@ fn collect_identifiers_expr(expr: &Expression, out: &mut Vec<String>) {
             collect_identifiers_expr(operand, out);
         }
         Expression::ArrowFunction { body, defaults, .. } => {
-            for def in defaults {
-                if let Some(expr) = def {
-                    collect_identifiers_expr(expr, out);
-                }
+            for expr in defaults.iter().flatten() {
+                collect_identifiers_expr(expr, out);
             }
             match body.as_ref() {
                 crate::compiler::parser::ArrowFunctionBody::Expression(expr) => {
@@ -372,10 +375,8 @@ fn collect_identifiers_expr(expr: &Expression, out: &mut Vec<String>) {
             }
         }
         Expression::FunctionExpression { body, defaults, .. } => {
-            for def in defaults {
-                if let Some(expr) = def {
-                    collect_identifiers_expr(expr, out);
-                }
+            for expr in defaults.iter().flatten() {
+                collect_identifiers_expr(expr, out);
             }
             collect_identifiers_body(body, out);
         }
@@ -390,7 +391,9 @@ fn collect_identifiers_expr(expr: &Expression, out: &mut Vec<String>) {
                 collect_identifiers_expr(expr, out);
             }
         }
-        Expression::ClassExpression { superclass, body, .. } => {
+        Expression::ClassExpression {
+            superclass, body, ..
+        } => {
             if let Some(sc) = superclass {
                 collect_identifiers_expr(sc, out);
             }

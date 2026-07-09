@@ -177,11 +177,24 @@ impl<'a> Parser<'a> {
             let decl = match self.peek().token {
                 Token::Function => {
                     let mut look_ahead = self.pos + 1;
-                    if self.tokens.get(look_ahead).map(|t| t.token == Token::Star).unwrap_or(false) {
+                    if self
+                        .tokens
+                        .get(look_ahead)
+                        .map(|t| t.token == Token::Star)
+                        .unwrap_or(false)
+                    {
                         look_ahead += 1;
                     }
-                    if self.tokens.get(look_ahead).map(|t| t.token == Token::LeftParen).unwrap_or(false)
-                        || self.tokens.get(look_ahead).map(|t| t.token == Token::LeftBrace).unwrap_or(false)
+                    if self
+                        .tokens
+                        .get(look_ahead)
+                        .map(|t| t.token == Token::LeftParen)
+                        .unwrap_or(false)
+                        || self
+                            .tokens
+                            .get(look_ahead)
+                            .map(|t| t.token == Token::LeftBrace)
+                            .unwrap_or(false)
                     {
                         let expr = self.parse_expression()?;
                         if self.peek().token == Token::Semicolon {
@@ -192,9 +205,7 @@ impl<'a> Parser<'a> {
                         self.parse_statement()?
                     }
                 }
-                Token::Class | Token::Const | Token::Let | Token::Var => {
-                    self.parse_statement()?
-                }
+                Token::Class | Token::Const | Token::Let | Token::Var => self.parse_statement()?,
                 _ => {
                     let expr = self.parse_expression()?;
                     if self.peek().token == Token::Semicolon {

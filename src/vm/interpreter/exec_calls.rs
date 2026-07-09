@@ -13,9 +13,11 @@ impl Interpreter {
             .ok_or_else(|| Error::RuntimeError(super::ERR_STACK_UNDERFLOW.into()))?;
         let mut args = Vec::new();
         for _ in 0..*argc {
-            args.push(self.stack.pop().ok_or_else(|| {
-                Error::RuntimeError(super::ERR_STACK_UNDERFLOW.into())
-            })?);
+            args.push(
+                self.stack
+                    .pop()
+                    .ok_or_else(|| Error::RuntimeError(super::ERR_STACK_UNDERFLOW.into()))?,
+            );
         }
         args.reverse();
         match &callee {
@@ -63,18 +65,12 @@ impl Interpreter {
                         if let Some(promise_idx) = promise_idx {
                             match f.name.as_deref() {
                                 Some("resolve") => {
-                                    let val = args
-                                        .first()
-                                        .cloned()
-                                        .unwrap_or(Value::Undefined);
+                                    let val = args.first().cloned().unwrap_or(Value::Undefined);
                                     self.resolve_promise(promise_idx, val);
                                     self.stack.push(Value::Undefined);
                                 }
                                 Some("reject") => {
-                                    let reason = args
-                                        .first()
-                                        .cloned()
-                                        .unwrap_or(Value::Undefined);
+                                    let reason = args.first().cloned().unwrap_or(Value::Undefined);
                                     self.reject_promise(promise_idx, reason);
                                     self.stack.push(Value::Undefined);
                                 }
@@ -100,11 +96,8 @@ impl Interpreter {
                             };
                             let mut combined_args = bound_args;
                             combined_args.extend(args);
-                            let result = self.call_value(
-                                &original_fn,
-                                &bound_this,
-                                &combined_args,
-                            )?;
+                            let result =
+                                self.call_value(&original_fn, &bound_this, &combined_args)?;
                             self.stack.push(result);
                             *pc += 1;
                             return Ok(true);
@@ -112,16 +105,15 @@ impl Interpreter {
                     }
                     self.stack.push(Value::Undefined);
                 } else {
-                    let same_module =
-                        if let HeapValue::Function(f) = &self.heap[*func_idx] {
-                            match (&f.owner_module, &self.current_module) {
-                                (Some(om), Some(cm)) => Rc::ptr_eq(om, cm),
-                                (None, None) => true,
-                                _ => false,
-                            }
-                        } else {
-                            false
-                        };
+                    let same_module = if let HeapValue::Function(f) = &self.heap[*func_idx] {
+                        match (&f.owner_module, &self.current_module) {
+                            (Some(om), Some(cm)) => Rc::ptr_eq(om, cm),
+                            (None, None) => true,
+                            _ => false,
+                        }
+                    } else {
+                        false
+                    };
                     if same_module {
                         let func_info = {
                             if let HeapValue::Function(f) = &self.heap[*func_idx] {
@@ -179,10 +171,7 @@ impl Interpreter {
                                 generator_heap_idx: None,
                                 source_line: self.current_source_line(*pc),
                                 source_col: self.current_source_col(*pc),
-                                exception_handlers_snapshot: if self
-                                    .exception_handlers
-                                    .is_empty()
-                                {
+                                exception_handlers_snapshot: if self.exception_handlers.is_empty() {
                                     Vec::new()
                                 } else {
                                     self.exception_handlers.clone()
@@ -196,8 +185,7 @@ impl Interpreter {
                                 for arg in args.iter().take(param_count) {
                                     self.stack.push(arg.clone());
                                 }
-                                let rest_args: Vec<Value> =
-                                    args[param_count..].to_vec();
+                                let rest_args: Vec<Value> = args[param_count..].to_vec();
                                 let rest_arr_idx = self.gc.allocate(
                                     &mut self.heap,
                                     HeapValue::Array(JsArray {
@@ -226,10 +214,9 @@ impl Interpreter {
                 if let HeapValue::Proxy(proxy) = &self.heap[*proxy_idx] {
                     let handler = proxy.handler.clone();
                     let target = proxy.target.clone();
-                    let arr_idx = self.gc.allocate(
-                        &mut self.heap,
-                        HeapValue::Array(JsArray { elements: args }),
-                    );
+                    let arr_idx = self
+                        .gc
+                        .allocate(&mut self.heap, HeapValue::Array(JsArray { elements: args }));
                     let trap_result = self.call_proxy_trap(
                         &handler,
                         "apply",
@@ -257,16 +244,14 @@ impl Interpreter {
         Ok(true)
     }
 
-    pub(crate) fn exec_call_method(
-        &mut self,
-        argc: &u16,
-        pc: &mut usize,
-    ) -> Result<bool> {
+    pub(crate) fn exec_call_method(&mut self, argc: &u16, pc: &mut usize) -> Result<bool> {
         let mut args = Vec::with_capacity(usize::from(*argc));
         for _ in 0..*argc {
-            args.push(self.stack.pop().ok_or_else(|| {
-                Error::RuntimeError(super::ERR_STACK_UNDERFLOW.into())
-            })?);
+            args.push(
+                self.stack
+                    .pop()
+                    .ok_or_else(|| Error::RuntimeError(super::ERR_STACK_UNDERFLOW.into()))?,
+            );
         }
         args.reverse();
         let key = self
@@ -295,11 +280,7 @@ impl Interpreter {
                         };
                         let mut combined_args = bound_args;
                         combined_args.extend(args);
-                        let result = self.call_value(
-                            &original_fn,
-                            &bound_this,
-                            &combined_args,
-                        )?;
+                        let result = self.call_value(&original_fn, &bound_this, &combined_args)?;
                         self.stack.push(result);
                         *pc += 1;
                         return Ok(true);
@@ -361,10 +342,7 @@ impl Interpreter {
                                 generator_heap_idx: None,
                                 source_line: self.current_source_line(*pc),
                                 source_col: self.current_source_col(*pc),
-                                exception_handlers_snapshot: if self
-                                    .exception_handlers
-                                    .is_empty()
-                                {
+                                exception_handlers_snapshot: if self.exception_handlers.is_empty() {
                                     Vec::new()
                                 } else {
                                     self.exception_handlers.clone()
@@ -378,8 +356,7 @@ impl Interpreter {
                                 for arg in args.iter().take(param_count) {
                                     self.stack.push(arg.clone());
                                 }
-                                let rest_args: Vec<Value> =
-                                    args[param_count..].to_vec();
+                                let rest_args: Vec<Value> = args[param_count..].to_vec();
                                 let rest_arr_idx = self.gc.allocate(
                                     &mut self.heap,
                                     HeapValue::Array(JsArray {
@@ -423,9 +400,11 @@ impl Interpreter {
     ) -> Result<bool> {
         let mut args = Vec::new();
         for _ in 0..*argc {
-            args.push(self.stack.pop().ok_or_else(|| {
-                Error::RuntimeError(super::ERR_STACK_UNDERFLOW.into())
-            })?);
+            args.push(
+                self.stack
+                    .pop()
+                    .ok_or_else(|| Error::RuntimeError(super::ERR_STACK_UNDERFLOW.into()))?,
+            );
         }
         args.reverse();
         let constructor = self
@@ -434,11 +413,9 @@ impl Interpreter {
             .ok_or_else(|| Error::RuntimeError(super::ERR_STACK_UNDERFLOW.into()))?;
         match &constructor {
             Value::Function(func_idx) => {
-                let proto_idx = if let Value::Object(proto_obj_idx) = self
-                    .get_property(
-                        &constructor,
-                        &Value::String("prototype".to_string()),
-                    )? {
+                let proto_idx = if let Value::Object(proto_obj_idx) =
+                    self.get_property(&constructor, &Value::String("prototype".to_string()))?
+                {
                     Some(proto_obj_idx)
                 } else {
                     None
@@ -452,16 +429,12 @@ impl Interpreter {
                     if f.bytecode_index == usize::MAX {
                         if let Some(ref super_val) = f.super_class {
                             if let Value::Function(super_func_idx) = super_val {
-                                if let HeapValue::Function(super_f) =
-                                    &self.heap[*super_func_idx]
-                                {
+                                if let HeapValue::Function(super_f) = &self.heap[*super_func_idx] {
                                     if super_f.bytecode_index != usize::MAX {
                                         let super_f_clone = super_f.clone();
                                         let return_address = *pc + 1;
                                         let base_pointer = self.stack.len();
-                                        if self.call_stack.len()
-                                            >= self.max_call_stack_depth
-                                        {
+                                        if self.call_stack.len() >= self.max_call_stack_depth {
                                             self.throw_stack_overflow(pc)?;
                                             return Ok(true);
                                         }
@@ -472,9 +445,7 @@ impl Interpreter {
                                             func_heap_idx: Some(*super_func_idx),
                                             this_value: Some(this_val.clone()),
                                             is_construct: true,
-                                            source_name: self
-                                                .current_module_path
-                                                .clone(),
+                                            source_name: self.current_module_path.clone(),
                                             generator_heap_idx: None,
                                             source_line: self.current_source_line(*pc),
                                             source_col: self.current_source_col(*pc),
@@ -490,14 +461,9 @@ impl Interpreter {
                                         return Ok(true);
                                     }
                                 }
-                            } else if let Value::NativeFunction(super_native_idx) =
-                                super_val
-                            {
-                                let result = self.call_native(
-                                    *super_native_idx,
-                                    &this_val,
-                                    &args,
-                                )?;
+                            } else if let Value::NativeFunction(super_native_idx) = super_val {
+                                let result =
+                                    self.call_native(*super_native_idx, &this_val, &args)?;
                                 match result {
                                     Value::Object(_)
                                     | Value::Array(_)
@@ -529,16 +495,16 @@ impl Interpreter {
                             }
                         };
                         if let Some((closure_vars, bytecode_index)) = func_info {
-                            let same_module =
-                                if let HeapValue::Function(f) = &self.heap[*func_idx] {
-                                    match (&f.owner_module, &self.current_module) {
-                                        (Some(om), Some(cm)) => Rc::ptr_eq(om, cm),
-                                        (None, None) => true,
-                                        _ => false,
-                                    }
-                                } else {
-                                    false
-                                };
+                            let same_module = if let HeapValue::Function(f) = &self.heap[*func_idx]
+                            {
+                                match (&f.owner_module, &self.current_module) {
+                                    (Some(om), Some(cm)) => Rc::ptr_eq(om, cm),
+                                    (None, None) => true,
+                                    _ => false,
+                                }
+                            } else {
+                                false
+                            };
                             if same_module {
                                 let return_address = *pc + 1;
                                 let base_pointer = self.stack.len();
@@ -558,13 +524,10 @@ impl Interpreter {
                                     generator_heap_idx: None,
                                     source_line: self.current_source_line(*pc),
                                     source_col: self.current_source_col(*pc),
-                                    exception_handlers_snapshot: self
-                                        .exception_handlers
-                                        .clone(),
+                                    exception_handlers_snapshot: self.exception_handlers.clone(),
                                     shared_closure_env: None,
                                 });
-                                for closure_var in closure_vars.borrow().iter().cloned()
-                                {
+                                for closure_var in closure_vars.borrow().iter().cloned() {
                                     self.stack.push(closure_var);
                                 }
                                 for arg in args {
@@ -624,10 +587,9 @@ impl Interpreter {
                 if let HeapValue::Proxy(proxy) = &self.heap[*proxy_idx] {
                     let handler = proxy.handler.clone();
                     let target = proxy.target.clone();
-                    let args_arr_idx = self.gc.allocate(
-                        &mut self.heap,
-                        HeapValue::Array(JsArray { elements: args }),
-                    );
+                    let args_arr_idx = self
+                        .gc
+                        .allocate(&mut self.heap, HeapValue::Array(JsArray { elements: args }));
                     let trap_result = self.call_proxy_trap(
                         &handler,
                         "construct",

@@ -386,10 +386,10 @@ impl CodeGenerator {
                         }
                     }
                 }
-                Statement::ClassDeclaration { name, .. } => {
-                    if !self.locals.iter().any(|l| l == name) {
-                        self.locals.push(name.clone());
-                    }
+                Statement::ClassDeclaration { name, .. }
+                    if !self.locals.iter().any(|l| l == name) =>
+                {
+                    self.locals.push(name.clone());
                 }
                 _ => {}
             }
@@ -409,7 +409,10 @@ impl CodeGenerator {
                     if matches!(&stmt.inner, Statement::FunctionDeclaration { .. }) {
                         continue;
                     }
-                    if !matches!(&stmt.inner, Statement::VariableDeclaration { .. } | Statement::ClassDeclaration { .. }) {
+                    if !matches!(
+                        &stmt.inner,
+                        Statement::VariableDeclaration { .. } | Statement::ClassDeclaration { .. }
+                    ) {
                         continue;
                     }
                     self.record_line_from_span(&stmt.span);
@@ -422,10 +425,15 @@ impl CodeGenerator {
                     if matches!(&stmt.inner, Statement::FunctionDeclaration { .. }) {
                         continue;
                     }
-                    if matches!(&stmt.inner, Statement::VariableDeclaration { .. } | Statement::ClassDeclaration { .. }) {
+                    if matches!(
+                        &stmt.inner,
+                        Statement::VariableDeclaration { .. } | Statement::ClassDeclaration { .. }
+                    ) {
                         continue;
                     }
-                    let is_last = stmts[i + 1..].iter().all(|s| matches!(&s.inner, Statement::FunctionDeclaration { .. }));
+                    let is_last = stmts[i + 1..]
+                        .iter()
+                        .all(|s| matches!(&s.inner, Statement::FunctionDeclaration { .. }));
                     self.record_line_from_span(&stmt.span);
                     self.generate_statement(&stmt.inner, is_last)?;
                 }
@@ -453,7 +461,9 @@ impl CodeGenerator {
                     if !self.locals.iter().any(|l| l == id) {
                         self.locals.push(id.clone());
                     }
-                    let slot = self.resolve_local(id).unwrap_or_else(|| self.last_local_slot());
+                    let slot = self
+                        .resolve_local(id)
+                        .unwrap_or_else(|| self.last_local_slot());
                     self.emit(Instruction::StoreLocal(slot));
                 }
             }

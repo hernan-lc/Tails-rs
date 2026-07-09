@@ -121,10 +121,7 @@ impl Interpreter {
                             .iter()
                             .map(|slot| {
                                 let s = base_pointer + *slot as usize;
-                                self.stack
-                                    .get(s)
-                                    .cloned()
-                                    .unwrap_or(Value::Undefined)
+                                self.stack.get(s).cloned().unwrap_or(Value::Undefined)
                             })
                             .collect();
                         *f.closure.borrow_mut() = new_values;

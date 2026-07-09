@@ -42,23 +42,17 @@ impl<'a> Parser<'a> {
         if self.peek().token == Token::Arrow {
             let params = match &expr.inner {
                 Expression::Identifier(name) => vec![name.clone()],
-                Expression::ArrayLiteral { elements } => {
-                    elements
-                        .iter()
-                        .map(|e| match e {
-                            Expression::Identifier(n) => n.clone(),
-                            _ => format!("__destr_{}", 0),
-                        })
-                        .collect()
-                }
+                Expression::ArrayLiteral { elements } => elements
+                    .iter()
+                    .map(|e| match e {
+                        Expression::Identifier(n) => n.clone(),
+                        _ => format!("__destr_{}", 0),
+                    })
+                    .collect(),
                 Expression::ObjectLiteral { properties } => {
                     properties.iter().map(|p| p.key.clone()).collect()
                 }
-                _ => {
-                    return Err(Error::ParseError(
-                        "Invalid arrow function parameter".into(),
-                    ))
-                }
+                _ => return Err(Error::ParseError("Invalid arrow function parameter".into())),
             };
             self.advance();
             return self.parse_arrow_body(params, None, vec![], None, None, false);
@@ -185,14 +179,7 @@ impl<'a> Parser<'a> {
             self.advance();
             if self.peek().token == Token::Arrow {
                 self.advance();
-                self.parse_arrow_body(
-                    vec!["async".to_string()],
-                    None,
-                    vec![],
-                    None,
-                    None,
-                    false,
-                )
+                self.parse_arrow_body(vec!["async".to_string()], None, vec![], None, None, false)
             } else {
                 Ok(self.spanned(Expression::Identifier("async".to_string())))
             }
@@ -390,8 +377,7 @@ impl<'a> Parser<'a> {
                     }
                     if let Ok(key) = self.token_to_key_string() {
                         let is_method_like = self.peek().token == Token::LeftParen
-                            || (self.peek().token == Token::This
-                                && (key == "get" || key == "set"));
+                            || (self.peek().token == Token::This && (key == "get" || key == "set"));
                         if is_method_like {
                             self.advance();
                             let (params, param_types, defaults, rest_param) =
@@ -428,10 +414,7 @@ impl<'a> Parser<'a> {
                                 is_setter: false,
                             });
                         } else if (key == "get" || key == "set")
-                            && matches!(
-                                self.peek().token,
-                                Token::Identifier(_) | Token::String(_)
-                            )
+                            && matches!(self.peek().token, Token::Identifier(_) | Token::String(_))
                         {
                             let prop_name = match self.advance().token {
                                 Token::Identifier(n) => n,
@@ -478,8 +461,9 @@ impl<'a> Parser<'a> {
                             } else {
                                 Expression::FunctionExpression {
                                     name: Some(prop_name.clone()),
-                                    params: vec![setter_param
-                                        .unwrap_or_else(|| "__set_val".to_string())],
+                                    params: vec![
+                                        setter_param.unwrap_or_else(|| "__set_val".to_string())
+                                    ],
                                     param_types: Some(vec![None]),
                                     defaults: vec![],
                                     rest_param: None,

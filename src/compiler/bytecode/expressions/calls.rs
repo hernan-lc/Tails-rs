@@ -1,11 +1,7 @@
 use super::*;
 
 impl CodeGenerator {
-    pub(super) fn generate_call(
-        &mut self,
-        callee: &Expression,
-        args: &[Expression],
-    ) -> Result<()> {
+    pub(super) fn generate_call(&mut self, callee: &Expression, args: &[Expression]) -> Result<()> {
         if let Expression::Member {
             object,
             property,

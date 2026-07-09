@@ -278,7 +278,9 @@ pub(crate) fn native_headers_keys(
     let arr_idx = interp.heap.len();
     interp
         .heap
-        .push(HeapValue::Array(crate::vm::interpreter::JsArray { elements: keys }));
+        .push(HeapValue::Array(crate::vm::interpreter::JsArray {
+            elements: keys,
+        }));
     Ok(Value::Array(arr_idx))
 }
 
@@ -293,7 +295,9 @@ pub(crate) fn native_headers_values(
     let arr_idx = interp.heap.len();
     interp
         .heap
-        .push(HeapValue::Array(crate::vm::interpreter::JsArray { elements: vals }));
+        .push(HeapValue::Array(crate::vm::interpreter::JsArray {
+            elements: vals,
+        }));
     Ok(Value::Array(arr_idx))
 }
 
@@ -307,14 +311,18 @@ pub(crate) fn native_headers_entries(
     let mut result = Vec::with_capacity(entries.len());
     for (k, v) in entries {
         let pair_idx = interp.heap.len();
-        interp.heap.push(HeapValue::Array(crate::vm::interpreter::JsArray {
-            elements: vec![Value::String(k), Value::String(v)],
-        }));
+        interp
+            .heap
+            .push(HeapValue::Array(crate::vm::interpreter::JsArray {
+                elements: vec![Value::String(k), Value::String(v)],
+            }));
         result.push(Value::Array(pair_idx));
     }
     let arr_idx = interp.heap.len();
     interp
         .heap
-        .push(HeapValue::Array(crate::vm::interpreter::JsArray { elements: result }));
+        .push(HeapValue::Array(crate::vm::interpreter::JsArray {
+            elements: result,
+        }));
     Ok(Value::Array(arr_idx))
 }

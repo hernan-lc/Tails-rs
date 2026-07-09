@@ -26,9 +26,13 @@ impl CodeGenerator {
             Expression::NaNLiteral => self.generate_nan_literal(),
             Expression::InfinityLiteral => self.generate_infinity_literal(),
             Expression::Identifier(name) => self.generate_identifier(name),
-            Expression::BinaryOp { op, left, right } => self.generate_binary_op_expr(op, left, right),
+            Expression::BinaryOp { op, left, right } => {
+                self.generate_binary_op_expr(op, left, right)
+            }
             Expression::UnaryOp { op, operand } => self.generate_unary_op(op, operand),
-            Expression::Assignment { target, value, op } => self.generate_assignment(target, value, op),
+            Expression::Assignment { target, value, op } => {
+                self.generate_assignment(target, value, op)
+            }
             Expression::Call { callee, args } => self.generate_call(callee, args),
             Expression::Member {
                 object,
@@ -51,9 +55,13 @@ impl CodeGenerator {
                 is_generator,
                 defaults,
                 rest_param,
-            } => {
-                self.generate_function_expression(params, body, *is_generator, rest_param.as_deref(), defaults)
-            }
+            } => self.generate_function_expression(
+                params,
+                body,
+                *is_generator,
+                rest_param.as_deref(),
+                defaults,
+            ),
             Expression::ArrowFunction {
                 params,
                 body,
@@ -63,7 +71,9 @@ impl CodeGenerator {
                 defaults,
                 rest_param,
             } => self.generate_arrow_function(params, body, rest_param.as_deref(), defaults),
-            Expression::NewExpression { callee, args } => self.generate_new_expression(callee, args),
+            Expression::NewExpression { callee, args } => {
+                self.generate_new_expression(callee, args)
+            }
             Expression::ConditionalExpression {
                 test,
                 consequent,
@@ -296,11 +306,8 @@ impl CodeGenerator {
         if let Some(rp) = rest_param {
             all_params.push(rp.to_string());
         }
-        let outer_refs = super::closures::find_outer_refs(
-            &body_stmts,
-            &all_params,
-            &parent_locals_snapshot,
-        );
+        let outer_refs =
+            super::closures::find_outer_refs(&body_stmts, &all_params, &parent_locals_snapshot);
         let num_captures = outer_refs.len();
 
         self.functions.push(CompiledFunction {
@@ -400,12 +407,8 @@ impl CodeGenerator {
                     is_static,
                     ..
                 } => {
-                    let func_idx = self.compile_function(
-                        Some(format!("get_{}", mname)),
-                        &[],
-                        mbody,
-                        false,
-                    )?;
+                    let func_idx =
+                        self.compile_function(Some(format!("get_{}", mname)), &[], mbody, false)?;
                     methods.push(ClassMethodInfo {
                         name: mname.clone(),
                         func_idx,
@@ -469,11 +472,7 @@ impl CodeGenerator {
         Ok(())
     }
 
-    fn generate_super_member(
-        &mut self,
-        property: &Expression,
-        computed: bool,
-    ) -> Result<()> {
+    fn generate_super_member(&mut self, property: &Expression, computed: bool) -> Result<()> {
         self.emit(Instruction::LoadThis);
         if computed {
             self.generate_expression(property)?;
@@ -515,7 +514,10 @@ impl CodeGenerator {
         Ok(())
     }
 
-    fn generate_object_literal(&mut self, properties: &[crate::compiler::parser::ObjectProperty]) -> Result<()> {
+    fn generate_object_literal(
+        &mut self,
+        properties: &[crate::compiler::parser::ObjectProperty],
+    ) -> Result<()> {
         let has_spread = properties
             .iter()
             .any(|p| matches!(p.value, Expression::SpreadElement { .. }));
@@ -528,7 +530,6 @@ impl CodeGenerator {
                         self.emit(Instruction::SpreadObject);
                     }
                 } else if prop.computed {
-                    self.emit(Instruction::Dup);
                     if let Some(key_expr) = &prop.computed_key {
                         self.generate_expression(key_expr)?;
                     }
@@ -543,13 +544,11 @@ impl CodeGenerator {
                         prop.key.clone()
                     };
                     let key_idx = self.add_constant(Value::String(actual_key));
-                    self.emit(Instruction::Dup);
                     self.emit(Instruction::LoadConst(key_idx));
                     self.generate_expression(&prop.value)?;
                     self.emit(Instruction::SetProperty);
                 }
             }
-            self.emit(Instruction::Pop);
         } else {
             self.emit(Instruction::NewObject);
             for prop in properties {

@@ -534,7 +534,9 @@ impl Interpreter {
             }
             Instruction::SpreadArray => {
                 let source = self.stack_pop()?;
-                if let Value::Array(target_idx) = self.stack.last().cloned().unwrap_or(Value::Undefined) {
+                if let Value::Array(target_idx) =
+                    self.stack.last().cloned().unwrap_or(Value::Undefined)
+                {
                     if let Value::Array(source_idx) = source {
                         if let HeapValue::Array(source_arr) = &self.heap[source_idx] {
                             let elements: Vec<Value> = source_arr.elements.clone();
@@ -549,7 +551,9 @@ impl Interpreter {
             }
             Instruction::SpreadObject => {
                 let source = self.stack_pop()?;
-                if let Value::Object(target_idx) = self.stack.last().cloned().unwrap_or(Value::Undefined) {
+                if let Value::Object(target_idx) =
+                    self.stack.last().cloned().unwrap_or(Value::Undefined)
+                {
                     if let Value::Object(source_idx) = source {
                         let props: Vec<(String, Value)> =
                             if let HeapValue::Object(source_obj) = &self.heap[source_idx] {

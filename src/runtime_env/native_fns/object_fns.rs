@@ -257,15 +257,12 @@ pub(super) fn native_object_define_property(
     } {
         match &target {
             Value::Object(obj_idx) => {
-                if let crate::vm::interpreter::HeapValue::Object(obj) =
-                    &mut interp.heap[*obj_idx]
-                {
+                if let crate::vm::interpreter::HeapValue::Object(obj) = &mut interp.heap[*obj_idx] {
                     obj.properties.insert(property, val);
                 }
             }
             Value::Function(func_idx) => {
-                if let crate::vm::interpreter::HeapValue::Function(f) =
-                    &mut interp.heap[*func_idx]
+                if let crate::vm::interpreter::HeapValue::Function(f) = &mut interp.heap[*func_idx]
                 {
                     f.properties.insert(property, val);
                 }

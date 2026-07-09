@@ -170,12 +170,14 @@ impl CodeGenerator {
 
                 // Emit this.param = param for constructor params with access modifiers
                 for p in params {
-                    if p.access_modifiers.iter().any(|m| matches!(
-                        m,
-                        crate::compiler::parser::AccessModifier::Public
-                            | crate::compiler::parser::AccessModifier::Private
-                            | crate::compiler::parser::AccessModifier::Protected
-                    )) {
+                    if p.access_modifiers.iter().any(|m| {
+                        matches!(
+                            m,
+                            crate::compiler::parser::AccessModifier::Public
+                                | crate::compiler::parser::AccessModifier::Private
+                                | crate::compiler::parser::AccessModifier::Protected
+                        )
+                    }) {
                         full_body.push(SpannedNode {
                             inner: Statement::Expression(Expression::Assignment {
                                 target: Box::new(Expression::Member {

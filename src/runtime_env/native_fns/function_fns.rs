@@ -143,9 +143,13 @@ pub(super) fn native_function_constructor(
 
     // Build a source string: function __tails_anon__(...params) { body }
     let params_str = param_names.join(", ");
-    // Ensure body ends with a semicolon so the parser doesn't choke on missing ASI
-    let body_trimmed = body.trim_end();
-    let body_with_semi = if body_trimmed.ends_with(';') || body_trimmed.ends_with('}') {
+    // Normalize the body: strip surrounding whitespace and stray semicolons so
+    // that an empty/jitless body compiles to `{}` instead of `{ ; }` (a lone
+    // `;` is not a valid statement in this parser).
+    let body_trimmed = body.trim().trim_end_matches(';').trim();
+    let body_with_semi = if body_trimmed.is_empty() {
+        String::new()
+    } else if body_trimmed.ends_with('}') {
         body_trimmed.to_string()
     } else {
         format!("{};", body_trimmed)

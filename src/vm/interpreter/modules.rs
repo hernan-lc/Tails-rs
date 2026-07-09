@@ -224,21 +224,17 @@ impl Interpreter {
         // binding with the same name (e.g. `export const ns`), and the merge
         // below would otherwise clobber the namespace object with that export.
         // Never overwrite an existing module-namespace object.
-        let is_existing_namespace = |globals: &FxHashMap<String, Value>,
-                                      heap: &[HeapValue],
-                                      k: &str|
-         -> bool {
-            if let Some(existing) = globals.get(k) {
-                if let Value::Object(idx) = existing {
+        let is_existing_namespace =
+            |globals: &FxHashMap<String, Value>, heap: &[HeapValue], k: &str| -> bool {
+                if let Some(Value::Object(idx)) = globals.get(k) {
                     if let HeapValue::Object(o) = &heap[*idx] {
                         if o.properties.contains_key("__module_path") {
                             return true;
                         }
                     }
                 }
-            }
-            false
-        };
+                false
+            };
         // Restore exported values
         for (k, v) in &exec_exports {
             if is_existing_namespace(&self.globals, &self.heap, k) {
@@ -860,7 +856,8 @@ impl Interpreter {
 
     pub(crate) fn exec_export_default(&mut self) -> Result<()> {
         let val = self.stack.last().cloned().unwrap_or(Value::Undefined);
-        self.module_exports.insert("default".to_string(), val.clone());
+        self.module_exports
+            .insert("default".to_string(), val.clone());
         if let Some(path) = &self.current_module_path {
             if let Some(exports) = self.module_registry.get_mut(path) {
                 exports.insert("default".to_string(), val);

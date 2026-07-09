@@ -153,14 +153,14 @@ impl Interpreter {
                     // __module_path, read from the registry so circular
                     // dependency imports see exports defined so far.
                     if key_str != "__module_path" {
-                        if let Some(path_val) = obj.properties.get("__module_path") {
-                            if let Value::String(module_path) = path_val {
-                                if let Some(exports) = self.module_registry.get(module_path) {
-                                    if let Some(val) = exports.get(&key_str) {
-                                        return Ok(val.clone());
-                                    }
-                                    return Ok(Value::Undefined);
+                        if let Some(Value::String(module_path)) =
+                            obj.properties.get("__module_path")
+                        {
+                            if let Some(exports) = self.module_registry.get(module_path) {
+                                if let Some(val) = exports.get(&key_str) {
+                                    return Ok(val.clone());
                                 }
+                                return Ok(Value::Undefined);
                             }
                         }
                     }

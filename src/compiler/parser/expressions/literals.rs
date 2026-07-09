@@ -1,6 +1,6 @@
 use super::super::*;
-use crate::errors::{Error, Result};
 use crate::compiler::lexer::TemplatePart;
+use crate::errors::{Error, Result};
 
 impl<'a> Parser<'a> {
     pub(crate) fn parse_literal(&mut self) -> Result<SpannedNode<Expression>> {
@@ -62,9 +62,7 @@ impl<'a> Parser<'a> {
         }
     }
 
-    pub(crate) fn parse_keyword_as_identifier(
-        &mut self,
-    ) -> Result<SpannedNode<Expression>> {
+    pub(crate) fn parse_keyword_as_identifier(&mut self) -> Result<SpannedNode<Expression>> {
         let token = self.peek().token.clone();
         let name = match &token {
             Token::Set => Some("set"),

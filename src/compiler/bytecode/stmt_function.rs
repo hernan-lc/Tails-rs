@@ -169,6 +169,7 @@ impl CodeGenerator {
         Ok(true)
     }
 
+    #[allow(clippy::box_collection)]
     pub(crate) fn compile_hoisted_functions(
         &mut self,
         body: &[SpannedNode<Statement>],
@@ -276,10 +277,7 @@ impl CodeGenerator {
         Ok(())
     }
 
-    fn generate_body_statements(
-        &mut self,
-        body: &[SpannedNode<Statement>],
-    ) -> Result<()> {
+    fn generate_body_statements(&mut self, body: &[SpannedNode<Statement>]) -> Result<()> {
         self.pre_register_declarations(body);
         for stmt in body.iter() {
             if let Statement::FunctionDeclaration { .. } = &stmt.inner {
@@ -328,4 +326,3 @@ impl CodeGenerator {
         Ok(())
     }
 }
-

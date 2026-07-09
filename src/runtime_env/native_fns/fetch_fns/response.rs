@@ -234,7 +234,9 @@ pub(crate) fn native_response_json(
             if let Some(body) = get_string_prop(obj, "__body") {
                 let json_val: serde_json::Value = serde_json::from_str(&body)
                     .map_err(|e| Error::RuntimeError(format!("JSON parse error: {}", e)))?;
-                return Ok(crate::runtime_env::native_fns::helpers::from_json_value(interp, json_val));
+                return Ok(crate::runtime_env::native_fns::helpers::from_json_value(
+                    interp, json_val,
+                ));
             }
         }
     }
