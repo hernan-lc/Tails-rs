@@ -25,13 +25,11 @@ fn collect_enumerable_keys(properties: &PropertyStorage) -> Vec<String> {
     let mut seen = std::collections::HashSet::new();
 
     for k in properties.keys() {
-        if k.starts_with(GETTER_PREFIX) {
-            let real = &k[GETTER_PREFIX.len()..];
+        if let Some(real) = k.strip_prefix(GETTER_PREFIX) {
             if !real.is_empty() && seen.insert(real.to_string()) {
                 keys.push(real.to_string());
             }
-        } else if k.starts_with(SETTER_PREFIX) {
-            let real = &k[SETTER_PREFIX.len()..];
+        } else if let Some(real) = k.strip_prefix(SETTER_PREFIX) {
             if !real.is_empty() && seen.insert(real.to_string()) {
                 keys.push(real.to_string());
             }

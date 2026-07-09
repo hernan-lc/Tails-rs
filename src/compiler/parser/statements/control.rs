@@ -188,7 +188,7 @@ impl<'a> Parser<'a> {
         }
 
         let init_expr = self.parse_expression()?.inner;
-        let init = Some(Box::new(ForInit::Expression(init_expr)));
+        let init = Some(Box::new(ForInit::Expression(Box::new(init_expr))));
         self.expect(&Token::Semicolon)?;
         let condition = if self.peek().token != Token::Semicolon {
             Some(self.parse_expression()?.inner)

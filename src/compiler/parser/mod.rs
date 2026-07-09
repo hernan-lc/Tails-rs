@@ -138,7 +138,7 @@ pub struct EnumMember {
 #[derive(Debug, Clone)]
 pub enum ForInit {
     Variable(Box<SpannedNode<Statement>>),
-    Expression(Expression),
+    Expression(Box<Expression>),
 }
 
 #[derive(Debug, Clone)]

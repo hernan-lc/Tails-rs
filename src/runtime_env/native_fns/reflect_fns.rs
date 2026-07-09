@@ -234,12 +234,64 @@ pub(super) fn native_reflect_get_own_property_descriptor(
                 let setter_key = format!("__setter_{}", property);
                 let getter = obj.properties.get(&getter_key).cloned();
                 let setter = obj.properties.get(&setter_key).cloned();
-                let data = obj.properties.get(&property).cloned();
+                let mut data = obj.properties.get(&property).cloned();
 
-                if data.is_some() && getter.is_none() && setter.is_none() {
+                if let Some(data) = data.take() {
+                    if getter.is_none() && setter.is_none() {
+                        let descriptor = props! {
+                            "value" => data,
+                            "writable" => Value::Boolean(true),
+                            "enumerable" => Value::Boolean(true),
+                            "configurable" => Value::Boolean(true),
+                        };
+                        let desc_idx = interp.heap.len();
+                        interp.heap.push(crate::vm::interpreter::HeapValue::Object(
+                            crate::vm::interpreter::JsObject {
+                                properties: descriptor,
+                                prototype: None,
+                                extensible: true,
+                            },
+                        ));
+                        return Ok(Value::Object(desc_idx));
+                    }
+                    if getter.is_some() || setter.is_some() {
+                        let descriptor = props! {
+                            "get" => getter.unwrap_or(Value::Undefined),
+                            "set" => setter.unwrap_or(Value::Undefined),
+                            "enumerable" => Value::Boolean(true),
+                            "configurable" => Value::Boolean(true),
+                        };
+                        let desc_idx = interp.heap.len();
+                        interp.heap.push(crate::vm::interpreter::HeapValue::Object(
+                            crate::vm::interpreter::JsObject {
+                                properties: descriptor,
+                                prototype: None,
+                                extensible: true,
+                            },
+                        ));
+                        return Ok(Value::Object(desc_idx));
+                    }
+                    // Data property even if somehow accessors linger — prefer data.
                     let descriptor = props! {
-                        "value" => data.unwrap(),
+                        "value" => data,
                         "writable" => Value::Boolean(true),
+                        "enumerable" => Value::Boolean(true),
+                        "configurable" => Value::Boolean(true),
+                    };
+                    let desc_idx = interp.heap.len();
+                    interp.heap.push(crate::vm::interpreter::HeapValue::Object(
+                        crate::vm::interpreter::JsObject {
+                            properties: descriptor,
+                            prototype: None,
+                            extensible: true,
+                        },
+                    ));
+                    return Ok(Value::Object(desc_idx));
+                }
+                if getter.is_some() || setter.is_some() {
+                    let descriptor = props! {
+                        "get" => getter.unwrap_or(Value::Undefined),
+                        "set" => setter.unwrap_or(Value::Undefined),
                         "enumerable" => Value::Boolean(true),
                         "configurable" => Value::Boolean(true),
                     };

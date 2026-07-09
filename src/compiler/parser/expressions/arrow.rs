@@ -2,6 +2,7 @@ use super::super::*;
 use crate::errors::Result;
 
 impl<'a> Parser<'a> {
+    #[allow(clippy::too_many_arguments)]
     pub(crate) fn parse_arrow_body(
         &mut self,
         params: Vec<String>,
