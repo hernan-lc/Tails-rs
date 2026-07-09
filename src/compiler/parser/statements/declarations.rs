@@ -35,7 +35,7 @@ impl<'a> Parser<'a> {
                 break;
             }
         }
-        self.expect(&Token::Semicolon)?;
+        self.expect_statement_semicolon()?;
         Ok(self.spanned(Statement::VariableDeclaration { kind, declarations }))
     }
 

@@ -129,3 +129,8 @@ path = "tests/unit/vm.rs"
 [[test]]
 name = "unit_minified"
 path = "tests/unit/minified.rs"
+
+[[test]]
+name = "conformance_runner"
+path = "tests/conformance_runner.rs"
+

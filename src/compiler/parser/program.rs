@@ -36,12 +36,12 @@ impl<'a> Parser<'a> {
             Token::Switch => self.parse_switch_statement(),
             Token::Break => {
                 self.advance();
-                self.expect(&Token::Semicolon)?;
+                self.expect_statement_semicolon()?;
                 Ok(self.spanned(Statement::BreakStatement))
             }
             Token::Continue => {
                 self.advance();
-                self.expect(&Token::Semicolon)?;
+                self.expect_statement_semicolon()?;
                 Ok(self.spanned(Statement::ContinueStatement))
             }
             Token::Try => self.parse_try_statement(),

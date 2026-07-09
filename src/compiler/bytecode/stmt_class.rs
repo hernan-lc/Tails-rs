@@ -139,7 +139,7 @@ impl CodeGenerator {
                         let cond = Expression::BinaryOp {
                             op: BinaryOperator::StrictEq,
                             left: Box::new(Expression::Identifier(p.name.clone())),
-                            right: Box::new(Expression::Identifier("undefined".to_string())),
+                            right: Box::new(Expression::UndefinedLiteral),
                         };
                         let assign = Statement::Expression(Expression::Assignment {
                             target: Box::new(Expression::Identifier(p.name.clone())),

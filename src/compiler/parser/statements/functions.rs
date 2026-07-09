@@ -77,7 +77,7 @@ impl<'a> Parser<'a> {
             } else {
                 None
             };
-        self.expect(&Token::Semicolon)?;
+        self.expect_statement_semicolon()?;
         Ok(self.spanned(Statement::ReturnStatement(value)))
     }
 
@@ -89,7 +89,7 @@ impl<'a> Parser<'a> {
             } else {
                 None
             };
-        self.expect(&Token::Semicolon)?;
+        self.expect_statement_semicolon()?;
         Ok(self.spanned(Statement::YieldStatement(value)))
     }
 }

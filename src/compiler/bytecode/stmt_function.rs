@@ -1,4 +1,4 @@
-use crate::compiler::parser::{BindingPattern, SpannedNode, Statement};
+use crate::compiler::parser::{BinaryOperator, BindingPattern, Expression, SpannedNode, Statement};
 use crate::compiler::{CompiledFunction, Instruction};
 use crate::errors::Result;
 
@@ -46,7 +46,7 @@ impl CodeGenerator {
             param_types: _,
             return_type: _,
             is_generator,
-            defaults: _,
+            defaults,
             rest_param,
         } = stmt
         else {
@@ -116,6 +116,8 @@ impl CodeGenerator {
                 }
             }
         }
+
+        self.compile_default_params(params, defaults)?;
 
         let mut deferred_snapshots: Vec<(u16, Box<Vec<u16>>)> = Vec::new();
         self.compile_hoisted_functions(body, &mut deferred_snapshots)?;
@@ -309,4 +311,36 @@ impl CodeGenerator {
         }
         Ok(())
     }
+
+    pub(crate) fn compile_default_params(
+        &mut self,
+        params: &[String],
+        defaults: &[Option<Expression>],
+    ) -> Result<()> {
+        for (i, param_name) in params.iter().enumerate() {
+            if let Some(Some(default_expr)) = defaults.get(i) {
+                let cond = Expression::BinaryOp {
+                    op: BinaryOperator::StrictEq,
+                    left: Box::new(Expression::Identifier(param_name.clone())),
+                    right: Box::new(Expression::UndefinedLiteral),
+                };
+                let assign = Statement::Expression(Expression::Assignment {
+                    target: Box::new(Expression::Identifier(param_name.clone())),
+                    value: Box::new(default_expr.clone()),
+                    op: None,
+                });
+                let if_stmt = Statement::IfStatement {
+                    condition: cond,
+                    consequent: Box::new(SpannedNode {
+                        inner: assign,
+                        span: None,
+                    }),
+                    alternate: None,
+                };
+                self.generate_statement(&if_stmt, false)?;
+            }
+        }
+        Ok(())
+    }
 }
+

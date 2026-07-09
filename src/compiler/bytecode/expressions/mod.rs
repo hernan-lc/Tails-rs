@@ -49,10 +49,10 @@ impl CodeGenerator {
                 param_types: _,
                 return_type: _,
                 is_generator,
-                defaults: _,
+                defaults,
                 rest_param,
             } => {
-                self.generate_function_expression(params, body, *is_generator, rest_param.as_deref())
+                self.generate_function_expression(params, body, *is_generator, rest_param.as_deref(), defaults)
             }
             Expression::ArrowFunction {
                 params,
@@ -60,9 +60,9 @@ impl CodeGenerator {
                 is_async: _,
                 param_types: _,
                 return_type: _,
-                defaults: _,
+                defaults,
                 rest_param,
-            } => self.generate_arrow_function(params, body, rest_param.as_deref()),
+            } => self.generate_arrow_function(params, body, rest_param.as_deref(), defaults),
             Expression::NewExpression { callee, args } => self.generate_new_expression(callee, args),
             Expression::ConditionalExpression {
                 test,
@@ -200,6 +200,7 @@ impl CodeGenerator {
         body: &[SpannedNode<Statement>],
         is_generator: bool,
         rest_param: Option<&str>,
+        defaults: &[Option<Expression>],
     ) -> Result<()> {
         let func_idx = self.functions.len() as u32;
         let parent_locals_snapshot = self.locals.clone();
@@ -244,6 +245,8 @@ impl CodeGenerator {
             self.locals.push(rp.to_string());
         }
 
+        self.compile_default_params(params, defaults)?;
+
         for stmt in body {
             self.record_line_from_span(&stmt.span);
             self.generate_statement(&stmt.inner, false)?;
@@ -273,6 +276,7 @@ impl CodeGenerator {
         params: &[String],
         body: &ArrowFunctionBody,
         rest_param: Option<&str>,
+        defaults: &[Option<Expression>],
     ) -> Result<()> {
         let func_idx = self.functions.len() as u32;
 
@@ -331,6 +335,8 @@ impl CodeGenerator {
         if let Some(rp) = rest_param {
             self.locals.push(rp.to_string());
         }
+
+        self.compile_default_params(params, defaults)?;
 
         for stmt in &body_stmts {
             self.record_line_from_span(&stmt.span);

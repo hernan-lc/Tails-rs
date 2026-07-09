@@ -313,7 +313,7 @@ impl<'a> Parser<'a> {
     pub(crate) fn parse_throw_statement(&mut self) -> Result<SpannedNode<Statement>> {
         self.expect(&Token::Throw)?;
         let argument = self.parse_expression()?.inner;
-        self.expect(&Token::Semicolon)?;
+        self.expect_statement_semicolon()?;
         Ok(self.spanned(Statement::ThrowStatement(argument)))
     }
 }

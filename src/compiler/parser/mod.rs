@@ -628,6 +628,31 @@ impl<'a> Parser<'a> {
         }
     }
 
+    /// Consume a statement-terminating semicolon, applying Automatic Semicolon
+    /// Insertion: a semicolon is implied at end-of-input or when the next token
+    /// begins on a later line than the token just consumed. For-loop headers do
+    /// NOT use this and must keep their mandatory semicolons.
+    pub(crate) fn expect_statement_semicolon(&mut self) -> Result<()> {
+        let next = self.peek().token.clone();
+        if next == Token::Semicolon {
+            self.advance();
+            return Ok(());
+        }
+        if next == Token::Eof {
+            return Ok(());
+        }
+        if self.peek().span.line > self.current_span.line {
+            return Ok(());
+        }
+        Err(Error::ParseError(format!(
+            "Expected {:?} at {}:{}, got {:?}",
+            Token::Semicolon,
+            self.peek().span.line,
+            self.peek().span.col,
+            next
+        )))
+    }
+
     pub(crate) fn is_function_type_after_paren(&self) -> bool {
         let mut depth = 1;
         let mut pos = self.pos;
