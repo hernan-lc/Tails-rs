@@ -20,9 +20,9 @@ macro_rules! error_constructor {
             let obj_idx = interp.heap.len();
             let stack = interp.build_stack_trace($type_name, &message);
             let props = props! {
-                wk::MESSAGE => Value::from_string(message.clone().into()),
+                wk::MESSAGE => Value::from_string(message.clone()),
                 wk::NAME => Value::string($type_name),
-                wk::STACK => Value::from_string(stack.into()),
+                wk::STACK => Value::from_string(stack),
             };
             let proto_idx = $proto_finder(interp);
             interp.heap.push(crate::vm::interpreter::HeapValue::Object(
