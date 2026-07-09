@@ -85,6 +85,11 @@ pub struct Interpreter {
     pub(crate) current_module_path: Option<String>,
     pub(crate) module_globals: Option<Rc<RefCell<FxHashMap<String, Value>>>>,
     pub(crate) module_globals_rc: Option<Rc<RefCell<FxHashMap<String, Value>>>>,
+    /// Names bound by `import * as ns` (module-namespace objects). These
+    /// bindings must never be clobbered by an imported module's own export
+    /// that happens to share the same name (e.g. `import * as parse` vs
+    /// `export const parse`).
+    pub(crate) namespace_globals: std::collections::HashSet<String>,
     pub(crate) require_cache: FxHashMap<String, Value>,
     pub(crate) block_scope_stack: Vec<usize>,
     pub(crate) next_symbol_id: u64,
@@ -126,6 +131,7 @@ impl Interpreter {
             module_exports: FxHashMap::default(),
             module_globals: None,
             module_globals_rc: None,
+            namespace_globals: std::collections::HashSet::new(),
             current_module_path: None,
             require_cache: FxHashMap::default(),
             block_scope_stack: Vec::new(),
@@ -295,11 +301,34 @@ impl Interpreter {
             self.gc.allocation_count,
             self.gc.threshold
         );
-        let globals_ref = self.module_globals_rc.clone().unwrap_or_else(|| {
-            let mut map = self.globals.clone();
-            self.add_proto_roots(&mut map);
-            std::rc::Rc::new(std::cell::RefCell::new(map))
-        });
+        // Build the GC root set for global bindings. `self.globals` holds the
+        // built-in globals (Object, Array, …) as well as module-level function
+        // and export bindings that were merged back after each module finished
+        // executing. `module_globals_rc` holds the *currently executing*
+        // module's transient globals. Both must be marked: otherwise live
+        // module-level functions (e.g. a `const` holding a constructor) get
+        // collected and their heap slot is later reused, causing dangling
+        // references that read the wrong value.
+        let mut root_globals = self.globals.clone();
+        self.add_proto_roots(&mut root_globals);
+        if let Some(ref mg) = self.module_globals_rc {
+            for (k, v) in mg.borrow().iter() {
+                root_globals.insert(k.clone(), v.clone());
+            }
+        }
+        // The module registry holds every module's live exports (functions,
+        // namespace objects, …) as heap references. These must be marked as
+        // roots too, otherwise cross-module exports get collected and their
+        // heap slots are reused, leaving dangling references.
+        for exports in self.module_registry.values() {
+            for v in exports.values() {
+                // Insert under a synthetic key so the value is treated as a root.
+                root_globals.insert(format!("__module_export_{}", root_globals.len()), v.clone());
+            }
+        }
+        // Also keep any module-globals maps that are still held (e.g. the
+        // currently executing module's own globals) reachable.
+        let globals_ref = std::rc::Rc::new(std::cell::RefCell::new(root_globals));
         let globals_snapshot = globals_ref.borrow();
         // Phase 1.5: reserve the destination's capacity to the source's
         // length. The previous `self.stack.clone()` /
@@ -361,6 +390,18 @@ impl Interpreter {
     pub fn set_global(&mut self, name: &str, value: Value) {
         if let Some(ref mg) = self.module_globals {
             mg.borrow_mut().insert(name.to_string(), value.clone());
+        }
+        // Never clobber an `import * as ns` namespace binding with a plain
+        // value (e.g. an imported module's own same-named export). The
+        // namespace object itself is allowed through.
+        if self.namespace_globals.contains(name) {
+            let is_namespace = matches!(value, Value::Object(idx) if matches!(
+                &self.heap[idx],
+                HeapValue::Object(o) if o.properties.contains_key("__module_path")
+            ));
+            if !is_namespace {
+                return;
+            }
         }
         self.globals.insert(name.to_string(), value);
     }

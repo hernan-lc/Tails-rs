@@ -218,12 +218,36 @@ impl Interpreter {
         // exports are tracked separately via exec_store_module_export and
         // exec_reexport_all which update module_registry directly. Merging
         // would pollute the parent module's exports with nested module exports.
+        //
+        // Merge guard: a `import * as ns` binding creates a module-namespace
+        // object in the global scope. The imported module may also export a
+        // binding with the same name (e.g. `export const ns`), and the merge
+        // below would otherwise clobber the namespace object with that export.
+        // Never overwrite an existing module-namespace object.
+        let is_existing_namespace = |globals: &FxHashMap<String, Value>,
+                                      heap: &[HeapValue],
+                                      k: &str|
+         -> bool {
+            if let Some(existing) = globals.get(k) {
+                if let Value::Object(idx) = existing {
+                    if let HeapValue::Object(o) = &heap[*idx] {
+                        if o.properties.contains_key("__module_path") {
+                            return true;
+                        }
+                    }
+                }
+            }
+            false
+        };
         // Restore exported values
         for (k, v) in &exec_exports {
+            if is_existing_namespace(&self.globals, &self.heap, k) {
+                continue;
+            }
             if let Some(mv) = module_globals.get(k) {
-                self.globals.insert(k.clone(), mv.clone());
+                self.set_global(k, mv.clone());
             } else {
-                self.globals.insert(k.clone(), v.clone());
+                self.set_global(k, v.clone());
             }
         }
         // Also restore named imports that the module registered (via ImportNamed/ImportDefault/ImportAll)
@@ -237,7 +261,10 @@ impl Interpreter {
                 if matches!(v, Value::Function(_) | Value::NativeFunction(_))
                     || exec_exports.contains_key(k)
                 {
-                    self.globals.insert(k.clone(), v.clone());
+                    if is_existing_namespace(&self.globals, &self.heap, k) {
+                        continue;
+                    }
+                    self.set_global(k, v.clone());
                 }
             }
         }
@@ -784,6 +811,7 @@ impl Interpreter {
                 self.current_module_path = Some(module_path.clone());
                 let module_obj = self.build_module_object_from_exports(&exports);
                 self.current_module_path = prev_path;
+                self.namespace_globals.insert(local_name.to_string());
                 self.set_global(local_name, module_obj);
                 Ok(Value::Undefined)
             }
