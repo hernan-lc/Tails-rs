@@ -4,16 +4,15 @@ use crate::objects::Value;
 
 impl Interpreter {
     pub(crate) fn drain_microtasks(&mut self) {
-        // Phase 8.6: Process microtasks in a tight loop until the queue is
-        // fully drained.  This avoids re-entering the outer event-loop
-        // between chain links (each .then() callback that resolves a
-        // promise enqueues new microtasks that should be processed in the
-        // same drain pass).
+        // Process microtasks until the queue is empty. Use `take_microtasks`
+        // (mem::replace of the VecDeque) instead of collecting into a fresh
+        // Vec each wave — avoids alloc + double-move of every Microtask.
+        // Newly enqueued handlers from a wave are processed in the next.
         loop {
-            if self.async_runtime.is_idle() {
+            if !self.async_runtime.has_microtasks() {
                 return;
             }
-            let tasks = self.async_runtime.run_microtasks();
+            let tasks = self.async_runtime.take_microtasks();
             if tasks.is_empty() {
                 return;
             }
@@ -40,25 +39,17 @@ impl Interpreter {
     pub(crate) fn resolve_promise(&mut self, promise_idx: usize, value: Value) {
         if let HeapValue::Promise(promise) = &mut self.heap[promise_idx] {
             if promise.state == PromiseState::Pending {
+                // Take handlers with mem::take — no intermediate Vec of Values.
+                let then_handlers = std::mem::take(&mut promise.then_handlers);
+                let finally_handlers = std::mem::take(&mut promise.finally_handlers);
                 promise.state = PromiseState::Fulfilled(value.clone());
-                let handlers: Vec<Value> = promise
-                    .then_handlers
-                    .iter()
-                    .map(|h| Value::Function(h.callback))
-                    .collect();
-                promise.then_handlers.clear();
-                for handler in handlers {
+                for h in then_handlers {
                     self.async_runtime
-                        .enqueue_microtask_with_arg(handler, value.clone());
+                        .enqueue_microtask_with_arg(Value::Function(h.callback), value.clone());
                 }
-                let finally_handlers: Vec<Value> = promise
-                    .finally_handlers
-                    .iter()
-                    .map(|h| Value::Function(h.callback))
-                    .collect();
-                promise.finally_handlers.clear();
-                for handler in finally_handlers {
-                    self.async_runtime.enqueue_microtask(handler);
+                for h in finally_handlers {
+                    self.async_runtime
+                        .enqueue_microtask(Value::Function(h.callback));
                 }
             }
         }
@@ -67,25 +58,16 @@ impl Interpreter {
     pub(crate) fn reject_promise(&mut self, promise_idx: usize, reason: Value) {
         if let HeapValue::Promise(promise) = &mut self.heap[promise_idx] {
             if promise.state == PromiseState::Pending {
+                let catch_handlers = std::mem::take(&mut promise.catch_handlers);
+                let finally_handlers = std::mem::take(&mut promise.finally_handlers);
                 promise.state = PromiseState::Rejected(reason.clone());
-                let handlers: Vec<Value> = promise
-                    .catch_handlers
-                    .iter()
-                    .map(|h| Value::Function(h.callback))
-                    .collect();
-                promise.catch_handlers.clear();
-                for handler in handlers {
+                for h in catch_handlers {
                     self.async_runtime
-                        .enqueue_microtask_with_arg(handler, reason.clone());
+                        .enqueue_microtask_with_arg(Value::Function(h.callback), reason.clone());
                 }
-                let finally_handlers: Vec<Value> = promise
-                    .finally_handlers
-                    .iter()
-                    .map(|h| Value::Function(h.callback))
-                    .collect();
-                promise.finally_handlers.clear();
-                for handler in finally_handlers {
-                    self.async_runtime.enqueue_microtask(handler);
+                for h in finally_handlers {
+                    self.async_runtime
+                        .enqueue_microtask(Value::Function(h.callback));
                 }
             }
         }

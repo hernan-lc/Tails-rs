@@ -15,7 +15,7 @@ fn test_try_catch() {
     "#,
     );
     assert!(r.is_ok());
-    assert_eq!(r.unwrap(), Value::String("test error".to_string()));
+    assert_eq!(r.unwrap(), Value::string("test error"));
 }
 
 #[test]
@@ -35,7 +35,7 @@ fn test_error_types_and_stack() {
     "#,
     );
     assert!(r.is_ok());
-    assert_eq!(r.unwrap(), Value::String("TypeError,true".to_string()));
+    assert_eq!(r.unwrap(), Value::string("TypeError,true"));
 }
 
 #[test]
@@ -56,7 +56,7 @@ fn test_finally() {
     "#,
     );
     assert!(r.is_ok());
-    assert_eq!(r.unwrap(), Value::String("try,catch,finally".to_string()));
+    assert_eq!(r.unwrap(), Value::string("try,catch,finally"));
 }
 
 #[test]
@@ -68,7 +68,7 @@ fn test_parse_int_float() {
     "#,
     );
     assert!(r.is_ok());
-    assert_eq!(r.unwrap(), Value::String("42,255,3.14".to_string()));
+    assert_eq!(r.unwrap(), Value::string("42,255,3.14"));
 }
 
 #[test]
@@ -82,7 +82,7 @@ fn test_is_nan_is_finite() {
     assert!(r.is_ok());
     assert_eq!(
         r.unwrap(),
-        Value::String("true,false,true,false".to_string())
+        Value::string("true,false,true,false")
     );
 }
 
@@ -96,5 +96,5 @@ fn test_btoa_atob() {
     "#,
     );
     assert!(r.is_ok());
-    assert_eq!(r.unwrap(), Value::String("Hello, World!".to_string()));
+    assert_eq!(r.unwrap(), Value::string("Hello, World!"));
 }

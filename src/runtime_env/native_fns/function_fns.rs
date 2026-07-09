@@ -118,7 +118,7 @@ pub(super) fn native_function_constructor(
 
     let body_idx = args.len() - 1;
     let body = match &args[body_idx] {
-        Value::String(s) => s.clone(),
+        Value::String(s) => s.to_string(),
         Value::Cons(c) => c.flatten(),
         other => {
             return Err(Error::TypeError(format!(
@@ -131,7 +131,7 @@ pub(super) fn native_function_constructor(
     let mut param_names: Vec<String> = Vec::new();
     for arg in &args[..body_idx] {
         match arg {
-            Value::String(s) => param_names.push(s.clone()),
+            Value::String(s) => param_names.push(s.to_string()),
             Value::Cons(c) => param_names.push(c.flatten()),
             other => {
                 return Err(Error::TypeError(format!(

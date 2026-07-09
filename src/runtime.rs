@@ -1,10 +1,16 @@
 use crate::compiler::type_checker::Type;
-use crate::compiler::Compiler;
+use crate::compiler::{CompiledModule, Compiler};
 use crate::errors::Result;
 use crate::objects::Value;
 use crate::vm::{EventSource, Interpreter};
 use rustc_hash::FxHashMap;
+use std::hash::{Hash, Hasher};
 use std::path::Path;
+use std::rc::Rc;
+
+/// Cap on cached eval compilations (source → bytecode). Oldest entries are
+/// dropped when exceeded — simple FIFO by re-insert order.
+const EVAL_CACHE_MAX: usize = 128;
 
 pub struct RuntimeConfig {
     pub enable_type_checking: bool,
@@ -28,6 +34,9 @@ pub struct TailsRuntime {
     /// Long-lived event sources registered by native modules (http, net, …).
     /// Polled by [`run_event_loop`] after the top-level script finishes.
     event_sources: Vec<Box<dyn EventSource>>,
+    /// Source-hash → compiled module cache for repeated `eval` of the same script.
+    eval_cache: FxHashMap<u64, Rc<CompiledModule>>,
+    eval_cache_order: Vec<u64>,
 }
 
 impl TailsRuntime {
@@ -40,13 +49,22 @@ impl TailsRuntime {
             interpreter,
             config,
             event_sources: Vec::new(),
+            eval_cache: FxHashMap::default(),
+            eval_cache_order: Vec::new(),
         })
     }
 
+    fn source_hash(source: &str) -> u64 {
+        let mut hasher = rustc_hash::FxHasher::default();
+        source.hash(&mut hasher);
+        hasher.finish()
+    }
+
     pub fn eval(&mut self, source: &str) -> Result<Value> {
-        let mut compiler = Compiler::new(self.config.enable_type_checking);
-        // Pass known globals to the compiler for type checking
-        if self.config.enable_type_checking {
+        // Skip the compile cache when type-checking is on: known globals can
+        // change between evals and would invalidate cached bytecode types.
+        let compiled = if self.config.enable_type_checking {
+            let mut compiler = Compiler::new(true);
             let globals: FxHashMap<String, Type> = self
                 .interpreter
                 .globals
@@ -54,8 +72,25 @@ impl TailsRuntime {
                 .map(|k| (k.clone(), Type::Any))
                 .collect();
             compiler.set_known_globals(globals);
-        }
-        let compiled = compiler.compile(source)?;
+            Rc::new(compiler.compile(source)?)
+        } else {
+            let hash = Self::source_hash(source);
+            if let Some(cached) = self.eval_cache.get(&hash) {
+                cached.clone()
+            } else {
+                let compiler = Compiler::new(false);
+                let module = Rc::new(compiler.compile(source)?);
+                if self.eval_cache.len() >= EVAL_CACHE_MAX {
+                    if let Some(old) = self.eval_cache_order.first().copied() {
+                        self.eval_cache.remove(&old);
+                        self.eval_cache_order.remove(0);
+                    }
+                }
+                self.eval_cache.insert(hash, module.clone());
+                self.eval_cache_order.push(hash);
+                module
+            }
+        };
         match self.interpreter.execute(&compiled) {
             Ok(val) => Ok(val),
             Err(e) => {

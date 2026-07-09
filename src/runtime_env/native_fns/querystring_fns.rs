@@ -47,7 +47,7 @@ pub(super) fn native_querystring_parse(
                 .map(|s| s.into_owned())
                 .unwrap_or_else(|_| value.to_string());
             obj.properties
-                .insert(decoded_key, Value::String(decoded_value));
+                .insert(decoded_key, Value::from_string(decoded_value.into()));
         }
     }
 
@@ -71,7 +71,7 @@ pub(super) fn native_querystring_stringify(
 
     let idx = match &obj {
         Value::Object(idx) => *idx,
-        _ => return Ok(Value::String(String::new())),
+        _ => return Ok(Value::string("")),
     };
 
     let mut pairs;
@@ -87,7 +87,7 @@ pub(super) fn native_querystring_stringify(
         pairs = Vec::new();
     }
 
-    Ok(Value::String(pairs.join(&sep)))
+    Ok(Value::from_string(pairs.join(&sep).into()))
 }
 
 pub(super) fn native_querystring_encode(
@@ -99,7 +99,7 @@ pub(super) fn native_querystring_encode(
         .first()
         .map(|v| to_string_value(interp, v))
         .unwrap_or_default();
-    Ok(Value::String(urlencoding::encode(&input).into_owned()))
+    Ok(Value::from_string(urlencoding::encode(&input).into_owned().into()))
 }
 
 pub(super) fn native_querystring_decode(
@@ -111,9 +111,7 @@ pub(super) fn native_querystring_decode(
         .first()
         .map(|v| to_string_value(interp, v))
         .unwrap_or_default();
-    Ok(Value::String(
-        urlencoding::decode(&input)
+    Ok(Value::from_string(urlencoding::decode(&input)
             .map(|s| s.into_owned())
-            .unwrap_or_default(),
-    ))
+            .unwrap_or_default().into(),))
 }

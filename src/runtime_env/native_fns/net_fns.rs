@@ -66,7 +66,7 @@ pub(super) fn native_net_create_connection(
         .get(1)
         .and_then(|v| {
             if let Value::String(s) = v {
-                Some(s.clone())
+                Some(s.to_string())
             } else {
                 None
             }
@@ -98,7 +98,7 @@ pub(super) fn native_net_create_connection(
     // Build the socket JS object.
     let props = props! {
         "__stream_id" => Value::Integer(stream_id),
-        "readyState" => Value::String("open".into()),
+        "readyState" => Value::string("open"),
         "write" => Value::NativeFunction(c::NET_SOCKET_WRITE),
         "end" => Value::NativeFunction(c::NET_SOCKET_END),
         "on" => Value::NativeFunction(c::NET_SOCKET_ON),
@@ -147,7 +147,7 @@ pub(super) fn native_net_create_connection(
         }
 
         if !collected.is_empty() {
-            let data_val = Value::String(String::from_utf8_lossy(&collected).into_owned());
+            let data_val = Value::from_string(String::from_utf8_lossy(&collected).into_owned().into());
             fire_listeners(interp, sock_idx, "data", &[data_val]);
         }
     }
@@ -156,7 +156,7 @@ pub(super) fn native_net_create_connection(
     remove_stream(sid);
     if let HeapValue::Object(obj) = &mut interp.heap[sock_idx] {
         obj.properties
-            .insert("readyState".into(), Value::String("closed".into()));
+            .insert("readyState".into(), Value::string("closed"));
     }
     fire_listeners(interp, sock_idx, "close", &[]);
 
@@ -241,7 +241,7 @@ pub(super) fn native_net_socket_on(
         .first()
         .and_then(|v| {
             if let Value::String(s) = v {
-                Some(s.clone())
+                Some(s.to_string())
             } else {
                 None
             }

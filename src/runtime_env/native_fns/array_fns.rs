@@ -338,15 +338,15 @@ pub(super) fn native_array_join(
 ) -> Result<Value> {
     let elements = get_array_elements(interp, this)?;
     let sep = match args.first() {
-        Some(Value::String(s)) => s.clone(),
-        Some(v) => to_string_value(interp, v),
+        Some(Value::String(s)) => s.to_string(),
+        Some(v) => to_string_value(interp, v).into(),
         None => ",".to_string(),
     };
     let parts: Vec<String> = elements
         .iter()
         .map(|e| to_string_value(interp, e))
         .collect();
-    Ok(Value::String(parts.join(&sep)))
+    Ok(Value::from_string(parts.join(&sep).into()))
 }
 
 pub(super) fn native_array_reverse(
@@ -610,7 +610,7 @@ pub(super) fn native_array_from(
         }
         Value::String(s) => {
             for (i, c) in s.chars().enumerate() {
-                let val = Value::String(c.to_string());
+                let val = Value::from_string(c.to_string());
                 if let Some(ref callback) = map_fn {
                     let mapped = interp.call_value(
                         callback,

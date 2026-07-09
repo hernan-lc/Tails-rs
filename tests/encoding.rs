@@ -13,7 +13,7 @@ fn test_atob_btoa_roundtrip() {
     assert!(r.is_ok());
     assert_eq!(
         r.unwrap(),
-        tails::Value::String("Hello, World!".to_string())
+        tails::Value::string("Hello, World!")
     );
 }
 
@@ -26,7 +26,7 @@ fn test_btoa_known_value() {
     "#,
     );
     assert!(r.is_ok());
-    assert_eq!(r.unwrap(), tails::Value::String("SGk=".to_string()));
+    assert_eq!(r.unwrap(), tails::Value::string("SGk="));
 }
 
 #[test]
@@ -38,7 +38,7 @@ fn test_atob_known_value() {
     "#,
     );
     assert!(r.is_ok());
-    assert_eq!(r.unwrap(), tails::Value::String("Hi".to_string()));
+    assert_eq!(r.unwrap(), tails::Value::string("Hi"));
 }
 
 #[test]
@@ -50,7 +50,7 @@ fn test_atob_empty_string() {
     "#,
     );
     assert!(r.is_ok());
-    assert_eq!(r.unwrap(), tails::Value::String("".to_string()));
+    assert_eq!(r.unwrap(), tails::Value::string(""));
 }
 
 #[test]
@@ -62,5 +62,5 @@ fn test_btoa_empty_string() {
     "#,
     );
     assert!(r.is_ok());
-    assert_eq!(r.unwrap(), tails::Value::String("".to_string()));
+    assert_eq!(r.unwrap(), tails::Value::string(""));
 }

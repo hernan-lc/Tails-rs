@@ -14,7 +14,7 @@ fn test_intl_datetime_format_default() {
         Path::new("/tmp/test_module.ts"),
     );
     assert!(r.is_ok());
-    assert_eq!(r.unwrap(), tails::Value::String("string".to_string()));
+    assert_eq!(r.unwrap(), tails::Value::string("string"));
 }
 
 #[test]
@@ -69,7 +69,7 @@ fn test_intl_number_format_default() {
         Path::new("/tmp/test_module.ts"),
     );
     assert!(r.is_ok());
-    assert_eq!(r.unwrap(), tails::Value::String("1,234,567.89".to_string()));
+    assert_eq!(r.unwrap(), tails::Value::string("1,234,567.89"));
 }
 
 #[test]
@@ -87,7 +87,7 @@ fn test_intl_number_format_currency() {
         Path::new("/tmp/test_module.ts"),
     );
     assert!(r.is_ok());
-    assert_eq!(r.unwrap(), tails::Value::String("$1,234.56".to_string()));
+    assert_eq!(r.unwrap(), tails::Value::string("$1,234.56"));
 }
 
 #[test]
@@ -104,7 +104,7 @@ fn test_intl_number_format_percent() {
         Path::new("/tmp/test_module.ts"),
     );
     assert!(r.is_ok());
-    assert_eq!(r.unwrap(), tails::Value::String("85.6%".to_string()));
+    assert_eq!(r.unwrap(), tails::Value::string("85.6%"));
 }
 
 #[test]
@@ -119,7 +119,7 @@ fn test_intl_number_format_integer() {
         Path::new("/tmp/test_module.ts"),
     );
     assert!(r.is_ok());
-    assert_eq!(r.unwrap(), tails::Value::String("1,234,567".to_string()));
+    assert_eq!(r.unwrap(), tails::Value::string("1,234,567"));
 }
 
 #[test]
@@ -136,6 +136,6 @@ fn test_intl_number_format_negative() {
     assert!(r.is_ok());
     assert_eq!(
         r.unwrap(),
-        tails::Value::String("-1,234,567.89".to_string())
+        tails::Value::string("-1,234,567.89")
     );
 }

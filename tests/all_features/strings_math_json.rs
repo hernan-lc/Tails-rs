@@ -39,7 +39,7 @@ fn test_math() {
     assert!(r.is_ok());
     assert_eq!(
         r.unwrap(),
-        Value::String("5,3,4,4,1,3,1024,4,0,true".to_string())
+        Value::string("5,3,4,4,1,3,1024,4,0,true")
     );
 }
 
@@ -52,7 +52,7 @@ fn test_math_constants() {
     "#,
     );
     assert!(r.is_ok());
-    assert_eq!(r.unwrap(), Value::String("number,number".to_string()));
+    assert_eq!(r.unwrap(), Value::string("number,number"));
 }
 
 #[test]
@@ -66,5 +66,5 @@ fn test_json() {
     "#,
     );
     assert!(r.is_ok());
-    assert_eq!(r.unwrap(), Value::String("1,2".to_string()));
+    assert_eq!(r.unwrap(), Value::string("1,2"));
 }

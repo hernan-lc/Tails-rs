@@ -37,7 +37,7 @@ pub(crate) fn native_request_constructor(
                     .get("__headers")
                     .map(|v| {
                         if let Value::String(s) = v {
-                            s.clone()
+                            s.to_string()
                         } else {
                             String::new()
                         }
@@ -57,13 +57,13 @@ pub(crate) fn native_request_constructor(
                 }
 
                 let mut props = props! {
-                    "url" => Value::String(cloned_url),
-                    "method" => Value::String(method.to_uppercase()),
-                    "__headers" => Value::String(headers_raw.clone()),
-                    "__body" => body.clone().map(Value::String).unwrap_or(Value::Null),
+                    "url" => Value::from_string(cloned_url.into()),
+                    "method" => Value::from_string(method.to_uppercase().into()),
+                    "__headers" => Value::from_string(headers_raw.clone().into()),
+                    "__body" => body.clone().map(Value::from_string).unwrap_or(Value::Null),
                     "bodyUsed" => Value::Boolean(false),
                     "__is_request" => Value::Boolean(true),
-                    "__method" => Value::String(method.to_uppercase()),
+                    "__method" => Value::from_string(method.to_uppercase().into()),
                 };
 
                 let h_idx = interp.heap.len();
@@ -94,7 +94,7 @@ pub(crate) fn native_request_constructor(
             if let Some(Value::Object(hdr_idx)) = init_obj.properties.get("headers") {
                 if let HeapValue::Object(hdr_obj) = &interp.heap[*hdr_idx] {
                     if let Some(Value::String(h)) = hdr_obj.properties.get("__headers") {
-                        headers_raw = h.clone();
+                        headers_raw = h.to_string();
                     } else {
                         let mut header_strs = Vec::new();
                         for (k, v) in &hdr_obj.properties {
@@ -114,10 +114,10 @@ pub(crate) fn native_request_constructor(
     }
 
     let mut props = props! {
-        "url" => Value::String(url),
-        "method" => Value::String(method.to_uppercase()),
-        "__headers" => Value::String(headers_raw.clone()),
-        "__body" => body.map(Value::String).unwrap_or(Value::Null),
+        "url" => Value::from_string(url.into()),
+        "method" => Value::from_string(method.to_uppercase().into()),
+        "__headers" => Value::from_string(headers_raw.clone().into()),
+        "__body" => body.map(Value::from_string).unwrap_or(Value::Null),
         "bodyUsed" => Value::Boolean(false),
         "__is_request" => Value::Boolean(true),
     };

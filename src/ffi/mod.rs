@@ -185,7 +185,7 @@ pub extern "C" fn tails_string_new(runtime: *mut TailsRuntime, s: *const c_char)
     let cstr = unsafe { CStr::from_ptr(s) };
     match cstr.to_str() {
         Ok(s) => {
-            let value = Value::String(s.to_string());
+            let value = Value::from_string(s.to_string());
             value_to_tails_value(value)
         }
         Err(_) => empty_tails_value!(),

@@ -52,7 +52,7 @@ pub(super) fn native_crypto_random_uuid(
         bytes[10], bytes[11], bytes[12], bytes[13], bytes[14], bytes[15],
     );
 
-    Ok(Value::String(uuid))
+    Ok(Value::from_string(uuid.into()))
 }
 
 pub(super) fn native_crypto_create_hash(
@@ -71,7 +71,7 @@ pub(super) fn native_crypto_create_hash(
 
     // Create the hash object
     let props = props! {
-        "_algorithm" => Value::String(algorithm),
+        "_algorithm" => Value::from_string(algorithm.into()),
         "_data" => Value::Object(data_buf_idx),
         "update" => Value::NativeFunction(c::CRYPTO_HASH_UPDATE),
         "digest" => Value::NativeFunction(c::CRYPTO_HASH_DIGEST),
@@ -124,13 +124,13 @@ pub(super) fn native_crypto_hash_digest(
         let (algorithm, data) = match &interp.heap[*obj_idx] {
             HeapValue::Object(obj) => {
                 let alg = match obj.properties.get("_algorithm") {
-                    Some(Value::String(s)) => s.clone(),
+                    Some(Value::String(s)) => s.to_string(),
                     Some(Value::Cons(c)) => c.flatten(),
                     _ => "sha256".to_string(),
                 };
                 let buf_idx = match obj.properties.get("_data") {
                     Some(Value::Object(idx)) => *idx,
-                    _ => return Ok(Value::String("".to_string())),
+                    _ => return Ok(Value::from_string("".to_string())),
                 };
                 let buf = match &interp.heap[buf_idx] {
                     HeapValue::Buffer(b) => b.clone(),
@@ -138,10 +138,10 @@ pub(super) fn native_crypto_hash_digest(
                 };
                 (alg, buf)
             }
-            _ => return Ok(Value::String("".to_string())),
+            _ => return Ok(Value::from_string("".to_string())),
         };
 
-        let hash_hex = match algorithm.as_str() {
+        let hash_hex = match algorithm.as_ref() {
             "sha224" => {
                 use sha2::{Digest, Sha224};
                 let mut hasher = Sha224::new();
@@ -174,9 +174,9 @@ pub(super) fn native_crypto_hash_digest(
             }
         };
 
-        return Ok(Value::String(hash_hex));
+        return Ok(Value::from_string(hash_hex.into()));
     }
-    Ok(Value::String("".to_string()))
+    Ok(Value::from_string("".to_string()))
 }
 
 fn hex_encode(bytes: &[u8]) -> String {

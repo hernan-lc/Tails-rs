@@ -27,7 +27,7 @@ pub(super) fn native_array_iterator(
         HeapValue::Array(JsArray { elements: arr_data }),
     );
     let props = props! {
-        "__type" => Value::String("array".to_string()),
+        "__type" => Value::from_string("array".to_string()),
         "__index" => Value::Integer(0),
         "__data" => Value::Array(data_idx),
         "map" => Value::NativeFunction(c::ITERATOR_MAP),
@@ -64,7 +64,7 @@ pub(super) fn native_iterator_map(
 
     // Create a wrapper iterator object
     let props = props! {
-        "__type" => Value::String("mapped".to_string()),
+        "__type" => Value::from_string("mapped".to_string()),
         "__source" => this.clone(),
         "__callback" => callback,
         "__done" => Value::Boolean(false),
@@ -101,7 +101,7 @@ pub(super) fn native_iterator_filter(
     }
 
     let props = props! {
-        "__type" => Value::String("filtered".to_string()),
+        "__type" => Value::from_string("filtered".to_string()),
         "__source" => this.clone(),
         "__callback" => callback,
         "__done" => Value::Boolean(false),
@@ -137,7 +137,7 @@ pub(super) fn native_iterator_take(
     };
 
     let props = props! {
-        "__type" => Value::String("taking".to_string()),
+        "__type" => Value::from_string("taking".to_string()),
         "__source" => this.clone(),
         "__remaining" => Value::Integer(count),
         "__done" => Value::Boolean(false),
@@ -173,7 +173,7 @@ pub(super) fn native_iterator_drop(
     };
 
     let props = props! {
-        "__type" => Value::String("dropping".to_string()),
+        "__type" => Value::from_string("dropping".to_string()),
         "__source" => this.clone(),
         "__remaining" => Value::Integer(count),
         "__done" => Value::Boolean(false),
@@ -263,7 +263,7 @@ fn advance_iterator(interp: &mut Interpreter, iterator: &Value) -> Result<Option
             };
 
             match iter_type {
-                Some(Value::String(ref ty)) if ty == "array" || ty == "string" => {
+                Some(Value::String(ref ty)) if **ty == *"array" || **ty == *"string" => {
                     // Built-in array/string iterator
                     let (index, data_idx) =
                         if let HeapValue::Object(ref obj) = interp.heap[iter_idx] {
@@ -304,7 +304,7 @@ fn advance_iterator(interp: &mut Interpreter, iterator: &Value) -> Result<Option
 
                     Ok(Some(value))
                 }
-                Some(Value::String(ref ty)) if ty == "mapped" => {
+                Some(Value::String(ref ty)) if **ty == *"mapped" => {
                     // Mapped iterator: get source value, apply callback
                     let (source, callback) =
                         if let HeapValue::Object(ref obj) = interp.heap[iter_idx] {
@@ -333,7 +333,7 @@ fn advance_iterator(interp: &mut Interpreter, iterator: &Value) -> Result<Option
                         None => Ok(None),
                     }
                 }
-                Some(Value::String(ref ty)) if ty == "filtered" => {
+                Some(Value::String(ref ty)) if **ty == *"filtered" => {
                     // Filtered iterator: get source values until callback returns true
                     let (source, callback) =
                         if let HeapValue::Object(ref obj) = interp.heap[iter_idx] {
@@ -370,7 +370,7 @@ fn advance_iterator(interp: &mut Interpreter, iterator: &Value) -> Result<Option
                         }
                     }
                 }
-                Some(Value::String(ref ty)) if ty == "taking" => {
+                Some(Value::String(ref ty)) if **ty == *"taking" => {
                     // Taking iterator: return first N values
                     let (source, remaining) =
                         if let HeapValue::Object(ref obj) = interp.heap[iter_idx] {
@@ -407,7 +407,7 @@ fn advance_iterator(interp: &mut Interpreter, iterator: &Value) -> Result<Option
                         None => Ok(None),
                     }
                 }
-                Some(Value::String(ref ty)) if ty == "dropping" => {
+                Some(Value::String(ref ty)) if **ty == *"dropping" => {
                     // Dropping iterator: skip first N values
                     let (source, remaining) =
                         if let HeapValue::Object(ref obj) = interp.heap[iter_idx] {

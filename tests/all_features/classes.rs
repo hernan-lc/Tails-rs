@@ -16,7 +16,7 @@ fn test_class_basic() {
     "#,
     );
     assert!(r.is_ok());
-    assert_eq!(r.unwrap(), Value::String("Rex makes a noise".to_string()));
+    assert_eq!(r.unwrap(), Value::string("Rex makes a noise"));
 }
 
 #[test]
@@ -36,7 +36,7 @@ fn test_class_inheritance() {
     "#,
     );
     assert!(r.is_ok());
-    assert_eq!(r.unwrap(), Value::String("Rex barks".to_string()));
+    assert_eq!(r.unwrap(), Value::string("Rex barks"));
 }
 
 #[test]
@@ -56,7 +56,7 @@ fn test_class_getter_setter() {
     "#,
     );
     assert!(r.is_ok());
-    assert_eq!(r.unwrap(), Value::String("animal:Rex,Rex".to_string()));
+    assert_eq!(r.unwrap(), Value::string("animal:Rex,Rex"));
 }
 
 #[test]
@@ -71,7 +71,7 @@ fn test_instanceof() {
     "#,
     );
     assert!(r.is_ok());
-    assert_eq!(r.unwrap(), Value::String("true,true".to_string()));
+    assert_eq!(r.unwrap(), Value::string("true,true"));
 }
 
 #[test]

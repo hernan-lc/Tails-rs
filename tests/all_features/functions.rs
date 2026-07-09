@@ -40,7 +40,7 @@ fn test_closure() {
     "#,
     );
     assert!(r.is_ok());
-    assert_eq!(r.unwrap(), Value::String("1,2,3".to_string()));
+    assert_eq!(r.unwrap(), Value::string("1,2,3"));
 }
 
 #[test]
@@ -69,7 +69,7 @@ fn test_function_call() {
     "#,
     );
     assert!(r.is_ok());
-    assert_eq!(r.unwrap(), Value::String("Hi, World!".to_string()));
+    assert_eq!(r.unwrap(), Value::string("Hi, World!"));
 }
 
 #[test]

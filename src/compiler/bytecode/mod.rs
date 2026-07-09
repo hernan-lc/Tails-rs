@@ -486,7 +486,7 @@ impl CodeGenerator {
                         }
                         ArrayBindingElement::Rest(pat) => {
                             self.emit(Instruction::Dup);
-                            let idx = self.add_constant(Value::String("slice".to_string()));
+                            let idx = self.add_constant(Value::from_string("slice".to_string()));
                             self.emit(Instruction::LoadConst(idx));
                             let start_idx = self.add_constant(Value::Integer(i as i64));
                             self.emit(Instruction::LoadConst(start_idx));
@@ -513,7 +513,7 @@ impl CodeGenerator {
                         self.generate_destructuring_pattern(&element.value)?;
                     } else {
                         self.emit(Instruction::Dup);
-                        let key_idx = self.add_constant(Value::String(element.key.clone()));
+                        let key_idx = self.add_constant(Value::from_string(element.key.clone().into()));
                         self.emit(Instruction::LoadConst(key_idx));
                         self.emit(Instruction::GetProperty);
                         if let Some(default_expr) = &element.default_value {
@@ -550,7 +550,7 @@ impl CodeGenerator {
                 if *computed {
                     self.generate_expression(property)?;
                 } else if let Expression::Identifier(name) = property.as_ref() {
-                    let idx = self.add_constant(Value::String(name.clone()));
+                    let idx = self.add_constant(Value::from_string(name.clone().into()));
                     self.emit(Instruction::LoadConst(idx));
                 } else {
                     self.generate_expression(property)?;
@@ -563,7 +563,7 @@ impl CodeGenerator {
                     match element {
                         Expression::SpreadElement { .. } => {
                             self.emit(Instruction::Dup);
-                            let idx = self.add_constant(Value::String("slice".to_string()));
+                            let idx = self.add_constant(Value::from_string("slice".to_string()));
                             self.emit(Instruction::LoadConst(idx));
                             let start_idx = self.add_constant(Value::Integer(i as i64));
                             self.emit(Instruction::LoadConst(start_idx));
@@ -589,7 +589,7 @@ impl CodeGenerator {
                             self.generate_expression(key_expr)?;
                         }
                     } else {
-                        let key_idx = self.add_constant(Value::String(prop.key.clone()));
+                        let key_idx = self.add_constant(Value::from_string(prop.key.clone().into()));
                         self.emit(Instruction::LoadConst(key_idx));
                     }
                     self.emit(Instruction::GetProperty);

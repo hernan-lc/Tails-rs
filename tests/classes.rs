@@ -119,7 +119,7 @@ fn test_class_no_constructor() {
     "#,
         )
         .unwrap();
-    assert_eq!(result, tails::Value::String("hello".to_string()));
+    assert_eq!(result, tails::Value::string("hello"));
 }
 
 #[test]
@@ -149,7 +149,7 @@ fn test_class_extends_basic() {
     "#,
         )
         .unwrap();
-    assert_eq!(result, tails::Value::String("Rex speaks".to_string()));
+    assert_eq!(result, tails::Value::string("Rex speaks"));
 }
 
 #[test]
@@ -201,7 +201,7 @@ fn test_class_getter() {
     "#,
         )
         .unwrap();
-    assert_eq!(result, tails::Value::String("Alice".to_string()));
+    assert_eq!(result, tails::Value::string("Alice"));
 }
 
 #[test]
@@ -227,7 +227,7 @@ fn test_class_setter() {
     "#,
         )
         .unwrap();
-    assert_eq!(result, tails::Value::String("Bob".to_string()));
+    assert_eq!(result, tails::Value::string("Bob"));
 }
 
 #[test]

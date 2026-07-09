@@ -8,10 +8,10 @@ macro_rules! compare_values {
         pub(super) fn $name(&self, left: &Value, right: &Value) -> Result<bool> {
             match (left, right) {
                 (Value::Integer(a), Value::Integer(b)) => Ok(a $op b),
-                (Value::String(a), Value::String(b)) => Ok(a $op b),
-                (Value::String(a), Value::Cons(c)) => Ok(a.as_str() $op c.flatten().as_str()),
-                (Value::Cons(c), Value::String(b)) => Ok(c.flatten().as_str() $op b.as_str()),
-                (Value::Cons(a), Value::Cons(b)) => Ok(a.flatten() $op b.flatten()),
+                (Value::String(a), Value::String(b)) => Ok(a.as_ref() $op b.as_ref()),
+                (Value::String(a), Value::Cons(c)) => Ok(a.as_ref() $op c.flatten().as_str()),
+                (Value::Cons(c), Value::String(b)) => Ok(c.flatten().as_str() $op b.as_ref()),
+                (Value::Cons(a), Value::Cons(b)) => Ok(a.flatten().as_str() $op b.flatten().as_str()),
                 (Value::BigInt(a), Value::BigInt(b)) => Ok(a $op b),
                 _ => {
                     let l = self.to_number(left)?;
@@ -54,14 +54,14 @@ impl Interpreter {
             ))),
             // Phase 1.7: String + Number
             (Value::String(a), Value::Integer(b)) => {
-                let b_str = Value::String(b.to_string());
+                let b_str = Value::from_string(b.to_string());
                 Ok(Value::Cons(ConsString::new(
                     Value::String(a.clone()),
                     b_str,
                 )))
             }
             (Value::Integer(a), Value::String(b)) => {
-                let a_str = Value::String(a.to_string());
+                let a_str = Value::from_string(a.to_string());
                 Ok(Value::Cons(ConsString::new(
                     a_str,
                     Value::String(b.clone()),
@@ -69,9 +69,9 @@ impl Interpreter {
             }
             (Value::String(a), Value::Float(b)) => {
                 let b_str = if b.is_finite() && *b == (*b as i64) as f64 {
-                    Value::String((*b as i64).to_string())
+                    Value::from_string((*b as i64).to_string().into())
                 } else {
-                    Value::String(b.to_string())
+                    Value::from_string(b.to_string())
                 };
                 Ok(Value::Cons(ConsString::new(
                     Value::String(a.clone()),
@@ -80,9 +80,9 @@ impl Interpreter {
             }
             (Value::Float(a), Value::String(b)) => {
                 let a_str = if a.is_finite() && *a == (*a as i64) as f64 {
-                    Value::String((*a as i64).to_string())
+                    Value::from_string((*a as i64).to_string().into())
                 } else {
-                    Value::String(a.to_string())
+                    Value::from_string(a.to_string())
                 };
                 Ok(Value::Cons(ConsString::new(
                     a_str,
@@ -92,27 +92,27 @@ impl Interpreter {
             // Cons + Number
             (Value::Cons(c), Value::Integer(b)) => {
                 let left = Value::Cons(c.clone());
-                let right = Value::String(b.to_string());
+                let right = Value::from_string(b.to_string());
                 Ok(Value::Cons(ConsString::new(left, right)))
             }
             (Value::Integer(a), Value::Cons(c)) => {
-                let left = Value::String(a.to_string());
+                let left = Value::from_string(a.to_string());
                 let right = Value::Cons(c.clone());
                 Ok(Value::Cons(ConsString::new(left, right)))
             }
             (Value::Cons(c), Value::Float(b)) => {
                 let right = if b.is_finite() && *b == (*b as i64) as f64 {
-                    Value::String((*b as i64).to_string())
+                    Value::from_string((*b as i64).to_string().into())
                 } else {
-                    Value::String(b.to_string())
+                    Value::from_string(b.to_string())
                 };
                 Ok(Value::Cons(ConsString::new(Value::Cons(c.clone()), right)))
             }
             (Value::Float(a), Value::Cons(c)) => {
                 let left = if a.is_finite() && *a == (*a as i64) as f64 {
-                    Value::String((*a as i64).to_string())
+                    Value::from_string((*a as i64).to_string().into())
                 } else {
-                    Value::String(a.to_string())
+                    Value::from_string(a.to_string())
                 };
                 Ok(Value::Cons(ConsString::new(left, Value::Cons(c.clone()))))
             }
@@ -121,13 +121,13 @@ impl Interpreter {
                 let coerced = self.to_string_coerce_value(r).flatten();
                 Ok(Value::Cons(ConsString::new(
                     Value::String(a.clone()),
-                    Value::String(coerced),
+                    Value::from_string(coerced.into()),
                 )))
             }
             (l, Value::String(b)) => {
                 let coerced = self.to_string_coerce_value(l).flatten();
                 Ok(Value::Cons(ConsString::new(
-                    Value::String(coerced),
+                    Value::from_string(coerced.into()),
                     Value::String(b.clone()),
                 )))
             }
@@ -135,13 +135,13 @@ impl Interpreter {
                 let coerced = self.to_string_coerce_value(r).flatten();
                 Ok(Value::Cons(ConsString::new(
                     Value::Cons(c.clone()),
-                    Value::String(coerced),
+                    Value::from_string(coerced.into()),
                 )))
             }
             (l, Value::Cons(c)) => {
                 let coerced = self.to_string_coerce_value(l).flatten();
                 Ok(Value::Cons(ConsString::new(
-                    Value::String(coerced),
+                    Value::from_string(coerced.into()),
                     Value::Cons(c.clone()),
                 )))
             }
@@ -167,7 +167,7 @@ impl Interpreter {
                     n.to_string()
                 }
             }
-            Value::String(s) => s.clone(),
+            Value::String(s) => s.to_string(),
             Value::Cons(c) => c.flatten(),
             Value::BigInt(n) => format!("{}", n),
             Value::Function(idx) => {
@@ -196,7 +196,7 @@ impl Interpreter {
     pub(crate) fn to_string_coerce_value(&self, value: &Value) -> Value {
         match value {
             Value::String(_) | Value::Cons(_) => value.clone(),
-            _ => Value::String(self.to_string_coerce(value)),
+            _ => Value::from_string(self.to_string_coerce(value).into()),
         }
     }
 
@@ -328,9 +328,9 @@ impl Interpreter {
             (_, Value::Boolean(b)) => {
                 self.is_equal(left, &Value::Float(if *b { 1.0 } else { 0.0 }))
             }
-            (Value::String(a), Value::String(b)) => a == b,
-            (Value::String(a), Value::Cons(c)) => a.as_str() == c.flatten().as_str(),
-            (Value::Cons(c), Value::String(b)) => c.flatten().as_str() == b.as_str(),
+            (Value::String(a), Value::String(b)) => a.as_ref() == b.as_ref(),
+            (Value::String(a), Value::Cons(c)) => a.as_ref() == c.flatten().as_str(),
+            (Value::Cons(c), Value::String(b)) => c.flatten().as_str() == b.as_ref(),
             (Value::Cons(a), Value::Cons(b)) => a.flatten() == b.flatten(),
             (Value::String(s), _) => {
                 let num = s.parse::<f64>().unwrap_or(f64::NAN);
@@ -418,7 +418,7 @@ impl Interpreter {
                     n.to_string()
                 }
             }
-            Value::String(s) => s.clone(),
+            Value::String(s) => s.to_string(),
             Value::Cons(c) => c.flatten(),
             Value::BigInt(n) => format!("{}n", n),
             Value::Symbol(id) => format!("Symbol({})", id),

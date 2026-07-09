@@ -12,7 +12,7 @@ fn test_bigint_literal() {
 fn test_bigint_typeof() {
     let mut rt = TailsRuntime::default();
     let r = rt.eval(r#"typeof 100n;"#).unwrap();
-    assert_eq!(r, Value::String("bigint".to_string()));
+    assert_eq!(r, Value::string("bigint"));
 }
 
 #[test]
@@ -138,7 +138,7 @@ fn test_date_get_date() {
 fn test_date_to_iso_string() {
     let mut rt = TailsRuntime::default();
     let r = rt.eval(r#"let d = new Date(0); d.toISOString();"#).unwrap();
-    assert_eq!(r, Value::String("1970-01-01T00:00:00.000Z".to_string()));
+    assert_eq!(r, Value::string("1970-01-01T00:00:00.000Z"));
 }
 
 #[test]
@@ -152,7 +152,7 @@ fn test_date_value_of() {
 fn test_date_now_static() {
     let mut rt = TailsRuntime::default();
     let r = rt.eval(r#"typeof Date.now();"#).unwrap();
-    assert_eq!(r, Value::String("number".to_string()));
+    assert_eq!(r, Value::string("number"));
 }
 
 #[test]
@@ -202,7 +202,7 @@ fn test_regexp_to_string() {
     let r = rt
         .eval(r#"let re = new RegExp("abc", "gi"); re.toString();"#)
         .unwrap();
-    assert_eq!(r, Value::String("/abc/gi".to_string()));
+    assert_eq!(r, Value::string("/abc/gi"));
 }
 
 #[test]
@@ -214,13 +214,13 @@ fn test_regexp_exec_with_capture() {
     match r {
         Value::Object(idx) => {
             let full = rt.get_property(&Value::Object(idx), "0");
-            assert_eq!(full, Some(Value::String("2024-01-15".to_string())));
+            assert_eq!(full, Some(Value::string("2024-01-15")));
             let g1 = rt.get_property(&Value::Object(idx), "1");
-            assert_eq!(g1, Some(Value::String("2024".to_string())));
+            assert_eq!(g1, Some(Value::string("2024")));
             let g2 = rt.get_property(&Value::Object(idx), "2");
-            assert_eq!(g2, Some(Value::String("01".to_string())));
+            assert_eq!(g2, Some(Value::string("01")));
             let g3 = rt.get_property(&Value::Object(idx), "3");
-            assert_eq!(g3, Some(Value::String("15".to_string())));
+            assert_eq!(g3, Some(Value::string("15")));
         }
         _ => panic!("Expected Object, got {:?}", r),
     }
@@ -232,7 +232,7 @@ fn test_regexp_source() {
     let r = rt
         .eval(r#"let re = new RegExp("hello", "gi"); re.source();"#)
         .unwrap();
-    assert_eq!(r, Value::String("hello".to_string()));
+    assert_eq!(r, Value::string("hello"));
 }
 
 #[test]
@@ -241,7 +241,7 @@ fn test_regexp_flags() {
     let r = rt
         .eval(r#"let re = new RegExp("abc", "gim"); re.flags();"#)
         .unwrap();
-    assert_eq!(r, Value::String("gim".to_string()));
+    assert_eq!(r, Value::string("gim"));
 }
 
 #[test]
@@ -281,7 +281,7 @@ fn test_regexp_constructor_from_regexp() {
     let r = rt
         .eval(r#"let re1 = new RegExp("abc"); let re2 = new RegExp(re1); re2.source();"#)
         .unwrap();
-    assert_eq!(r, Value::String("abc".to_string()));
+    assert_eq!(r, Value::string("abc"));
 }
 
 // ---- Phase 3.4 — RegExp Lazy Result Cache ----
@@ -366,7 +366,7 @@ fn test_symbol_iterator_on_array() {
     "#,
         )
         .unwrap();
-    assert_eq!(r, Value::String("symbol".to_string()));
+    assert_eq!(r, Value::string("symbol"));
 }
 
 #[test]
@@ -381,7 +381,7 @@ fn test_array_iterator_method() {
     "#,
         )
         .unwrap();
-    assert_eq!(r, Value::String("function".to_string()));
+    assert_eq!(r, Value::string("function"));
 }
 
 #[test]
@@ -396,7 +396,7 @@ fn test_array_iterator_call() {
     "#,
         )
         .unwrap();
-    assert_eq!(r, Value::String("object".to_string()));
+    assert_eq!(r, Value::string("object"));
 }
 
 #[test]
@@ -411,7 +411,7 @@ fn test_iterator_has_to_array() {
     "#,
         )
         .unwrap();
-    assert_eq!(r, Value::String("function".to_string()));
+    assert_eq!(r, Value::string("function"));
 }
 
 #[test]
@@ -639,7 +639,7 @@ fn test_loadconst_bigint_in_switch() {
         "#,
         )
         .unwrap();
-    assert_eq!(r, Value::String("answer".to_string()));
+    assert_eq!(r, Value::string("answer"));
 }
 
 #[test]
@@ -670,14 +670,14 @@ fn test_loadconst_symbol_equality() {
 fn test_add_string_plus_integer() {
     let mut rt = TailsRuntime::default();
     let r = rt.eval(r#""answer: " + 42;"#).unwrap();
-    assert_eq!(r, Value::String("answer: 42".to_string()));
+    assert_eq!(r, Value::string("answer: 42"));
 }
 
 #[test]
 fn test_add_integer_plus_string() {
     let mut rt = TailsRuntime::default();
     let r = rt.eval(r#"42 + " is the answer";"#).unwrap();
-    assert_eq!(r, Value::String("42 is the answer".to_string()));
+    assert_eq!(r, Value::string("42 is the answer"));
 }
 
 #[test]
@@ -685,14 +685,14 @@ fn test_add_string_plus_float() {
     // Match `to_string_coerce`'s finite-integer special case: "5" not "5.0".
     let mut rt = TailsRuntime::default();
     let r = rt.eval(r#""x=" + 5.0;"#).unwrap();
-    assert_eq!(r, Value::String("x=5".to_string()));
+    assert_eq!(r, Value::string("x=5"));
 }
 
 #[test]
 fn test_add_float_plus_string() {
     let mut rt = TailsRuntime::default();
     let r = rt.eval(r#"3.14 + " pi";"#).unwrap();
-    assert_eq!(r, Value::String("3.14 pi".to_string()));
+    assert_eq!(r, Value::string("3.14 pi"));
 }
 
 #[test]
@@ -700,7 +700,7 @@ fn test_add_string_plus_negative_integer() {
     // Negative integers: the inline `i64::to_string` produces "-5".
     let mut rt = TailsRuntime::default();
     let r = rt.eval(r#""temp: " + -5;"#).unwrap();
-    assert_eq!(r, Value::String("temp: -5".to_string()));
+    assert_eq!(r, Value::string("temp: -5"));
 }
 
 #[test]
@@ -708,7 +708,7 @@ fn test_add_string_plus_float_no_integer_form() {
     // Non-integer-valued floats keep their decimal form.
     let mut rt = TailsRuntime::default();
     let r = rt.eval(r#""x=" + 0.5;"#).unwrap();
-    assert_eq!(r, Value::String("x=0.5".to_string()));
+    assert_eq!(r, Value::string("x=0.5"));
 }
 
 // ---- Phase 1.5 (`Vec::with_capacity` for `collect_garbage` snapshot) ----

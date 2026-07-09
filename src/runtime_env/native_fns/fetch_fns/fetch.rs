@@ -30,7 +30,7 @@ pub(crate) fn native_fetch(
                     .get("__headers")
                     .map(|v| {
                         if let Value::String(s) = v {
-                            s.clone()
+                            s.to_string()
                         } else {
                             String::new()
                         }
@@ -42,7 +42,7 @@ pub(crate) fn native_fetch(
                         if s.is_empty() {
                             None
                         } else {
-                            Some(s.clone())
+                            Some(s.to_string())
                         }
                     } else {
                         None
@@ -78,7 +78,7 @@ pub(crate) fn native_fetch(
             Ok(Value::Promise(promise_idx))
         }
         Err(e) => {
-            let err_msg = Value::String(e.to_string());
+            let err_msg = Value::from_string(e.to_string());
             let promise = JsPromise::rejected(err_msg);
             let promise_idx = interp.heap.len();
             interp.heap.push(HeapValue::Promise(promise));

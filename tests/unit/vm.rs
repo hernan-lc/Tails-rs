@@ -76,7 +76,7 @@ fn test_not() {
 fn test_string_addition() {
     let mut runtime = TailsRuntime::default();
     let result = runtime.eval(r#""hello" + " ""#).unwrap();
-    assert_eq!(result, tails::Value::String("hello ".to_string()));
+    assert_eq!(result, tails::Value::string("hello "));
 }
 
 #[test]

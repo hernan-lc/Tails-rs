@@ -137,7 +137,7 @@ fn test_events_on_and_emit() {
         Path::new("/tmp/test_events_module.ts"),
     );
     assert!(r.is_ok(), "events on/emit failed: {:?}", r.err());
-    assert_eq!(r.unwrap(), tails::Value::String("hello".to_string()));
+    assert_eq!(r.unwrap(), tails::Value::string("hello"));
 }
 
 #[test]
@@ -225,7 +225,7 @@ fn test_events_emit_with_multiple_args() {
         Path::new("/tmp/test_events_module.ts"),
     );
     assert!(r.is_ok(), "events multi-arg emit failed: {:?}", r.err());
-    assert_eq!(r.unwrap(), tails::Value::String("hello-world".to_string()));
+    assert_eq!(r.unwrap(), tails::Value::string("hello-world"));
 }
 
 #[test]

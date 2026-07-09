@@ -5,7 +5,7 @@ use tails::{TailsRuntime, Value};
 fn test_symbol_typeof() {
     let mut rt = TailsRuntime::default();
     let r = rt.eval(r#"typeof Symbol();"#).unwrap();
-    assert_eq!(r, Value::String("symbol".to_string()));
+    assert_eq!(r, Value::string("symbol"));
 }
 
 #[test]
@@ -33,7 +33,7 @@ fn test_symbol_iterator() {
     "#,
         )
         .unwrap();
-    assert_eq!(r, Value::String("symbol".to_string()));
+    assert_eq!(r, Value::string("symbol"));
 }
 
 #[test]
@@ -62,7 +62,7 @@ fn test_symbol_key_for() {
     "#,
         )
         .unwrap();
-    assert_eq!(r, Value::String("bar".to_string()));
+    assert_eq!(r, Value::string("bar"));
 }
 
 // ---- for...of with iterator protocol ----
@@ -99,7 +99,7 @@ fn test_for_of_string() {
     "#,
         )
         .unwrap();
-    assert_eq!(r, Value::String("abc".to_string()));
+    assert_eq!(r, Value::string("abc"));
 }
 
 // ---- Function.prototype ----
@@ -116,7 +116,7 @@ fn test_function_call() {
     "#,
         )
         .unwrap();
-    assert_eq!(r, Value::String("Hello World".to_string()));
+    assert_eq!(r, Value::string("Hello World"));
 }
 
 #[test]
@@ -219,7 +219,7 @@ fn test_array_fill() {
     "#,
         )
         .unwrap();
-    assert_eq!(r, Value::String("1,0,0,4,5".to_string()));
+    assert_eq!(r, Value::string("1,0,0,4,5"));
 }
 
 #[test]

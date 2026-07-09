@@ -372,7 +372,7 @@ pub(super) fn native_promise_all_settled(
             match &p.state {
                 crate::objects::js_promise::PromiseState::Fulfilled(v) => {
                     let props = props! {
-                        "status" => Value::String("fulfilled".to_string()),
+                        "status" => Value::from_string("fulfilled".to_string()),
                         "value" => v.clone(),
                     };
                     let obj_idx = interp.heap.len();
@@ -387,7 +387,7 @@ pub(super) fn native_promise_all_settled(
                 }
                 crate::objects::js_promise::PromiseState::Rejected(r) => {
                     let props = props! {
-                        "status" => Value::String("rejected".to_string()),
+                        "status" => Value::from_string("rejected".to_string()),
                         "reason" => r.clone(),
                     };
                     let obj_idx = interp.heap.len();
@@ -479,7 +479,7 @@ pub(super) fn native_promise_any(
         ));
         // Create an AggregateError-like object
         let props = props! {
-            wk::MESSAGE => Value::String("All promises were rejected".to_string()),
+            wk::MESSAGE => Value::from_string("All promises were rejected".to_string()),
             "errors" => Value::Array(errors_idx),
         };
         let err_obj_idx = interp.heap.len();

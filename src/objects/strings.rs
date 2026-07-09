@@ -145,8 +145,8 @@ impl ConsString {
                 buf.push_str(b);
                 let total_len = buf.len();
                 Self {
-                    left: SharedValue::new(Value::String(buf)),
-                    right: SharedValue::new(Value::String(String::new())),
+                    left: SharedValue::new(Value::from_string(buf.into())),
+                    right: SharedValue::new(Value::string("")),
                     total_len,
                     cached: RefCell::new(None),
                     cached_hash: Cell::new(0),

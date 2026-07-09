@@ -24,7 +24,7 @@ pub(super) fn native_child_process_exec_sync(
         if let HeapValue::Object(obj) = &interp.heap[*opts_idx] {
             if let Some(v) = obj.properties.get("encoding") {
                 encoding = match v {
-                    Value::String(s) if s == "buffer" => "buffer",
+                    Value::String(s) if **s == *"buffer" => "buffer",
                     Value::Cons(c) if c.flatten() == "buffer" => "buffer",
                     _ => "utf8",
                 };
@@ -72,10 +72,10 @@ pub(super) fn native_child_process_exec_sync(
 
         // Create error object similar to Node.js
         let err_props = props! {
-            "message" => Value::String(format!("Command failed: {}", command.trim())),
+            "message" => Value::from_string(format!("Command failed: {}", command.trim())),
             "status" => Value::Integer(exit_code as i64),
-            "stderr" => Value::String(stderr_str.clone()),
-            "stdout" => Value::String(stdout_str.clone()),
+            "stderr" => Value::from_string(stderr_str.clone().into()),
+            "stdout" => Value::from_string(stdout_str.clone().into()),
             "signal" => Value::Null,
         };
 
@@ -99,7 +99,7 @@ pub(super) fn native_child_process_exec_sync(
         interp.heap.push(HeapValue::Buffer(stdout));
         Ok(Value::Buffer(buf_idx))
     } else {
-        Ok(Value::String(String::from_utf8_lossy(&stdout).to_string()))
+        Ok(Value::from_string(String::from_utf8_lossy(&stdout).to_string()))
     }
 }
 
@@ -171,8 +171,8 @@ pub(super) fn native_child_process_exec(
 
     // Build result object
     let result_props = props! {
-        "stdout" => Value::String(stdout_str),
-        "stderr" => Value::String(stderr_str),
+        "stdout" => Value::from_string(stdout_str.into()),
+        "stderr" => Value::from_string(stderr_str.into()),
         "status" => Value::Integer(exit_code as i64),
     };
 
@@ -186,7 +186,7 @@ pub(super) fn native_child_process_exec(
     // Call callback if provided
     if let Some(cb_idx) = callback_idx {
         let error_val = if !output.status.success() {
-            Value::String(format!("Command failed: {}", command.trim()))
+            Value::from_string(format!("Command failed: {}", command.trim()))
         } else {
             Value::Null
         };
@@ -309,7 +309,7 @@ pub(super) fn native_child_process_spawn(
     let stdout_idx = interp.heap.len();
     interp.heap.push(HeapValue::Object(JsObject {
         properties: props! {
-            "data" => Value::String(stdout_str),
+            "data" => Value::from_string(stdout_str.into()),
         },
         prototype: None,
         extensible: true,
@@ -318,7 +318,7 @@ pub(super) fn native_child_process_spawn(
     let stderr_idx = interp.heap.len();
     interp.heap.push(HeapValue::Object(JsObject {
         properties: props! {
-            "data" => Value::String(stderr_str),
+            "data" => Value::from_string(stderr_str.into()),
         },
         prototype: None,
         extensible: true,

@@ -62,7 +62,7 @@ fn test_type_error_stack() {
     assert!(r.is_ok());
     assert_eq!(
         r.unwrap(),
-        tails::Value::String("TypeError: bad type".to_string())
+        tails::Value::string("TypeError: bad type")
     );
 }
 
@@ -171,7 +171,7 @@ fn test_error_without_message() {
     "#,
     );
     assert!(r.is_ok());
-    assert_eq!(r.unwrap(), tails::Value::String("Error".to_string()));
+    assert_eq!(r.unwrap(), tails::Value::string("Error"));
 }
 
 #[test]
@@ -186,6 +186,6 @@ fn test_error_message_property() {
     assert!(r.is_ok());
     assert_eq!(
         r.unwrap(),
-        tails::Value::String("custom message".to_string())
+        tails::Value::string("custom message")
     );
 }

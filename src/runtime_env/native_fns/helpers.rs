@@ -109,7 +109,7 @@ pub(super) fn to_string_value(interp: &Interpreter, v: &Value) -> String {
                 n.to_string()
             }
         }
-        Value::String(s) => s.clone(),
+        Value::String(s) => s.to_string(),
         Value::Cons(c) => c.flatten(),
         Value::BigInt(n) => format!("{}n", n),
         Value::Symbol(id) => format!("Symbol({})", id),
@@ -295,7 +295,7 @@ fn format_property_value(interp: &Interpreter, v: &Value) -> String {
 
 pub(super) fn to_display_string(interp: &Interpreter, v: &Value) -> String {
     match v {
-        Value::String(s) => s.clone(),
+        Value::String(s) => s.to_string(),
         other => to_string_value(interp, other),
     }
 }
@@ -385,7 +385,7 @@ pub(super) fn from_json_value(interp: &mut Interpreter, val: serde_json::Value) 
                 Value::Float(n.as_f64().unwrap_or(f64::NAN))
             }
         }
-        serde_json::Value::String(s) => Value::String(s),
+        serde_json::Value::String(s) => Value::from_string(s.into()),
         serde_json::Value::Array(arr) => {
             let len = arr.len();
             let elems: Vec<Value> = Vec::with_capacity(len);
@@ -434,7 +434,7 @@ pub(super) fn get_array_elements(
 
 pub(super) fn get_string(this: &Value) -> Option<String> {
     match this {
-        Value::String(s) => Some(s.clone()),
+        Value::String(s) => Some(s.to_string()),
         Value::Cons(c) => Some(c.flatten()),
         _ => None,
     }
@@ -458,7 +458,7 @@ pub(crate) fn find_error_proto(interp: &Interpreter, type_name: &str) -> Option<
     for (i, hv) in interp.heap.iter().enumerate() {
         if let crate::vm::interpreter::HeapValue::Object(obj) = hv {
             if let Some(Value::String(name)) = obj.properties.get(wk::NAME) {
-                if name == type_name {
+                if **name == *type_name {
                     return Some(i);
                 }
             }

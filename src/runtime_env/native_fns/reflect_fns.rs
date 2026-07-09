@@ -13,7 +13,7 @@ fn prop_key_to_value(key: &str) -> Value {
             return Value::Symbol(id);
         }
     }
-    Value::String(key.to_string())
+    Value::from_string(key.to_string())
 }
 
 pub(super) fn native_reflect_get(
@@ -195,9 +195,9 @@ pub(super) fn native_reflect_own_keys(
         Value::Array(arr_idx) => {
             if let crate::vm::interpreter::HeapValue::Array(arr) = &interp.heap[*arr_idx] {
                 for i in 0..arr.elements.len() {
-                    keys.push(Value::String(i.to_string()));
+                    keys.push(Value::from_string(i.to_string()));
                 }
-                keys.push(Value::String(wk::LENGTH.to_string()));
+                keys.push(Value::from_string(wk::LENGTH.to_string()));
             }
         }
         Value::Function(func_idx) => {
@@ -223,7 +223,7 @@ pub(super) fn native_reflect_get_own_property_descriptor(
 ) -> Result<Value> {
     let target = args.first().cloned().unwrap_or(Value::Undefined);
     let property = match args.get(1) {
-        Some(Value::String(s)) => s.clone(),
+        Some(Value::String(s)) => s.to_string(),
         _ => return Ok(Value::Undefined),
     };
 
@@ -344,7 +344,7 @@ pub(super) fn native_reflect_get_own_property_descriptor(
         }
         Value::Array(arr_idx) => {
             if let crate::vm::interpreter::HeapValue::Array(arr) = &interp.heap[*arr_idx] {
-                if property == wk::LENGTH {
+                if property.as_str() == wk::LENGTH {
                     let descriptor = props! {
                         "value" => Value::Float(arr.elements.len() as f64),
                         "writable" => Value::Boolean(false),
@@ -394,7 +394,7 @@ pub(super) fn native_reflect_define_property(
 ) -> Result<Value> {
     let target = args.first().cloned().unwrap_or(Value::Undefined);
     let property = match args.get(1) {
-        Some(Value::String(s)) => s.clone(),
+        Some(Value::String(s)) => s.to_string(),
         _ => return Ok(Value::Boolean(false)),
     };
     let descriptor = args.get(2).cloned().unwrap_or(Value::Undefined);
@@ -414,7 +414,7 @@ pub(super) fn native_reflect_define_property(
         Value::Object(obj_idx) => {
             if let Some(val) = value {
                 if let crate::vm::interpreter::HeapValue::Object(obj) = &mut interp.heap[*obj_idx] {
-                    obj.properties.insert(property, val);
+                    obj.properties.insert(property.to_string(), val);
                     return Ok(Value::Boolean(true));
                 }
             }
@@ -424,7 +424,7 @@ pub(super) fn native_reflect_define_property(
             if let Some(val) = value {
                 if let crate::vm::interpreter::HeapValue::Function(f) = &mut interp.heap[*func_idx]
                 {
-                    f.properties.insert(property, val);
+                    f.properties.insert(property.to_string(), val);
                     return Ok(Value::Boolean(true));
                 }
             }

@@ -106,7 +106,7 @@ pub(super) fn native_typed_array_constructor(
     args: &[Value],
 ) -> Result<Value> {
     let type_name = match args.first() {
-        Some(Value::String(s)) => s.as_str(),
+        Some(Value::String(s)) => s.as_ref(),
         _ => {
             return Err(Error::TypeError(
                 "TypedArray constructor requires type name".into(),
@@ -283,7 +283,7 @@ pub(super) fn native_typed_array_from(
     args: &[Value],
 ) -> Result<Value> {
     let type_name = match args.first() {
-        Some(Value::String(s)) => s.as_str(),
+        Some(Value::String(s)) => s.as_ref(),
         _ => {
             return Err(Error::TypeError(
                 "TypedArray.from requires type name".into(),
@@ -340,7 +340,7 @@ pub(super) fn native_typed_array_of(
     args: &[Value],
 ) -> Result<Value> {
     let type_name = match args.first() {
-        Some(Value::String(s)) => s.as_str(),
+        Some(Value::String(s)) => s.as_ref(),
         _ => return Err(Error::TypeError("TypedArray.of requires type name".into())),
     };
 

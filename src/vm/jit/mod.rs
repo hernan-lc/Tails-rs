@@ -42,7 +42,9 @@ impl JitCompiler {
     pub fn new() -> Self {
         Self {
             profiles: Vec::new(),
-            threshold: 1000,
+            // Lowered from 1000 so short hot loops (≤ a few hundred iters)
+            // still get compiled; tick still fires every 128 back-edges.
+            threshold: 100,
             compiled: FxHashMap::default(),
             enabled: true,
         }

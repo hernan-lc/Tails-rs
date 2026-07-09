@@ -27,7 +27,7 @@ fn test_for_of_string() {
     "#,
     );
     assert!(r.is_ok());
-    assert_eq!(r.unwrap(), Value::String("a-b-c-".to_string()));
+    assert_eq!(r.unwrap(), Value::string("a-b-c-"));
 }
 
 #[test]
@@ -45,7 +45,7 @@ fn test_generator() {
     "#,
     );
     assert!(r.is_ok());
-    assert_eq!(r.unwrap(), Value::String("10,20".to_string()));
+    assert_eq!(r.unwrap(), Value::string("10,20"));
 }
 
 #[test]
@@ -115,6 +115,6 @@ fn test_iterator_helpers() {
     assert!(r.is_ok());
     assert_eq!(
         r.unwrap(),
-        Value::String("2,4,6,8,10|3,4,5|1,2,3|3,4,5".to_string())
+        Value::string("2,4,6,8,10|3,4,5|1,2,3|3,4,5")
     );
 }

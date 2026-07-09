@@ -15,17 +15,17 @@ impl CodeGenerator {
     }
 
     pub(super) fn generate_string_literal(&mut self, s: &str) -> Result<()> {
-        let idx = self.add_constant(Value::String(s.to_string()));
+        let idx = self.add_constant(Value::from_string(s.to_string()));
         self.emit(Instruction::LoadConst(idx));
         Ok(())
     }
 
     pub(super) fn generate_regex_literal(&mut self, pattern: &str, flags: &str) -> Result<()> {
         self.emit(Instruction::LoadGlobal("RegExp".to_string()));
-        let reg_idx = self.add_constant(Value::String(pattern.to_string()));
+        let reg_idx = self.add_constant(Value::from_string(pattern.to_string()));
         self.emit(Instruction::LoadConst(reg_idx));
         if !flags.is_empty() {
-            let flags_idx = self.add_constant(Value::String(flags.to_string()));
+            let flags_idx = self.add_constant(Value::from_string(flags.to_string()));
             self.emit(Instruction::LoadConst(flags_idx));
             self.emit(Instruction::Construct(2));
         } else {
@@ -62,12 +62,12 @@ impl CodeGenerator {
     ) -> Result<()> {
         if expressions.is_empty() {
             let s = quasis.join("");
-            let idx = self.add_constant(Value::String(s));
+            let idx = self.add_constant(Value::from_string(s.into()));
             self.emit(Instruction::LoadConst(idx));
         } else {
             let first = &quasis[0];
             if !first.is_empty() {
-                let idx = self.add_constant(Value::String(first.clone()));
+                let idx = self.add_constant(Value::from_string(first.clone().into()));
                 self.emit(Instruction::LoadConst(idx));
             }
 
@@ -82,7 +82,7 @@ impl CodeGenerator {
                 }
 
                 if i + 1 < quasis.len() && !quasis[i + 1].is_empty() {
-                    let idx = self.add_constant(Value::String(quasis[i + 1].clone()));
+                    let idx = self.add_constant(Value::from_string(quasis[i + 1].clone().into()));
                     self.emit(Instruction::LoadConst(idx));
                     self.emit(Instruction::Add);
                 }

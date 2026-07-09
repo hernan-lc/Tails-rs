@@ -74,7 +74,7 @@ pub(super) fn native_atob(
     let decoded = base64_decode(&encoded)?;
     let s = String::from_utf8(decoded)
         .unwrap_or_else(|e| String::from_utf8_lossy(e.as_bytes()).to_string());
-    Ok(Value::String(s))
+    Ok(Value::from_string(s.into()))
 }
 
 pub(super) fn native_btoa(
@@ -88,5 +88,5 @@ pub(super) fn native_btoa(
         .unwrap_or_default();
 
     let encoded = base64_encode(input.as_bytes());
-    Ok(Value::String(encoded))
+    Ok(Value::from_string(encoded.into()))
 }

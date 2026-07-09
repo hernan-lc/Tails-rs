@@ -118,13 +118,13 @@ pub fn tails_value_to_value(value: TailsValue) -> Value {
         3 => Value::Float(f64::from_bits(value.data)),
         4 => {
             if value.data == 0 {
-                Value::String(String::new())
+                Value::string("")
             } else {
                 let ptr = value.data as *const c_char;
                 unsafe {
                     match CStr::from_ptr(ptr).to_str() {
-                        Ok(s) => Value::String(s.to_string()),
-                        Err(_) => Value::String(String::new()),
+                        Ok(s) => Value::from_string(s.to_string()),
+                        Err(_) => Value::string(""),
                     }
                 }
             }

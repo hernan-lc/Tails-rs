@@ -91,7 +91,7 @@ impl Interpreter {
                     Value::Date(_) | Value::RegExp(_) => "object",
                     Value::NativeObject(_) => "object",
                 };
-                self.stack.push(Value::String(type_str.to_string()));
+                self.stack.push(Value::from_string(type_str.to_string()));
             }
             Instruction::StoreGlobal(name) => {
                 let value = self
@@ -213,16 +213,16 @@ impl Interpreter {
                                     let b_val = *b;
                                     self.stack[dst_idx] = Value::Cons(ConsString::new(
                                         left,
-                                        Value::String(b_val.to_string()),
+                                        Value::from_string(b_val.to_string()),
                                     ));
                                 }
                                 (Value::String(_), Value::Float(b)) => {
                                     let b_val = *b;
                                     let b_str =
                                         if b_val.is_finite() && b_val == (b_val as i64) as f64 {
-                                            Value::String((b_val as i64).to_string())
+                                            Value::from_string((b_val as i64).to_string().into())
                                         } else {
-                                            Value::String(b_val.to_string())
+                                            Value::from_string(b_val.to_string())
                                         };
                                     self.stack[dst_idx] = Value::Cons(ConsString::new(left, b_str));
                                 }
@@ -230,16 +230,16 @@ impl Interpreter {
                                     let b_val = *b;
                                     self.stack[dst_idx] = Value::Cons(ConsString::new(
                                         left,
-                                        Value::String(b_val.to_string()),
+                                        Value::from_string(b_val.to_string()),
                                     ));
                                 }
                                 (Value::Cons(_), Value::Float(b)) => {
                                     let b_val = *b;
                                     let right =
                                         if b_val.is_finite() && b_val == (b_val as i64) as f64 {
-                                            Value::String((b_val as i64).to_string())
+                                            Value::from_string((b_val as i64).to_string().into())
                                         } else {
-                                            Value::String(b_val.to_string())
+                                            Value::from_string(b_val.to_string())
                                         };
                                     self.stack[dst_idx] = Value::Cons(ConsString::new(left, right));
                                 }

@@ -11,17 +11,26 @@ impl Hash for Value {
                 2u8.hash(state);
                 b.hash(state);
             }
+            // Numbers share tag 3 and hash as f64 bits so Integer(5) and
+            // Float(5.0) collide under SameValueZero (required for Map/Set).
             Value::Integer(i) => {
                 3u8.hash(state);
-                i.hash(state);
+                (*i as f64).to_bits().hash(state);
             }
             Value::Float(f) => {
-                4u8.hash(state);
-                f.to_bits().hash(state);
+                3u8.hash(state);
+                let bits = if f.is_nan() {
+                    f64::NAN.to_bits()
+                } else if *f == 0.0 {
+                    0.0f64.to_bits() // +0 and -0
+                } else {
+                    f.to_bits()
+                };
+                bits.hash(state);
             }
             Value::String(s) => {
                 5u8.hash(state);
-                s.hash(state);
+                s.as_ref().hash(state);
             }
             Value::Cons(c) => {
                 5u8.hash(state);

@@ -38,7 +38,7 @@ fn test_path_join() {
         import path from "./path.native";
         path.join('["/foo","bar","baz"]');
         "#);
-    assert_eq!(val, tails::Value::String("/foo/bar/baz".to_string()));
+    assert_eq!(val, tails::Value::string("/foo/bar/baz"));
 }
 
 #[test]
@@ -51,7 +51,7 @@ fn test_path_join_single() {
         import path from "./path.native";
         path.join('["foo"]');
         "#);
-    assert_eq!(val, tails::Value::String("foo".to_string()));
+    assert_eq!(val, tails::Value::string("foo"));
 }
 
 #[test]
@@ -64,7 +64,7 @@ fn test_path_basename() {
         import path from "./path.native";
         path.basename("/foo/bar/baz.txt", "");
         "#);
-    assert_eq!(val, tails::Value::String("baz.txt".to_string()));
+    assert_eq!(val, tails::Value::string("baz.txt"));
 }
 
 #[test]
@@ -77,7 +77,7 @@ fn test_path_basename_with_ext() {
         import path from "./path.native";
         path.basename("/foo/bar/baz.txt", ".txt");
         "#);
-    assert_eq!(val, tails::Value::String("baz".to_string()));
+    assert_eq!(val, tails::Value::string("baz"));
 }
 
 #[test]
@@ -90,7 +90,7 @@ fn test_path_dirname() {
         import path from "./path.native";
         path.dirname("/foo/bar/baz.txt");
         "#);
-    assert_eq!(val, tails::Value::String("/foo/bar".to_string()));
+    assert_eq!(val, tails::Value::string("/foo/bar"));
 }
 
 #[test]
@@ -103,7 +103,7 @@ fn test_path_extname() {
         import path from "./path.native";
         path.extname("/foo/bar/baz.txt");
         "#);
-    assert_eq!(val, tails::Value::String(".txt".to_string()));
+    assert_eq!(val, tails::Value::string(".txt"));
 }
 
 #[test]
@@ -116,7 +116,7 @@ fn test_path_extname_no_ext() {
         import path from "./path.native";
         path.extname("/foo/bar/baz");
         "#);
-    assert_eq!(val, tails::Value::String("".to_string()));
+    assert_eq!(val, tails::Value::string(""));
 }
 
 #[test]
@@ -155,7 +155,7 @@ fn test_path_normalize() {
         import path from "./path.native";
         path.normalize("/foo/../bar");
         "#);
-    assert_eq!(val, tails::Value::String("/bar".to_string()));
+    assert_eq!(val, tails::Value::string("/bar"));
 }
 
 #[test]
@@ -168,7 +168,7 @@ fn test_path_normalize_dots() {
         import path from "./path.native";
         path.normalize("/foo/./bar/../baz");
         "#);
-    assert_eq!(val, tails::Value::String("/foo/baz".to_string()));
+    assert_eq!(val, tails::Value::string("/foo/baz"));
 }
 
 #[test]

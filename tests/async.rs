@@ -35,7 +35,7 @@ fn test_promise_reject_static() {
         )
         .unwrap();
     let result = runtime.get_global("result").unwrap();
-    assert_eq!(result, Value::String("err".into()));
+    assert_eq!(result, Value::string("err"));
 }
 
 #[test]
@@ -77,7 +77,7 @@ fn test_promise_all_one_rejected() {
         )
         .unwrap();
     let result = runtime.get_global("result").unwrap();
-    assert_eq!(result, Value::String("fail".into()));
+    assert_eq!(result, Value::string("fail"));
 }
 
 #[test]

@@ -135,9 +135,9 @@ impl Interpreter {
         let obj_idx = self.heap.len();
         let stack = self.build_stack_trace(wk::RANGE_ERROR, message);
         let props = props! {
-            wk::MESSAGE => Value::String(message.into()),
-            wk::NAME => Value::String(wk::RANGE_ERROR.into()),
-            wk::STACK => Value::String(stack),
+            wk::MESSAGE => Value::string(message),
+            wk::NAME => Value::string(wk::RANGE_ERROR),
+            wk::STACK => Value::from_string(stack.into()),
         };
         let proto_idx = self.find_error_prototype(wk::RANGE_ERROR);
         self.heap.push(HeapValue::Object(JsObject {
@@ -181,7 +181,7 @@ impl Interpreter {
         for (i, hv) in self.heap.iter().enumerate() {
             if let HeapValue::Object(obj) = hv {
                 if let Some(Value::String(name)) = obj.properties.get(wk::NAME) {
-                    if name == type_name {
+                    if **name == *type_name {
                         return Some(i);
                     }
                 }

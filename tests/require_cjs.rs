@@ -30,7 +30,7 @@ fn test_require_exports_object() {
     let result = eval_fixture(&mut runtime, "main_exports.ts");
 
     let greeting = runtime.get_property(&result, "greeting").unwrap();
-    assert_eq!(greeting, tails::Value::String("hello from CJS".to_string()));
+    assert_eq!(greeting, tails::Value::string("hello from CJS"));
 
     let pi = runtime.get_property(&result, "PI").unwrap();
     assert_eq!(pi, tails::Value::Float(3.14159));
@@ -53,10 +53,10 @@ fn test_require_exports_function() {
         .call_function(
             &result,
             &tails::Value::Undefined,
-            &[tails::Value::String("World".to_string())],
+            &[tails::Value::string("World")],
         )
         .unwrap();
-    assert_eq!(output, tails::Value::String("Hello, World!".to_string()));
+    assert_eq!(output, tails::Value::string("Hello, World!"));
 }
 
 // ── CJS require caching (identity preservation) ──────────────────────────────
@@ -90,10 +90,10 @@ fn test_require_chain() {
     let result = eval_fixture(&mut runtime, "main_chain.ts");
 
     let from_a = runtime.get_property(&result, "from_a").unwrap();
-    assert_eq!(from_a, tails::Value::String("A".to_string()));
+    assert_eq!(from_a, tails::Value::string("A"));
 
     let b_from_b = runtime.get_property(&result, "b_from_b").unwrap();
-    assert_eq!(b_from_b, tails::Value::String("B".to_string()));
+    assert_eq!(b_from_b, tails::Value::string("B"));
 
     // chain_c exports module.exports = 42
     let b_c_val = runtime.get_property(&result, "b_c_val").unwrap();
@@ -108,7 +108,7 @@ fn test_require_obj_literal() {
     let result = eval_fixture(&mut runtime, "main_obj_literal.ts");
 
     let color = runtime.get_property(&result, "color").unwrap();
-    assert_eq!(color, tails::Value::String("red".to_string()));
+    assert_eq!(color, tails::Value::string("red"));
 
     let size = runtime.get_property(&result, "size").unwrap();
     assert_eq!(size, tails::Value::Float(42.0));
@@ -147,7 +147,7 @@ fn test_require_native_path() {
     "#;
     let result = runtime.eval(source).unwrap();
     let sep = std::path::MAIN_SEPARATOR;
-    assert_eq!(result, tails::Value::String(format!("a{sep}b{sep}c")));
+    assert_eq!(result, tails::Value::string(format!("a{sep}b{sep}c")));
 }
 
 // ── __dirname and __filename ─────────────────────────────────────────────────

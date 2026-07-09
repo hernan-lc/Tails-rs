@@ -91,7 +91,7 @@ impl CodeGenerator {
                 if *computed {
                     self.generate_expression(property)?;
                 } else if let Expression::Identifier(name) = property.as_ref() {
-                    let idx = self.add_constant(Value::String(name.clone()));
+                    let idx = self.add_constant(Value::from_string(name.clone().into()));
                     self.emit(Instruction::LoadConst(idx));
                 } else {
                     self.generate_expression(property)?;
@@ -103,7 +103,7 @@ impl CodeGenerator {
                 if *computed {
                     self.generate_expression(property)?;
                 } else if let Expression::Identifier(name) = property.as_ref() {
-                    let idx = self.add_constant(Value::String(name.clone()));
+                    let idx = self.add_constant(Value::from_string(name.clone().into()));
                     self.emit(Instruction::LoadConst(idx));
                 } else {
                     self.generate_expression(property)?;
@@ -167,7 +167,7 @@ impl CodeGenerator {
         if computed {
             self.generate_expression(property)?;
         } else if let Expression::Identifier(name) = property {
-            let idx = self.add_constant(Value::String(name.clone()));
+            let idx = self.add_constant(Value::from_string(name.clone().into()));
             self.emit(Instruction::LoadConst(idx));
         } else {
             self.generate_expression(property)?;

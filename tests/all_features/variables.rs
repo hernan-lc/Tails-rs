@@ -30,7 +30,7 @@ fn test_primitives() {
     assert!(r.is_ok());
     assert_eq!(
         r.unwrap(),
-        Value::String("string,boolean,object,undefined".to_string())
+        Value::string("string,boolean,object,undefined")
     );
 }
 
@@ -45,7 +45,7 @@ fn test_arithmetic_operators() {
     assert!(r.is_ok());
     assert_eq!(
         r.unwrap(),
-        Value::String("13,7,30,3.3333333333333335,1,1024".to_string())
+        Value::string("13,7,30,3.3333333333333335,1,1024")
     );
 }
 
@@ -74,7 +74,7 @@ fn test_comparison_operators() {
     assert!(r.is_ok());
     assert_eq!(
         r.unwrap(),
-        Value::String("true,true,true,true,true,true".to_string())
+        Value::string("true,true,true,true,true,true")
     );
 }
 
@@ -87,7 +87,7 @@ fn test_logical_operators() {
     "#,
     );
     assert!(r.is_ok());
-    assert_eq!(r.unwrap(), Value::String("false,true,false".to_string()));
+    assert_eq!(r.unwrap(), Value::string("false,true,false"));
 }
 
 #[test]
@@ -101,7 +101,7 @@ fn test_typeof_and_void() {
     assert!(r.is_ok());
     assert_eq!(
         r.unwrap(),
-        Value::String("number,string,boolean,undefined,undefined".to_string())
+        Value::string("number,string,boolean,undefined,undefined")
     );
 }
 

@@ -109,7 +109,7 @@ impl CodeGenerator {
                                                                         Expression::BooleanLiteral(b) => Some(Value::Boolean(*b)),
                                                                         Expression::NullLiteral => Some(Value::Null),
                                                                         Expression::UndefinedLiteral => Some(Value::Undefined),
-                                                                        Expression::StringLiteral(s) => Some(Value::String(s.clone())),
+                                                                        Expression::StringLiteral(s) => Some(Value::from_string(s.clone().into())),
                                                                         _ => None,
                                                                     };
                                                                     if let Some(limit_value) =
@@ -352,7 +352,7 @@ impl CodeGenerator {
                 let len_slot = self.current_local_slot();
                 self.locals.push("__len".to_string());
                 self.emit(Instruction::LoadLocal(keys_slot));
-                let len_key = self.add_constant(Value::String(wk::LENGTH.to_string()));
+                let len_key = self.add_constant(Value::from_string(wk::LENGTH.to_string()));
                 self.emit(Instruction::LoadConst(len_key));
                 self.emit(Instruction::GetProperty);
                 self.emit(Instruction::StoreLocal(len_slot));

@@ -10,7 +10,7 @@ fn test_object_methods() {
     "#,
     );
     assert!(r.is_ok());
-    assert_eq!(r.unwrap(), Value::String("2,2,2".to_string()));
+    assert_eq!(r.unwrap(), Value::string("2,2,2"));
 }
 
 #[test]
@@ -24,7 +24,7 @@ fn test_object_assign() {
     "#,
     );
     assert!(r.is_ok());
-    assert_eq!(r.unwrap(), Value::String("NYC".to_string()));
+    assert_eq!(r.unwrap(), Value::string("NYC"));
 }
 
 #[test]
@@ -39,7 +39,7 @@ fn test_object_get_own_property_descriptors_and_define_properties() {
     "#,
     );
     assert!(r.is_ok());
-    assert_eq!(r.unwrap(), Value::String("1,2,1,true".to_string()));
+    assert_eq!(r.unwrap(), Value::string("1,2,1,true"));
 }
 
 #[test]
@@ -65,7 +65,7 @@ fn test_array_methods() {
     assert!(r.is_ok());
     assert_eq!(
         r.unwrap(),
-        Value::String("2,4,6,8,10|4,5|15|4|true|true|true|1-2-3-4-5|2,3|1,2,3,4".to_string())
+        Value::string("2,4,6,8,10|4,5|15|4|true|true|true|1-2-3-4-5|2,3|1,2,3,4")
     );
 }
 
@@ -89,7 +89,7 @@ fn test_array_enhancements() {
     assert!(r.is_ok());
     assert_eq!(
         r.unwrap(),
-        Value::String("true,3,2,4,6,4,5,3,4,5,1,0,0,4,5,3,2,3,1,2,2,4,3,6".to_string())
+        Value::string("true,3,2,4,6,4,5,3,4,5,1,0,0,4,5,3,2,3,1,2,2,4,3,6")
     );
 }
 
@@ -106,7 +106,7 @@ fn test_typed_array_int32() {
     "#,
     );
     assert!(r.is_ok());
-    assert_eq!(r.unwrap(), Value::String("3,10,20,30".to_string()));
+    assert_eq!(r.unwrap(), Value::string("3,10,20,30"));
 }
 
 #[test]
@@ -119,7 +119,7 @@ fn test_typed_array_float64() {
     "#,
     );
     assert!(r.is_ok());
-    assert_eq!(r.unwrap(), Value::String("3,1.5,2.5,3.5".to_string()));
+    assert_eq!(r.unwrap(), Value::string("3,1.5,2.5,3.5"));
 }
 
 #[test]
@@ -135,7 +135,7 @@ fn test_map() {
     "#,
     );
     assert!(r.is_ok());
-    assert_eq!(r.unwrap(), Value::String("3,1,2,true,false".to_string()));
+    assert_eq!(r.unwrap(), Value::string("3,1,2,true,false"));
 }
 
 #[test]
@@ -169,7 +169,7 @@ fn test_set() {
     "#,
     );
     assert!(r.is_ok());
-    assert_eq!(r.unwrap(), Value::String("3,true,false".to_string()));
+    assert_eq!(r.unwrap(), Value::string("3,true,false"));
 }
 
 #[test]
@@ -273,7 +273,7 @@ fn test_weakmap() {
     "#,
     );
     assert!(r.is_ok());
-    assert_eq!(r.unwrap(), Value::String("val".to_string()));
+    assert_eq!(r.unwrap(), Value::string("val"));
 }
 
 #[test]
@@ -302,7 +302,7 @@ fn test_destructuring() {
     "#,
     );
     assert!(r.is_ok());
-    assert_eq!(r.unwrap(), Value::String("1,2,3,4,5|Bob,25".to_string()));
+    assert_eq!(r.unwrap(), Value::string("1,2,3,4,5|Bob,25"));
 }
 
 #[test]
@@ -316,7 +316,7 @@ fn test_spread() {
     "#,
     );
     assert!(r.is_ok());
-    assert_eq!(r.unwrap(), Value::String("1,2,3,4,5".to_string()));
+    assert_eq!(r.unwrap(), Value::string("1,2,3,4,5"));
 }
 
 #[test]
@@ -334,7 +334,7 @@ fn test_proxy() {
     "#,
     );
     assert!(r.is_ok());
-    assert_eq!(r.unwrap(), Value::String("1,42".to_string()));
+    assert_eq!(r.unwrap(), Value::string("1,42"));
 }
 
 #[test]
@@ -347,7 +347,7 @@ fn test_optional_chaining() {
     "#,
     );
     assert!(r.is_ok());
-    assert_eq!(r.unwrap(), Value::String("NYC,default,0".to_string()));
+    assert_eq!(r.unwrap(), Value::string("NYC,default,0"));
 }
 
 #[test]
@@ -360,7 +360,7 @@ fn test_symbol() {
     "#,
     );
     assert!(r.is_ok());
-    assert_eq!(r.unwrap(), Value::String("symbol,symbol,test".to_string()));
+    assert_eq!(r.unwrap(), Value::string("symbol,symbol,test"));
 }
 
 #[test]
@@ -376,7 +376,7 @@ fn test_object_freeze_seal() {
     "#,
     );
     assert!(r.is_ok());
-    assert_eq!(r.unwrap(), Value::String("true,true,true,true".to_string()));
+    assert_eq!(r.unwrap(), Value::string("true,true,true,true"));
 }
 
 #[test]
@@ -403,5 +403,5 @@ fn test_reflect() {
     "#,
     );
     assert!(r.is_ok());
-    assert_eq!(r.unwrap(), Value::String("1,true,true".to_string()));
+    assert_eq!(r.unwrap(), Value::string("1,true,true"));
 }

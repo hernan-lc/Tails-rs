@@ -10,7 +10,7 @@ fn test_if_else() {
     "#,
     );
     assert!(r.is_ok());
-    assert_eq!(r.unwrap(), Value::String("medium".to_string()));
+    assert_eq!(r.unwrap(), Value::string("medium"));
 }
 
 #[test]
@@ -24,7 +24,7 @@ fn test_ternary() {
     "#,
     );
     assert!(r.is_ok());
-    assert_eq!(r.unwrap(), Value::String("big".to_string()));
+    assert_eq!(r.unwrap(), Value::string("big"));
 }
 
 #[test]
@@ -82,7 +82,7 @@ fn test_for_in() {
     );
     assert!(r.is_ok());
     let val = r.unwrap();
-    assert!(val == Value::String("ab".to_string()) || val == Value::String("ba".to_string()));
+    assert!(val == Value::string("ab") || val == Value::string("ba"));
 }
 
 #[test]
@@ -101,7 +101,7 @@ fn test_switch() {
     "#,
     );
     assert!(r.is_ok());
-    assert_eq!(r.unwrap(), Value::String("Tue".to_string()));
+    assert_eq!(r.unwrap(), Value::string("Tue"));
 }
 
 #[test]

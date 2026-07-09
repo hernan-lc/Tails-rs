@@ -139,15 +139,13 @@ pub fn create_path_module(
         "relative" => Value::NativeFunction(c::PATH_RELATIVE),
         "isAbsolute" => Value::NativeFunction(c::PATH_IS_ABSOLUTE),
         "normalize" => Value::NativeFunction(c::PATH_NORMALIZE),
-        "sep" => Value::String(std::path::MAIN_SEPARATOR.to_string()),
-        "delimiter" => Value::String(
-            if cfg!(target_os = "windows") {
+        "sep" => Value::from_string(std::path::MAIN_SEPARATOR.to_string()),
+        "delimiter" => Value::from_string(if cfg!(target_os = "windows") {
                 ";"
             } else {
                 ":"
             }
-            .to_string(),
-        ),
+            .to_string().into(),),
     }
 }
 
@@ -164,8 +162,7 @@ pub fn create_process_module(
         "exit" => Value::NativeFunction(c::PROCESS_EXIT),
         "cwd" => Value::NativeFunction(c::PROCESS_CWD),
         "chdir" => Value::NativeFunction(c::PROCESS_CHDIR),
-        "platform" => Value::String(
-            if cfg!(target_os = "linux") {
+        "platform" => Value::from_string(if cfg!(target_os = "linux") {
                 "linux"
             } else if cfg!(target_os = "macos") {
                 "darwin"
@@ -174,18 +171,15 @@ pub fn create_process_module(
             } else {
                 "unknown"
             }
-            .into(),
-        ),
-        "arch" => Value::String(
-            if cfg!(target_arch = "x86_64") {
+            .into(),),
+        "arch" => Value::from_string(if cfg!(target_arch = "x86_64") {
                 "x64"
             } else if cfg!(target_arch = "aarch64") {
                 "arm64"
             } else {
                 "unknown"
             }
-            .into(),
-        ),
+            .into(),),
         "pid" => Value::Integer(std::process::id() as i64),
         "hrtime" => Value::NativeFunction(c::PROCESS_HRTIME),
         "hrtime.bigint" => Value::NativeFunction(c::PROCESS_HRTIME_BIGINT),
@@ -200,7 +194,7 @@ pub fn create_process_module(
     // process.env
     let mut env_props = PropertyStorage::new();
     for (key, value) in std::env::vars() {
-        env_props.insert(key, Value::String(value));
+        env_props.insert(key, Value::from_string(value.into()));
     }
     let env_obj_idx = gc.allocate(
         heap,
@@ -213,7 +207,7 @@ pub fn create_process_module(
     props.insert("env".into(), Value::Object(env_obj_idx));
 
     // process.argv
-    let argv: Vec<Value> = std::env::args().map(Value::String).collect();
+    let argv: Vec<Value> = std::env::args().map(Value::from_string).collect();
     let argv_idx = gc.allocate(
         heap,
         HeapValue::Array(crate::vm::interpreter::JsArray { elements: argv }),

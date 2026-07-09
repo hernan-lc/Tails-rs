@@ -67,7 +67,7 @@ fn test_bigint() {
     "#,
     );
     assert!(r.is_ok());
-    assert_eq!(r.unwrap(), Value::String("bigint,52".to_string()));
+    assert_eq!(r.unwrap(), Value::string("bigint,52"));
 }
 
 #[test]
@@ -94,7 +94,7 @@ fn test_date() {
     assert!(r.is_ok());
     assert_eq!(
         r.unwrap(),
-        Value::String("number,number,number".to_string())
+        Value::string("number,number,number")
     );
 }
 
@@ -170,5 +170,5 @@ fn test_url() {
     "#,
     );
     assert!(r.is_ok());
-    assert_eq!(r.unwrap(), Value::String("https:,bar".to_string()));
+    assert_eq!(r.unwrap(), Value::string("https:,bar"));
 }

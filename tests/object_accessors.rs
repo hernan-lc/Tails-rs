@@ -67,7 +67,7 @@ fn test_object_getter_not_function() {
     "#,
     );
     assert!(result.is_ok());
-    assert_eq!(result.unwrap(), Value::String("number".to_string()));
+    assert_eq!(result.unwrap(), Value::string("number"));
 }
 
 // ============================================
@@ -149,7 +149,7 @@ fn test_rest_params_with_normal() {
     "#,
         )
         .unwrap();
-    assert_eq!(result, Value::String("info:a,b,c".to_string()));
+    assert_eq!(result, Value::string("info:a,b,c"));
 }
 
 #[test]
@@ -234,7 +234,7 @@ fn test_forin_object_literal() {
     "#,
         )
         .unwrap();
-    assert_eq!(result, Value::String("a,b,c".to_string()));
+    assert_eq!(result, Value::string("a,b,c"));
 }
 
 // ============================================
@@ -256,7 +256,7 @@ fn test_object_method_shorthand() {
     "#,
         )
         .unwrap();
-    assert_eq!(result, Value::String("Hello, World".to_string()));
+    assert_eq!(result, Value::string("Hello, World"));
 }
 
 #[test]

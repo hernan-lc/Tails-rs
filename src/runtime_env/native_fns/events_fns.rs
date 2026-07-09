@@ -278,7 +278,7 @@ pub(super) fn native_event_emitter_once(
         HeapValue::Object(JsObject {
             properties: crate::props! {
                 "_callback" => callback,
-                "_event" => Value::String(event.clone()),
+                "_event" => Value::from_string(event.clone().into()),
                 "_once" => Value::Boolean(true),
             },
             prototype: None,
@@ -289,7 +289,7 @@ pub(super) fn native_event_emitter_once(
     let _ = native_event_emitter_on(
         interp,
         this,
-        &[Value::String(event), Value::Object(wrapper_idx)],
+        &[Value::from_string(event.into()), Value::Object(wrapper_idx)],
     );
     Ok(this.clone())
 }
@@ -369,7 +369,7 @@ pub(super) fn native_event_emitter_event_names(
             if let Value::Array(arr_idx) = val {
                 if let HeapValue::Array(arr) = &interp.heap[*arr_idx] {
                     if !arr.elements.is_empty() {
-                        names.push(Value::String(key.to_string()));
+                        names.push(Value::from_string(key.to_string()));
                     }
                 }
             }
@@ -445,7 +445,7 @@ pub(super) fn native_event_emitter_prepend_once_listener(
         HeapValue::Object(JsObject {
             properties: crate::props! {
                 "_callback" => callback,
-                "_event" => Value::String(event.clone()),
+                "_event" => Value::from_string(event.clone().into()),
                 "_once" => Value::Boolean(true),
             },
             prototype: None,
@@ -456,7 +456,7 @@ pub(super) fn native_event_emitter_prepend_once_listener(
     let _ = native_event_emitter_prepend_listener(
         interp,
         this,
-        &[Value::String(event), Value::Object(wrapper_idx)],
+        &[Value::from_string(event.into()), Value::Object(wrapper_idx)],
     );
     Ok(this.clone())
 }
@@ -466,8 +466,8 @@ fn value_eq(a: &Value, b: &Value) -> bool {
         (Value::Integer(x), Value::Integer(y)) => x == y,
         (Value::Float(x), Value::Float(y)) => x == y,
         (Value::String(x), Value::String(y)) => x == y,
-        (Value::Cons(x), Value::String(y)) => x.flatten() == *y,
-        (Value::String(x), Value::Cons(y)) => *x == y.flatten(),
+        (Value::Cons(x), Value::String(y)) => x.flatten() == **y,
+        (Value::String(x), Value::Cons(y)) => *x == y.flatten().into(),
         (Value::Cons(x), Value::Cons(y)) => x.flatten() == y.flatten(),
         (Value::Boolean(x), Value::Boolean(y)) => x == y,
         (Value::Undefined, Value::Undefined) => true,

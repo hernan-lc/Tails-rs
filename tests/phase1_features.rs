@@ -378,7 +378,7 @@ fn test_template_literal_simple() {
     let mut runtime = TailsRuntime::default();
     let result = runtime.eval(r#"`hello world`;"#);
     match &result {
-        Ok(v) => assert_eq!(*v, tails::Value::String("hello world".to_string())),
+        Ok(v) => assert_eq!(*v, tails::Value::string("hello world")),
         Err(e) => panic!("Error: {:?}", e),
     }
 }
@@ -393,7 +393,7 @@ fn test_template_literal_interpolation() {
     "#,
     );
     match &result {
-        Ok(v) => assert_eq!(*v, tails::Value::String("Hello World".to_string())),
+        Ok(v) => assert_eq!(*v, tails::Value::string("Hello World")),
         Err(e) => panic!("Error: {:?}", e),
     }
 }
@@ -408,7 +408,7 @@ fn test_template_literal_expression() {
     "#,
     );
     match &result {
-        Ok(v) => assert_eq!(*v, tails::Value::String("The value is 20".to_string())),
+        Ok(v) => assert_eq!(*v, tails::Value::string("The value is 20")),
         Err(e) => panic!("Error: {:?}", e),
     }
 }
@@ -424,7 +424,7 @@ fn test_template_literal_multiple() {
     "#,
     );
     match &result {
-        Ok(v) => assert_eq!(*v, tails::Value::String("Hello, World!".to_string())),
+        Ok(v) => assert_eq!(*v, tails::Value::string("Hello, World!")),
         Err(e) => panic!("Error: {:?}", e),
     }
 }

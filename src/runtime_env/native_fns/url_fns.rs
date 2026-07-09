@@ -39,15 +39,15 @@ pub(super) fn native_url_constructor(
     };
 
     let props = props! {
-        "href" => Value::String(parsed.as_str().to_string()),
-        "origin" => Value::String(parsed.origin().ascii_serialization()),
-        "protocol" => Value::String(parsed.scheme().to_string() + ":"),
-        "host" => Value::String(parsed.host_str().unwrap_or("").to_string()),
-        "hostname" => Value::String(parsed.host_str().unwrap_or("").to_string()),
-        "port" => Value::String(parsed.port().map(|p| p.to_string()).unwrap_or_default()),
-        "pathname" => Value::String(parsed.path().to_string()),
-        "search" => Value::String(search),
-        "hash" => Value::String(hash),
+        "href" => Value::from_string(parsed.as_str().to_string()),
+        "origin" => Value::from_string(parsed.origin().ascii_serialization()),
+        "protocol" => Value::from_string(parsed.scheme().to_string() + ":"),
+        "host" => Value::from_string(parsed.host_str().unwrap_or("").to_string()),
+        "hostname" => Value::from_string(parsed.host_str().unwrap_or("").to_string()),
+        "port" => Value::from_string(parsed.port().map(|p| p.to_string()).unwrap_or_default()),
+        "pathname" => Value::from_string(parsed.path().to_string()),
+        "search" => Value::from_string(search),
+        "hash" => Value::from_string(hash),
         "searchParams" => Value::Object(search_params_idx),
         wk::TO_STRING => Value::NativeFunction(c::URL_TO_STRING),
         "toJSON" => Value::NativeFunction(c::URL_TO_JSON),
@@ -75,13 +75,13 @@ pub(super) fn native_url_to_string(
             }
         }
     }
-    Ok(Value::String(String::new()))
+    Ok(Value::string(""))
 }
 
 fn create_search_params(interp: &mut Interpreter, query: &str) -> usize {
     let size = query.split('&').filter(|s| !s.is_empty()).count() as i64;
     let props = props! {
-        "__entries" => Value::String(query.to_string()),
+        "__entries" => Value::from_string(query.to_string()),
         "size" => Value::Integer(size),
         "get" => Value::NativeFunction(c::SEARCH_PARAMS_GET),
         "getAll" => Value::NativeFunction(c::SEARCH_PARAMS_GET_ALL),
@@ -125,7 +125,7 @@ pub(super) fn native_search_params_get(
                             let decoded = urlencoding::decode(&value)
                                 .unwrap_or(std::borrow::Cow::Owned(value.clone()))
                                 .to_string();
-                            return Ok(Value::String(decoded));
+                            return Ok(Value::from_string(decoded));
                         }
                     }
                 }
@@ -156,7 +156,7 @@ pub(super) fn native_search_params_get_all(
                             let decoded = urlencoding::decode(&value)
                                 .unwrap_or(std::borrow::Cow::Owned(value.clone()))
                                 .to_string();
-                            values.push(Value::String(decoded));
+                            values.push(Value::from_string(decoded));
                         }
                     }
                 }
@@ -263,7 +263,7 @@ pub(super) fn native_search_params_to_string(
             }
         }
     }
-    Ok(Value::String(String::new()))
+    Ok(Value::string(""))
 }
 
 pub(super) fn native_search_params_entries(
@@ -278,7 +278,7 @@ pub(super) fn native_search_params_entries(
         interp
             .heap
             .push(HeapValue::Array(crate::vm::interpreter::JsArray {
-                elements: vec![Value::String(key), Value::String(value)],
+                elements: vec![Value::from_string(key), Value::from_string(value)],
             }));
         entries.push(Value::Array(entry_idx));
     }
@@ -299,7 +299,7 @@ pub(super) fn native_search_params_keys(
     let entries_data: Vec<(String, String)> = parse_entries(interp, _this);
     let keys: Vec<Value> = entries_data
         .into_iter()
-        .map(|(k, _)| Value::String(k))
+        .map(|(k, _)| Value::from_string(k))
         .collect();
     let arr_idx = interp.heap.len();
     interp
@@ -318,7 +318,7 @@ pub(super) fn native_search_params_values(
     let entries_data: Vec<(String, String)> = parse_entries(interp, _this);
     let vals: Vec<Value> = entries_data
         .into_iter()
-        .map(|(_, v)| Value::String(v))
+        .map(|(_, v)| Value::from_string(v))
         .collect();
     let arr_idx = interp.heap.len();
     interp
@@ -341,8 +341,8 @@ pub(super) fn native_search_params_for_each(
             &callback,
             &Value::Undefined,
             &[
-                Value::String(value.clone()),
-                Value::String(key.clone()),
+                Value::from_string(value.clone()),
+                Value::from_string(key.clone()),
                 _this.clone(),
             ],
         );
@@ -393,7 +393,7 @@ where
                     .map(|(k, v)| format!("{}={}", k, v))
                     .collect();
                 obj.properties
-                    .insert("__entries".into(), Value::String(new_str.join("&")));
+                    .insert("__entries".into(), Value::from_string(new_str.join("&")));
                 obj.properties
                     .insert("size".into(), Value::Integer(entries.len() as i64));
             }
@@ -410,12 +410,12 @@ pub(super) fn native_url_search_params_constructor(
 ) -> Result<Value> {
     let init = args.first().cloned().unwrap_or(Value::Undefined);
     let query_str = match &init {
-        Value::String(s) => s.clone(),
+        Value::String(s) => s.to_string(),
         Value::Object(obj_idx) => {
             if let HeapValue::Object(obj) = &interp.heap[*obj_idx] {
                 // If it has __entries, it's already a URLSearchParams
                 if let Some(Value::String(entries)) = obj.properties.get("__entries") {
-                    entries.clone()
+                    entries.to_string()
                 } else {
                     // Object: key=value pairs
                     let pairs: Vec<String> = obj
@@ -522,7 +522,7 @@ pub(super) fn native_url_parse(
     match parsed {
         Some(url) => {
             // Reuse native_url_constructor logic
-            native_url_constructor(interp, &Value::Undefined, &[Value::String(url.to_string())])
+            native_url_constructor(interp, &Value::Undefined, &[Value::from_string(url.to_string())])
         }
         None => Ok(Value::Null),
     }
@@ -559,7 +559,7 @@ pub(super) fn native_url_file_url_to_path(
         let normalized = std::path::Path::new(&decoded)
             .components()
             .collect::<std::path::PathBuf>();
-        Ok(Value::String(normalized.to_string_lossy().into_owned()))
+        Ok(Value::from_string(normalized.to_string_lossy().into_owned()))
     } else {
         Err(Error::TypeError(format!("Invalid file URL: {}", url_str)))
     }

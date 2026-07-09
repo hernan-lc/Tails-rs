@@ -12,7 +12,7 @@ fn register_error_subclass(
     ctor_const: usize,
 ) {
     let proto_props = props! {
-        wk::NAME => Value::String(name.into()),
+        wk::NAME => Value::string(name),
     };
     let proto_idx = interp.gc.allocate(
         &mut interp.heap,

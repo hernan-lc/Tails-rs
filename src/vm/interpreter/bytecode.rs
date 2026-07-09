@@ -196,21 +196,16 @@ impl Interpreter {
                     }
                     // Cold path: fall through
                 }
-                // Fused global add: x = x + local
+                // Fused global add: x = x + local. Read globals by ref (no clone)
+                // on the integer/float hot paths.
                 Instruction::AddGlobal(name, local_slot) => {
                     if let Some(frame) = self.call_stack.last() {
                         let local_idx = frame.base_pointer + *local_slot as usize;
                         if local_idx < self.stack.len() {
-                            let right = &self.stack[local_idx];
-                            match (
-                                &self
-                                    .globals
-                                    .get(name.as_str())
-                                    .cloned()
-                                    .unwrap_or(Value::Undefined),
-                                right,
-                            ) {
-                                (Value::Integer(a), Value::Integer(b)) => {
+                            let right = self.stack[local_idx].clone();
+                            let left_ref = self.globals.get(name.as_str());
+                            match (left_ref, &right) {
+                                (Some(Value::Integer(a)), Value::Integer(b)) => {
                                     if let Some(result) = a.checked_add(*b) {
                                         self.globals.insert(name.clone(), Value::Integer(result));
                                     } else {
@@ -222,30 +217,26 @@ impl Interpreter {
                                     pc += 1;
                                     continue;
                                 }
-                                (Value::Float(a), Value::Float(b)) => {
+                                (Some(Value::Float(a)), Value::Float(b)) => {
                                     self.globals.insert(name.clone(), Value::Float(a + b));
                                     pc += 1;
                                     continue;
                                 }
-                                (Value::Integer(a), Value::Float(b)) => {
+                                (Some(Value::Integer(a)), Value::Float(b)) => {
                                     self.globals
                                         .insert(name.clone(), Value::Float(*a as f64 + *b));
                                     pc += 1;
                                     continue;
                                 }
-                                (Value::Float(a), Value::Integer(b)) => {
+                                (Some(Value::Float(a)), Value::Integer(b)) => {
                                     self.globals
                                         .insert(name.clone(), Value::Float(*a + *b as f64));
                                     pc += 1;
                                     continue;
                                 }
                                 _ => {
-                                    let left = self
-                                        .globals
-                                        .get(name.as_str())
-                                        .cloned()
-                                        .unwrap_or(Value::Undefined);
-                                    let result = self.add(left, right.clone())?;
+                                    let left = left_ref.cloned().unwrap_or(Value::Undefined);
+                                    let result = self.add(left, right)?;
                                     self.globals.insert(name.clone(), result);
                                     pc += 1;
                                     continue;
@@ -293,52 +284,75 @@ impl Interpreter {
                     pc += 1;
                     continue;
                 }
-                // Phase 8.4: Inline MapSet/MapGet on the hot path
+                // Phase 8.4: Inline MapSet/MapGet. Fast path for the common
+                // 2-arg form pops value/key/map without a temporary args Vec.
                 Instruction::MapSet(argc) => {
-                    let mut args = Vec::with_capacity(usize::from(*argc));
-                    for _ in 0..*argc {
-                        args.push(self.stack.pop().ok_or_else(|| {
+                    if *argc == 2 {
+                        let value = self.stack.pop().ok_or_else(|| {
                             Error::RuntimeError(super::ERR_STACK_UNDERFLOW.into())
-                        })?);
-                    }
-                    args.reverse();
-                    let object = self
-                        .stack
-                        .pop()
-                        .ok_or_else(|| Error::RuntimeError(super::ERR_STACK_UNDERFLOW.into()))?;
-                    if let Value::Map(map_idx) = &object {
-                        let key = args.first().cloned().unwrap_or(Value::Undefined);
-                        let value = args.get(1).cloned().unwrap_or(Value::Undefined);
-                        if let HeapValue::Map(map) = &mut self.heap[*map_idx] {
-                            map.set(key, value);
+                        })?;
+                        let key = self.stack.pop().ok_or_else(|| {
+                            Error::RuntimeError(super::ERR_STACK_UNDERFLOW.into())
+                        })?;
+                        let object = self.stack.pop().ok_or_else(|| {
+                            Error::RuntimeError(super::ERR_STACK_UNDERFLOW.into())
+                        })?;
+                        if let Value::Map(map_idx) = object {
+                            if let HeapValue::Map(map) = &mut self.heap[map_idx] {
+                                map.set(key, value);
+                            }
+                            self.stack.push(Value::Map(map_idx));
+                        } else {
+                            let method =
+                                self.get_property(&object, &Value::string("set"))?;
+                            let result =
+                                self.call_value(&method, &object, &[key, value])?;
+                            self.stack.push(result);
                         }
-                        self.stack.push(object);
                     } else {
-                        let method = self.get_property(&object, &Value::String("set".into()))?;
-                        let result = self.call_value(&method, &object, &args)?;
-                        self.stack.push(result);
+                        let mut args = Vec::with_capacity(usize::from(*argc));
+                        for _ in 0..*argc {
+                            args.push(self.stack.pop().ok_or_else(|| {
+                                Error::RuntimeError(super::ERR_STACK_UNDERFLOW.into())
+                            })?);
+                        }
+                        args.reverse();
+                        let object = self.stack.pop().ok_or_else(|| {
+                            Error::RuntimeError(super::ERR_STACK_UNDERFLOW.into())
+                        })?;
+                        if let Value::Map(map_idx) = object {
+                            let key = args.first().cloned().unwrap_or(Value::Undefined);
+                            let value = args.get(1).cloned().unwrap_or(Value::Undefined);
+                            if let HeapValue::Map(map) = &mut self.heap[map_idx] {
+                                map.set(key, value);
+                            }
+                            self.stack.push(Value::Map(map_idx));
+                        } else {
+                            let method =
+                                self.get_property(&object, &Value::string("set"))?;
+                            let result = self.call_value(&method, &object, &args)?;
+                            self.stack.push(result);
+                        }
                     }
                     pc += 1;
                     continue;
                 }
                 Instruction::MapGet => {
-                    let key = self
-                        .stack
-                        .pop()
-                        .ok_or_else(|| Error::RuntimeError(super::ERR_STACK_UNDERFLOW.into()))?;
-                    let object = self
-                        .stack
-                        .pop()
-                        .ok_or_else(|| Error::RuntimeError(super::ERR_STACK_UNDERFLOW.into()))?;
-                    if let Value::Map(map_idx) = &object {
-                        let result = if let HeapValue::Map(map) = &self.heap[*map_idx] {
+                    let key = self.stack.pop().ok_or_else(|| {
+                        Error::RuntimeError(super::ERR_STACK_UNDERFLOW.into())
+                    })?;
+                    let object = self.stack.pop().ok_or_else(|| {
+                        Error::RuntimeError(super::ERR_STACK_UNDERFLOW.into())
+                    })?;
+                    if let Value::Map(map_idx) = object {
+                        let result = if let HeapValue::Map(map) = &self.heap[map_idx] {
                             map.get(&key).cloned().unwrap_or(Value::Undefined)
                         } else {
                             Value::Undefined
                         };
                         self.stack.push(result);
                     } else {
-                        let method = self.get_property(&object, &Value::String("get".into()))?;
+                        let method = self.get_property(&object, &Value::string("get"))?;
                         let result = self.call_value(&method, &object, &[key])?;
                         self.stack.push(result);
                     }
@@ -593,9 +607,7 @@ impl Interpreter {
                         _ => {
                             let promise_idx = self.heap.len();
                             self.heap.push(HeapValue::Promise(
-                                crate::objects::js_promise::JsPromise::rejected(Value::String(
-                                    format!("Cannot resolve import source: {}", source),
-                                )),
+                                crate::objects::js_promise::JsPromise::rejected(Value::from_string(format!("Cannot resolve import source: {}", source),)),
                             ));
                             self.stack.push(Value::Promise(promise_idx));
                             continue;

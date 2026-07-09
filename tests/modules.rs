@@ -39,7 +39,7 @@ fn test_default_export_function() {
     runtime.eval_module(&source, &dir).unwrap();
 
     let result = runtime.eval("greet('World')").unwrap();
-    assert_eq!(result, tails::Value::String("Hello, World!".to_string()));
+    assert_eq!(result, tails::Value::string("Hello, World!"));
 }
 
 #[test]
@@ -56,7 +56,7 @@ fn test_multiple_named_exports() {
     assert_eq!(result, tails::Value::Float(1.0));
 
     let result = runtime.eval("DEFAULT_NAME").unwrap();
-    assert_eq!(result, tails::Value::String("test".to_string()));
+    assert_eq!(result, tails::Value::string("test"));
 }
 
 #[test]
@@ -95,7 +95,7 @@ fn test_import_default_from_module() {
         greet("Tails")
     "#;
     let result = runtime.eval(source).unwrap();
-    assert_eq!(result, tails::Value::String("Hello, Tails!".to_string()));
+    assert_eq!(result, tails::Value::string("Hello, Tails!"));
 }
 
 #[test]
@@ -139,7 +139,7 @@ fn test_import_from_chain() {
         fromB()
     "#;
     let result = runtime.eval(source).unwrap();
-    assert_eq!(result, tails::Value::String("AB".to_string()));
+    assert_eq!(result, tails::Value::string("AB"));
 }
 
 #[test]
@@ -162,7 +162,7 @@ fn test_exported_values_visible() {
     runtime.eval_module(&source, &dir).unwrap();
 
     let result = runtime.eval("getSecret()").unwrap();
-    assert_eq!(result, tails::Value::String("private".to_string()));
+    assert_eq!(result, tails::Value::string("private"));
 
     let result = runtime.eval("exposed").unwrap();
     assert_eq!(result, tails::Value::Float(42.0));
@@ -178,7 +178,7 @@ fn test_module_does_not_pollute_global() {
     let result = runtime
         .eval("typeof mySecret !== 'undefined' ? 'leaked' : 'ok'")
         .unwrap();
-    assert_eq!(result, tails::Value::String("ok".to_string()));
+    assert_eq!(result, tails::Value::string("ok"));
 }
 
 #[test]
@@ -217,7 +217,7 @@ fn test_reexport_default_as() {
         myGreet("World")
     "#;
     let result = runtime.eval(source).unwrap();
-    assert_eq!(result, tails::Value::String("Default: World".to_string()));
+    assert_eq!(result, tails::Value::string("Default: World"));
 }
 
 #[test]
@@ -228,14 +228,14 @@ fn test_reexport_named_as() {
         sayHello("Tails")
     "#;
     let result = runtime.eval(source).unwrap();
-    assert_eq!(result, tails::Value::String("Hello, Tails!".to_string()));
+    assert_eq!(result, tails::Value::string("Hello, Tails!"));
 
     let source2 = r#"
         import { APP_VERSION } from "./tests/fixtures/modules/reexport_named_as.ts";
         APP_VERSION
     "#;
     let result2 = runtime.eval(source2).unwrap();
-    assert_eq!(result2, tails::Value::String("1.0.0".to_string()));
+    assert_eq!(result2, tails::Value::string("1.0.0"));
 }
 
 #[test]
@@ -246,7 +246,7 @@ fn test_reexport_star_as() {
         values.greet("X")
     "#;
     let result = runtime.eval(source).unwrap();
-    assert_eq!(result, tails::Value::String("Hello, X!".to_string()));
+    assert_eq!(result, tails::Value::string("Hello, X!"));
 }
 
 #[test]
@@ -257,7 +257,7 @@ fn test_anonymous_default_export() {
         fn("test")
     "#;
     let result = runtime.eval(source).unwrap();
-    assert_eq!(result, tails::Value::String("Anonymous: test".to_string()));
+    assert_eq!(result, tails::Value::string("Anonymous: test"));
 }
 
 #[test]
@@ -268,21 +268,21 @@ fn test_multi_reexport() {
         ver
     "#;
     let result = runtime.eval(source).unwrap();
-    assert_eq!(result, tails::Value::String("1.0.0".to_string()));
+    assert_eq!(result, tails::Value::string("1.0.0"));
 
     let source2 = r#"
         import { hi } from "./tests/fixtures/modules/multi_reexport.ts";
         hi("World")
     "#;
     let result2 = runtime.eval(source2).unwrap();
-    assert_eq!(result2, tails::Value::String("Hello, World!".to_string()));
+    assert_eq!(result2, tails::Value::string("Hello, World!"));
 
     let source3 = r#"
         import { main } from "./tests/fixtures/modules/multi_reexport.ts";
         main("test")
     "#;
     let result3 = runtime.eval(source3).unwrap();
-    assert_eq!(result3, tails::Value::String("Default: test".to_string()));
+    assert_eq!(result3, tails::Value::string("Default: test"));
 }
 
 #[test]
@@ -293,7 +293,7 @@ fn test_reexport_default_as_via_eval_module() {
         myGreet('Tails')
     "#;
     let result = runtime.eval(source).unwrap();
-    assert_eq!(result, tails::Value::String("Default: Tails".to_string()));
+    assert_eq!(result, tails::Value::string("Default: Tails"));
 }
 
 #[test]
@@ -304,7 +304,7 @@ fn test_anonymous_default_via_eval_module() {
         fn('Tails')
     "#;
     let result = runtime.eval(source).unwrap();
-    assert_eq!(result, tails::Value::String("Anonymous: Tails".to_string()));
+    assert_eq!(result, tails::Value::string("Anonymous: Tails"));
 }
 
 #[test]
@@ -315,7 +315,7 @@ fn test_import_named_default_from_reexport() {
         defaultGreet("Direct")
     "#;
     let result = runtime.eval(source).unwrap();
-    assert_eq!(result, tails::Value::String("Default: Direct".to_string()));
+    assert_eq!(result, tails::Value::string("Default: Direct"));
 }
 
 #[test]
@@ -340,12 +340,12 @@ fn test_import_default_from_named_default_reexport() {
         myGreet("A")
     "#;
     let result = runtime.eval(source).unwrap();
-    assert_eq!(result, tails::Value::String("Default: A".to_string()));
+    assert_eq!(result, tails::Value::string("Default: A"));
 
     let source2 = r#"
         import defaultGreet from "./tests/fixtures/modules/base_values.ts";
         defaultGreet("B")
     "#;
     let result2 = runtime.eval(source2).unwrap();
-    assert_eq!(result2, tails::Value::String("Default: B".to_string()));
+    assert_eq!(result2, tails::Value::string("Default: B"));
 }

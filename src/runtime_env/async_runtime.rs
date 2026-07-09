@@ -23,12 +23,15 @@ pub struct AsyncRuntime {
 impl AsyncRuntime {
     pub fn new() -> Self {
         Self {
-            microtask_queue: VecDeque::new(),
+            // Pre-size so the first burst of promise resolutions does not
+            // reallocate the queue buffer.
+            microtask_queue: VecDeque::with_capacity(64),
             macrotask_queue: VecDeque::new(),
             next_timer_id: 1,
         }
     }
 
+    #[inline]
     pub fn enqueue_microtask(&mut self, callback: Value) {
         self.microtask_queue.push_back(Microtask {
             callback,
@@ -36,10 +39,12 @@ impl AsyncRuntime {
         });
     }
 
+    #[inline]
     pub fn enqueue_microtask_with_arg(&mut self, callback: Value, arg: Value) {
         self.microtask_queue.push_back(Microtask { callback, arg });
     }
 
+    #[inline]
     pub fn dequeue_microtask(&mut self) -> Option<Microtask> {
         self.microtask_queue.pop_front()
     }
@@ -78,6 +83,9 @@ impl AsyncRuntime {
         self.macrotask_queue.retain(|t| t.id != id);
     }
 
+    /// Drain the microtask queue into a reused buffer (zero extra alloc when
+    /// the destination already has capacity). Prefer
+    /// [`take_microtasks`](Self::take_microtasks) for the hot path.
     pub fn run_microtasks(&mut self) -> Vec<Microtask> {
         if self.microtask_queue.is_empty() {
             return Vec::new();
@@ -87,6 +95,25 @@ impl AsyncRuntime {
             tasks.push(task);
         }
         tasks
+    }
+
+    /// Move the current microtask queue out without allocating a new Vec.
+    /// Callers process the returned queue, then drop it; newly enqueued tasks
+    /// land in a fresh queue on `self`.
+    #[inline]
+    pub fn take_microtasks(&mut self) -> VecDeque<Microtask> {
+        if self.microtask_queue.is_empty() {
+            return VecDeque::new();
+        }
+        std::mem::replace(
+            &mut self.microtask_queue,
+            VecDeque::with_capacity(32),
+        )
+    }
+
+    #[inline]
+    pub fn has_microtasks(&self) -> bool {
+        !self.microtask_queue.is_empty()
     }
 
     pub fn run_macrotasks(&mut self) -> Vec<Macrotask> {
@@ -131,6 +158,7 @@ impl AsyncRuntime {
             .min()
     }
 
+    #[inline]
     pub fn is_idle(&self) -> bool {
         self.microtask_queue.is_empty() && self.macrotask_queue.is_empty()
     }

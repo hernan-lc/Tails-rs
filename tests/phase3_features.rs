@@ -540,7 +540,7 @@ fn test_array_join() {
     "#,
     );
     assert!(r.is_ok());
-    assert_eq!(r.unwrap(), tails::Value::String("1-2-3".to_string()));
+    assert_eq!(r.unwrap(), tails::Value::string("1-2-3"));
 }
 
 #[test]
@@ -604,7 +604,7 @@ fn test_string_char_at() {
     let mut rt = TailsRuntime::default();
     let r = rt.eval(r#""hello".charAt(1);"#);
     assert!(r.is_ok());
-    assert_eq!(r.unwrap(), tails::Value::String("e".to_string()));
+    assert_eq!(r.unwrap(), tails::Value::string("e"));
 }
 
 #[test]
@@ -620,7 +620,7 @@ fn test_string_slice() {
     let mut rt = TailsRuntime::default();
     let r = rt.eval(r#""hello".slice(1, 3);"#);
     assert!(r.is_ok());
-    assert_eq!(r.unwrap(), tails::Value::String("el".to_string()));
+    assert_eq!(r.unwrap(), tails::Value::string("el"));
 }
 
 #[test]
@@ -628,7 +628,7 @@ fn test_string_substring() {
     let mut rt = TailsRuntime::default();
     let r = rt.eval(r#""hello".substring(1, 4);"#);
     assert!(r.is_ok());
-    assert_eq!(r.unwrap(), tails::Value::String("ell".to_string()));
+    assert_eq!(r.unwrap(), tails::Value::string("ell"));
 }
 
 #[test]
@@ -652,7 +652,7 @@ fn test_string_replace() {
     let mut rt = TailsRuntime::default();
     let r = rt.eval(r#""hello world".replace("world", "JS");"#);
     assert!(r.is_ok());
-    assert_eq!(r.unwrap(), tails::Value::String("hello JS".to_string()));
+    assert_eq!(r.unwrap(), tails::Value::string("hello JS"));
 }
 
 #[test]
@@ -673,7 +673,7 @@ fn test_string_trim() {
     let mut rt = TailsRuntime::default();
     let r = rt.eval(r#""  hello  ".trim();"#);
     assert!(r.is_ok());
-    assert_eq!(r.unwrap(), tails::Value::String("hello".to_string()));
+    assert_eq!(r.unwrap(), tails::Value::string("hello"));
 }
 
 #[test]
@@ -681,7 +681,7 @@ fn test_string_to_lower_case() {
     let mut rt = TailsRuntime::default();
     let r = rt.eval(r#""HELLO".toLowerCase();"#);
     assert!(r.is_ok());
-    assert_eq!(r.unwrap(), tails::Value::String("hello".to_string()));
+    assert_eq!(r.unwrap(), tails::Value::string("hello"));
 }
 
 #[test]
@@ -689,7 +689,7 @@ fn test_string_to_upper_case() {
     let mut rt = TailsRuntime::default();
     let r = rt.eval(r#""hello".toUpperCase();"#);
     assert!(r.is_ok());
-    assert_eq!(r.unwrap(), tails::Value::String("HELLO".to_string()));
+    assert_eq!(r.unwrap(), tails::Value::string("HELLO"));
 }
 
 #[test]
@@ -713,7 +713,7 @@ fn test_string_repeat() {
     let mut rt = TailsRuntime::default();
     let r = rt.eval(r#""ha".repeat(3);"#);
     assert!(r.is_ok());
-    assert_eq!(r.unwrap(), tails::Value::String("hahaha".to_string()));
+    assert_eq!(r.unwrap(), tails::Value::string("hahaha"));
 }
 
 #[test]
@@ -721,7 +721,7 @@ fn test_string_pad_start() {
     let mut rt = TailsRuntime::default();
     let r = rt.eval(r#""5".padStart(3, "0");"#);
     assert!(r.is_ok());
-    assert_eq!(r.unwrap(), tails::Value::String("005".to_string()));
+    assert_eq!(r.unwrap(), tails::Value::string("005"));
 }
 
 #[test]
@@ -729,7 +729,7 @@ fn test_string_pad_end() {
     let mut rt = TailsRuntime::default();
     let r = rt.eval(r#""5".padEnd(3, "0");"#);
     assert!(r.is_ok());
-    assert_eq!(r.unwrap(), tails::Value::String("500".to_string()));
+    assert_eq!(r.unwrap(), tails::Value::string("500"));
 }
 
 // ---- Number methods ----
@@ -823,7 +823,7 @@ fn test_string_split_and_join() {
     assert!(r.is_ok());
     assert_eq!(
         r.unwrap(),
-        tails::Value::String("hello world foo".to_string())
+        tails::Value::string("hello world foo")
     );
 }
 

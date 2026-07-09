@@ -11,7 +11,7 @@ pub(super) fn native_string_constructor(
     args: &[Value],
 ) -> Result<Value> {
     let value = args.first().cloned().unwrap_or(Value::Undefined);
-    Ok(Value::String(to_string_value(interp, &value)))
+    Ok(Value::from_string(to_string_value(interp, &value).into()))
 }
 
 pub(super) fn native_string_char_at(
@@ -22,8 +22,8 @@ pub(super) fn native_string_char_at(
     let s = get_string(this).unwrap_or_default();
     let idx = args.first().map(|v| to_f64(v) as usize).unwrap_or(0);
     match s.chars().nth(idx) {
-        Some(c) => Ok(Value::String(c.to_string())),
-        None => Ok(Value::String("".to_string())),
+        Some(c) => Ok(Value::from_string(c.to_string())),
+        None => Ok(Value::from_string("".to_string())),
     }
 }
 
@@ -63,7 +63,7 @@ pub(super) fn native_string_slice(
     } as usize;
 
     let result: String = chars[start..end].iter().collect();
-    Ok(Value::String(result))
+    Ok(Value::from_string(result.into()))
 }
 
 pub(super) fn native_string_substring(
@@ -92,7 +92,7 @@ pub(super) fn native_string_substring(
         (end, start)
     };
     let result: String = chars[start..end].iter().collect();
-    Ok(Value::String(result))
+    Ok(Value::from_string(result.into()))
 }
 
 pub(super) fn native_string_index_of(
@@ -102,7 +102,7 @@ pub(super) fn native_string_index_of(
 ) -> Result<Value> {
     let s = get_string(this).unwrap_or_default();
     let search = match args.first() {
-        Some(Value::String(ss)) => ss.as_str(),
+        Some(Value::String(ss)) => ss.as_ref(),
         _ => return Ok(Value::Float(-1.0)),
     };
     match s.find(search) {
@@ -118,7 +118,7 @@ pub(super) fn native_string_includes(
 ) -> Result<Value> {
     let s = get_string(this).unwrap_or_default();
     let search = match args.first() {
-        Some(Value::String(ss)) => ss.as_str(),
+        Some(Value::String(ss)) => ss.as_ref(),
         _ => return Ok(Value::Boolean(false)),
     };
     Ok(Value::Boolean(s.contains(search)))
@@ -131,8 +131,8 @@ pub(super) fn native_string_replace(
 ) -> Result<Value> {
     let s = get_string(this).unwrap_or_default();
     let pattern = match args.first() {
-        Some(Value::String(ss)) => ss.as_str(),
-        _ => return Ok(Value::String(s)),
+        Some(Value::String(ss)) => ss.as_ref(),
+        _ => return Ok(Value::from_string(s.into())),
     };
     let replacement = match args.get(1) {
         Some(v) => to_string_value(interp, v),
@@ -142,9 +142,9 @@ pub(super) fn native_string_replace(
         Some(pos) => {
             let end = pos + pattern.len();
             let result = format!("{}{}{}", &s[..pos], replacement, &s[end..]);
-            Ok(Value::String(result))
+            Ok(Value::from_string(result.into()))
         }
-        None => Ok(Value::String(s)),
+        None => Ok(Value::from_string(s.into())),
     }
 }
 
@@ -155,20 +155,20 @@ pub(super) fn native_string_split(
 ) -> Result<Value> {
     let s = get_string(this).unwrap_or_default();
     let sep = match args.first() {
-        Some(Value::String(ss)) => ss.as_str(),
+        Some(Value::String(ss)) => ss.as_ref(),
         _ => {
             return {
                 let heap_idx = interp.heap.len();
                 interp.heap.push(crate::vm::interpreter::HeapValue::Array(
                     crate::vm::interpreter::JsArray {
-                        elements: vec![Value::String(s)],
+                        elements: vec![Value::from_string(s.into())],
                     },
                 ));
                 Ok(Value::Array(heap_idx))
             }
         }
     };
-    let parts: Vec<Value> = s.split(sep).map(|p| Value::String(p.to_string())).collect();
+    let parts: Vec<Value> = s.split(sep).map(|p| Value::from_string(p.to_string())).collect();
     let heap_idx = interp.heap.len();
     interp.heap.push(crate::vm::interpreter::HeapValue::Array(
         crate::vm::interpreter::JsArray { elements: parts },
@@ -182,7 +182,7 @@ pub(super) fn native_string_trim(
     _args: &[Value],
 ) -> Result<Value> {
     let s = get_string(this).unwrap_or_default();
-    Ok(Value::String(s.trim().to_string()))
+    Ok(Value::from_string(s.trim().to_string()))
 }
 
 pub(super) fn native_string_trim_start(
@@ -191,7 +191,7 @@ pub(super) fn native_string_trim_start(
     _args: &[Value],
 ) -> Result<Value> {
     let s = get_string(this).unwrap_or_default();
-    Ok(Value::String(s.trim_start().to_string()))
+    Ok(Value::from_string(s.trim_start().to_string()))
 }
 
 pub(super) fn native_string_trim_end(
@@ -200,7 +200,7 @@ pub(super) fn native_string_trim_end(
     _args: &[Value],
 ) -> Result<Value> {
     let s = get_string(this).unwrap_or_default();
-    Ok(Value::String(s.trim_end().to_string()))
+    Ok(Value::from_string(s.trim_end().to_string()))
 }
 
 pub(super) fn native_string_to_lower_case(
@@ -209,7 +209,7 @@ pub(super) fn native_string_to_lower_case(
     _args: &[Value],
 ) -> Result<Value> {
     let s = get_string(this).unwrap_or_default();
-    Ok(Value::String(s.to_lowercase()))
+    Ok(Value::from_string(s.to_lowercase().into()))
 }
 
 pub(super) fn native_string_to_upper_case(
@@ -218,7 +218,7 @@ pub(super) fn native_string_to_upper_case(
     _args: &[Value],
 ) -> Result<Value> {
     let s = get_string(this).unwrap_or_default();
-    Ok(Value::String(s.to_uppercase()))
+    Ok(Value::from_string(s.to_uppercase().into()))
 }
 
 pub(super) fn native_string_starts_with(
@@ -228,7 +228,7 @@ pub(super) fn native_string_starts_with(
 ) -> Result<Value> {
     let s = get_string(this).unwrap_or_default();
     let prefix = match args.first() {
-        Some(Value::String(ss)) => ss.as_str(),
+        Some(Value::String(ss)) => ss.as_ref(),
         _ => return Ok(Value::Boolean(false)),
     };
     Ok(Value::Boolean(s.starts_with(prefix)))
@@ -241,7 +241,7 @@ pub(super) fn native_string_ends_with(
 ) -> Result<Value> {
     let s = get_string(this).unwrap_or_default();
     let suffix = match args.first() {
-        Some(Value::String(ss)) => ss.as_str(),
+        Some(Value::String(ss)) => ss.as_ref(),
         _ => return Ok(Value::Boolean(false)),
     };
     Ok(Value::Boolean(s.ends_with(suffix)))
@@ -255,10 +255,10 @@ pub(super) fn native_string_repeat(
     let s = get_string(this).unwrap_or_default();
     let count = args.first().map(|v| to_f64(v) as usize).unwrap_or(0);
     if count == 0 || s.is_empty() {
-        return Ok(Value::String("".to_string()));
+        return Ok(Value::from_string("".to_string()));
     }
     let result: String = s.repeat(count);
-    Ok(Value::String(result))
+    Ok(Value::from_string(result.into()))
 }
 
 fn pad_string(s: &str, target_len: usize, pad_char: char, pad_start: bool) -> String {
@@ -285,7 +285,7 @@ pub(super) fn native_string_pad_start(
         Some(Value::String(ss)) => ss.chars().next().unwrap_or(' '),
         _ => ' ',
     };
-    Ok(Value::String(pad_string(&s, target_len, pad_char, true)))
+    Ok(Value::from_string(pad_string(&s, target_len, pad_char, true).into()))
 }
 
 pub(super) fn native_string_pad_end(
@@ -299,7 +299,7 @@ pub(super) fn native_string_pad_end(
         Some(Value::String(ss)) => ss.chars().next().unwrap_or(' '),
         _ => ' ',
     };
-    Ok(Value::String(pad_string(&s, target_len, pad_char, false)))
+    Ok(Value::from_string(pad_string(&s, target_len, pad_char, false).into()))
 }
 
 pub(super) fn native_string_match_all(
@@ -331,7 +331,7 @@ pub(super) fn native_string_match_all(
                         let arr_idx = interp.gc.allocate(
                             &mut interp.heap,
                             HeapValue::Array(JsArray {
-                                elements: vec![Value::String(match_str)],
+                                elements: vec![Value::from_string(match_str.into())],
                             }),
                         );
                         results.push(Value::Array(arr_idx));
@@ -366,7 +366,7 @@ pub(super) fn native_string_match_all(
                 let arr_idx = interp.gc.allocate(
                     &mut interp.heap,
                     HeapValue::Array(JsArray {
-                        elements: vec![Value::String(match_str)],
+                        elements: vec![Value::from_string(match_str.into())],
                     }),
                 );
                 results.push(Value::Array(arr_idx));

@@ -77,24 +77,22 @@ pub(super) fn native_number_to_fixed(
     let n = match this {
         Value::Float(f) => *f,
         Value::Integer(i) => *i as f64,
-        _ => return Ok(Value::String(wk::NAN.to_string())),
+        _ => return Ok(Value::from_string(wk::NAN.to_string())),
     };
     let digits = args.first().map(|v| to_f64(v) as u32).unwrap_or(0);
     if n.is_nan() {
-        return Ok(Value::String(wk::NAN.to_string()));
+        return Ok(Value::from_string(wk::NAN.to_string()));
     }
     if n.is_infinite() {
-        return Ok(Value::String(
-            if n.is_sign_positive() {
+        return Ok(Value::from_string(if n.is_sign_positive() {
                 wk::INFINITY.to_string()
             } else {
                 format!("-{}", wk::INFINITY)
             }
-            .to_string(),
-        ));
+            .to_string(),));
     }
     let formatted = format!("{:.*}", digits as usize, n);
-    Ok(Value::String(formatted))
+    Ok(Value::from_string(formatted.into()))
 }
 
 pub(super) fn native_number_to_string(
@@ -106,22 +104,22 @@ pub(super) fn native_number_to_string(
     match this {
         Value::Float(f) => {
             if *f == 0.0 && f.is_sign_negative() {
-                return Ok(Value::String("-0".to_string()));
+                return Ok(Value::from_string("-0".to_string()));
             }
             if radix == 10 {
-                Ok(Value::String(format_number(*f)))
+                Ok(Value::from_string(format_number(*f).into()))
             } else {
-                Ok(Value::String(format_int(*f as i64, radix)))
+                Ok(Value::from_string(format_int(*f as i64, radix).into()))
             }
         }
         Value::Integer(i) => {
             if radix == 10 {
-                Ok(Value::String(i.to_string()))
+                Ok(Value::from_string(i.to_string()))
             } else {
-                Ok(Value::String(format_int(*i, radix)))
+                Ok(Value::from_string(format_int(*i, radix).into()))
             }
         }
-        _ => Ok(Value::String(wk::NAN.to_string())),
+        _ => Ok(Value::from_string(wk::NAN.to_string())),
     }
 }
 
@@ -139,8 +137,8 @@ pub(super) fn native_boolean_to_string(
     _args: &[Value],
 ) -> Result<Value> {
     match this {
-        Value::Boolean(b) => Ok(Value::String(b.to_string())),
-        _ => Ok(Value::String(wk::TRUE.to_string())),
+        Value::Boolean(b) => Ok(Value::from_string(b.to_string())),
+        _ => Ok(Value::from_string(wk::TRUE.to_string())),
     }
 }
 
@@ -160,24 +158,22 @@ pub(super) fn native_number_to_exponential(
     let n = match this {
         Value::Float(f) => *f,
         Value::Integer(i) => *i as f64,
-        _ => return Ok(Value::String(wk::NAN.to_string())),
+        _ => return Ok(Value::from_string(wk::NAN.to_string())),
     };
     let digits = match args.first() {
         Some(v) => to_f64(v) as usize,
         None => 20,
     };
     if n.is_nan() {
-        return Ok(Value::String(wk::NAN.to_string()));
+        return Ok(Value::from_string(wk::NAN.to_string()));
     }
     if n.is_infinite() {
-        return Ok(Value::String(
-            if n.is_sign_positive() {
+        return Ok(Value::from_string(if n.is_sign_positive() {
                 wk::INFINITY.to_string()
             } else {
                 format!("-{}", wk::INFINITY)
             }
-            .to_string(),
-        ));
+            .to_string(),));
     }
     let formatted = format!("{:.*e}", digits, n);
     let fixed = formatted.replacen(
@@ -207,7 +203,7 @@ pub(super) fn native_number_to_exponential(
     } else {
         fixed
     };
-    Ok(Value::String(result))
+    Ok(Value::from_string(result.into()))
 }
 
 pub(super) fn native_number_to_precision(
@@ -218,24 +214,22 @@ pub(super) fn native_number_to_precision(
     let n = match this {
         Value::Float(f) => *f,
         Value::Integer(i) => *i as f64,
-        _ => return Ok(Value::String(wk::NAN.to_string())),
+        _ => return Ok(Value::from_string(wk::NAN.to_string())),
     };
     let precision = args.first().map(|v| to_f64(v) as usize).unwrap_or(0);
     if n.is_nan() {
-        return Ok(Value::String(wk::NAN.to_string()));
+        return Ok(Value::from_string(wk::NAN.to_string()));
     }
     if n.is_infinite() {
-        return Ok(Value::String(
-            if n.is_sign_positive() {
+        return Ok(Value::from_string(if n.is_sign_positive() {
                 wk::INFINITY.to_string()
             } else {
                 format!("-{}", wk::INFINITY)
             }
-            .to_string(),
-        ));
+            .to_string(),));
     }
     if precision == 0 {
-        return Ok(Value::String(format_number(n)));
+        return Ok(Value::from_string(format_number(n).into()));
     }
     let abs_n = n.abs();
     let int_part = abs_n.floor();
@@ -248,7 +242,7 @@ pub(super) fn native_number_to_precision(
     let factor = 10.0_f64.powi(decimal_places as i32);
     let rounded = (n * factor).round() / factor;
     let formatted = format!("{:.*}", decimal_places, rounded);
-    Ok(Value::String(formatted))
+    Ok(Value::from_string(formatted.into()))
 }
 
 pub(super) fn native_number_is_integer(
@@ -278,7 +272,7 @@ pub(super) fn native_number_parse_float(
     args: &[Value],
 ) -> Result<Value> {
     let s = match args.first().unwrap_or(&Value::Undefined) {
-        Value::String(s) => s.clone(),
+        Value::String(s) => s.to_string(),
         other => format!("{}", to_f64(other)),
     };
     match s.trim().parse::<f64>() {

@@ -2,82 +2,138 @@ use crate::objects::Value;
 use rustc_hash::FxHashMap;
 use rustc_hash::FxHashSet;
 
-/// Swap-remove `item` from `vec` in O(1). Returns whether the item was found.
-fn swap_remove_vec<T: PartialEq>(vec: &mut Vec<T>, item: &T) -> bool {
-    if let Some(idx) = vec.iter().position(|v| v == item) {
-        let last = vec.len() - 1;
-        if idx != last {
-            vec.swap(idx, last);
-        }
-        vec.pop();
-        true
-    } else {
-        false
-    }
-}
-
+/// Ordered Map with a specialized integer-key fast path.
+///
+/// `Value` is ~96 bytes (dominated by `ConsString`), so using it directly as
+/// an `FxHashMap` key causes pathological cache behaviour under growth.
+/// Integer keys (the common case for `Map` benchmarks and numeric loops) go
+/// through a dense `FxHashMap<i64, usize>` instead.
 #[derive(Debug, Clone)]
 pub struct JsMap {
+    /// Integer-key → index into `keys`/`values`.
+    int_map: FxHashMap<i64, usize>,
+    /// Non-integer keys → index.
     map: FxHashMap<Value, usize>,
     pub(crate) keys: Vec<Value>,
     pub(crate) values: Vec<Value>,
 }
 
+/// Classify a value as an integer map key when it is an exact integer
+/// (SameValueZero-friendly for Integer/whole Float).
+#[inline]
+fn as_int_key(key: &Value) -> Option<i64> {
+    match key {
+        Value::Integer(i) => Some(*i),
+        Value::Float(f) if f.is_finite() && *f == (*f as i64) as f64 && *f != -0.0 => {
+            Some(*f as i64)
+        }
+        // +0.0 / -0.0 → 0 under SameValueZero
+        Value::Float(f) if *f == 0.0 => Some(0),
+        _ => None,
+    }
+}
+
 impl JsMap {
     pub fn new() -> Self {
         Self {
+            int_map: FxHashMap::default(),
             map: FxHashMap::default(),
             keys: Vec::new(),
             values: Vec::new(),
         }
     }
 
-    pub fn get(&self, key: &Value) -> Option<&Value> {
-        self.map.get(key).map(|&idx| &self.values[idx])
-    }
-
-    pub fn set(&mut self, key: Value, value: Value) {
-        if let Some(&idx) = self.map.get(&key) {
-            self.values[idx] = value;
-        } else {
-            let idx = self.keys.len();
-            self.map.insert(key.clone(), idx);
-            self.keys.push(key);
-            self.values.push(value);
+    pub fn with_capacity(cap: usize) -> Self {
+        Self {
+            int_map: FxHashMap::with_capacity_and_hasher(cap, Default::default()),
+            map: FxHashMap::with_capacity_and_hasher(cap / 4 + 1, Default::default()),
+            keys: Vec::with_capacity(cap),
+            values: Vec::with_capacity(cap),
         }
     }
 
+    #[inline]
+    pub fn get(&self, key: &Value) -> Option<&Value> {
+        if let Some(i) = as_int_key(key) {
+            return self.int_map.get(&i).map(|&idx| &self.values[idx]);
+        }
+        self.map.get(key).map(|&idx| &self.values[idx])
+    }
+
+    #[inline]
+    pub fn set(&mut self, key: Value, value: Value) {
+        if let Some(i) = as_int_key(&key) {
+            if let Some(&idx) = self.int_map.get(&i) {
+                self.values[idx] = value;
+                return;
+            }
+            let idx = self.keys.len();
+            self.int_map.insert(i, idx);
+            self.keys.push(key);
+            self.values.push(value);
+            return;
+        }
+        if let Some(&idx) = self.map.get(&key) {
+            self.values[idx] = value;
+            return;
+        }
+        let idx = self.keys.len();
+        self.map.insert(key.clone(), idx);
+        self.keys.push(key);
+        self.values.push(value);
+    }
+
+    #[inline]
     pub fn has(&self, key: &Value) -> bool {
+        if let Some(i) = as_int_key(key) {
+            return self.int_map.contains_key(&i);
+        }
         self.map.contains_key(key)
     }
 
     pub fn delete(&mut self, key: &Value) -> bool {
-        if let Some(idx) = self.map.remove(key) {
-            let last = self.keys.len() - 1;
-            if idx != last {
-                self.keys.swap(idx, last);
-                self.values.swap(idx, last);
-                self.keys.pop();
-                self.values.pop();
-                // Update index of key that was moved from last to idx
-                let moved_key = self.keys[idx].clone();
-                *self.map.get_mut(&moved_key).unwrap() = idx;
-            } else {
-                self.keys.pop();
-                self.values.pop();
+        let idx = if let Some(i) = as_int_key(key) {
+            match self.int_map.remove(&i) {
+                Some(idx) => idx,
+                None => return false,
             }
-            true
         } else {
-            false
+            match self.map.remove(key) {
+                Some(idx) => idx,
+                None => return false,
+            }
+        };
+
+        let last = self.keys.len() - 1;
+        if idx != last {
+            self.keys.swap(idx, last);
+            self.values.swap(idx, last);
+            self.keys.pop();
+            self.values.pop();
+            // Fix index of the swapped-in key
+            let moved = &self.keys[idx];
+            if let Some(i) = as_int_key(moved) {
+                if let Some(slot) = self.int_map.get_mut(&i) {
+                    *slot = idx;
+                }
+            } else if let Some(slot) = self.map.get_mut(moved) {
+                *slot = idx;
+            }
+        } else {
+            self.keys.pop();
+            self.values.pop();
         }
+        true
     }
 
     pub fn clear(&mut self) {
+        self.int_map.clear();
         self.map.clear();
         self.keys.clear();
         self.values.clear();
     }
 
+    #[inline]
     pub fn size(&self) -> usize {
         self.keys.len()
     }
@@ -113,6 +169,7 @@ impl Default for JsMap {
 
 #[derive(Debug, Clone)]
 pub struct JsSet {
+    int_set: FxHashSet<i64>,
     set: FxHashSet<Value>,
     pub(crate) values: Vec<Value>,
 }
@@ -120,34 +177,68 @@ pub struct JsSet {
 impl JsSet {
     pub fn new() -> Self {
         Self {
+            int_set: FxHashSet::default(),
             set: FxHashSet::default(),
             values: Vec::new(),
         }
     }
 
+    pub fn with_capacity(cap: usize) -> Self {
+        Self {
+            int_set: FxHashSet::with_capacity_and_hasher(cap, Default::default()),
+            set: FxHashSet::with_capacity_and_hasher(cap / 4 + 1, Default::default()),
+            values: Vec::with_capacity(cap),
+        }
+    }
+
+    #[inline]
     pub fn add(&mut self, value: Value) {
+        if let Some(i) = as_int_key(&value) {
+            if self.int_set.insert(i) {
+                self.values.push(value);
+            }
+            return;
+        }
         if self.set.insert(value.clone()) {
             self.values.push(value);
         }
     }
 
+    #[inline]
     pub fn has(&self, value: &Value) -> bool {
+        if let Some(i) = as_int_key(value) {
+            return self.int_set.contains(&i);
+        }
         self.set.contains(value)
     }
 
     pub fn delete(&mut self, value: &Value) -> bool {
-        if self.set.remove(value) {
-            swap_remove_vec(&mut self.values, value)
+        let removed = if let Some(i) = as_int_key(value) {
+            self.int_set.remove(&i)
+        } else {
+            self.set.remove(value)
+        };
+        if removed {
+            if let Some(idx) = self.values.iter().position(|v| v == value) {
+                let last = self.values.len() - 1;
+                if idx != last {
+                    self.values.swap(idx, last);
+                }
+                self.values.pop();
+            }
+            true
         } else {
             false
         }
     }
 
     pub fn clear(&mut self) {
+        self.int_set.clear();
         self.set.clear();
         self.values.clear();
     }
 
+    #[inline]
     pub fn size(&self) -> usize {
         self.values.len()
     }
@@ -171,42 +262,33 @@ impl Default for JsSet {
 
 #[derive(Debug, Clone)]
 pub struct JsWeakMap {
-    pub entries: Vec<(usize, Value)>,
+    map: FxHashMap<usize, Value>,
 }
 
 impl JsWeakMap {
     pub fn new() -> Self {
         Self {
-            entries: Vec::new(),
+            map: FxHashMap::default(),
         }
     }
 
     pub fn get(&self, key: &Value) -> Option<&Value> {
         if let Value::Object(idx) = key {
-            for (k, v) in &self.entries {
-                if *k == *idx {
-                    return Some(v);
-                }
-            }
+            self.map.get(idx)
+        } else {
+            None
         }
-        None
     }
 
     pub fn set(&mut self, key: Value, value: Value) {
         if let Value::Object(idx) = key {
-            for (k, v) in &mut self.entries {
-                if *k == idx {
-                    *v = value;
-                    return;
-                }
-            }
-            self.entries.push((idx, value));
+            self.map.insert(idx, value);
         }
     }
 
     pub fn has(&self, key: &Value) -> bool {
         if let Value::Object(idx) = key {
-            self.entries.iter().any(|(k, _)| k == idx)
+            self.map.contains_key(idx)
         } else {
             false
         }
@@ -214,9 +296,7 @@ impl JsWeakMap {
 
     pub fn delete(&mut self, key: &Value) -> bool {
         if let Value::Object(idx) = key {
-            let len = self.entries.len();
-            self.entries.retain(|(k, _)| k != idx);
-            self.entries.len() < len
+            self.map.remove(idx).is_some()
         } else {
             false
         }
@@ -231,19 +311,19 @@ impl Default for JsWeakMap {
 
 #[derive(Debug, Clone)]
 pub struct JsWeakSet {
-    pub values: Vec<usize>,
+    values: FxHashSet<usize>,
 }
 
 impl JsWeakSet {
     pub fn new() -> Self {
-        Self { values: Vec::new() }
+        Self {
+            values: FxHashSet::default(),
+        }
     }
 
     pub fn add(&mut self, value: Value) {
         if let Value::Object(idx) = value {
-            if !self.values.contains(&idx) {
-                self.values.push(idx);
-            }
+            self.values.insert(idx);
         }
     }
 
@@ -257,9 +337,7 @@ impl JsWeakSet {
 
     pub fn delete(&mut self, value: &Value) -> bool {
         if let Value::Object(idx) = value {
-            let len = self.values.len();
-            self.values.retain(|v| v != idx);
-            self.values.len() < len
+            self.values.remove(idx)
         } else {
             false
         }
@@ -269,5 +347,25 @@ impl JsWeakSet {
 impl Default for JsWeakSet {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn integer_keys_roundtrip() {
+        let mut m = JsMap::new();
+        for i in 0..1000i64 {
+            m.set(Value::Integer(i), Value::Integer(i * 2));
+        }
+        assert_eq!(m.size(), 1000);
+        assert_eq!(m.get(&Value::Integer(42)), Some(&Value::Integer(84)));
+        // Whole floats share the int fast-path (SameValueZero).
+        assert_eq!(m.get(&Value::Float(42.0)), Some(&Value::Integer(84)));
+        assert!(m.delete(&Value::Integer(42)));
+        assert!(!m.has(&Value::Integer(42)));
+        assert_eq!(m.size(), 999);
     }
 }

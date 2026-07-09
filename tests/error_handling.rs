@@ -37,7 +37,7 @@ fn test_throw_new_error() {
     assert!(r.is_ok());
     assert_eq!(
         r.unwrap(),
-        tails::Value::String("something went wrong".to_string())
+        tails::Value::string("something went wrong")
     );
 }
 
@@ -58,7 +58,7 @@ fn test_catch_binding() {
     assert!(r.is_ok());
     assert_eq!(
         r.unwrap(),
-        tails::Value::String("my error value".to_string())
+        tails::Value::string("my error value")
     );
 }
 
@@ -122,7 +122,7 @@ fn test_nested_try_catch() {
     assert!(r.is_ok());
     assert_eq!(
         r.unwrap(),
-        tails::Value::String("inner: inner error, outer: outer error".to_string())
+        tails::Value::string("inner: inner error, outer: outer error")
     );
 }
 
@@ -136,7 +136,7 @@ fn test_error_prototype_message() {
     "#,
     );
     assert!(r.is_ok());
-    assert_eq!(r.unwrap(), tails::Value::String("test message".to_string()));
+    assert_eq!(r.unwrap(), tails::Value::string("test message"));
 }
 
 #[test]
@@ -149,7 +149,7 @@ fn test_error_prototype_stack() {
     "#,
     );
     assert!(r.is_ok());
-    assert_eq!(r.unwrap(), tails::Value::String("string".to_string()));
+    assert_eq!(r.unwrap(), tails::Value::string("string"));
 }
 
 #[test]
@@ -189,7 +189,7 @@ fn test_no_catch_propagates() {
     "#,
     );
     assert!(r.is_ok());
-    assert_eq!(r.unwrap(), tails::Value::String("uncaught".to_string()));
+    assert_eq!(r.unwrap(), tails::Value::string("uncaught"));
 }
 
 #[test]
@@ -202,7 +202,7 @@ fn test_type_error_constructor() {
     "#,
     );
     assert!(r.is_ok());
-    assert_eq!(r.unwrap(), tails::Value::String("bad type".to_string()));
+    assert_eq!(r.unwrap(), tails::Value::string("bad type"));
 }
 
 #[test]
@@ -215,7 +215,7 @@ fn test_reference_error_constructor() {
     "#,
     );
     assert!(r.is_ok());
-    assert_eq!(r.unwrap(), tails::Value::String("not defined".to_string()));
+    assert_eq!(r.unwrap(), tails::Value::string("not defined"));
 }
 
 #[test]
@@ -230,7 +230,7 @@ fn test_syntax_error_constructor() {
     assert!(r.is_ok());
     assert_eq!(
         r.unwrap(),
-        tails::Value::String("unexpected token".to_string())
+        tails::Value::string("unexpected token")
     );
 }
 
@@ -244,7 +244,7 @@ fn test_range_error_constructor() {
     "#,
     );
     assert!(r.is_ok());
-    assert_eq!(r.unwrap(), tails::Value::String("out of range".to_string()));
+    assert_eq!(r.unwrap(), tails::Value::string("out of range"));
 }
 
 #[test]
@@ -297,7 +297,7 @@ fn test_infinite_recursion_caught_by_try_catch() {
     assert!(r.is_ok(), "eval should succeed when caught: {:?}", r);
     assert_eq!(
         r.unwrap(),
-        tails::Value::String("Maximum call stack size exceeded".into())
+        tails::Value::string("Maximum call stack size exceeded")
     );
 }
 
@@ -317,7 +317,7 @@ fn test_infinite_recursion_caught_check_name() {
     "#,
     );
     assert!(r.is_ok(), "eval should succeed when caught: {:?}", r);
-    assert_eq!(r.unwrap(), tails::Value::String("RangeError".into()));
+    assert_eq!(r.unwrap(), tails::Value::string("RangeError"));
 }
 
 #[test]
@@ -379,7 +379,7 @@ fn test_custom_shorter_recursion_limit() {
     assert!(r.is_ok(), "custom limit 50: {:?}", r);
     assert_eq!(
         r.unwrap(),
-        tails::Value::String("Maximum call stack size exceeded".into())
+        tails::Value::string("Maximum call stack size exceeded")
     );
     drop(rt);
 
@@ -403,7 +403,7 @@ fn test_custom_shorter_recursion_limit() {
     assert!(r.is_ok(), "custom limit 200: {:?}", r);
     assert_eq!(
         r.unwrap(),
-        tails::Value::String("Maximum call stack size exceeded".into())
+        tails::Value::string("Maximum call stack size exceeded")
     );
 }
 
@@ -427,7 +427,7 @@ fn test_custom_shorter_limit_caught_name() {
     "#,
     );
     assert!(r.is_ok(), "caught name: {:?}", r);
-    assert_eq!(r.unwrap(), tails::Value::String("RangeError".into()));
+    assert_eq!(r.unwrap(), tails::Value::string("RangeError"));
 }
 
 #[test]

@@ -27,7 +27,7 @@ impl Interpreter {
                 Ok(Value::Object(iter_idx))
             }
             Value::String(s) => {
-                let chars: Vec<Value> = s.chars().map(|c| Value::String(c.to_string())).collect();
+                let chars: Vec<Value> = s.chars().map(|c| Value::from_string(c.to_string())).collect();
                 let data_idx = self.gc.allocate(
                     &mut self.heap,
                     HeapValue::Array(JsArray { elements: chars }),
@@ -47,7 +47,7 @@ impl Interpreter {
                 let flat = c.flatten();
                 let chars: Vec<Value> = flat
                     .chars()
-                    .map(|ch| Value::String(ch.to_string()))
+                    .map(|ch| Value::from_string(ch.to_string()))
                     .collect();
                 let data_idx = self.gc.allocate(
                     &mut self.heap,
@@ -127,7 +127,7 @@ impl Interpreter {
                 Ok(Value::Object(iter_idx))
             }
             Value::String(s) => {
-                let chars: Vec<Value> = s.chars().map(|c| Value::String(c.to_string())).collect();
+                let chars: Vec<Value> = s.chars().map(|c| Value::from_string(c.to_string())).collect();
                 let data_idx = self.gc.allocate(
                     &mut self.heap,
                     HeapValue::Array(JsArray { elements: chars }),
@@ -147,7 +147,7 @@ impl Interpreter {
                 let flat = c.flatten();
                 let chars: Vec<Value> = flat
                     .chars()
-                    .map(|ch| Value::String(ch.to_string()))
+                    .map(|ch| Value::from_string(ch.to_string()))
                     .collect();
                 let data_idx = self.gc.allocate(
                     &mut self.heap,
@@ -269,7 +269,7 @@ impl Interpreter {
             }
         }
 
-        let next_fn = self.get_property(&iterator, &Value::String("next".to_string()))?;
+        let next_fn = self.get_property(&iterator, &Value::from_string("next".to_string()))?;
         let next_result = self.call_value(&next_fn, &iterator, &[])?;
         // OPTIMIZATION (Phase 6C): for generator results, extract `done` and
         // `value` directly from the JsObject properties without re-doing
@@ -291,11 +291,11 @@ impl Interpreter {
         }
         // Slow path: fall back to the original property-access logic for
         // custom iterators that don't follow the generator protocol.
-        let done = self.get_property(&next_result, &Value::String("done".to_string()))?;
+        let done = self.get_property(&next_result, &Value::from_string("done".to_string()))?;
         match done {
             Value::Boolean(true) => Ok(ControlFlowOutcome::Jump(target)),
             _ => {
-                let value = self.get_property(&next_result, &Value::String("value".to_string()))?;
+                let value = self.get_property(&next_result, &Value::from_string("value".to_string()))?;
                 self.stack.push(value);
                 Ok(ControlFlowOutcome::Next)
             }
@@ -315,14 +315,14 @@ impl Interpreter {
                 index = iter.index;
                 data_val = iter.data.clone();
             } else {
-                let next_fn = self.get_property(&iterator, &Value::String("next".to_string()))?;
+                let next_fn = self.get_property(&iterator, &Value::from_string("next".to_string()))?;
                 let next_result = self.call_value(&next_fn, &iterator, &[])?;
-                let done = self.get_property(&next_result, &Value::String("done".to_string()))?;
+                let done = self.get_property(&next_result, &Value::from_string("done".to_string()))?;
                 match done {
                     Value::Boolean(true) => return Ok(ControlFlowOutcome::Jump(target)),
                     _ => {
                         let value =
-                            self.get_property(&next_result, &Value::String("value".to_string()))?;
+                            self.get_property(&next_result, &Value::from_string("value".to_string()))?;
                         let awaited_value = Self::resolve_value_promise(&self.heap, &value);
                         self.stack.push(awaited_value);
                         return Ok(ControlFlowOutcome::Next);
@@ -362,13 +362,13 @@ impl Interpreter {
             }
         }
 
-        let next_fn = self.get_property(&iterator, &Value::String("next".to_string()))?;
+        let next_fn = self.get_property(&iterator, &Value::from_string("next".to_string()))?;
         let next_result = self.call_value(&next_fn, &iterator, &[])?;
-        let done = self.get_property(&next_result, &Value::String("done".to_string()))?;
+        let done = self.get_property(&next_result, &Value::from_string("done".to_string()))?;
         match done {
             Value::Boolean(true) => Ok(ControlFlowOutcome::Jump(target)),
             _ => {
-                let value = self.get_property(&next_result, &Value::String("value".to_string()))?;
+                let value = self.get_property(&next_result, &Value::from_string("value".to_string()))?;
                 let awaited_value = Self::resolve_value_promise(&self.heap, &value);
                 self.stack.push(awaited_value);
                 Ok(ControlFlowOutcome::Next)
@@ -377,7 +377,7 @@ impl Interpreter {
     }
 
     pub(crate) fn exec_iterator_close(&mut self, iterator: Value) -> Result<()> {
-        if let Ok(return_fn) = self.get_property(&iterator, &Value::String("return".to_string())) {
+        if let Ok(return_fn) = self.get_property(&iterator, &Value::from_string("return".to_string())) {
             if matches!(return_fn, Value::Function(_) | Value::NativeFunction(_)) {
                 let _ = self.call_value(&return_fn, &iterator, &[]);
             }

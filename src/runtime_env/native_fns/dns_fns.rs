@@ -19,9 +19,9 @@ pub(super) fn native_dns_resolve(
         .unwrap_or_else(|| "A".to_string());
 
     match rrtype.to_uppercase().as_str() {
-        "A" => native_dns_resolve4(interp, _this, &[Value::String(domain)]),
-        "AAAA" => native_dns_resolve6(interp, _this, &[Value::String(domain)]),
-        "MX" => native_dns_resolve_mx(interp, _this, &[Value::String(domain)]),
+        "A" => native_dns_resolve4(interp, _this, &[Value::from_string(domain.into())]),
+        "AAAA" => native_dns_resolve6(interp, _this, &[Value::from_string(domain.into())]),
+        "MX" => native_dns_resolve_mx(interp, _this, &[Value::from_string(domain.into())]),
         _ => {
             let arr_idx = interp.heap.len();
             interp.heap.push(HeapValue::Array(JsArray {
@@ -45,7 +45,7 @@ pub(super) fn native_dns_lookup(
         &mut interp.heap,
         HeapValue::Object(JsObject {
             properties: crate::props! {
-                "address" => Value::String(hostname.clone()),
+                "address" => Value::from_string(hostname.clone().into()),
                 "family" => Value::Integer(4),
             },
             prototype: None,

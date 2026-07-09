@@ -111,7 +111,7 @@ fn test_process_argv() {
 fn test_process_env() {
     skip_if_cdylib_present!();
     let val = run("typeof process.env;");
-    assert_eq!(val, tails::Value::String("object".to_string()));
+    assert_eq!(val, tails::Value::string("object"));
 }
 
 #[test]

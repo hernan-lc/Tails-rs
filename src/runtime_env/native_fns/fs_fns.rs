@@ -21,7 +21,7 @@ pub(super) fn native_fs_read_file_sync(
             path
         ))
     })?;
-    Ok(Value::String(content))
+    Ok(Value::from_string(content.into()))
 }
 
 pub(super) fn native_fs_write_file_sync(
@@ -99,7 +99,7 @@ pub(super) fn native_fs_readdir_sync(
             ))
         })?
         .into_iter()
-        .map(Value::String)
+        .map(Value::from_string)
         .collect();
     let arr_idx = interp.heap.len();
     interp
@@ -273,7 +273,7 @@ pub(super) fn native_fs_readdir(
 
     match tails_fs::readdir(&path) {
         Ok(names) => {
-            let entries: Vec<Value> = names.into_iter().map(Value::String).collect();
+            let entries: Vec<Value> = names.into_iter().map(Value::from_string).collect();
             let arr_idx = interp.heap.len();
             interp
                 .heap
@@ -289,7 +289,7 @@ pub(super) fn native_fs_readdir(
         Err(e) => {
             let err_idx = interp.heap.len();
             let props = props! {
-                "message" => Value::String(format!(
+                "message" => Value::from_string(format!(
                     "ENOENT: no such file or directory, scandir '{}': {}",
                     path, e
                 )),
@@ -324,14 +324,14 @@ pub(super) fn native_fs_read_file(
         Ok(content) => {
             let promise_idx = interp.heap.len();
             interp.heap.push(HeapValue::Promise(
-                crate::objects::js_promise::JsPromise::fulfilled(Value::String(content)),
+                crate::objects::js_promise::JsPromise::fulfilled(Value::from_string(content.into())),
             ));
             Ok(Value::Promise(promise_idx))
         }
         Err(e) => {
             let err_idx = interp.heap.len();
             let props = props! {
-                "message" => Value::String(format!(
+                "message" => Value::from_string(format!(
                     "ENOENT: no such file or directory, open '{}': {}",
                     path, e
                 )),
@@ -377,7 +377,7 @@ pub(super) fn native_fs_write_file(
         Err(e) => {
             let err_idx = interp.heap.len();
             let props = props! {
-                "message" => Value::String(format!("EACCES: permission denied, open '{}': {}", path, e)),
+                "message" => Value::from_string(format!("EACCES: permission denied, open '{}': {}", path, e)),
             };
             interp
                 .heap
@@ -438,7 +438,7 @@ pub(super) fn native_fs_stat(
         Err(e) => {
             let err_idx = interp.heap.len();
             let props = props! {
-                "message" => Value::String(format!(
+                "message" => Value::from_string(format!(
                     "ENOENT: no such file or directory, stat '{}': {}",
                     path, e
                 )),
@@ -494,7 +494,7 @@ pub(super) fn native_fs_mkdir(
         Err(e) => {
             let err_idx = interp.heap.len();
             let props = props! {
-                "message" => Value::String(format!(
+                "message" => Value::from_string(format!(
                     "EACCES: permission denied, mkdir '{}': {}",
                     path, e
                 )),
@@ -536,7 +536,7 @@ pub(super) fn native_fs_unlink(
         Err(e) => {
             let err_idx = interp.heap.len();
             let props = props! {
-                "message" => Value::String(format!(
+                "message" => Value::from_string(format!(
                     "ENOENT: no such file or directory, unlink '{}': {}",
                     path, e
                 )),
@@ -582,7 +582,7 @@ pub(super) fn native_fs_copy_file(
         Err(e) => {
             let err_idx = interp.heap.len();
             let props = props! {
-                "message" => Value::String(format!(
+                "message" => Value::from_string(format!(
                     "EACCES: permission denied, copy '{}' to '{}': {}",
                     src, dest, e
                 )),
@@ -628,7 +628,7 @@ pub(super) fn native_fs_rename(
         Err(e) => {
             let err_idx = interp.heap.len();
             let props = props! {
-                "message" => Value::String(format!(
+                "message" => Value::from_string(format!(
                     "EACCES: permission denied, rename '{}' to '{}': {}",
                     old_path, new_path, e
                 )),

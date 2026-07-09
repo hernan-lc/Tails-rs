@@ -10,7 +10,7 @@ pub(super) fn native_path_join(
     args: &[Value],
 ) -> Result<Value> {
     let parts: Vec<String> = args.iter().map(|v| to_string_value(interp, v)).collect();
-    Ok(Value::String(tails_path::join(&parts)))
+    Ok(Value::from_string(tails_path::join(&parts).into()))
 }
 
 pub(super) fn native_path_resolve(
@@ -19,7 +19,7 @@ pub(super) fn native_path_resolve(
     args: &[Value],
 ) -> Result<Value> {
     let parts: Vec<String> = args.iter().map(|v| to_string_value(interp, v)).collect();
-    Ok(Value::String(tails_path::resolve(&parts)))
+    Ok(Value::from_string(tails_path::resolve(&parts).into()))
 }
 
 pub(super) fn native_path_basename(
@@ -33,7 +33,7 @@ pub(super) fn native_path_basename(
         .unwrap_or_default();
     let ext = args.get(1).map(|v| to_string_value(interp, v));
     let ext_ref = ext.as_deref();
-    Ok(Value::String(tails_path::basename(&path, ext_ref)))
+    Ok(Value::from_string(tails_path::basename(&path, ext_ref).into()))
 }
 
 pub(super) fn native_path_dirname(
@@ -45,7 +45,7 @@ pub(super) fn native_path_dirname(
         .first()
         .map(|v| to_string_value(interp, v))
         .unwrap_or_default();
-    Ok(Value::String(tails_path::dirname(&path)))
+    Ok(Value::from_string(tails_path::dirname(&path).into()))
 }
 
 pub(super) fn native_path_extname(
@@ -57,7 +57,7 @@ pub(super) fn native_path_extname(
         .first()
         .map(|v| to_string_value(interp, v))
         .unwrap_or_default();
-    Ok(Value::String(tails_path::extname(&path)))
+    Ok(Value::from_string(tails_path::extname(&path).into()))
 }
 
 pub(super) fn native_path_relative(
@@ -73,7 +73,7 @@ pub(super) fn native_path_relative(
         .get(1)
         .map(|v| to_string_value(interp, v))
         .unwrap_or_default();
-    Ok(Value::String(tails_path::relative(&from, &to)))
+    Ok(Value::from_string(tails_path::relative(&from, &to).into()))
 }
 
 pub(super) fn native_path_is_absolute(
@@ -97,5 +97,5 @@ pub(super) fn native_path_normalize(
         .first()
         .map(|v| to_string_value(interp, v))
         .unwrap_or_default();
-    Ok(Value::String(tails_path::normalize(&path)))
+    Ok(Value::from_string(tails_path::normalize(&path).into()))
 }

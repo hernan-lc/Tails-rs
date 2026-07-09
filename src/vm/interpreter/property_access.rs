@@ -7,7 +7,7 @@ use crate::well_known as wk;
 
 fn key_to_str(key: &Value) -> Option<String> {
     match key {
-        Value::String(s) => Some(s.clone()),
+        Value::String(s) => Some(s.to_string()),
         Value::Cons(c) => Some(c.flatten()),
         Value::Integer(n) => Some(n.to_string()),
         Value::Float(n) => Some(((*n) as i64).to_string()),
@@ -45,12 +45,12 @@ impl Interpreter {
     }
 
     pub fn get_property_str(&mut self, object: &Value, key: &str) -> Option<Value> {
-        self.get_property(object, &Value::String(key.to_string()))
+        self.get_property(object, &Value::from_string(key.to_string()))
             .ok()
     }
 
     pub fn set_property_str(&mut self, object: &Value, key: &str, value: Value) {
-        let _ = self.set_property(object, &Value::String(key.to_string()), value);
+        let _ = self.set_property(object, &Value::from_string(key.to_string()), value);
     }
 
     pub fn get_array_length(&self, array: &Value) -> Option<i64> {
@@ -170,7 +170,7 @@ impl Interpreter {
                         if let Some(Value::String(module_path)) =
                             obj.properties.get("__module_path")
                         {
-                            if let Some(exports) = self.module_registry.get(module_path) {
+                            if let Some(exports) = self.module_registry.get(module_path.as_ref()) {
                                 if let Some(val) = exports.get(&key_str) {
                                     return Ok(val.clone());
                                 }
@@ -199,7 +199,7 @@ impl Interpreter {
                 if let HeapValue::Array(arr) = &self.heap[*arr_idx] {
                     match key {
                         Value::String(key_str) => {
-                            if key_str == wk::LENGTH {
+                            if **key_str == *wk::LENGTH {
                                 return Ok(Value::Float(arr.elements.len() as f64));
                             }
                             if let Ok(index) = key_str.parse::<usize>() {
@@ -293,7 +293,7 @@ impl Interpreter {
                     wk::FINALLY => return Ok(Value::NativeFunction(c::PROMISE_FINALLY)),
                     "state" => {
                         if let HeapValue::Promise(p) = &self.heap[*promise_idx] {
-                            return Ok(Value::String(format!("{:?}", p.state)));
+                            return Ok(Value::from_string(format!("{:?}", p.state)));
                         }
                     }
                     "value" => {
@@ -421,7 +421,7 @@ impl Interpreter {
                 if let HeapValue::Proxy(proxy) = &self.heap[*proxy_idx] {
                     let handler = proxy.handler.clone();
                     let target = proxy.target.clone();
-                    let trap = self.get_property(&handler, &Value::String("get".to_string()));
+                    let trap = self.get_property(&handler, &Value::from_string("get".to_string()));
                     match &trap {
                         Ok(Value::Function(_)) | Ok(Value::NativeFunction(_)) => {
                             let trap_val = trap.unwrap();
@@ -782,7 +782,7 @@ impl Interpreter {
     }
 
     pub(super) fn instanceof_check(&mut self, left: &Value, right: &Value) -> Result<Value> {
-        let proto_key = Value::String(wk::PROTOTYPE.to_string());
+        let proto_key = Value::from_string(wk::PROTOTYPE.to_string());
         let right_proto = match self.get_property(right, &proto_key) {
             Ok(val) => val,
             Err(_) => return Ok(Value::Boolean(false)),
@@ -867,7 +867,7 @@ impl Interpreter {
                 if let HeapValue::Proxy(proxy) = &self.heap[*proxy_idx] {
                     let handler = proxy.handler.clone();
                     let target = proxy.target.clone();
-                    let trap = self.get_property(&handler, &Value::String("has".to_string()));
+                    let trap = self.get_property(&handler, &Value::from_string("has".to_string()));
                     if let Ok(Value::Function(_)) | Ok(Value::NativeFunction(_)) = &trap {
                         let trap_result = self.call_value(&trap?, &handler, &[target, key.clone()]);
                         if let Ok(v) = trap_result {
@@ -889,7 +889,7 @@ impl Interpreter {
         trap_name: &str,
         args: &[Value],
     ) -> Result<Value> {
-        let trap = self.get_property(handler, &Value::String(trap_name.to_string()))?;
+        let trap = self.get_property(handler, &Value::from_string(trap_name.to_string()))?;
         if matches!(trap, Value::Undefined) {
             return Err(self.err_at_location(Error::RuntimeError(format!(
                 "Proxy has no '{}' trap",

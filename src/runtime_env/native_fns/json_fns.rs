@@ -10,7 +10,7 @@ pub(super) fn native_json_parse(
     args: &[Value],
 ) -> Result<Value> {
     let s = match args.first() {
-        Some(Value::String(s)) => s.as_str(),
+        Some(Value::String(s)) => s.as_ref(),
         Some(other) => {
             return Err(Error::TypeError(format!(
                 "Cannot parse {}",
@@ -35,5 +35,5 @@ pub(super) fn native_json_stringify(
     args: &[Value],
 ) -> Result<Value> {
     let val = args.first().cloned().unwrap_or(Value::Undefined);
-    Ok(Value::String(to_json_value(interp, &val)))
+    Ok(Value::from_string(to_json_value(interp, &val).into()))
 }

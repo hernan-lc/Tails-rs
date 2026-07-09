@@ -206,7 +206,7 @@ impl Interpreter {
                             let f_clone = f.clone();
                             let proto_val = self.get_property(
                                 &super_class,
-                                &Value::String(wk::PROTOTYPE.to_string()),
+                                &Value::from_string(wk::PROTOTYPE.to_string()),
                             )?;
                             let proto_idx = if let Value::Object(pi) = proto_val {
                                 Some(pi)

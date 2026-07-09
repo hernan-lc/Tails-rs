@@ -74,9 +74,9 @@ pub(super) fn native_http_req_on(
             obj.properties
                 .get("__body")
                 .cloned()
-                .unwrap_or_else(|| Value::String(String::new()))
+                .unwrap_or_else(|| Value::string(""))
         } else {
-            Value::String(String::new())
+            Value::string("")
         };
         let _ = interp.call_value(&cb, &Value::Undefined, &[body_val]);
     } else if event == "end" {
@@ -129,14 +129,14 @@ pub(super) fn native_http_res_write(
                 .get("__body")
                 .and_then(|v| {
                     if let Value::String(s) = v {
-                        Some(s.clone())
+                        Some(s.to_string())
                     } else {
                         None
                     }
                 })
                 .unwrap_or_default();
             obj.properties
-                .insert("__body".into(), Value::String(prev + &chunk));
+                .insert("__body".into(), Value::from_string(prev.to_string() + &chunk));
         }
     }
     Ok(Value::Undefined)
@@ -156,14 +156,14 @@ pub(super) fn native_http_res_end(
                     .get("__body")
                     .and_then(|v| {
                         if let Value::String(s) = v {
-                            Some(s.clone())
+                            Some(s.to_string())
                         } else {
                             None
                         }
                     })
                     .unwrap_or_default();
                 obj.properties
-                    .insert("__body".into(), Value::String(prev + &chunk));
+                    .insert("__body".into(), Value::from_string(prev.to_string() + &chunk));
             }
         }
         if let HeapValue::Object(obj) = &mut interp.heap[*obj_idx] {
@@ -305,7 +305,7 @@ fn handle_one_request(
     // --- req object ---
     let mut hdr_props = FxHashMap::default();
     for (k, v) in &req.headers {
-        hdr_props.insert(k.clone(), Value::String(v.clone()));
+        hdr_props.insert(k.clone(), Value::from_string(v.clone().into()));
     }
     let hdr_idx = interp.heap.len();
     interp.heap.push(HeapValue::Object(JsObject {
@@ -315,10 +315,10 @@ fn handle_one_request(
     }));
 
     let req_props = props! {
-        "method" => Value::String(req.method),
-        "url" => Value::String(req.path),
-        "body" => Value::String(req.body.clone()),
-        "__body" => Value::String(req.body),
+        "method" => Value::from_string(req.method.into()),
+        "url" => Value::from_string(req.path.into()),
+        "body" => Value::from_string(req.body.clone().into()),
+        "__body" => Value::from_string(req.body.into()),
         "headers" => Value::Object(hdr_idx),
         "on" => Value::NativeFunction(c::HTTP_REQ_ON),
     };
@@ -334,7 +334,7 @@ fn handle_one_request(
     let res_props = props! {
         "statusCode" => Value::Integer(200),
         "__status" => Value::Integer(200),
-        "__body" => Value::String(String::new()),
+        "__body" => Value::string(""),
         "__ended" => Value::Boolean(false),
         "writeHead" => Value::NativeFunction(c::HTTP_RES_WRITE_HEAD),
         "write" => Value::NativeFunction(c::HTTP_RES_WRITE),
@@ -369,7 +369,7 @@ fn handle_one_request(
             .get("__body")
             .and_then(|v| {
                 if let Value::String(s) = v {
-                    Some(s.clone())
+                    Some(s.to_string())
                 } else {
                     None
                 }
@@ -382,7 +382,7 @@ fn handle_one_request(
                     .iter()
                     .filter_map(|(k, v)| {
                         if let Value::String(s) = v {
-                            Some((k.to_string(), s.clone()))
+                            Some((k.to_string(), s.to_string()))
                         } else {
                             None
                         }

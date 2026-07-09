@@ -49,31 +49,31 @@ impl Interpreter {
                     .get(wk::NAME)
                     .map(|v| match v {
                         Value::String(s) => s.clone(),
-                        Value::Cons(c) => c.flatten(),
-                        _ => wk::ERROR.to_string(),
+                        Value::Cons(c) => c.flatten().into(),
+                        _ => wk::ERROR.to_string().into(),
                     })
-                    .unwrap_or_else(|| wk::ERROR.to_string());
+                    .unwrap_or_else(|| wk::ERROR.to_string().into());
                 let message = obj
                     .properties
                     .get(wk::MESSAGE)
                     .map(|v| match v {
                         Value::String(s) => s.clone(),
-                        Value::Cons(c) => c.flatten(),
-                        _ => String::new(),
+                        Value::Cons(c) => c.flatten().into(),
+                        _ => String::new().into(),
                     })
                     .unwrap_or_default();
                 let stack = obj.properties.get(wk::STACK).map(|v| match v {
                     Value::String(s) => s.clone(),
-                    Value::Cons(c) => c.flatten(),
-                    _ => String::new(),
+                    Value::Cons(c) => c.flatten().into(),
+                    _ => String::new().into(),
                 });
                 if let Some(stack) = stack {
                     if !stack.is_empty() {
-                        return stack;
+                        return stack.to_string();
                     }
                 }
                 if message.is_empty() {
-                    return name;
+                    return name.to_string();
                 }
                 return format!("{}: {}", name, message);
             }

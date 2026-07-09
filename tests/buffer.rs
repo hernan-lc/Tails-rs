@@ -28,7 +28,7 @@ fn test_buffer_from_string() {
         Path::new("/tmp/test_module.ts"),
     );
     assert!(r.is_ok());
-    assert_eq!(r.unwrap(), tails::Value::String("Hello".to_string()));
+    assert_eq!(r.unwrap(), tails::Value::string("Hello"));
 }
 
 #[test]
@@ -43,7 +43,7 @@ fn test_buffer_from_array() {
         Path::new("/tmp/test_module.ts"),
     );
     assert!(r.is_ok());
-    assert_eq!(r.unwrap(), tails::Value::String("Hello".to_string()));
+    assert_eq!(r.unwrap(), tails::Value::string("Hello"));
 }
 
 #[test]
@@ -60,7 +60,7 @@ fn test_buffer_concat() {
         Path::new("/tmp/test_module.ts"),
     );
     assert!(r.is_ok());
-    assert_eq!(r.unwrap(), tails::Value::String("Hello World".to_string()));
+    assert_eq!(r.unwrap(), tails::Value::string("Hello World"));
 }
 
 #[test]
@@ -119,7 +119,7 @@ fn test_buffer_slice() {
         Path::new("/tmp/test_module.ts"),
     );
     assert!(r.is_ok());
-    assert_eq!(r.unwrap(), tails::Value::String("Hello".to_string()));
+    assert_eq!(r.unwrap(), tails::Value::string("Hello"));
 }
 
 #[test]
@@ -197,7 +197,7 @@ fn test_buffer_alloc_fill() {
         Path::new("/tmp/test_module.ts"),
     );
     assert!(r.is_ok());
-    assert_eq!(r.unwrap(), tails::Value::String("AAA".to_string()));
+    assert_eq!(r.unwrap(), tails::Value::string("AAA"));
 }
 
 #[test]
@@ -212,5 +212,5 @@ fn test_buffer_alloc_zero_fill() {
         Path::new("/tmp/test_module.ts"),
     );
     assert!(r.is_ok());
-    assert_eq!(r.unwrap(), tails::Value::String("\0\0\0".to_string()));
+    assert_eq!(r.unwrap(), tails::Value::string("\0\0\0"));
 }

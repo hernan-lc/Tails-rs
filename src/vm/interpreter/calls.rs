@@ -309,7 +309,7 @@ impl Interpreter {
                     3 => Ok(Value::Float(f64::from_bits(result.data))),
                     4 => {
                         let s = tails_abi::get_string(result);
-                        Ok(Value::String(s))
+                        Ok(Value::from_string(s.into()))
                     }
                     5 => {
                         // Native object - create NativeObject value with the ID
@@ -361,7 +361,7 @@ impl Interpreter {
         for (i, hv) in self.heap.iter().enumerate() {
             if let HeapValue::Object(obj) = hv {
                 if let Some(Value::String(name)) = obj.properties.get(wk::NAME) {
-                    if name == ctor_name {
+                    if **name == *ctor_name {
                         return Some(i);
                     }
                 }
@@ -389,7 +389,7 @@ impl Interpreter {
 
     fn value_to_json(&self, value: &Value) -> simd_json::OwnedValue {
         match value {
-            Value::String(s) => simd_json::OwnedValue::String(s.clone()),
+            Value::String(s) => simd_json::OwnedValue::String(s.to_string()),
             Value::Cons(c) => simd_json::OwnedValue::String(c.flatten()),
             Value::Integer(n) => simd_json::OwnedValue::Static(simd_json::StaticNode::I64(*n)),
             Value::Float(n) => simd_json::OwnedValue::Static(simd_json::StaticNode::F64(*n)),

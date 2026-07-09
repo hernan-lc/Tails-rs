@@ -102,7 +102,7 @@ fn test_http_module_has_create_server() {
         Path::new("/tmp/test_http_module.ts"),
     );
     assert!(r.is_ok(), "import http failed: {:?}", r.err());
-    assert_eq!(r.unwrap(), tails::Value::String("function".to_string()));
+    assert_eq!(r.unwrap(), tails::Value::string("function"));
 }
 
 #[test]

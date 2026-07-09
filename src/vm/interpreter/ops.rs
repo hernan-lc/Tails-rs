@@ -171,12 +171,12 @@ impl Interpreter {
                     Value::Date(_) | Value::RegExp(_) => TYPE_OBJECT,
                     Value::NativeObject(_) => TYPE_OBJECT,
                 };
-                self.stack.push(Value::String(type_str.to_string()));
+                self.stack.push(Value::from_string(type_str.to_string()));
             }
             Instruction::ToString => {
                 let value = self.stack_pop()?;
                 let s = self.value_to_string_raw(&value);
-                self.stack.push(Value::String(s));
+                self.stack.push(Value::from_string(s.into()));
             }
             _ => return Ok(false),
         }
@@ -255,27 +255,46 @@ impl Interpreter {
                 let result = self.in_check_mut(&left, &right)?;
                 self.stack.push(result);
             }
-            // Map/Set fast-path bytecodes
+            // Map/Set fast-path bytecodes (argc==2 avoids temporary Vec)
             Instruction::MapSet(argc) => {
-                let mut args = Vec::with_capacity(usize::from(*argc));
-                for _ in 0..*argc {
-                    args.push(self.stack_pop()?);
-                }
-                args.reverse();
-                let object = self.stack_pop()?;
-                match &object {
-                    Value::Map(map_idx) => {
-                        let key = args.first().cloned().unwrap_or(Value::Undefined);
-                        let value = args.get(1).cloned().unwrap_or(Value::Undefined);
-                        if let HeapValue::Map(map) = &mut self.heap[*map_idx] {
-                            map.set(key, value);
+                if *argc == 2 {
+                    let value = self.stack_pop()?;
+                    let key = self.stack_pop()?;
+                    let object = self.stack_pop()?;
+                    match object {
+                        Value::Map(map_idx) => {
+                            if let HeapValue::Map(map) = &mut self.heap[map_idx] {
+                                map.set(key, value);
+                            }
+                            self.stack.push(Value::Map(map_idx));
                         }
-                        self.stack.push(object);
+                        other => {
+                            let method = self.get_property(&other, &Value::string("set"))?;
+                            let result = self.call_value(&method, &other, &[key, value])?;
+                            self.stack.push(result);
+                        }
                     }
-                    _ => {
-                        let method = self.get_property(&object, &Value::String("set".into()))?;
-                        let result = self.call_value(&method, &object, &args)?;
-                        self.stack.push(result);
+                } else {
+                    let mut args = Vec::with_capacity(usize::from(*argc));
+                    for _ in 0..*argc {
+                        args.push(self.stack_pop()?);
+                    }
+                    args.reverse();
+                    let object = self.stack_pop()?;
+                    match object {
+                        Value::Map(map_idx) => {
+                            let key = args.first().cloned().unwrap_or(Value::Undefined);
+                            let value = args.get(1).cloned().unwrap_or(Value::Undefined);
+                            if let HeapValue::Map(map) = &mut self.heap[map_idx] {
+                                map.set(key, value);
+                            }
+                            self.stack.push(Value::Map(map_idx));
+                        }
+                        other => {
+                            let method = self.get_property(&other, &Value::string("set"))?;
+                            let result = self.call_value(&method, &other, &args)?;
+                            self.stack.push(result);
+                        }
                     }
                 }
             }
@@ -292,7 +311,7 @@ impl Interpreter {
                         self.stack.push(result);
                     }
                     _ => {
-                        let method = self.get_property(&object, &Value::String("get".into()))?;
+                        let method = self.get_property(&object, &Value::string("get"))?;
                         let result = self.call_value(&method, &object, &[key])?;
                         self.stack.push(result);
                     }
@@ -319,7 +338,7 @@ impl Interpreter {
                         self.stack.push(result);
                     }
                     _ => {
-                        let method = self.get_property(&object, &Value::String("has".into()))?;
+                        let method = self.get_property(&object, &Value::string("has"))?;
                         let result = self.call_value(&method, &object, &[key])?;
                         self.stack.push(result);
                     }
@@ -346,7 +365,7 @@ impl Interpreter {
                         self.stack.push(result);
                     }
                     _ => {
-                        let method = self.get_property(&object, &Value::String("delete".into()))?;
+                        let method = self.get_property(&object, &Value::string("delete"))?;
                         let result = self.call_value(&method, &object, &[key])?;
                         self.stack.push(result);
                     }
@@ -363,7 +382,7 @@ impl Interpreter {
                         self.stack.push(object);
                     }
                     _ => {
-                        let method = self.get_property(&object, &Value::String("add".into()))?;
+                        let method = self.get_property(&object, &Value::string("add"))?;
                         let result = self.call_value(&method, &object, &[value])?;
                         self.stack.push(result);
                     }
@@ -390,7 +409,7 @@ impl Interpreter {
                         self.stack.push(result);
                     }
                     _ => {
-                        let method = self.get_property(&object, &Value::String("has".into()))?;
+                        let method = self.get_property(&object, &Value::string("has"))?;
                         let result = self.call_value(&method, &object, &[value])?;
                         self.stack.push(result);
                     }
@@ -409,7 +428,7 @@ impl Interpreter {
                         self.stack.push(result);
                     }
                     _ => {
-                        let method = self.get_property(&object, &Value::String("delete".into()))?;
+                        let method = self.get_property(&object, &Value::string("delete"))?;
                         let result = self.call_value(&method, &object, &[value])?;
                         self.stack.push(result);
                     }
@@ -434,7 +453,7 @@ impl Interpreter {
                 let object = self.stack_pop()?;
 
                 let resolved_key: Option<String> = match &key {
-                    Value::String(s) => Some(s.clone()),
+                    Value::String(s) => Some(s.to_string()),
                     Value::Cons(c) => Some(c.flatten()),
                     Value::Symbol(id) => Some(format!("__sym_{}", id)),
                     Value::Integer(n) => Some(n.to_string()),
@@ -450,7 +469,7 @@ impl Interpreter {
                                 let target = proxy.target.clone();
                                 let trap = self.get_property(
                                     &handler,
-                                    &Value::String(PROXY_SET_TRAP.to_string()),
+                                    &Value::from_string(PROXY_SET_TRAP.to_string()),
                                 );
                                 if let Ok(Value::Function(_)) | Ok(Value::NativeFunction(_)) = &trap
                                 {
@@ -708,7 +727,7 @@ impl Interpreter {
                         if let HeapValue::Object(o) = &self.heap[*idx] {
                             collect_enumerable_keys(&o.properties)
                                 .into_iter()
-                                .map(Value::String)
+                                .map(Value::from_string)
                                 .collect()
                         } else {
                             vec![]
@@ -741,7 +760,7 @@ impl Interpreter {
                             let target = proxy.target.clone();
                             let trap = self.get_property(
                                 &handler,
-                                &Value::String(PROXY_DELETE_TRAP.to_string()),
+                                &Value::from_string(PROXY_DELETE_TRAP.to_string()),
                             );
                             if let Ok(Value::Function(_)) | Ok(Value::NativeFunction(_)) = &trap {
                                 let trap_result =

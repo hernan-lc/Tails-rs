@@ -456,7 +456,7 @@ impl Interpreter {
         match &constructor {
             Value::Function(func_idx) => {
                 let proto_idx = if let Value::Object(proto_obj_idx) =
-                    self.get_property(&constructor, &Value::String("prototype".to_string()))?
+                    self.get_property(&constructor, &Value::from_string("prototype".to_string()))?
                 {
                     Some(proto_obj_idx)
                 } else {

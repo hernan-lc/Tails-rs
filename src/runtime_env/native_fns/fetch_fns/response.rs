@@ -16,10 +16,10 @@ pub(crate) fn build_response(
 ) -> Result<Value> {
     let mut props = props! {
         "status" => Value::Integer(status as i64),
-        "statusText" => Value::String(status_text.to_string()),
+        "statusText" => Value::from_string(status_text.to_string()),
         "ok" => Value::Boolean((200..300).contains(&status)),
-        "__body" => Value::String(body),
-        "__headers" => Value::String(headers_raw.to_string()),
+        "__body" => Value::from_string(body.into()),
+        "__headers" => Value::from_string(headers_raw.to_string()),
         "text" => Value::NativeFunction(c::RESPONSE_TEXT),
         "json" => Value::NativeFunction(c::RESPONSE_JSON),
         "arrayBuffer" => Value::NativeFunction(c::RESPONSE_ARRAY_BUFFER),
@@ -52,7 +52,7 @@ pub(crate) fn native_response_constructor(
     let body = args.first().cloned().unwrap_or(Value::Undefined);
     let body_str = match &body {
         Value::Null | Value::Undefined => None,
-        Value::String(s) => Some(s.clone()),
+        Value::String(s) => Some(s.to_string()),
         _ => Some(to_string_value(interp, &body)),
     };
 
@@ -75,7 +75,7 @@ pub(crate) fn native_response_constructor(
             if let Some(Value::Object(hdr_idx)) = obj.properties.get("headers") {
                 if let HeapValue::Object(hdr_obj) = &interp.heap[*hdr_idx] {
                     if let Some(Value::String(h)) = hdr_obj.properties.get("__headers") {
-                        headers_raw = h.clone();
+                        headers_raw = h.to_string();
                     } else {
                         let mut header_strs = Vec::new();
                         for (k, v) in &hdr_obj.properties {
@@ -172,10 +172,10 @@ pub(crate) fn native_response_clone(
                 .get("__body")
                 .map(|v| {
                     if let Value::String(s) = v {
-                        s.clone()
-                    } else {
-                        String::new()
-                    }
+                            s.to_string()
+                        } else {
+                            String::new()
+                        }
                 })
                 .unwrap_or_default();
             let status = obj
@@ -197,10 +197,10 @@ pub(crate) fn native_response_clone(
                 .get("__headers")
                 .map(|v| {
                     if let Value::String(s) = v {
-                        s.clone()
-                    } else {
-                        String::new()
-                    }
+                            s.to_string()
+                        } else {
+                            String::new()
+                        }
                 })
                 .unwrap_or_default();
             return build_response(interp, body, status, &status_text, &headers_raw);
@@ -217,11 +217,11 @@ pub(crate) fn native_response_text(
     if let Value::Object(obj_idx) = _this {
         if let HeapValue::Object(obj) = &interp.heap[*obj_idx] {
             if let Some(body) = get_string_prop(obj, "__body") {
-                return Ok(Value::String(body.clone()));
+                return Ok(Value::from_string(body.clone().into()));
             }
         }
     }
-    Ok(Value::String(String::new()))
+    Ok(Value::string(""))
 }
 
 pub(crate) fn native_response_json(

@@ -10,6 +10,11 @@ pub mod js_proxy;
 pub mod safe_typed_array;
 pub mod strings;
 
+use std::sync::Arc;
+
+/// Shared JS string payload. Cloning is O(1) (atomic refcount).
+pub type JsStr = Arc<str>;
+
 #[derive(Debug, Clone)]
 pub enum Value {
     Undefined,
@@ -17,7 +22,7 @@ pub enum Value {
     Boolean(bool),
     Integer(i64),
     Float(f64),
-    String(String),
+    String(JsStr),
     Cons(strings::ConsString),
     BigInt(i128),
     Symbol(u64),
@@ -45,11 +50,23 @@ pub struct NativeObjectId(pub u32);
 impl Eq for Value {}
 
 impl Value {
-    /// Flatten this value into a `String`. For `Value::String` this is
-    /// a clone; for `Value::Cons` it walks the rope tree iteratively.
+    /// Build a shared string value (preferred constructor).
+    #[inline]
+    pub fn string(s: impl AsRef<str>) -> Self {
+        Value::String(Arc::from(s.as_ref()))
+    }
+
+    /// Move a `String` into a shared string value without copying bytes twice.
+    #[inline]
+    pub fn from_string(s: String) -> Self {
+        Value::String(Arc::from(s))
+    }
+
+    /// Flatten this value into a `String`. For `Value::String` this copies
+    /// the shared bytes; for `Value::Cons` it walks the rope tree.
     pub fn flatten(&self) -> String {
         match self {
-            Value::String(s) => s.clone(),
+            Value::String(s) => s.to_string(),
             Value::Cons(c) => c.flatten(),
             _ => self.to_string(),
         }
@@ -73,6 +90,14 @@ impl Value {
             _ => None,
         }
     }
+
+    #[inline]
+    pub fn as_str(&self) -> Option<&str> {
+        match self {
+            Value::String(s) => Some(s.as_ref()),
+            _ => None,
+        }
+    }
 }
 
 pub use strings::{
@@ -88,7 +113,7 @@ mod size_probe {
         use std::mem::size_of;
         eprintln!("Value={}", size_of::<Value>());
         eprintln!("ConsString={}", size_of::<ConsString>());
-        eprintln!("String={}", size_of::<String>());
+        eprintln!("JsStr={}", size_of::<JsStr>());
         eprintln!("i128={}", size_of::<i128>());
         assert!(size_of::<Value>() > 0);
     }

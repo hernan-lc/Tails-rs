@@ -214,7 +214,7 @@ fn pretty_format(
             } else if include_quotes {
                 format!("\"{}\"", s)
             } else {
-                s.clone()
+                s.to_string()
             }
         }
         Value::Integer(n) => {

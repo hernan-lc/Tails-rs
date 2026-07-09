@@ -8,7 +8,7 @@ pub(super) fn native_os_platform(
     _this: &Value,
     _args: &[Value],
 ) -> Result<Value> {
-    Ok(Value::String(tails_os::platform().to_string()))
+    Ok(Value::from_string(tails_os::platform().to_string()))
 }
 
 pub(super) fn native_os_arch(
@@ -16,7 +16,7 @@ pub(super) fn native_os_arch(
     _this: &Value,
     _args: &[Value],
 ) -> Result<Value> {
-    Ok(Value::String(tails_os::arch().to_string()))
+    Ok(Value::from_string(tails_os::arch().to_string()))
 }
 
 pub(super) fn native_os_cpus(
@@ -44,7 +44,7 @@ pub(super) fn native_os_cpus(
                 }),
             );
             let props = props! {
-                "model" => Value::String(cpu.model.clone()),
+                "model" => Value::from_string(cpu.model.clone().into()),
                 "speed" => Value::Float(cpu.speed),
                 "times" => Value::Object(times_idx),
             };
@@ -97,8 +97,8 @@ pub(super) fn native_os_hostname(
     _args: &[Value],
 ) -> Result<Value> {
     match tails_os::hostname() {
-        Ok(h) => Ok(Value::String(h)),
-        Err(_) => Ok(Value::String("localhost".to_string())),
+        Ok(h) => Ok(Value::from_string(h.into())),
+        Err(_) => Ok(Value::from_string("localhost".to_string())),
     }
 }
 
@@ -107,7 +107,7 @@ pub(super) fn native_os_type(
     _this: &Value,
     _args: &[Value],
 ) -> Result<Value> {
-    Ok(Value::String(tails_os::os_type().to_string()))
+    Ok(Value::from_string(tails_os::os_type().to_string()))
 }
 
 pub(super) fn native_os_release(
@@ -115,7 +115,7 @@ pub(super) fn native_os_release(
     _this: &Value,
     _args: &[Value],
 ) -> Result<Value> {
-    Ok(Value::String(tails_os::release()))
+    Ok(Value::from_string(tails_os::release().into()))
 }
 
 pub(super) fn native_os_homedir(
@@ -123,7 +123,7 @@ pub(super) fn native_os_homedir(
     _this: &Value,
     _args: &[Value],
 ) -> Result<Value> {
-    Ok(Value::String(tails_os::homedir()))
+    Ok(Value::from_string(tails_os::homedir().into()))
 }
 
 pub(super) fn native_os_tmpdir(
@@ -131,5 +131,5 @@ pub(super) fn native_os_tmpdir(
     _this: &Value,
     _args: &[Value],
 ) -> Result<Value> {
-    Ok(Value::String(tails_os::tmpdir()))
+    Ok(Value::from_string(tails_os::tmpdir().into()))
 }

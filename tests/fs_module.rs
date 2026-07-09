@@ -41,7 +41,7 @@ fn test_fs_write_and_read() {
         fs.write_file("/tmp/test_fs_write.txt", "Hello");
         fs.read_file("/tmp/test_fs_write.txt");
         "#);
-    assert_eq!(val, tails::Value::String("Hello".to_string()));
+    assert_eq!(val, tails::Value::string("Hello"));
     std::fs::remove_file("/tmp/test_fs_write.txt").ok();
 }
 
@@ -122,7 +122,7 @@ fn test_fs_append_file() {
         fs.unlink("/tmp/test_fs_append.txt");
         result;
         "#);
-    assert_eq!(val, tails::Value::String("Hello World".to_string()));
+    assert_eq!(val, tails::Value::string("Hello World"));
 }
 
 #[test]
@@ -140,7 +140,7 @@ fn test_fs_copy_file() {
         fs.unlink("/tmp/test_fs_copy_dst.txt");
         result;
         "#);
-    assert_eq!(val, tails::Value::String("copy me".to_string()));
+    assert_eq!(val, tails::Value::string("copy me"));
 }
 
 #[test]
@@ -157,7 +157,7 @@ fn test_fs_rename_file() {
         fs.unlink("/tmp/test_fs_rename_new.txt");
         result;
         "#);
-    assert_eq!(val, tails::Value::String("rename me".to_string()));
+    assert_eq!(val, tails::Value::string("rename me"));
 }
 
 #[test]

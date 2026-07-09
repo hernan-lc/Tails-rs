@@ -15,7 +15,7 @@ pub(super) fn native_require(
     args: &[Value],
 ) -> Result<Value> {
     let specifier = match args.first() {
-        Some(Value::String(s)) => s.clone(),
+        Some(Value::String(s)) => s.to_string(),
         Some(Value::Cons(c)) => c.flatten(),
         Some(v) => {
             return Err(crate::errors::Error::RuntimeError(format!(
@@ -43,7 +43,7 @@ pub(super) fn native_require(
                 );
             }
             if interp.native_loader.has_module(module_name) {
-                if let Some(cached) = interp.require_cache.get(module_name) {
+                if let Some(cached) = interp.require_cache.get(module_name.as_str()) {
                     return Ok(cached.clone());
                 }
                 let exports = interp.native_loader.load_module(
@@ -51,7 +51,7 @@ pub(super) fn native_require(
                     &mut interp.heap,
                     &mut interp.gc,
                 )?;
-                if module_name == wk::MOD_BUFFER {
+                if **module_name == *wk::MOD_BUFFER {
                     if let Some(Value::Object(proto_idx)) = exports.get(wk::PROTOTYPE) {
                         interp.buffer_proto_idx = Some(*proto_idx);
                     }
@@ -184,10 +184,10 @@ pub(super) fn native_require(
         .insert("exports".to_string(), exports_obj.clone());
     interp
         .globals
-        .insert("__filename".to_string(), Value::String(module_path.clone()));
+        .insert("__filename".to_string(), Value::from_string(module_path.clone().into()));
     interp
         .globals
-        .insert("__dirname".to_string(), Value::String(dirname));
+        .insert("__dirname".to_string(), Value::from_string(dirname.into()));
 
     // 12. Execute the module
     let module_scope_rc: std::rc::Rc<std::cell::RefCell<rustc_hash::FxHashMap<String, Value>>> =

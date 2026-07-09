@@ -114,9 +114,9 @@ pub(super) fn native_date_parse(
     args: &[Value],
 ) -> Result<Value> {
     let s = match args.first() {
-        Some(Value::String(s)) => s.clone(),
+        Some(Value::String(s)) => s.to_string(),
         Some(Value::Cons(c)) => c.flatten(),
-        Some(v) => interp.to_string_coerce(v),
+        Some(v) => interp.to_string_coerce(v).into(),
         None => return Ok(Value::Float(f64::NAN)),
     };
 
@@ -351,7 +351,7 @@ macro_rules! date_to_string_fn {
             _args: &[Value],
         ) -> Result<Value> {
             with_date!(interp, this, |date: &JsDate| {
-                Ok(Value::String(date.$method()))
+                Ok(Value::from_string(date.$method().into()))
             })
         }
     };

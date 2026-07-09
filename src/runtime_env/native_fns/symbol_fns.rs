@@ -22,7 +22,7 @@ pub(super) fn native_symbol_for(
     args: &[Value],
 ) -> Result<Value> {
     let key = match args.first().cloned().unwrap_or(Value::Undefined) {
-        Value::String(s) => s,
+        Value::String(s) => s.to_string(),
         other => format!("{}", other),
     };
 
@@ -47,7 +47,7 @@ pub(super) fn native_symbol_key_for(
         Value::Symbol(id) => {
             for (key, &reg_id) in &interp.symbol_registry {
                 if reg_id == id {
-                    return Ok(Value::String(key.clone()));
+                    return Ok(Value::from_string(key.clone().into()));
                 }
             }
             Ok(Value::Undefined)

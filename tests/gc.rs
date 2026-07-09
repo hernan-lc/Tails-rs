@@ -162,7 +162,7 @@ fn test_gc_with_global_objects() {
     "#,
     );
     assert!(result.is_ok());
-    assert_eq!(result.unwrap(), Value::String("global".into()));
+    assert_eq!(result.unwrap(), Value::string("global"));
 }
 
 #[test]
@@ -216,7 +216,7 @@ fn test_gc_with_classes() {
     "#,
     );
     assert!(result.is_ok());
-    assert_eq!(result.unwrap(), Value::String("Alice".into()));
+    assert_eq!(result.unwrap(), Value::string("Alice"));
 }
 
 #[test]

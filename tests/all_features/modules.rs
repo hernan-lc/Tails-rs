@@ -16,7 +16,7 @@ fn test_buffer() {
     assert!(r.is_ok());
     assert_eq!(
         r.unwrap(),
-        Value::String("Hello|5|AAAAA|Hello World|true".to_string())
+        Value::string("Hello|5|AAAAA|Hello World|true")
     );
 }
 
@@ -35,7 +35,7 @@ fn test_process_globals() {
     assert!(r.is_ok());
     assert_eq!(
         r.unwrap(),
-        Value::String("string,string,number,function,object".to_string())
+        Value::string("string,string,number,function,object")
     );
 }
 
@@ -60,7 +60,7 @@ fn test_path_module() {
     assert!(r.is_ok(), "path test failed: {:?}", r.err());
     assert_eq!(
         r.unwrap(),
-        Value::String(format!(
+        Value::string(format!(
             "/foo{sep}bar{sep}baz,bar.txt,/foo,.txt,true,/bar,true",
             sep = sep
         ))
@@ -88,7 +88,7 @@ fn test_fs_module() {
     assert!(r.is_ok(), "fs test failed: {:?}", r.err());
     assert_eq!(
         r.unwrap(),
-        Value::String("Hello from Tails!,true,false".to_string())
+        Value::string("Hello from Tails!,true,false")
     );
 }
 
@@ -105,7 +105,7 @@ fn test_intl() {
         std::path::Path::new("/tmp/test_module.ts"),
     );
     assert!(r.is_ok());
-    assert_eq!(r.unwrap(), Value::String("true,true".to_string()));
+    assert_eq!(r.unwrap(), Value::string("true,true"));
 }
 
 #[test]
@@ -127,5 +127,5 @@ fn test_import_default() {
         greet("World")
     "#;
     let result = runtime.eval(source).unwrap();
-    assert_eq!(result, tails::Value::String("Hello, World!".to_string()));
+    assert_eq!(result, tails::Value::string("Hello, World!"));
 }

@@ -31,7 +31,7 @@ fn test_websocket_instance_properties() {
     assert!(r.is_ok(), "WebSocket instance failed: {:?}", r.err());
     assert_eq!(
         r.unwrap(),
-        tails::Value::String("wss://example.com/ws".to_string())
+        tails::Value::string("wss://example.com/ws")
     );
 }
 

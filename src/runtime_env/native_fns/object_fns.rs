@@ -21,7 +21,7 @@ pub(super) fn native_object_keys(
             if let crate::vm::interpreter::HeapValue::Object(obj) = &interp.heap[*obj_idx] {
                 collect_own_enumerable_keys(&obj.properties)
                     .into_iter()
-                    .map(Value::String)
+                    .map(Value::from_string)
                     .collect()
             } else {
                 Vec::new()
@@ -31,7 +31,7 @@ pub(super) fn native_object_keys(
             if let crate::vm::interpreter::HeapValue::Array(arr) = &interp.heap[*arr_idx] {
                 let mut keys = Vec::with_capacity(arr.elements.len());
                 for i in 0..arr.elements.len() {
-                    keys.push(Value::String(i.to_string()));
+                    keys.push(Value::from_string(i.to_string()));
                 }
                 keys
             } else {
@@ -68,7 +68,7 @@ pub(super) fn native_object_from_entries(
                         continue;
                     }
                     let key = match &pair.elements[0] {
-                        Value::String(s) => s.clone(),
+                        Value::String(s) => s.to_string(),
                         Value::Cons(c) => c.flatten(),
                         Value::Integer(i) => i.to_string(),
                         Value::Float(f) => f.to_string(),
@@ -180,7 +180,7 @@ pub(super) fn native_object_entries(
         let heap_idx = interp.heap.len();
         interp.heap.push(crate::vm::interpreter::HeapValue::Array(
             crate::vm::interpreter::JsArray {
-                elements: vec![Value::String(k), v],
+                elements: vec![Value::from_string(k.into()), v],
             },
         ));
         entries.push(Value::Array(heap_idx));
@@ -355,7 +355,7 @@ pub(super) fn native_object_define_property(
 ) -> Result<Value> {
     let target = args.first().cloned().unwrap_or(Value::Undefined);
     let property = match args.get(1) {
-        Some(Value::String(s)) => s.clone(),
+        Some(Value::String(s)) => s.to_string(),
         Some(Value::Cons(c)) => c.flatten(),
         Some(Value::Symbol(id)) => format!("__sym_{}", id),
         Some(Value::Integer(n)) => n.to_string(),
@@ -542,8 +542,8 @@ fn value_strict_equal(a: &Value, b: &Value) -> bool {
         (Value::Null, Value::Null) => true,
         (Value::Boolean(a), Value::Boolean(b)) => a == b,
         (Value::String(a), Value::String(b)) => a == b,
-        (Value::Cons(a), Value::String(b)) => a.flatten() == *b,
-        (Value::String(a), Value::Cons(b)) => *a == b.flatten(),
+        (Value::Cons(a), Value::String(b)) => a.flatten() == **b,
+        (Value::String(a), Value::Cons(b)) => *a == b.flatten().into(),
         (Value::Cons(a), Value::Cons(b)) => a.flatten() == b.flatten(),
         (Value::Integer(a), Value::Integer(b)) => a == b,
         (Value::Float(a), Value::Float(b)) => {
@@ -673,7 +673,7 @@ pub(super) fn native_object_has_own_property(
     args: &[Value],
 ) -> Result<Value> {
     let prop = match args.first() {
-        Some(Value::String(s)) => s.clone(),
+        Some(Value::String(s)) => s.to_string(),
         Some(Value::Cons(c)) => c.flatten(),
         Some(v) => format!("{:?}", v),
         None => return Ok(Value::Boolean(false)),

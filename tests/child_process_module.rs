@@ -38,7 +38,7 @@ fn test_child_process_exec_sync_output() {
     );
     assert_eq!(
         r.unwrap(),
-        tails::Value::String("tails-test".to_string()),
+        tails::Value::string("tails-test"),
         "execSync should capture stdout"
     );
 }

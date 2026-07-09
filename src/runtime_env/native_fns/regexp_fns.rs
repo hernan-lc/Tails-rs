@@ -68,7 +68,7 @@ pub(super) fn native_regexp_test(
     // to avoid the 24-byte String clone that to_string_coerce would do.
     let input_owned;
     let input: &str = match args.first() {
-        Some(Value::String(s)) => s.as_str(),
+        Some(Value::String(s)) => s.as_ref(),
         Some(v) => {
             input_owned = interp.to_string_coerce(v);
             input_owned.as_str()
@@ -105,7 +105,7 @@ pub(super) fn native_regexp_exec(
     // to avoid the 24-byte String clone that to_string_coerce would do.
     let input_owned;
     let input: &str = match args.first() {
-        Some(Value::String(s)) => s.as_str(),
+        Some(Value::String(s)) => s.as_ref(),
         Some(v) => {
             input_owned = interp.to_string_coerce(v);
             input_owned.as_str()
@@ -134,7 +134,7 @@ pub(super) fn native_regexp_exec(
                     }
                     let mut elements: Vec<Value> = Vec::with_capacity(caps.len());
                     for s in caps {
-                        elements.push(Value::String(s));
+                        elements.push(Value::from_string(s.into()));
                     }
                     let arr_idx = interp.heap.len();
                     interp
@@ -154,17 +154,17 @@ pub(super) fn native_regexp_exec(
                 Some((captures, named_groups, match_start)) => {
                     let mut props = rustc_hash::FxHashMap::default();
                     for (i, cap) in captures.iter().enumerate() {
-                        props.insert(i.to_string(), Value::String(cap.clone()));
+                        props.insert(i.to_string(), Value::from_string(cap.clone().into()));
                     }
                     props.insert(wk::LENGTH.to_string(), Value::Float(captures.len() as f64));
                     props.insert("index".to_string(), Value::Float(match_start as f64));
-                    props.insert("input".to_string(), Value::String(input.to_string()));
+                    props.insert("input".to_string(), Value::from_string(input.to_string()));
                     if named_groups.is_empty() {
                         props.insert("groups".to_string(), Value::Undefined);
                     } else {
                         let mut group_props = rustc_hash::FxHashMap::default();
                         for (k, v) in named_groups {
-                            group_props.insert(k, Value::String(v));
+                            group_props.insert(k, Value::from_string(v.into()));
                         }
                         let groups_idx = interp.heap.len();
                         interp
@@ -200,7 +200,7 @@ pub(super) fn native_regexp_to_string(
     _args: &[Value],
 ) -> Result<Value> {
     with_regexp!(interp, this, |regexp: &JsRegExp| {
-        Ok(Value::String(format!(
+        Ok(Value::from_string(format!(
             "/{}/{}",
             regexp.source, regexp.flags
         )))
@@ -215,7 +215,7 @@ pub(super) fn native_regexp_source(
     _args: &[Value],
 ) -> Result<Value> {
     with_regexp!(interp, this, |regexp: &JsRegExp| {
-        Ok(Value::String(regexp.source.clone()))
+        Ok(Value::from_string(regexp.source.clone().into()))
     })
 }
 
@@ -225,7 +225,7 @@ pub(super) fn native_regexp_flags(
     _args: &[Value],
 ) -> Result<Value> {
     with_regexp!(interp, this, |regexp: &JsRegExp| {
-        Ok(Value::String(regexp.flags.clone()))
+        Ok(Value::from_string(regexp.flags.clone().into()))
     })
 }
 
@@ -307,8 +307,8 @@ pub(super) fn native_string_match(
     args: &[Value],
 ) -> Result<Value> {
     let input = match _this {
-        Value::String(s) => s.clone(),
-        _ => interp.to_string_coerce(_this),
+        Value::String(s) => s.to_string(),
+        _ => interp.to_string_coerce(_this).into(),
     };
 
     let regexp_idx = match args.first() {
@@ -322,7 +322,7 @@ pub(super) fn native_string_match(
             if matches.is_empty() {
                 return Ok(Value::Null);
             }
-            let elements: Vec<Value> = matches.into_iter().map(Value::String).collect();
+            let elements: Vec<Value> = matches.into_iter().map(Value::from_string).collect();
             let arr_idx = interp.heap.len();
             interp
                 .heap
@@ -335,17 +335,17 @@ pub(super) fn native_string_match(
                 Some((captures, named_groups, match_start)) => {
                     let mut props = rustc_hash::FxHashMap::default();
                     for (i, cap) in captures.iter().enumerate() {
-                        props.insert(i.to_string(), Value::String(cap.clone()));
+                        props.insert(i.to_string(), Value::from_string(cap.clone().into()));
                     }
                     props.insert(wk::LENGTH.to_string(), Value::Float(captures.len() as f64));
                     props.insert("index".to_string(), Value::Float(match_start as f64));
-                    props.insert("input".to_string(), Value::String(input));
+                    props.insert("input".to_string(), Value::from_string(input.clone()));
                     if named_groups.is_empty() {
                         props.insert("groups".to_string(), Value::Undefined);
                     } else {
                         let mut group_props = rustc_hash::FxHashMap::default();
                         for (k, v) in named_groups {
-                            group_props.insert(k, Value::String(v));
+                            group_props.insert(k, Value::from_string(v.into()));
                         }
                         let groups_idx = interp.heap.len();
                         interp
@@ -381,8 +381,8 @@ pub(super) fn native_string_replace(
     args: &[Value],
 ) -> Result<Value> {
     let input = match _this {
-        Value::String(s) => s.clone(),
-        _ => interp.to_string_coerce(_this),
+        Value::String(s) => s.to_string(),
+        _ => interp.to_string_coerce(_this).into(),
     };
 
     let search = args.first().cloned().unwrap_or(Value::Undefined);
@@ -398,12 +398,12 @@ pub(super) fn native_string_replace(
             } else {
                 return Err(Error::TypeError("Not a RegExp".into()));
             };
-            Ok(Value::String(result))
+            Ok(Value::from_string(result.into()))
         }
         Value::String(search_str) => {
-            Ok(Value::String(input.replacen(&search_str, &replacement, 1)))
+            Ok(Value::from_string(input.replacen(&*search_str, &replacement, 1).into()))
         }
-        _ => Ok(Value::String(input)),
+        _ => Ok(Value::from_string(input.clone())),
     }
 }
 
@@ -413,8 +413,8 @@ pub(super) fn native_string_search(
     args: &[Value],
 ) -> Result<Value> {
     let input = match _this {
-        Value::String(s) => s.clone(),
-        _ => interp.to_string_coerce(_this),
+        Value::String(s) => s.to_string(),
+        _ => interp.to_string_coerce(_this).into(),
     };
 
     let search = args.first().cloned().unwrap_or(Value::Undefined);
@@ -429,7 +429,7 @@ pub(super) fn native_string_search(
             Ok(Value::Integer(result))
         }
         Value::String(search_str) => Ok(Value::Integer(
-            input.find(&search_str).map(|i| i as i64).unwrap_or(-1),
+            input.find(&*search_str).map(|i| i as i64).unwrap_or(-1),
         )),
         _ => Ok(Value::Integer(-1)),
     }

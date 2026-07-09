@@ -18,7 +18,7 @@ fn test_arithmetic() {
 fn test_string_concatenation() {
     let mut runtime = TailsRuntime::default().unwrap();
     let result = runtime.eval(r#""hello" + " ""#).unwrap();
-    assert_eq!(result, tails::Value::String("hello ".to_string()));
+    assert_eq!(result, tails::Value::string("hello "));
 }
 
 #[test]
@@ -39,7 +39,7 @@ fn test_if_statement() {
             "small"
         }
     "#).unwrap();
-    assert_eq!(result, tails::Value::String("big".to_string()));
+    assert_eq!(result, tails::Value::string("big"));
 }
 
 #[test]
