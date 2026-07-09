@@ -178,7 +178,6 @@ impl Interpreter {
                                 } else {
                                     self.exception_handlers.clone()
                                 },
-                                shared_closure_env: None,
                             });
                             for closure_var in closure_vars.borrow().iter().cloned() {
                                 self.stack.push(closure_var);
@@ -352,7 +351,6 @@ impl Interpreter {
                                 } else {
                                     self.exception_handlers.clone()
                                 },
-                                shared_closure_env: None,
                             });
                             for closure_var in closure_vars.borrow().iter().cloned() {
                                 self.stack.push(closure_var);
@@ -497,7 +495,6 @@ impl Interpreter {
                                             exception_handlers_snapshot: self
                                                 .exception_handlers
                                                 .clone(),
-                                            shared_closure_env: None,
                                         });
                                         for arg in args {
                                             self.stack.push(arg);
@@ -571,7 +568,6 @@ impl Interpreter {
                                     source_line: self.current_source_line(*pc),
                                     source_col: self.current_source_col(*pc),
                                     exception_handlers_snapshot: self.exception_handlers.clone(),
-                                    shared_closure_env: None,
                                 });
                                 for closure_var in closure_vars.borrow().iter().cloned() {
                                     self.stack.push(closure_var);

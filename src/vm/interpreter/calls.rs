@@ -129,7 +129,6 @@ impl Interpreter {
                             source_line,
                             source_col: None,
                             exception_handlers_snapshot,
-                            shared_closure_env: None,
                         });
 
                         for closure_var in closure.borrow().iter().cloned() {

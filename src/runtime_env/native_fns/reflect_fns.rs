@@ -142,7 +142,6 @@ pub(super) fn native_reflect_construct(
                 source_line: None,
                 source_col: None,
                 exception_handlers_snapshot: interp.exception_handlers.clone(),
-                shared_closure_env: None,
             });
 
             for closure_var in f.closure.borrow().iter().cloned() {

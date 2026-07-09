@@ -177,7 +177,6 @@ impl Interpreter {
             } else {
                 self.exception_handlers.clone()
             },
-            shared_closure_env: None,
         });
         let mut result = self.execute_from(module, 0);
 

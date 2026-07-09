@@ -237,7 +237,6 @@ impl Interpreter {
                                 } else {
                                     self.exception_handlers.clone()
                                 },
-                                shared_closure_env: None,
                             });
                             for closure_var in f_clone.closure.borrow().iter().cloned() {
                                 self.stack.push(closure_var);

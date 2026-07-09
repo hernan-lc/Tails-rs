@@ -7,6 +7,9 @@ version = "0.1.0"
 edition = "2021"
 description = "A TypeScript-first runtime in Rust"
 license = "MIT"
+# Disable auto-discovery of src/bin/* so release/bench builds do not
+# LTO-link dump_new / test_promise on every cargo bench.
+autobins = false
 
 [features]
 default = ["fs", "fs-promises", "path", "process", "os", "websocket", "http", "net", "zlib", "tls", "dns"]
@@ -27,10 +30,6 @@ dev-bins = []
 [lib]
 name = "tails"
 path = "src/lib.rs"
-
-# Disable auto-discovery of src/bin/* debug tools so release/bench builds
-# do not LTO-link dump_new / test_promise on every cargo bench.
-autobins = false
 
 [[bin]]
 name = "tails"

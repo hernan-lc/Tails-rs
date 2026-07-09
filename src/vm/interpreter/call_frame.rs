@@ -1,7 +1,5 @@
 use crate::compiler::CompiledModule;
 use crate::objects::Value;
-use std::cell::RefCell;
-use std::collections::HashMap;
 use std::rc::Rc;
 
 #[derive(Debug, Clone)]
@@ -17,16 +15,6 @@ pub(crate) struct CallFrame {
     pub(crate) source_line: Option<usize>,
     pub(crate) source_col: Option<usize>,
     pub(crate) exception_handlers_snapshot: Vec<ExceptionHandler>,
-    /// Lazily allocated: only populated by MakeClosure instructions.
-    /// None for frames that never create closures (the common case).
-    pub(crate) shared_closure_env: Option<HashMap<u32, Rc<RefCell<Vec<Value>>>>>,
-}
-
-impl CallFrame {
-    /// Get or create the shared closure env map, allocating only when needed.
-    pub(crate) fn get_or_init_closure_env(&mut self) -> &mut HashMap<u32, Rc<RefCell<Vec<Value>>>> {
-        self.shared_closure_env.get_or_insert_with(HashMap::new)
-    }
 }
 
 #[derive(Debug, Clone)]
