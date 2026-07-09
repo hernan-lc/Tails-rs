@@ -213,13 +213,15 @@ impl CodeGenerator {
         defaults: &[Option<Expression>],
     ) -> Result<()> {
         let func_idx = self.functions.len() as u32;
-        let parent_locals_snapshot = self.locals.clone();
         let mut all_params = params.to_vec();
         if let Some(rp) = rest_param {
             all_params.push(rp.to_string());
         }
-        let outer_refs =
-            super::closures::find_outer_refs(body, &all_params, &parent_locals_snapshot);
+        let outer_refs = super::closures::find_outer_refs_with_slots(
+            body,
+            &all_params,
+            |name| self.resolve_local(name),
+        );
         let num_captures = outer_refs.len();
 
         self.functions.push(CompiledFunction {
@@ -304,13 +306,15 @@ impl CodeGenerator {
             ArrowFunctionBody::Block(stmts) => (stmts.clone(), false),
         };
 
-        let parent_locals_snapshot = self.locals.clone();
         let mut all_params = params.to_vec();
         if let Some(rp) = rest_param {
             all_params.push(rp.to_string());
         }
-        let outer_refs =
-            super::closures::find_outer_refs(&body_stmts, &all_params, &parent_locals_snapshot);
+        let outer_refs = super::closures::find_outer_refs_with_slots(
+            &body_stmts,
+            &all_params,
+            |name| self.resolve_local(name),
+        );
         let num_captures = outer_refs.len();
 
         self.functions.push(CompiledFunction {

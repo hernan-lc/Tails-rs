@@ -195,6 +195,9 @@ pub enum Instruction {
     ArrayPush,
     SpreadArray,
     SpreadObject,
+    /// Object rest destructuring: pop source object, push a new object with
+    /// all own enumerable properties except the listed keys.
+    ObjectRest(Box<Vec<String>>),
     GetKeys,
     TypeOf,
     InstanceOf,

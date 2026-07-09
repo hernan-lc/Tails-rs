@@ -14,8 +14,8 @@ impl CodeGenerator {
         is_generator: bool,
     ) -> Result<u32> {
         let func_idx = self.functions.len() as u32;
-        let parent_locals_snapshot = self.locals.clone();
-        let outer_refs = find_outer_refs(body, params, &parent_locals_snapshot);
+        let outer_refs =
+            find_outer_refs_with_slots(body, params, |name| self.resolve_local(name));
         let num_captures = outer_refs.len();
 
         self.functions.push(CompiledFunction {
@@ -85,11 +85,17 @@ impl CodeGenerator {
     }
 }
 
-pub(crate) fn find_outer_refs(
+/// Resolve each free identifier in `body` to a parent-frame slot via
+/// `resolve_slot` (typically `CodeGenerator::resolve_local`). Required for
+/// nested functions where raw `locals` indices are not frame slots.
+pub(crate) fn find_outer_refs_with_slots<F>(
     body: &[SpannedNode<Statement>],
     inner_params: &[String],
-    parent_locals: &[String],
-) -> Vec<(String, u16)> {
+    mut resolve_slot: F,
+) -> Vec<(String, u16)>
+where
+    F: FnMut(&str) -> Option<u16>,
+{
     let mut names = Vec::new();
     collect_identifiers_body(body, &mut names);
 
@@ -107,11 +113,8 @@ pub(crate) fn find_outer_refs(
         }
         seen.insert(name.as_str());
 
-        for (i, local) in parent_locals.iter().enumerate() {
-            if local == name {
-                result.push((name.clone(), i as u16));
-                break;
-            }
+        if let Some(slot) = resolve_slot(name.as_str()) {
+            result.push((name.clone(), slot));
         }
     }
 

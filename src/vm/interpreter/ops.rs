@@ -597,6 +597,49 @@ impl Interpreter {
                     }
                 }
             }
+            Instruction::ObjectRest(excluded) => {
+                let source = self.stack_pop()?;
+                let mut rest_props = PropertyStorage::new();
+                match &source {
+                    Value::Object(idx) => {
+                        if let HeapValue::Object(obj) = &self.heap[*idx] {
+                            for (k, v) in obj.properties.iter() {
+                                if excluded.iter().any(|e| e == k) {
+                                    continue;
+                                }
+                                if k.starts_with(GETTER_PREFIX)
+                                    || k.starts_with(SETTER_PREFIX)
+                                    || k.starts_with(METHOD_PREFIX)
+                                {
+                                    continue;
+                                }
+                                rest_props.insert(k.to_string(), v.clone());
+                            }
+                        }
+                    }
+                    Value::Array(idx) => {
+                        if let HeapValue::Array(arr) = &self.heap[*idx] {
+                            for (i, v) in arr.elements.iter().enumerate() {
+                                let k = i.to_string();
+                                if excluded.iter().any(|e| e == &k) {
+                                    continue;
+                                }
+                                rest_props.insert(k, v.clone());
+                            }
+                        }
+                    }
+                    _ => {}
+                }
+                let heap_idx = self.gc.allocate(
+                    &mut self.heap,
+                    HeapValue::Object(JsObject {
+                        properties: rest_props,
+                        prototype: None,
+                        extensible: true,
+                    }),
+                );
+                self.stack.push(Value::Object(heap_idx));
+            }
             Instruction::ArrayPush => {
                 let value = self.stack_pop()?;
                 let array = self.stack_pop()?;

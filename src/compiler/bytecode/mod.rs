@@ -501,19 +501,30 @@ impl CodeGenerator {
                 self.emit(Instruction::Pop);
             }
             BindingPattern::Object(elements) => {
+                let excluded_keys: Vec<String> = elements
+                    .iter()
+                    .filter(|e| !e.is_rest)
+                    .map(|e| e.key.clone())
+                    .collect();
                 for element in elements {
-                    self.emit(Instruction::Dup);
-                    let key_idx = self.add_constant(Value::String(element.key.clone()));
-                    self.emit(Instruction::LoadConst(key_idx));
-                    self.emit(Instruction::GetProperty);
-                    if let Some(default_expr) = &element.default_value {
-                        let skip_default = self.instructions.len();
-                        self.emit(Instruction::JumpIfNotUndefined(0));
-                        self.emit(Instruction::Pop);
-                        self.generate_expression(default_expr)?;
-                        self.patch_jump(skip_default, self.instructions.len());
+                    if element.is_rest {
+                        self.emit(Instruction::Dup);
+                        self.emit(Instruction::ObjectRest(Box::new(excluded_keys.clone())));
+                        self.generate_destructuring_pattern(&element.value)?;
+                    } else {
+                        self.emit(Instruction::Dup);
+                        let key_idx = self.add_constant(Value::String(element.key.clone()));
+                        self.emit(Instruction::LoadConst(key_idx));
+                        self.emit(Instruction::GetProperty);
+                        if let Some(default_expr) = &element.default_value {
+                            let skip_default = self.instructions.len();
+                            self.emit(Instruction::JumpIfNotUndefined(0));
+                            self.emit(Instruction::Pop);
+                            self.generate_expression(default_expr)?;
+                            self.patch_jump(skip_default, self.instructions.len());
+                        }
+                        self.generate_destructuring_pattern(&element.value)?;
                     }
-                    self.generate_destructuring_pattern(&element.value)?;
                 }
                 self.emit(Instruction::Pop);
             }

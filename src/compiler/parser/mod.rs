@@ -258,6 +258,8 @@ pub struct ObjectBindingElement {
     pub value: BindingPattern,
     pub shorthand: bool,
     pub default_value: Option<Expression>,
+    /// `...rest` element — `key`/`value` name the rest binding.
+    pub is_rest: bool,
 }
 
 #[derive(Debug, Clone)]

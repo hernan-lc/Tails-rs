@@ -54,12 +54,12 @@ impl CodeGenerator {
         };
 
         let func_idx = self.functions.len() as u32;
-        let parent_locals_snapshot = self.locals.clone();
         let mut all_params = params.clone();
         if let Some(rp) = rest_param {
             all_params.push(rp.clone());
         }
-        let outer_refs = closures::find_outer_refs(body, &all_params, &parent_locals_snapshot);
+        let outer_refs =
+            closures::find_outer_refs_with_slots(body, &all_params, |name| self.resolve_local(name));
         let num_captures = outer_refs.len();
 
         self.functions.push(CompiledFunction {
@@ -193,7 +193,9 @@ impl CodeGenerator {
                 if let Some(rp) = hrp {
                     all_p.push(rp.clone());
                 }
-                let orefs = closures::find_outer_refs(hbody, &all_p, &self.locals);
+                let orefs = closures::find_outer_refs_with_slots(hbody, &all_p, |name| {
+                    self.resolve_local(name)
+                });
 
                 let slot = self.resolve_local(hname).unwrap_or_else(|| {
                     self.locals.push(hname.clone());
@@ -273,7 +275,9 @@ impl CodeGenerator {
             if let Some(rp) = &h.rest_param {
                 all_p.push(rp.clone());
             }
-            let orefs = closures::find_outer_refs(&h.body, &all_p, &self.locals);
+            let orefs = closures::find_outer_refs_with_slots(&h.body, &all_p, |name| {
+                self.resolve_local(name)
+            });
             if !orefs.is_empty() {
                 let capture_slots: Vec<u16> = orefs.iter().map(|(_, s)| *s).collect();
                 deferred_snapshots.push((h.slot, Box::new(capture_slots)));

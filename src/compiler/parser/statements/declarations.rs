@@ -165,6 +165,7 @@ impl<'a> Parser<'a> {
                         value: rest,
                         shorthand: true,
                         default_value: None,
+                        is_rest: true,
                     });
                     break;
                 }
@@ -187,6 +188,7 @@ impl<'a> Parser<'a> {
                         value,
                         shorthand: false,
                         default_value: default,
+                        is_rest: false,
                     });
                 } else if self.peek().token == Token::Assign {
                     self.advance();
@@ -196,6 +198,7 @@ impl<'a> Parser<'a> {
                         value: BindingPattern::Identifier(key),
                         shorthand: true,
                         default_value: Some(default_value),
+                        is_rest: false,
                     });
                 } else {
                     elements.push(ObjectBindingElement {
@@ -203,6 +206,7 @@ impl<'a> Parser<'a> {
                         value: BindingPattern::Identifier(key),
                         shorthand: true,
                         default_value: None,
+                        is_rest: false,
                     });
                 }
                 if self.peek().token == Token::Comma {
