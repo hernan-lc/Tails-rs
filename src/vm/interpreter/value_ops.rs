@@ -69,7 +69,7 @@ impl Interpreter {
             }
             (Value::String(a), Value::Float(b)) => {
                 let b_str = if b.is_finite() && *b == (*b as i64) as f64 {
-                    Value::from_string((*b as i64).to_string().into())
+                    Value::from_string((*b as i64).to_string())
                 } else {
                     Value::from_string(b.to_string())
                 };
@@ -80,7 +80,7 @@ impl Interpreter {
             }
             (Value::Float(a), Value::String(b)) => {
                 let a_str = if a.is_finite() && *a == (*a as i64) as f64 {
-                    Value::from_string((*a as i64).to_string().into())
+                    Value::from_string((*a as i64).to_string())
                 } else {
                     Value::from_string(a.to_string())
                 };
@@ -102,7 +102,7 @@ impl Interpreter {
             }
             (Value::Cons(c), Value::Float(b)) => {
                 let right = if b.is_finite() && *b == (*b as i64) as f64 {
-                    Value::from_string((*b as i64).to_string().into())
+                    Value::from_string((*b as i64).to_string())
                 } else {
                     Value::from_string(b.to_string())
                 };
@@ -110,7 +110,7 @@ impl Interpreter {
             }
             (Value::Float(a), Value::Cons(c)) => {
                 let left = if a.is_finite() && *a == (*a as i64) as f64 {
-                    Value::from_string((*a as i64).to_string().into())
+                    Value::from_string((*a as i64).to_string())
                 } else {
                     Value::from_string(a.to_string())
                 };
@@ -121,13 +121,13 @@ impl Interpreter {
                 let coerced = self.to_string_coerce_value(r).flatten();
                 Ok(Value::Cons(ConsString::new(
                     Value::String(a.clone()),
-                    Value::from_string(coerced.into()),
+                    Value::from_string(coerced),
                 )))
             }
             (l, Value::String(b)) => {
                 let coerced = self.to_string_coerce_value(l).flatten();
                 Ok(Value::Cons(ConsString::new(
-                    Value::from_string(coerced.into()),
+                    Value::from_string(coerced),
                     Value::String(b.clone()),
                 )))
             }
@@ -135,13 +135,13 @@ impl Interpreter {
                 let coerced = self.to_string_coerce_value(r).flatten();
                 Ok(Value::Cons(ConsString::new(
                     Value::Cons(c.clone()),
-                    Value::from_string(coerced.into()),
+                    Value::from_string(coerced),
                 )))
             }
             (l, Value::Cons(c)) => {
                 let coerced = self.to_string_coerce_value(l).flatten();
                 Ok(Value::Cons(ConsString::new(
-                    Value::from_string(coerced.into()),
+                    Value::from_string(coerced),
                     Value::Cons(c.clone()),
                 )))
             }
@@ -196,7 +196,7 @@ impl Interpreter {
     pub(crate) fn to_string_coerce_value(&self, value: &Value) -> Value {
         match value {
             Value::String(_) | Value::Cons(_) => value.clone(),
-            _ => Value::from_string(self.to_string_coerce(value).into()),
+            _ => Value::from_string(self.to_string_coerce(value)),
         }
     }
 

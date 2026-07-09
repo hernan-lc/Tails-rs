@@ -27,7 +27,10 @@ impl Interpreter {
                 Ok(Value::Object(iter_idx))
             }
             Value::String(s) => {
-                let chars: Vec<Value> = s.chars().map(|c| Value::from_string(c.to_string())).collect();
+                let chars: Vec<Value> = s
+                    .chars()
+                    .map(|c| Value::from_string(c.to_string()))
+                    .collect();
                 let data_idx = self.gc.allocate(
                     &mut self.heap,
                     HeapValue::Array(JsArray { elements: chars }),
@@ -127,7 +130,10 @@ impl Interpreter {
                 Ok(Value::Object(iter_idx))
             }
             Value::String(s) => {
-                let chars: Vec<Value> = s.chars().map(|c| Value::from_string(c.to_string())).collect();
+                let chars: Vec<Value> = s
+                    .chars()
+                    .map(|c| Value::from_string(c.to_string()))
+                    .collect();
                 let data_idx = self.gc.allocate(
                     &mut self.heap,
                     HeapValue::Array(JsArray { elements: chars }),

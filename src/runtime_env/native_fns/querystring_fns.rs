@@ -47,7 +47,7 @@ pub(super) fn native_querystring_parse(
                 .map(|s| s.into_owned())
                 .unwrap_or_else(|_| value.to_string());
             obj.properties
-                .insert(decoded_key, Value::from_string(decoded_value.into()));
+                .insert(decoded_key, Value::from_string(decoded_value));
         }
     }
 
@@ -87,7 +87,7 @@ pub(super) fn native_querystring_stringify(
         pairs = Vec::new();
     }
 
-    Ok(Value::from_string(pairs.join(&sep).into()))
+    Ok(Value::from_string(pairs.join(&sep)))
 }
 
 pub(super) fn native_querystring_encode(
@@ -99,7 +99,9 @@ pub(super) fn native_querystring_encode(
         .first()
         .map(|v| to_string_value(interp, v))
         .unwrap_or_default();
-    Ok(Value::from_string(urlencoding::encode(&input).into_owned().into()))
+    Ok(Value::from_string(
+        urlencoding::encode(&input).into_owned(),
+    ))
 }
 
 pub(super) fn native_querystring_decode(
@@ -111,7 +113,9 @@ pub(super) fn native_querystring_decode(
         .first()
         .map(|v| to_string_value(interp, v))
         .unwrap_or_default();
-    Ok(Value::from_string(urlencoding::decode(&input)
+    Ok(Value::from_string(
+        urlencoding::decode(&input)
             .map(|s| s.into_owned())
-            .unwrap_or_default().into(),))
+            .unwrap_or_default(),
+    ))
 }

@@ -28,10 +28,7 @@ fn test_primitives() {
     "#,
     );
     assert!(r.is_ok());
-    assert_eq!(
-        r.unwrap(),
-        Value::string("string,boolean,object,undefined")
-    );
+    assert_eq!(r.unwrap(), Value::string("string,boolean,object,undefined"));
 }
 
 #[test]
@@ -72,10 +69,7 @@ fn test_comparison_operators() {
     "#,
     );
     assert!(r.is_ok());
-    assert_eq!(
-        r.unwrap(),
-        Value::string("true,true,true,true,true,true")
-    );
+    assert_eq!(r.unwrap(), Value::string("true,true,true,true,true,true"));
 }
 
 #[test]

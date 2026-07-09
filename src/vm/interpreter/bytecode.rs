@@ -314,12 +314,14 @@ impl Interpreter {
                     continue;
                 }
                 Instruction::MapGet => {
-                    let key = self.stack.pop().ok_or_else(|| {
-                        Error::RuntimeError(super::ERR_STACK_UNDERFLOW.into())
-                    })?;
-                    let object = self.stack.pop().ok_or_else(|| {
-                        Error::RuntimeError(super::ERR_STACK_UNDERFLOW.into())
-                    })?;
+                    let key = self
+                        .stack
+                        .pop()
+                        .ok_or_else(|| Error::RuntimeError(super::ERR_STACK_UNDERFLOW.into()))?;
+                    let object = self
+                        .stack
+                        .pop()
+                        .ok_or_else(|| Error::RuntimeError(super::ERR_STACK_UNDERFLOW.into()))?;
                     self.exec_map_get(object, key)?;
                     pc += 1;
                     continue;
@@ -572,7 +574,12 @@ impl Interpreter {
                         _ => {
                             let promise_idx = self.heap.len();
                             self.heap.push(HeapValue::Promise(
-                                crate::objects::js_promise::JsPromise::rejected(Value::from_string(format!("Cannot resolve import source: {}", source),)),
+                                crate::objects::js_promise::JsPromise::rejected(
+                                    Value::from_string(format!(
+                                        "Cannot resolve import source: {}",
+                                        source
+                                    )),
+                                ),
                             ));
                             self.stack.push(Value::Promise(promise_idx));
                             continue;

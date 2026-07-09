@@ -44,7 +44,7 @@ pub(super) fn native_os_cpus(
                 }),
             );
             let props = props! {
-                "model" => Value::from_string(cpu.model.clone().into()),
+                "model" => Value::from_string(cpu.model.clone()),
                 "speed" => Value::Float(cpu.speed),
                 "times" => Value::Object(times_idx),
             };
@@ -97,7 +97,7 @@ pub(super) fn native_os_hostname(
     _args: &[Value],
 ) -> Result<Value> {
     match tails_os::hostname() {
-        Ok(h) => Ok(Value::from_string(h.into())),
+        Ok(h) => Ok(Value::from_string(h)),
         Err(_) => Ok(Value::from_string("localhost".to_string())),
     }
 }
@@ -115,7 +115,7 @@ pub(super) fn native_os_release(
     _this: &Value,
     _args: &[Value],
 ) -> Result<Value> {
-    Ok(Value::from_string(tails_os::release().into()))
+    Ok(Value::from_string(tails_os::release()))
 }
 
 pub(super) fn native_os_homedir(
@@ -123,7 +123,7 @@ pub(super) fn native_os_homedir(
     _this: &Value,
     _args: &[Value],
 ) -> Result<Value> {
-    Ok(Value::from_string(tails_os::homedir().into()))
+    Ok(Value::from_string(tails_os::homedir()))
 }
 
 pub(super) fn native_os_tmpdir(
@@ -131,5 +131,5 @@ pub(super) fn native_os_tmpdir(
     _this: &Value,
     _args: &[Value],
 ) -> Result<Value> {
-    Ok(Value::from_string(tails_os::tmpdir().into()))
+    Ok(Value::from_string(tails_os::tmpdir()))
 }

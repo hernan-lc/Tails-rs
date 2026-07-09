@@ -134,8 +134,5 @@ fn test_intl_number_format_negative() {
         Path::new("/tmp/test_module.ts"),
     );
     assert!(r.is_ok());
-    assert_eq!(
-        r.unwrap(),
-        tails::Value::string("-1,234,567.89")
-    );
+    assert_eq!(r.unwrap(), tails::Value::string("-1,234,567.89"));
 }

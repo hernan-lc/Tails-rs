@@ -37,10 +37,7 @@ fn test_math() {
     "#,
     );
     assert!(r.is_ok());
-    assert_eq!(
-        r.unwrap(),
-        Value::string("5,3,4,4,1,3,1024,4,0,true")
-    );
+    assert_eq!(r.unwrap(), Value::string("5,3,4,4,1,3,1024,4,0,true"));
 }
 
 #[test]

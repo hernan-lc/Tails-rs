@@ -220,7 +220,7 @@ impl Interpreter {
                                     let b_val = *b;
                                     let b_str =
                                         if b_val.is_finite() && b_val == (b_val as i64) as f64 {
-                                            Value::from_string((b_val as i64).to_string().into())
+                                            Value::from_string((b_val as i64).to_string())
                                         } else {
                                             Value::from_string(b_val.to_string())
                                         };
@@ -237,7 +237,7 @@ impl Interpreter {
                                     let b_val = *b;
                                     let right =
                                         if b_val.is_finite() && b_val == (b_val as i64) as f64 {
-                                            Value::from_string((b_val as i64).to_string().into())
+                                            Value::from_string((b_val as i64).to_string())
                                         } else {
                                             Value::from_string(b_val.to_string())
                                         };

@@ -62,12 +62,12 @@ impl CodeGenerator {
     ) -> Result<()> {
         if expressions.is_empty() {
             let s = quasis.join("");
-            let idx = self.add_constant(Value::from_string(s.into()));
+            let idx = self.add_constant(Value::from_string(s));
             self.emit(Instruction::LoadConst(idx));
         } else {
             let first = &quasis[0];
             if !first.is_empty() {
-                let idx = self.add_constant(Value::from_string(first.clone().into()));
+                let idx = self.add_constant(Value::from_string(first.clone()));
                 self.emit(Instruction::LoadConst(idx));
             }
 
@@ -82,7 +82,7 @@ impl CodeGenerator {
                 }
 
                 if i + 1 < quasis.len() && !quasis[i + 1].is_empty() {
-                    let idx = self.add_constant(Value::from_string(quasis[i + 1].clone().into()));
+                    let idx = self.add_constant(Value::from_string(quasis[i + 1].clone()));
                     self.emit(Instruction::LoadConst(idx));
                     self.emit(Instruction::Add);
                 }

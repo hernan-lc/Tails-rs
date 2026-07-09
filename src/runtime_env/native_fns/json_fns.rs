@@ -35,5 +35,5 @@ pub(super) fn native_json_stringify(
     args: &[Value],
 ) -> Result<Value> {
     let val = args.first().cloned().unwrap_or(Value::Undefined);
-    Ok(Value::from_string(to_json_value(interp, &val).into()))
+    Ok(Value::from_string(to_json_value(interp, &val)))
 }

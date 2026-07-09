@@ -55,10 +55,7 @@ fn test_websocket_native_url_returns_initial_url() {
         Path::new("/tmp/test_websocket_native.ts"),
     );
     assert!(r.is_ok(), "ws.url failed: {:?}", r.err());
-    assert_eq!(
-        r.unwrap(),
-        tails::Value::string("wss://example.com/path")
-    );
+    assert_eq!(r.unwrap(), tails::Value::string("wss://example.com/path"));
 }
 
 #[test]

@@ -47,7 +47,7 @@ pub(super) fn native_symbol_key_for(
         Value::Symbol(id) => {
             for (key, &reg_id) in &interp.symbol_registry {
                 if reg_id == id {
-                    return Ok(Value::from_string(key.clone().into()));
+                    return Ok(Value::from_string(key.clone()));
                 }
             }
             Ok(Value::Undefined)

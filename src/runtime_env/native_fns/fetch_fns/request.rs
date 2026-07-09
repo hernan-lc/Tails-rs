@@ -57,13 +57,13 @@ pub(crate) fn native_request_constructor(
                 }
 
                 let mut props = props! {
-                    "url" => Value::from_string(cloned_url.into()),
-                    "method" => Value::from_string(method.to_uppercase().into()),
-                    "__headers" => Value::from_string(headers_raw.clone().into()),
+                    "url" => Value::from_string(cloned_url),
+                    "method" => Value::from_string(method.to_uppercase()),
+                    "__headers" => Value::from_string(headers_raw.clone()),
                     "__body" => body.clone().map(Value::from_string).unwrap_or(Value::Null),
                     "bodyUsed" => Value::Boolean(false),
                     "__is_request" => Value::Boolean(true),
-                    "__method" => Value::from_string(method.to_uppercase().into()),
+                    "__method" => Value::from_string(method.to_uppercase()),
                 };
 
                 let h_idx = interp.heap.len();
@@ -114,9 +114,9 @@ pub(crate) fn native_request_constructor(
     }
 
     let mut props = props! {
-        "url" => Value::from_string(url.into()),
-        "method" => Value::from_string(method.to_uppercase().into()),
-        "__headers" => Value::from_string(headers_raw.clone().into()),
+        "url" => Value::from_string(url),
+        "method" => Value::from_string(method.to_uppercase()),
+        "__headers" => Value::from_string(headers_raw.clone()),
         "__body" => body.map(Value::from_string).unwrap_or(Value::Null),
         "bodyUsed" => Value::Boolean(false),
         "__is_request" => Value::Boolean(true),

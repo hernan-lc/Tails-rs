@@ -11,7 +11,7 @@ pub(super) fn native_string_constructor(
     args: &[Value],
 ) -> Result<Value> {
     let value = args.first().cloned().unwrap_or(Value::Undefined);
-    Ok(Value::from_string(to_string_value(interp, &value).into()))
+    Ok(Value::from_string(to_string_value(interp, &value)))
 }
 
 pub(super) fn native_string_char_at(
@@ -63,7 +63,7 @@ pub(super) fn native_string_slice(
     } as usize;
 
     let result: String = chars[start..end].iter().collect();
-    Ok(Value::from_string(result.into()))
+    Ok(Value::from_string(result))
 }
 
 pub(super) fn native_string_substring(
@@ -92,7 +92,7 @@ pub(super) fn native_string_substring(
         (end, start)
     };
     let result: String = chars[start..end].iter().collect();
-    Ok(Value::from_string(result.into()))
+    Ok(Value::from_string(result))
 }
 
 pub(super) fn native_string_index_of(
@@ -132,7 +132,7 @@ pub(super) fn native_string_replace(
     let s = get_string(this).unwrap_or_default();
     let pattern = match args.first() {
         Some(Value::String(ss)) => ss.as_ref(),
-        _ => return Ok(Value::from_string(s.into())),
+        _ => return Ok(Value::from_string(s)),
     };
     let replacement = match args.get(1) {
         Some(v) => to_string_value(interp, v),
@@ -142,9 +142,9 @@ pub(super) fn native_string_replace(
         Some(pos) => {
             let end = pos + pattern.len();
             let result = format!("{}{}{}", &s[..pos], replacement, &s[end..]);
-            Ok(Value::from_string(result.into()))
+            Ok(Value::from_string(result))
         }
-        None => Ok(Value::from_string(s.into())),
+        None => Ok(Value::from_string(s)),
     }
 }
 
@@ -161,14 +161,17 @@ pub(super) fn native_string_split(
                 let heap_idx = interp.heap.len();
                 interp.heap.push(crate::vm::interpreter::HeapValue::Array(
                     crate::vm::interpreter::JsArray {
-                        elements: vec![Value::from_string(s.into())],
+                        elements: vec![Value::from_string(s)],
                     },
                 ));
                 Ok(Value::Array(heap_idx))
             }
         }
     };
-    let parts: Vec<Value> = s.split(sep).map(|p| Value::from_string(p.to_string())).collect();
+    let parts: Vec<Value> = s
+        .split(sep)
+        .map(|p| Value::from_string(p.to_string()))
+        .collect();
     let heap_idx = interp.heap.len();
     interp.heap.push(crate::vm::interpreter::HeapValue::Array(
         crate::vm::interpreter::JsArray { elements: parts },
@@ -209,7 +212,7 @@ pub(super) fn native_string_to_lower_case(
     _args: &[Value],
 ) -> Result<Value> {
     let s = get_string(this).unwrap_or_default();
-    Ok(Value::from_string(s.to_lowercase().into()))
+    Ok(Value::from_string(s.to_lowercase()))
 }
 
 pub(super) fn native_string_to_upper_case(
@@ -218,7 +221,7 @@ pub(super) fn native_string_to_upper_case(
     _args: &[Value],
 ) -> Result<Value> {
     let s = get_string(this).unwrap_or_default();
-    Ok(Value::from_string(s.to_uppercase().into()))
+    Ok(Value::from_string(s.to_uppercase()))
 }
 
 pub(super) fn native_string_starts_with(
@@ -258,7 +261,7 @@ pub(super) fn native_string_repeat(
         return Ok(Value::from_string("".to_string()));
     }
     let result: String = s.repeat(count);
-    Ok(Value::from_string(result.into()))
+    Ok(Value::from_string(result))
 }
 
 fn pad_string(s: &str, target_len: usize, pad_char: char, pad_start: bool) -> String {
@@ -285,7 +288,9 @@ pub(super) fn native_string_pad_start(
         Some(Value::String(ss)) => ss.chars().next().unwrap_or(' '),
         _ => ' ',
     };
-    Ok(Value::from_string(pad_string(&s, target_len, pad_char, true).into()))
+    Ok(Value::from_string(
+        pad_string(&s, target_len, pad_char, true),
+    ))
 }
 
 pub(super) fn native_string_pad_end(
@@ -299,7 +304,9 @@ pub(super) fn native_string_pad_end(
         Some(Value::String(ss)) => ss.chars().next().unwrap_or(' '),
         _ => ' ',
     };
-    Ok(Value::from_string(pad_string(&s, target_len, pad_char, false).into()))
+    Ok(Value::from_string(
+        pad_string(&s, target_len, pad_char, false),
+    ))
 }
 
 pub(super) fn native_string_match_all(
@@ -331,7 +338,7 @@ pub(super) fn native_string_match_all(
                         let arr_idx = interp.gc.allocate(
                             &mut interp.heap,
                             HeapValue::Array(JsArray {
-                                elements: vec![Value::from_string(match_str.into())],
+                                elements: vec![Value::from_string(match_str)],
                             }),
                         );
                         results.push(Value::Array(arr_idx));
@@ -366,7 +373,7 @@ pub(super) fn native_string_match_all(
                 let arr_idx = interp.gc.allocate(
                     &mut interp.heap,
                     HeapValue::Array(JsArray {
-                        elements: vec![Value::from_string(match_str.into())],
+                        elements: vec![Value::from_string(match_str)],
                     }),
                 );
                 results.push(Value::Array(arr_idx));

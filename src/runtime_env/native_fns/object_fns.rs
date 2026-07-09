@@ -180,7 +180,7 @@ pub(super) fn native_object_entries(
         let heap_idx = interp.heap.len();
         interp.heap.push(crate::vm::interpreter::HeapValue::Array(
             crate::vm::interpreter::JsArray {
-                elements: vec![Value::from_string(k.into()), v],
+                elements: vec![Value::from_string(k), v],
             },
         ));
         entries.push(Value::Array(heap_idx));

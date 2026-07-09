@@ -7,7 +7,10 @@ use rustc_hash::FxHashMap;
 
 pub(crate) fn create_headers_props(headers_raw: &str) -> PropertyStorage {
     let mut props = FxHashMap::default();
-    props.insert("__headers".into(), Value::from_string(headers_raw.to_string()));
+    props.insert(
+        "__headers".into(),
+        Value::from_string(headers_raw.to_string()),
+    );
     props.insert("append".into(), Value::NativeFunction(c::HEADERS_APPEND));
     props.insert("get".into(), Value::NativeFunction(c::HEADERS_GET));
     props.insert("set".into(), Value::NativeFunction(c::HEADERS_SET));
@@ -76,8 +79,10 @@ where
                 .iter()
                 .map(|(k, v)| format!("{}\0{}", k, v))
                 .collect();
-            obj.properties
-                .insert("__headers".into(), Value::from_string(new_raw.join("\n").into()));
+            obj.properties.insert(
+                "__headers".into(),
+                Value::from_string(new_raw.join("\n")),
+            );
         }
     }
 }
@@ -95,7 +100,7 @@ pub(crate) fn native_headers_constructor(
             Value::Object(obj_idx) => {
                 if let HeapValue::Object(obj) = &interp.heap[*obj_idx] {
                     if let Some(h) = get_string_prop(obj, "__headers") {
-                        props.insert("__headers".into(), Value::from_string(h.clone().into()));
+                        props.insert("__headers".into(), Value::from_string(h.clone()));
                     } else {
                         let mut header_strs = Vec::new();
                         for (k, v) in &obj.properties {
@@ -104,7 +109,10 @@ pub(crate) fn native_headers_constructor(
                                 header_strs.push(format!("{}\0{}", k.to_lowercase(), val));
                             }
                         }
-                        props.insert("__headers".into(), Value::from_string(header_strs.join("\n").into()));
+                        props.insert(
+                            "__headers".into(),
+                            Value::from_string(header_strs.join("\n")),
+                        );
                     }
                 }
             }
@@ -123,7 +131,10 @@ pub(crate) fn native_headers_constructor(
                             }
                         }
                     }
-                    props.insert("__headers".into(), Value::from_string(header_strs.join("\n").into()));
+                    props.insert(
+                        "__headers".into(),
+                        Value::from_string(header_strs.join("\n")),
+                    );
                 }
             }
             _ => {}
@@ -192,7 +203,7 @@ pub(crate) fn native_headers_get(
     if values.is_empty() {
         Ok(Value::Null)
     } else {
-        Ok(Value::from_string(values.join(", ").into()))
+        Ok(Value::from_string(values.join(", ")))
     }
 }
 
@@ -258,8 +269,8 @@ pub(crate) fn native_headers_for_each(
             &callback,
             &Value::Undefined,
             &[
-                Value::from_string(value.clone().into()),
-                Value::from_string(key.clone().into()),
+                Value::from_string(value.clone()),
+                Value::from_string(key.clone()),
                 _this.clone(),
             ],
         );
@@ -274,7 +285,10 @@ pub(crate) fn native_headers_keys(
 ) -> crate::errors::Result<Value> {
     let raw = get_headers_string(interp, _this);
     let entries = parse_headers(&raw);
-    let keys: Vec<Value> = entries.into_iter().map(|(k, _)| Value::from_string(k.into())).collect();
+    let keys: Vec<Value> = entries
+        .into_iter()
+        .map(|(k, _)| Value::from_string(k))
+        .collect();
     let arr_idx = interp.heap.len();
     interp
         .heap
@@ -291,7 +305,10 @@ pub(crate) fn native_headers_values(
 ) -> crate::errors::Result<Value> {
     let raw = get_headers_string(interp, _this);
     let entries = parse_headers(&raw);
-    let vals: Vec<Value> = entries.into_iter().map(|(_, v)| Value::from_string(v.into())).collect();
+    let vals: Vec<Value> = entries
+        .into_iter()
+        .map(|(_, v)| Value::from_string(v))
+        .collect();
     let arr_idx = interp.heap.len();
     interp
         .heap
@@ -314,7 +331,7 @@ pub(crate) fn native_headers_entries(
         interp
             .heap
             .push(HeapValue::Array(crate::vm::interpreter::JsArray {
-                elements: vec![Value::from_string(k.into()), Value::from_string(v.into())],
+                elements: vec![Value::from_string(k), Value::from_string(v)],
             }));
         result.push(Value::Array(pair_idx));
     }

@@ -148,14 +148,16 @@ impl Interpreter {
 
         // Inject __filename, __dirname, module, exports globals
         if let Some(ref path) = self.current_module_path {
-            self.globals
-                .insert("__filename".to_string(), Value::from_string(path.clone().into()));
+            self.globals.insert(
+                "__filename".to_string(),
+                Value::from_string(path.clone()),
+            );
             let dir = std::path::Path::new(path)
                 .parent()
                 .map(|p| p.to_string_lossy().to_string())
                 .unwrap_or_else(|| ".".to_string());
             self.globals
-                .insert("__dirname".to_string(), Value::from_string(dir.into()));
+                .insert("__dirname".to_string(), Value::from_string(dir));
 
             // inject import.meta with url property (file:// URL)
             let file_url = if path.starts_with('/') {
@@ -170,7 +172,7 @@ impl Interpreter {
                 )
             };
             let meta_props = props! {
-                "url" => Value::from_string(file_url.into()),
+                "url" => Value::from_string(file_url),
             };
             let meta_obj_idx = self.gc.allocate(
                 &mut self.heap,
@@ -692,7 +694,10 @@ impl Interpreter {
         }
         // Tag as module namespace for live binding support.
         if let Some(path) = &self.current_module_path {
-            props.insert("__module_path".to_string(), Value::from_string(path.clone().into()));
+            props.insert(
+                "__module_path".to_string(),
+                Value::from_string(path.clone()),
+            );
         }
         self.heap.push(HeapValue::Object(JsObject {
             properties: PropertyStorage::Map(props),
@@ -705,7 +710,7 @@ impl Interpreter {
     pub(crate) fn build_error_promise(&mut self, message: String) -> Value {
         let reason_idx = self.heap.len();
         let props = props! {
-            wk::MESSAGE => Value::from_string(message.into()),
+            wk::MESSAGE => Value::from_string(message),
         };
         self.heap.push(HeapValue::Object(JsObject {
             properties: props,

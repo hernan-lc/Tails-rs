@@ -182,12 +182,13 @@ pub(super) fn native_require(
     interp
         .globals
         .insert("exports".to_string(), exports_obj.clone());
+    interp.globals.insert(
+        "__filename".to_string(),
+        Value::from_string(module_path.clone()),
+    );
     interp
         .globals
-        .insert("__filename".to_string(), Value::from_string(module_path.clone().into()));
-    interp
-        .globals
-        .insert("__dirname".to_string(), Value::from_string(dirname.into()));
+        .insert("__dirname".to_string(), Value::from_string(dirname));
 
     // 12. Execute the module
     let module_scope_rc: std::rc::Rc<std::cell::RefCell<rustc_hash::FxHashMap<String, Value>>> =

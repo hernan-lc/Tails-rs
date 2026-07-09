@@ -84,15 +84,17 @@ pub(super) fn native_number_to_fixed(
         return Ok(Value::from_string(wk::NAN.to_string()));
     }
     if n.is_infinite() {
-        return Ok(Value::from_string(if n.is_sign_positive() {
+        return Ok(Value::from_string(
+            if n.is_sign_positive() {
                 wk::INFINITY.to_string()
             } else {
                 format!("-{}", wk::INFINITY)
             }
-            .to_string(),));
+            .to_string(),
+        ));
     }
     let formatted = format!("{:.*}", digits as usize, n);
-    Ok(Value::from_string(formatted.into()))
+    Ok(Value::from_string(formatted))
 }
 
 pub(super) fn native_number_to_string(
@@ -107,16 +109,16 @@ pub(super) fn native_number_to_string(
                 return Ok(Value::from_string("-0".to_string()));
             }
             if radix == 10 {
-                Ok(Value::from_string(format_number(*f).into()))
+                Ok(Value::from_string(format_number(*f)))
             } else {
-                Ok(Value::from_string(format_int(*f as i64, radix).into()))
+                Ok(Value::from_string(format_int(*f as i64, radix)))
             }
         }
         Value::Integer(i) => {
             if radix == 10 {
                 Ok(Value::from_string(i.to_string()))
             } else {
-                Ok(Value::from_string(format_int(*i, radix).into()))
+                Ok(Value::from_string(format_int(*i, radix)))
             }
         }
         _ => Ok(Value::from_string(wk::NAN.to_string())),
@@ -168,12 +170,14 @@ pub(super) fn native_number_to_exponential(
         return Ok(Value::from_string(wk::NAN.to_string()));
     }
     if n.is_infinite() {
-        return Ok(Value::from_string(if n.is_sign_positive() {
+        return Ok(Value::from_string(
+            if n.is_sign_positive() {
                 wk::INFINITY.to_string()
             } else {
                 format!("-{}", wk::INFINITY)
             }
-            .to_string(),));
+            .to_string(),
+        ));
     }
     let formatted = format!("{:.*e}", digits, n);
     let fixed = formatted.replacen(
@@ -203,7 +207,7 @@ pub(super) fn native_number_to_exponential(
     } else {
         fixed
     };
-    Ok(Value::from_string(result.into()))
+    Ok(Value::from_string(result))
 }
 
 pub(super) fn native_number_to_precision(
@@ -221,15 +225,17 @@ pub(super) fn native_number_to_precision(
         return Ok(Value::from_string(wk::NAN.to_string()));
     }
     if n.is_infinite() {
-        return Ok(Value::from_string(if n.is_sign_positive() {
+        return Ok(Value::from_string(
+            if n.is_sign_positive() {
                 wk::INFINITY.to_string()
             } else {
                 format!("-{}", wk::INFINITY)
             }
-            .to_string(),));
+            .to_string(),
+        ));
     }
     if precision == 0 {
-        return Ok(Value::from_string(format_number(n).into()));
+        return Ok(Value::from_string(format_number(n)));
     }
     let abs_n = n.abs();
     let int_part = abs_n.floor();
@@ -242,7 +248,7 @@ pub(super) fn native_number_to_precision(
     let factor = 10.0_f64.powi(decimal_places as i32);
     let rounded = (n * factor).round() / factor;
     let formatted = format!("{:.*}", decimal_places, rounded);
-    Ok(Value::from_string(formatted.into()))
+    Ok(Value::from_string(formatted))
 }
 
 pub(super) fn native_number_is_integer(

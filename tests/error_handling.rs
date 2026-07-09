@@ -35,10 +35,7 @@ fn test_throw_new_error() {
     "#,
     );
     assert!(r.is_ok());
-    assert_eq!(
-        r.unwrap(),
-        tails::Value::string("something went wrong")
-    );
+    assert_eq!(r.unwrap(), tails::Value::string("something went wrong"));
 }
 
 #[test]
@@ -56,10 +53,7 @@ fn test_catch_binding() {
     "#,
     );
     assert!(r.is_ok());
-    assert_eq!(
-        r.unwrap(),
-        tails::Value::string("my error value")
-    );
+    assert_eq!(r.unwrap(), tails::Value::string("my error value"));
 }
 
 #[test]
@@ -228,10 +222,7 @@ fn test_syntax_error_constructor() {
     "#,
     );
     assert!(r.is_ok());
-    assert_eq!(
-        r.unwrap(),
-        tails::Value::string("unexpected token")
-    );
+    assert_eq!(r.unwrap(), tails::Value::string("unexpected token"));
 }
 
 #[test]

@@ -70,7 +70,7 @@ pub(super) fn native_util_format(
             result.push(ch);
         }
     }
-    Ok(Value::from_string(result.into()))
+    Ok(Value::from_string(result))
 }
 
 pub(super) fn native_util_inspect(
@@ -92,7 +92,9 @@ pub(super) fn native_util_inspect(
             _ => None,
         })
         .unwrap_or(2);
-    Ok(Value::from_string(inspect_value(interp, &value, depth, 0).into()))
+    Ok(Value::from_string(
+        inspect_value(interp, &value, depth, 0),
+    ))
 }
 
 pub(super) fn native_util_promisify(
@@ -107,7 +109,7 @@ pub(super) fn native_util_promisify(
         HeapValue::Object(JsObject {
             properties: crate::props! {
                 "_original" => original,
-                wk::NAME => Value::from_string(name.into()),
+                wk::NAME => Value::from_string(name),
             },
             prototype: None,
             extensible: true,
@@ -128,7 +130,7 @@ pub(super) fn native_util_callbackify(
         HeapValue::Object(JsObject {
             properties: crate::props! {
                 "_original" => original,
-                wk::NAME => Value::from_string(name.into()),
+                wk::NAME => Value::from_string(name),
             },
             prototype: None,
             extensible: true,

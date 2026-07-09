@@ -147,7 +147,8 @@ pub(super) fn native_net_create_connection(
         }
 
         if !collected.is_empty() {
-            let data_val = Value::from_string(String::from_utf8_lossy(&collected).into_owned().into());
+            let data_val =
+                Value::from_string(String::from_utf8_lossy(&collected).into_owned());
             fire_listeners(interp, sock_idx, "data", &[data_val]);
         }
     }

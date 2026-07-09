@@ -51,7 +51,7 @@ pub(super) fn native_tls_connect(
         &mut interp.heap,
         HeapValue::Object(JsObject {
             properties: crate::props! {
-                "host" => Value::from_string(host.into()),
+                "host" => Value::from_string(host),
                 "port" => Value::Integer(port as i64),
                 "authorized" => Value::Boolean(true),
             },

@@ -14,10 +14,7 @@ fn test_buffer() {
         std::path::Path::new("/tmp/test_module.ts"),
     );
     assert!(r.is_ok());
-    assert_eq!(
-        r.unwrap(),
-        Value::string("Hello|5|AAAAA|Hello World|true")
-    );
+    assert_eq!(r.unwrap(), Value::string("Hello|5|AAAAA|Hello World|true"));
 }
 
 #[test]
@@ -86,10 +83,7 @@ fn test_fs_module() {
         path = path,
     ));
     assert!(r.is_ok(), "fs test failed: {:?}", r.err());
-    assert_eq!(
-        r.unwrap(),
-        Value::string("Hello from Tails!,true,false")
-    );
+    assert_eq!(r.unwrap(), Value::string("Hello from Tails!,true,false"));
 }
 
 #[test]

@@ -52,7 +52,7 @@ pub(super) fn native_crypto_random_uuid(
         bytes[10], bytes[11], bytes[12], bytes[13], bytes[14], bytes[15],
     );
 
-    Ok(Value::from_string(uuid.into()))
+    Ok(Value::from_string(uuid))
 }
 
 pub(super) fn native_crypto_create_hash(
@@ -71,7 +71,7 @@ pub(super) fn native_crypto_create_hash(
 
     // Create the hash object
     let props = props! {
-        "_algorithm" => Value::from_string(algorithm.into()),
+        "_algorithm" => Value::from_string(algorithm),
         "_data" => Value::Object(data_buf_idx),
         "update" => Value::NativeFunction(c::CRYPTO_HASH_UPDATE),
         "digest" => Value::NativeFunction(c::CRYPTO_HASH_DIGEST),
@@ -174,7 +174,7 @@ pub(super) fn native_crypto_hash_digest(
             }
         };
 
-        return Ok(Value::from_string(hash_hex.into()));
+        return Ok(Value::from_string(hash_hex));
     }
     Ok(Value::from_string("".to_string()))
 }

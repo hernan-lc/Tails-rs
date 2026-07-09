@@ -176,7 +176,7 @@ impl CodeGenerator {
         if computed {
             self.generate_expression(property)?;
         } else if let Expression::Identifier(name) = property {
-            let idx = self.add_constant(Value::from_string(name.clone().into()));
+            let idx = self.add_constant(Value::from_string(name.clone()));
             self.emit(Instruction::LoadConst(idx));
         } else {
             self.generate_expression(property)?;
@@ -198,7 +198,7 @@ impl CodeGenerator {
         if computed {
             self.generate_expression(property)?;
         } else if let Expression::Identifier(name) = property {
-            let idx = self.add_constant(Value::from_string(name.clone().into()));
+            let idx = self.add_constant(Value::from_string(name.clone()));
             self.emit(Instruction::LoadConst(idx));
         } else {
             self.generate_expression(property)?;
@@ -522,7 +522,7 @@ impl CodeGenerator {
         if computed {
             self.generate_expression(property)?;
         } else if let Expression::Identifier(name) = property {
-            let idx = self.add_constant(Value::from_string(name.clone().into()));
+            let idx = self.add_constant(Value::from_string(name.clone()));
             self.emit(Instruction::LoadConst(idx));
         } else {
             self.generate_expression(property)?;
@@ -590,7 +590,7 @@ impl CodeGenerator {
                     } else {
                         prop.key.clone()
                     };
-                    let key_idx = self.add_constant(Value::from_string(actual_key.into()));
+                    let key_idx = self.add_constant(Value::from_string(actual_key));
                     self.emit(Instruction::LoadConst(key_idx));
                     self.generate_expression(&prop.value)?;
                     self.emit(Instruction::SetProperty);
@@ -611,7 +611,7 @@ impl CodeGenerator {
                     } else {
                         prop.key.clone()
                     };
-                    let key_idx = self.add_constant(Value::from_string(actual_key.into()));
+                    let key_idx = self.add_constant(Value::from_string(actual_key));
                     self.emit(Instruction::LoadConst(key_idx));
                 }
                 self.generate_expression(&prop.value)?;

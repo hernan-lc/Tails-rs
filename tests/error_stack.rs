@@ -60,10 +60,7 @@ fn test_type_error_stack() {
     "#,
     );
     assert!(r.is_ok());
-    assert_eq!(
-        r.unwrap(),
-        tails::Value::string("TypeError: bad type")
-    );
+    assert_eq!(r.unwrap(), tails::Value::string("TypeError: bad type"));
 }
 
 #[test]
@@ -184,8 +181,5 @@ fn test_error_message_property() {
     "#,
     );
     assert!(r.is_ok());
-    assert_eq!(
-        r.unwrap(),
-        tails::Value::string("custom message")
-    );
+    assert_eq!(r.unwrap(), tails::Value::string("custom message"));
 }

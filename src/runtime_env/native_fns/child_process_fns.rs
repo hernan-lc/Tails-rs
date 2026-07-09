@@ -74,8 +74,8 @@ pub(super) fn native_child_process_exec_sync(
         let err_props = props! {
             "message" => Value::from_string(format!("Command failed: {}", command.trim())),
             "status" => Value::Integer(exit_code as i64),
-            "stderr" => Value::from_string(stderr_str.clone().into()),
-            "stdout" => Value::from_string(stdout_str.clone().into()),
+            "stderr" => Value::from_string(stderr_str.clone()),
+            "stdout" => Value::from_string(stdout_str.clone()),
             "signal" => Value::Null,
         };
 
@@ -99,7 +99,9 @@ pub(super) fn native_child_process_exec_sync(
         interp.heap.push(HeapValue::Buffer(stdout));
         Ok(Value::Buffer(buf_idx))
     } else {
-        Ok(Value::from_string(String::from_utf8_lossy(&stdout).to_string()))
+        Ok(Value::from_string(
+            String::from_utf8_lossy(&stdout).to_string(),
+        ))
     }
 }
 
@@ -171,8 +173,8 @@ pub(super) fn native_child_process_exec(
 
     // Build result object
     let result_props = props! {
-        "stdout" => Value::from_string(stdout_str.into()),
-        "stderr" => Value::from_string(stderr_str.into()),
+        "stdout" => Value::from_string(stdout_str),
+        "stderr" => Value::from_string(stderr_str),
         "status" => Value::Integer(exit_code as i64),
     };
 
@@ -309,7 +311,7 @@ pub(super) fn native_child_process_spawn(
     let stdout_idx = interp.heap.len();
     interp.heap.push(HeapValue::Object(JsObject {
         properties: props! {
-            "data" => Value::from_string(stdout_str.into()),
+            "data" => Value::from_string(stdout_str),
         },
         prototype: None,
         extensible: true,
@@ -318,7 +320,7 @@ pub(super) fn native_child_process_spawn(
     let stderr_idx = interp.heap.len();
     interp.heap.push(HeapValue::Object(JsObject {
         properties: props! {
-            "data" => Value::from_string(stderr_str.into()),
+            "data" => Value::from_string(stderr_str),
         },
         prototype: None,
         extensible: true,

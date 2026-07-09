@@ -135,8 +135,10 @@ pub(super) fn native_http_res_write(
                     }
                 })
                 .unwrap_or_default();
-            obj.properties
-                .insert("__body".into(), Value::from_string(prev.to_string() + &chunk));
+            obj.properties.insert(
+                "__body".into(),
+                Value::from_string(prev.to_string() + &chunk),
+            );
         }
     }
     Ok(Value::Undefined)
@@ -162,8 +164,10 @@ pub(super) fn native_http_res_end(
                         }
                     })
                     .unwrap_or_default();
-                obj.properties
-                    .insert("__body".into(), Value::from_string(prev.to_string() + &chunk));
+                obj.properties.insert(
+                    "__body".into(),
+                    Value::from_string(prev.to_string() + &chunk),
+                );
             }
         }
         if let HeapValue::Object(obj) = &mut interp.heap[*obj_idx] {
@@ -305,7 +309,7 @@ fn handle_one_request(
     // --- req object ---
     let mut hdr_props = FxHashMap::default();
     for (k, v) in &req.headers {
-        hdr_props.insert(k.clone(), Value::from_string(v.clone().into()));
+        hdr_props.insert(k.clone(), Value::from_string(v.clone()));
     }
     let hdr_idx = interp.heap.len();
     interp.heap.push(HeapValue::Object(JsObject {
@@ -315,10 +319,10 @@ fn handle_one_request(
     }));
 
     let req_props = props! {
-        "method" => Value::from_string(req.method.into()),
-        "url" => Value::from_string(req.path.into()),
-        "body" => Value::from_string(req.body.clone().into()),
-        "__body" => Value::from_string(req.body.into()),
+        "method" => Value::from_string(req.method),
+        "url" => Value::from_string(req.path),
+        "body" => Value::from_string(req.body.clone()),
+        "__body" => Value::from_string(req.body),
         "headers" => Value::Object(hdr_idx),
         "on" => Value::NativeFunction(c::HTTP_REQ_ON),
     };

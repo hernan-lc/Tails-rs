@@ -21,7 +21,7 @@ pub(super) fn native_websocket_constructor(
     }
 
     let props = props! {
-        "url" => Value::from_string(url.into()),
+        "url" => Value::from_string(url),
         "readyState" => Value::Integer(0),
         "bufferedAmount" => Value::Integer(0),
         "binaryType" => Value::string("blob"),
@@ -56,8 +56,10 @@ pub(super) fn native_websocket_send(
 
         if let HeapValue::Object(obj) = &mut interp.heap[*obj_idx] {
             let msg_len = message.len();
-            obj.properties
-                .insert("__pendingMessage".into(), Value::from_string(message.into()));
+            obj.properties.insert(
+                "__pendingMessage".into(),
+                Value::from_string(message),
+            );
 
             let buffered = obj
                 .properties

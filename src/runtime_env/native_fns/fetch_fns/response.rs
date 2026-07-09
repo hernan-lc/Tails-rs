@@ -18,7 +18,7 @@ pub(crate) fn build_response(
         "status" => Value::Integer(status as i64),
         "statusText" => Value::from_string(status_text.to_string()),
         "ok" => Value::Boolean((200..300).contains(&status)),
-        "__body" => Value::from_string(body.into()),
+        "__body" => Value::from_string(body),
         "__headers" => Value::from_string(headers_raw.to_string()),
         "text" => Value::NativeFunction(c::RESPONSE_TEXT),
         "json" => Value::NativeFunction(c::RESPONSE_JSON),
@@ -172,10 +172,10 @@ pub(crate) fn native_response_clone(
                 .get("__body")
                 .map(|v| {
                     if let Value::String(s) = v {
-                            s.to_string()
-                        } else {
-                            String::new()
-                        }
+                        s.to_string()
+                    } else {
+                        String::new()
+                    }
                 })
                 .unwrap_or_default();
             let status = obj
@@ -197,10 +197,10 @@ pub(crate) fn native_response_clone(
                 .get("__headers")
                 .map(|v| {
                     if let Value::String(s) = v {
-                            s.to_string()
-                        } else {
-                            String::new()
-                        }
+                        s.to_string()
+                    } else {
+                        String::new()
+                    }
                 })
                 .unwrap_or_default();
             return build_response(interp, body, status, &status_text, &headers_raw);
@@ -217,7 +217,7 @@ pub(crate) fn native_response_text(
     if let Value::Object(obj_idx) = _this {
         if let HeapValue::Object(obj) = &interp.heap[*obj_idx] {
             if let Some(body) = get_string_prop(obj, "__body") {
-                return Ok(Value::from_string(body.clone().into()));
+                return Ok(Value::from_string(body.clone()));
             }
         }
     }

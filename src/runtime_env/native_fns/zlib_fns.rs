@@ -49,7 +49,10 @@ pub(super) fn native_zlib_gzip_sync(
     let compressed = encoder
         .finish()
         .map_err(|e| Error::RuntimeError(format!("gzip finish failed: {}", e)))?;
-    Ok(Value::from_string(base64::engine::general_purpose::STANDARD.encode(&compressed).into(),))
+    Ok(Value::from_string(
+        base64::engine::general_purpose::STANDARD
+            .encode(&compressed),
+    ))
 }
 
 pub(super) fn native_zlib_gunzip_sync(
@@ -70,7 +73,7 @@ pub(super) fn native_zlib_gunzip_sync(
     decoder
         .read_to_string(&mut output)
         .map_err(|e| Error::RuntimeError(format!("gunzip failed: {}", e)))?;
-    Ok(Value::from_string(output.into()))
+    Ok(Value::from_string(output))
 }
 
 pub(super) fn native_zlib_deflate_sync(
@@ -96,7 +99,10 @@ pub(super) fn native_zlib_deflate_sync(
     let compressed = encoder
         .finish()
         .map_err(|e| Error::RuntimeError(format!("deflate finish failed: {}", e)))?;
-    Ok(Value::from_string(base64::engine::general_purpose::STANDARD.encode(&compressed).into(),))
+    Ok(Value::from_string(
+        base64::engine::general_purpose::STANDARD
+            .encode(&compressed),
+    ))
 }
 
 pub(super) fn native_zlib_inflate_sync(
@@ -117,7 +123,7 @@ pub(super) fn native_zlib_inflate_sync(
     decoder
         .read_to_string(&mut output)
         .map_err(|e| Error::RuntimeError(format!("inflate failed: {}", e)))?;
-    Ok(Value::from_string(output.into()))
+    Ok(Value::from_string(output))
 }
 
 pub(super) fn native_zlib_deflate_raw_sync(

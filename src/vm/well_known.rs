@@ -310,11 +310,7 @@ mod tests {
         for s in all {
             // TRAP_GET/SET/HAS intentionally equal GET/SET_PROP/HAS — skip aliases
             // by only inserting primary names above.
-            assert!(
-                seen.insert(s),
-                "duplicate well-known string: {:?}",
-                s
-            );
+            assert!(seen.insert(s), "duplicate well-known string: {:?}", s);
         }
     }
 

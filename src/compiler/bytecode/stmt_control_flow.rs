@@ -109,7 +109,7 @@ impl CodeGenerator {
                                                                         Expression::BooleanLiteral(b) => Some(Value::Boolean(*b)),
                                                                         Expression::NullLiteral => Some(Value::Null),
                                                                         Expression::UndefinedLiteral => Some(Value::Undefined),
-                                                                        Expression::StringLiteral(s) => Some(Value::from_string(s.clone().into())),
+                                                                        Expression::StringLiteral(s) => Some(Value::from_string(s.clone())),
                                                                         _ => None,
                                                                     };
                                                                     if let Some(limit_value) =

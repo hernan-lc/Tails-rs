@@ -309,7 +309,7 @@ impl Interpreter {
                     3 => Ok(Value::Float(f64::from_bits(result.data))),
                     4 => {
                         let s = tails_abi::get_string(result);
-                        Ok(Value::from_string(s.into()))
+                        Ok(Value::from_string(s))
                     }
                     5 => {
                         // Native object - create NativeObject value with the ID

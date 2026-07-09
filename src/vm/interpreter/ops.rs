@@ -176,7 +176,7 @@ impl Interpreter {
             Instruction::ToString => {
                 let value = self.stack_pop()?;
                 let s = self.value_to_string_raw(&value);
-                self.stack.push(Value::from_string(s.into()));
+                self.stack.push(Value::from_string(s));
             }
             _ => return Ok(false),
         }

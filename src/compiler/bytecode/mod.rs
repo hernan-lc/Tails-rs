@@ -513,7 +513,8 @@ impl CodeGenerator {
                         self.generate_destructuring_pattern(&element.value)?;
                     } else {
                         self.emit(Instruction::Dup);
-                        let key_idx = self.add_constant(Value::from_string(element.key.clone().into()));
+                        let key_idx =
+                            self.add_constant(Value::from_string(element.key.clone()));
                         self.emit(Instruction::LoadConst(key_idx));
                         self.emit(Instruction::GetProperty);
                         if let Some(default_expr) = &element.default_value {
@@ -550,7 +551,7 @@ impl CodeGenerator {
                 if *computed {
                     self.generate_expression(property)?;
                 } else if let Expression::Identifier(name) = property.as_ref() {
-                    let idx = self.add_constant(Value::from_string(name.clone().into()));
+                    let idx = self.add_constant(Value::from_string(name.clone()));
                     self.emit(Instruction::LoadConst(idx));
                 } else {
                     self.generate_expression(property)?;
@@ -589,7 +590,8 @@ impl CodeGenerator {
                             self.generate_expression(key_expr)?;
                         }
                     } else {
-                        let key_idx = self.add_constant(Value::from_string(prop.key.clone().into()));
+                        let key_idx =
+                            self.add_constant(Value::from_string(prop.key.clone()));
                         self.emit(Instruction::LoadConst(key_idx));
                     }
                     self.emit(Instruction::GetProperty);

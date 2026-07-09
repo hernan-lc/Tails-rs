@@ -145,7 +145,7 @@ pub fn create_path_module(
             } else {
                 ":"
             }
-            .to_string().into(),),
+            .to_string(),),
     }
 }
 
@@ -194,7 +194,7 @@ pub fn create_process_module(
     // process.env
     let mut env_props = PropertyStorage::new();
     for (key, value) in std::env::vars() {
-        env_props.insert(key, Value::from_string(value.into()));
+        env_props.insert(key, Value::from_string(value));
     }
     let env_obj_idx = gc.allocate(
         heap,

@@ -225,7 +225,9 @@ pub(super) fn native_buffer_to_string(
         let end = args.get(1).map(|v| to_i64(v) as usize).unwrap_or(buf.len());
         let end = end.min(buf.len());
         let start = start.min(end);
-        Ok(Value::from_string(String::from_utf8_lossy(&buf[start..end]).to_string(),))
+        Ok(Value::from_string(
+            String::from_utf8_lossy(&buf[start..end]).to_string(),
+        ))
     })
 }
 

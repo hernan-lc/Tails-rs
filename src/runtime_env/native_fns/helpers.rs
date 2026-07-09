@@ -385,7 +385,7 @@ pub(super) fn from_json_value(interp: &mut Interpreter, val: serde_json::Value) 
                 Value::Float(n.as_f64().unwrap_or(f64::NAN))
             }
         }
-        serde_json::Value::String(s) => Value::from_string(s.into()),
+        serde_json::Value::String(s) => Value::from_string(s),
         serde_json::Value::Array(arr) => {
             let len = arr.len();
             let elems: Vec<Value> = Vec::with_capacity(len);

@@ -29,8 +29,7 @@ impl Interpreter {
                 self.stack.push(Value::Map(map_idx));
             }
             other => {
-                let result =
-                    self.call_named_method(&other, wk::SET_PROP, &[key, value])?;
+                let result = self.call_named_method(&other, wk::SET_PROP, &[key, value])?;
                 self.stack.push(result);
             }
         }

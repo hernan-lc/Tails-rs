@@ -821,10 +821,7 @@ fn test_string_split_and_join() {
     "#,
     );
     assert!(r.is_ok());
-    assert_eq!(
-        r.unwrap(),
-        tails::Value::string("hello world foo")
-    );
+    assert_eq!(r.unwrap(), tails::Value::string("hello world foo"));
 }
 
 #[test]

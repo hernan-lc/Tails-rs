@@ -522,7 +522,11 @@ pub(super) fn native_url_parse(
     match parsed {
         Some(url) => {
             // Reuse native_url_constructor logic
-            native_url_constructor(interp, &Value::Undefined, &[Value::from_string(url.to_string())])
+            native_url_constructor(
+                interp,
+                &Value::Undefined,
+                &[Value::from_string(url.to_string())],
+            )
         }
         None => Ok(Value::Null),
     }
@@ -559,7 +563,9 @@ pub(super) fn native_url_file_url_to_path(
         let normalized = std::path::Path::new(&decoded)
             .components()
             .collect::<std::path::PathBuf>();
-        Ok(Value::from_string(normalized.to_string_lossy().into_owned()))
+        Ok(Value::from_string(
+            normalized.to_string_lossy().into_owned(),
+        ))
     } else {
         Err(Error::TypeError(format!("Invalid file URL: {}", url_str)))
     }

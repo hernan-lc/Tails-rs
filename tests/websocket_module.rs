@@ -29,10 +29,7 @@ fn test_websocket_instance_properties() {
         Path::new("/tmp/test_websocket_module.ts"),
     );
     assert!(r.is_ok(), "WebSocket instance failed: {:?}", r.err());
-    assert_eq!(
-        r.unwrap(),
-        tails::Value::string("wss://example.com/ws")
-    );
+    assert_eq!(r.unwrap(), tails::Value::string("wss://example.com/ws"));
 }
 
 #[test]

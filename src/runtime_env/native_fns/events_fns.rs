@@ -278,7 +278,7 @@ pub(super) fn native_event_emitter_once(
         HeapValue::Object(JsObject {
             properties: crate::props! {
                 "_callback" => callback,
-                "_event" => Value::from_string(event.clone().into()),
+                "_event" => Value::from_string(event.clone()),
                 "_once" => Value::Boolean(true),
             },
             prototype: None,
@@ -289,7 +289,7 @@ pub(super) fn native_event_emitter_once(
     let _ = native_event_emitter_on(
         interp,
         this,
-        &[Value::from_string(event.into()), Value::Object(wrapper_idx)],
+        &[Value::from_string(event), Value::Object(wrapper_idx)],
     );
     Ok(this.clone())
 }
@@ -445,7 +445,7 @@ pub(super) fn native_event_emitter_prepend_once_listener(
         HeapValue::Object(JsObject {
             properties: crate::props! {
                 "_callback" => callback,
-                "_event" => Value::from_string(event.clone().into()),
+                "_event" => Value::from_string(event.clone()),
                 "_once" => Value::Boolean(true),
             },
             prototype: None,
@@ -456,7 +456,7 @@ pub(super) fn native_event_emitter_prepend_once_listener(
     let _ = native_event_emitter_prepend_listener(
         interp,
         this,
-        &[Value::from_string(event.into()), Value::Object(wrapper_idx)],
+        &[Value::from_string(event), Value::Object(wrapper_idx)],
     );
     Ok(this.clone())
 }

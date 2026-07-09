@@ -116,7 +116,7 @@ pub(super) fn native_date_parse(
     let s = match args.first() {
         Some(Value::String(s)) => s.to_string(),
         Some(Value::Cons(c)) => c.flatten(),
-        Some(v) => interp.to_string_coerce(v).into(),
+        Some(v) => interp.to_string_coerce(v),
         None => return Ok(Value::Float(f64::NAN)),
     };
 

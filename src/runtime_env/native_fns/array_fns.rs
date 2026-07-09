@@ -339,14 +339,14 @@ pub(super) fn native_array_join(
     let elements = get_array_elements(interp, this)?;
     let sep = match args.first() {
         Some(Value::String(s)) => s.to_string(),
-        Some(v) => to_string_value(interp, v).into(),
+        Some(v) => to_string_value(interp, v),
         None => ",".to_string(),
     };
     let parts: Vec<String> = elements
         .iter()
         .map(|e| to_string_value(interp, e))
         .collect();
-    Ok(Value::from_string(parts.join(&sep).into()))
+    Ok(Value::from_string(parts.join(&sep)))
 }
 
 pub(super) fn native_array_reverse(

@@ -11,10 +11,7 @@ fn test_atob_btoa_roundtrip() {
     "#,
     );
     assert!(r.is_ok());
-    assert_eq!(
-        r.unwrap(),
-        tails::Value::string("Hello, World!")
-    );
+    assert_eq!(r.unwrap(), tails::Value::string("Hello, World!"));
 }
 
 #[test]

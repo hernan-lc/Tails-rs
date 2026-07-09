@@ -137,7 +137,7 @@ impl Interpreter {
         let props = props! {
             wk::MESSAGE => Value::string(message),
             wk::NAME => Value::string(wk::RANGE_ERROR),
-            wk::STACK => Value::from_string(stack.into()),
+            wk::STACK => Value::from_string(stack),
         };
         let proto_idx = self.find_error_prototype(wk::RANGE_ERROR);
         self.heap.push(HeapValue::Object(JsObject {

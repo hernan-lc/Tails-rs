@@ -80,10 +80,7 @@ fn test_is_nan_is_finite() {
     "#,
     );
     assert!(r.is_ok());
-    assert_eq!(
-        r.unwrap(),
-        Value::string("true,false,true,false")
-    );
+    assert_eq!(r.unwrap(), Value::string("true,false,true,false"));
 }
 
 #[test]

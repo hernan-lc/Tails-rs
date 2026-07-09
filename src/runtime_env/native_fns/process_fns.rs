@@ -68,7 +68,7 @@ pub(super) fn native_process_cwd(
     _args: &[Value],
 ) -> Result<Value> {
     match tails_process::cwd() {
-        Ok(path) => Ok(Value::from_string(path.into())),
+        Ok(path) => Ok(Value::from_string(path)),
         Err(e) => Err(crate::errors::Error::RuntimeError(format!(
             "cwd failed: {}",
             e

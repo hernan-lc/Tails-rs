@@ -48,31 +48,31 @@ pub(super) fn native_datetime_format_constructor(
     // merged in below when the user actually provided them.
     let mut formatter_props = props! {
         "type" => Value::string("datetime"),
-        "dateStyle" => Value::from_string(date_style.into()),
-        "timeStyle" => Value::from_string(time_style.into()),
+        "dateStyle" => Value::from_string(date_style),
+        "timeStyle" => Value::from_string(time_style),
         "format" => Value::NativeFunction(c::DATETIME_FORMAT_FORMAT),
         "formatToParts" => Value::NativeFunction(c::DATETIME_FORMAT_FORMAT_TO_PARTS),
     };
     if let Some(w) = weekday {
-        formatter_props.insert("weekday".into(), Value::from_string(w.into()));
+        formatter_props.insert("weekday".into(), Value::from_string(w));
     }
     if let Some(y) = year {
-        formatter_props.insert("year".into(), Value::from_string(y.into()));
+        formatter_props.insert("year".into(), Value::from_string(y));
     }
     if let Some(m) = month {
-        formatter_props.insert("month".into(), Value::from_string(m.into()));
+        formatter_props.insert("month".into(), Value::from_string(m));
     }
     if let Some(d) = day {
-        formatter_props.insert("day".into(), Value::from_string(d.into()));
+        formatter_props.insert("day".into(), Value::from_string(d));
     }
     if let Some(h) = hour {
-        formatter_props.insert("hour".into(), Value::from_string(h.into()));
+        formatter_props.insert("hour".into(), Value::from_string(h));
     }
     if let Some(mi) = minute {
-        formatter_props.insert("minute".into(), Value::from_string(mi.into()));
+        formatter_props.insert("minute".into(), Value::from_string(mi));
     }
     if let Some(s) = second {
-        formatter_props.insert("second".into(), Value::from_string(s.into()));
+        formatter_props.insert("second".into(), Value::from_string(s));
     }
 
     let formatter_idx = interp.gc.allocate(
@@ -172,7 +172,7 @@ pub(super) fn native_datetime_format_format(
         interp,
         _this,
     );
-    Ok(Value::from_string(formatted.into()))
+    Ok(Value::from_string(formatted))
 }
 
 fn format_datetime(
@@ -437,13 +437,13 @@ pub(super) fn native_number_format_constructor(
     // when the user actually supplied one.
     let mut formatter_props = props! {
         "type" => Value::string("number"),
-        "style" => Value::from_string(style.into()),
+        "style" => Value::from_string(style),
         "minimumFractionDigits" => Value::Integer(minimum_fraction_digits as i64),
         "maximumFractionDigits" => Value::Integer(maximum_fraction_digits as i64),
         "format" => Value::NativeFunction(c::NUMBER_FORMAT_FORMAT),
     };
     if let Some(c) = currency {
-        formatter_props.insert("currency".into(), Value::from_string(c.into()));
+        formatter_props.insert("currency".into(), Value::from_string(c));
     }
 
     let formatter_idx = interp.gc.allocate(
@@ -533,7 +533,7 @@ pub(super) fn native_number_format_format(
         _ => format_number(number, min_frac, max_frac),
     };
 
-    Ok(Value::from_string(formatted.into()))
+    Ok(Value::from_string(formatted))
 }
 
 fn format_number(n: f64, min_frac: usize, max_frac: usize) -> String {

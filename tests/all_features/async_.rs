@@ -92,10 +92,7 @@ fn test_date() {
     "#,
     );
     assert!(r.is_ok());
-    assert_eq!(
-        r.unwrap(),
-        Value::string("number,number,number")
-    );
+    assert_eq!(r.unwrap(), Value::string("number,number,number"));
 }
 
 #[test]

@@ -11,7 +11,7 @@ pub(super) fn native_parse_int(
 ) -> Result<Value> {
     let s = match args.first() {
         Some(Value::String(s)) => s.to_string(),
-        Some(v) => to_string_value(_interp, v).into(),
+        Some(v) => to_string_value(_interp, v),
         None => return Ok(Value::Float(f64::NAN)),
     };
     let trimmed = s.trim();
@@ -86,7 +86,7 @@ pub(super) fn native_parse_float(
 ) -> Result<Value> {
     let s = match args.first() {
         Some(Value::String(s)) => s.to_string(),
-        Some(v) => to_string_value(interp, v).into(),
+        Some(v) => to_string_value(interp, v),
         None => return Ok(Value::Float(f64::NAN)),
     };
     let trimmed = s.trim();
