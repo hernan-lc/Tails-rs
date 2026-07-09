@@ -690,13 +690,15 @@ impl Interpreter {
                     self.stack.push(iter);
                 }
                 Instruction::IteratorNext(target) => {
-                    let iterator =
-                        self.stack.last().cloned().ok_or_else(|| {
-                            Error::RuntimeError(super::ERR_STACK_UNDERFLOW.into())
-                        })?;
+                    // Always pop the iterator: the for-of loop reloads it from a
+                    // local each iteration. Leaving it on the stack (old behavior)
+                    // stacked a new copy every time LoadLocal ran at loop head.
+                    let iterator = self
+                        .stack
+                        .pop()
+                        .ok_or_else(|| Error::RuntimeError(super::ERR_STACK_UNDERFLOW.into()))?;
                     match self.exec_iterator_next(iterator, *target as usize)? {
                         ControlFlowOutcome::Jump(jump_target) => {
-                            self.stack.pop();
                             pc = jump_target;
                             continue;
                         }
@@ -712,13 +714,12 @@ impl Interpreter {
                     self.exec_iterator_close(iterator)?;
                 }
                 Instruction::AsyncIteratorNext(target) => {
-                    let iterator =
-                        self.stack.last().cloned().ok_or_else(|| {
-                            Error::RuntimeError(super::ERR_STACK_UNDERFLOW.into())
-                        })?;
+                    let iterator = self
+                        .stack
+                        .pop()
+                        .ok_or_else(|| Error::RuntimeError(super::ERR_STACK_UNDERFLOW.into()))?;
                     match self.exec_async_iterator_next(iterator, *target as usize)? {
                         ControlFlowOutcome::Jump(jump_target) => {
-                            self.stack.pop();
                             pc = jump_target;
                             continue;
                         }

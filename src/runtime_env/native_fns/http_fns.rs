@@ -193,7 +193,109 @@ pub(super) fn native_http_res_end(
 }
 
 // ============================================================
-// server.listen(port[, readyCallback[, options]])
+// res.setHeader(name, value) / res.getHeader(name) / res.removeHeader(name)
+//
+// Express relies on these (via the http.ServerResponse.prototype chain) to set
+// Content-Type / Content-Length etc. Headers are kept in the `__headers`
+// sub-object that `handle_one_request` already forwards to write_response.
+// lookups are case-insensitive, matching Node's behaviour.
+// ============================================================
+fn res_header_map_idx(interp: &mut Interpreter, this: &Value) -> Option<usize> {
+    let obj_idx = match this {
+        Value::Object(i) => *i,
+        _ => return None,
+    };
+    if let HeapValue::Object(obj) = &interp.heap[obj_idx] {
+        if let Some(Value::Object(h)) = obj.properties.get("__headers") {
+            return Some(*h);
+        }
+    }
+    // Lazily create the __headers object on first use.
+    let h_idx = interp
+        .gc
+        .allocate(&mut interp.heap, HeapValue::Object(JsObject::new()));
+    if let HeapValue::Object(obj) = &mut interp.heap[obj_idx] {
+        obj.properties
+            .insert("__headers".into(), Value::Object(h_idx));
+    }
+    Some(h_idx)
+}
+
+fn header_key(name: &str) -> String {
+    name.to_ascii_lowercase()
+}
+
+pub(super) fn native_http_res_set_header(
+    interp: &mut Interpreter,
+    this: &Value,
+    args: &[Value],
+) -> Result<Value> {
+    let h_idx = res_header_map_idx(interp, this).unwrap_or(0);
+    let name = args
+        .first()
+        .map(|v| to_string_value(interp, v))
+        .unwrap_or_default();
+    let value = args
+        .get(1)
+        .map(|v| to_string_value(interp, v))
+        .unwrap_or_default();
+    if let HeapValue::Object(h) = &mut interp.heap[h_idx] {
+        h.properties
+            .insert(header_key(&name).into(), Value::from_string(value));
+    }
+    Ok(Value::Undefined)
+}
+
+pub(super) fn native_http_res_get_header(
+    interp: &mut Interpreter,
+    this: &Value,
+    args: &[Value],
+) -> Result<Value> {
+    let obj_idx = match this {
+        Value::Object(i) => *i,
+        _ => return Ok(Value::Undefined),
+    };
+    let name = args
+        .first()
+        .map(|v| to_string_value(interp, v))
+        .unwrap_or_default();
+    let key = header_key(&name);
+    if let HeapValue::Object(obj) = &interp.heap[obj_idx] {
+        if let Some(Value::Object(h)) = obj.properties.get("__headers") {
+            if let HeapValue::Object(hobj) = &interp.heap[*h] {
+                if let Some(v) = hobj.properties.get(&key) {
+                    return Ok(v.clone());
+                }
+            }
+        }
+    }
+    Ok(Value::Undefined)
+}
+
+pub(super) fn native_http_res_remove_header(
+    interp: &mut Interpreter,
+    this: &Value,
+    args: &[Value],
+) -> Result<Value> {
+    let obj_idx = match this {
+        Value::Object(i) => *i,
+        _ => return Ok(Value::Undefined),
+    };
+    let name = args
+        .first()
+        .map(|v| to_string_value(interp, v))
+        .unwrap_or_default();
+    let key = header_key(&name);
+    if let HeapValue::Object(obj) = &mut interp.heap[obj_idx] {
+        if let Some(Value::Object(h)) = obj.properties.get("__headers").cloned() {
+            if let HeapValue::Object(hobj) = &mut interp.heap[h] {
+                hobj.properties.remove(&key);
+            }
+        }
+    }
+    Ok(Value::Undefined)
+}
+
 //
 // Non-blocking: binds a TCP listener, fires `readyCallback`,
 // registers an HttpEventSource, and returns immediately.
@@ -359,9 +461,17 @@ fn handle_one_request(
         "__status" => Value::Integer(200),
         "__body" => Value::string(""),
         "__ended" => Value::Boolean(false),
+        "__headers" => Value::Object({
+            let h = interp.heap.len();
+            interp.heap.push(HeapValue::Object(JsObject::new()));
+            h
+        }),
         "writeHead" => Value::NativeFunction(c::HTTP_RES_WRITE_HEAD),
         "write" => Value::NativeFunction(c::HTTP_RES_WRITE),
         "end" => Value::NativeFunction(c::HTTP_RES_END),
+        "setHeader" => Value::NativeFunction(c::HTTP_RES_SET_HEADER),
+        "getHeader" => Value::NativeFunction(c::HTTP_RES_GET_HEADER),
+        "removeHeader" => Value::NativeFunction(c::HTTP_RES_REMOVE_HEADER),
     };
     let res_idx = interp.heap.len();
     interp.heap.push(HeapValue::Object(JsObject {

@@ -404,6 +404,11 @@ pub const HTTP_REQ_ON: usize = 398;
 pub const HTTP_RES_WRITE_HEAD: usize = 399;
 pub const HTTP_RES_WRITE: usize = 400;
 pub const HTTP_RES_END: usize = 401;
+// HTTP ServerResponse header accessors (used by Express via the
+// http.ServerResponse.prototype chain: setHeader/getHeader/removeHeader)
+pub const HTTP_RES_SET_HEADER: usize = 509;
+pub const HTTP_RES_GET_HEADER: usize = 510;
+pub const HTTP_RES_REMOVE_HEADER: usize = 511;
 // Net (TCP client) (402-405)
 pub const NET_CREATE_CONNECTION: usize = 402;
 pub const NET_SOCKET_WRITE: usize = 403;
@@ -540,6 +545,7 @@ pub const OBJECT_GET_OWN_PROPERTY_NAMES: usize = 505;
 pub const OBJECT_HAS_OWN: usize = 506;
 pub const DEBUG_NOOP: usize = 507;
 pub const DEBUG_LOGGER_NOOP: usize = 508;
+pub const ITERATOR_NEXT: usize = 512;
 
 #[cfg(test)]
 mod tests {

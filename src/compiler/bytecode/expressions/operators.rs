@@ -100,7 +100,12 @@ impl CodeGenerator {
             _ => {
                 if let UnaryOperator::Typeof = op {
                     if let Expression::Identifier(name) = operand {
-                        if let Some(local_idx) = self.resolve_local(name) {
+                        // `this` is parsed as Identifier("this") — must use LoadThis,
+                        // not TypeOfGlobal("this") which always yields "undefined".
+                        if name == "this" {
+                            self.emit(Instruction::LoadThis);
+                            self.emit(Instruction::TypeOf);
+                        } else if let Some(local_idx) = self.resolve_local(name) {
                             self.emit(Instruction::LoadLocal(local_idx));
                             self.emit(Instruction::TypeOf);
                         } else {

@@ -41,12 +41,15 @@ impl CodeGenerator {
 
         let saved_captured = std::mem::take(&mut self.captured_var_names);
         let saved_start = self.local_start_idx;
+        let saved_max_locals = self.max_local_count;
         self.captured_var_names = outer_refs.iter().map(|(n, _)| n.clone()).collect();
         self.local_start_idx = self.locals.len();
+        self.max_local_count = self.captured_var_names.len();
 
         for param in params {
             self.locals.push(param.clone());
         }
+        self.note_local_high_water();
 
         // JavaScript hoisting: pre-register every declaration (function,
         // var/let/const, and class) so sibling functions defined later can
@@ -78,6 +81,7 @@ impl CodeGenerator {
         self.locals.truncate(prev_locals);
         self.captured_var_names = saved_captured;
         self.local_start_idx = saved_start;
+        self.max_local_count = saved_max_locals;
 
         self.patch_jump(jump_over, self.instructions.len());
         Ok(func_idx)

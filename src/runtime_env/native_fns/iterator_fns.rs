@@ -52,6 +52,9 @@ fn make_array_style_iterator(interp: &mut Interpreter, arr_data: Vec<Value>) -> 
         "__type" => Value::from_string("array".to_string()),
         "__index" => Value::Integer(0),
         "__data" => Value::Array(data_idx),
+        // ES iterator protocol — required by `for (x of y[Symbol.iterator]())`
+        // and by libraries that call `.next()` directly.
+        "next" => Value::NativeFunction(c::ITERATOR_NEXT),
         "map" => Value::NativeFunction(c::ITERATOR_MAP),
         "filter" => Value::NativeFunction(c::ITERATOR_FILTER),
         "take" => Value::NativeFunction(c::ITERATOR_TAKE),
@@ -69,6 +72,32 @@ fn make_array_style_iterator(interp: &mut Interpreter, arr_data: Vec<Value>) -> 
         }),
     );
     Ok(Value::Object(iter_idx))
+}
+
+/// Iterator.prototype.next() — returns `{ value, done }` per the ES protocol.
+pub(super) fn native_iterator_next(
+    interp: &mut Interpreter,
+    this: &Value,
+    _args: &[Value],
+) -> Result<Value> {
+    let next_value = advance_iterator(interp, this)?;
+    let (value, done) = match next_value {
+        Some(v) => (v, false),
+        None => (Value::Undefined, true),
+    };
+    let props = props! {
+        "value" => value,
+        "done" => Value::Boolean(done),
+    };
+    let idx = interp.gc.allocate(
+        &mut interp.heap,
+        HeapValue::Object(JsObject {
+            properties: props,
+            prototype: interp.object_proto_idx,
+            extensible: true,
+        }),
+    );
+    Ok(Value::Object(idx))
 }
 
 // Iterator.prototype.map(callback)
@@ -90,6 +119,7 @@ pub(super) fn native_iterator_map(
         "__source" => this.clone(),
         "__callback" => callback,
         "__done" => Value::Boolean(false),
+        "next" => Value::NativeFunction(c::ITERATOR_NEXT),
         "map" => Value::NativeFunction(c::ITERATOR_MAP),
         "filter" => Value::NativeFunction(c::ITERATOR_FILTER),
         "take" => Value::NativeFunction(c::ITERATOR_TAKE),
@@ -127,6 +157,7 @@ pub(super) fn native_iterator_filter(
         "__source" => this.clone(),
         "__callback" => callback,
         "__done" => Value::Boolean(false),
+        "next" => Value::NativeFunction(c::ITERATOR_NEXT),
         "map" => Value::NativeFunction(c::ITERATOR_MAP),
         "filter" => Value::NativeFunction(c::ITERATOR_FILTER),
         "take" => Value::NativeFunction(c::ITERATOR_TAKE),
@@ -163,6 +194,7 @@ pub(super) fn native_iterator_take(
         "__source" => this.clone(),
         "__remaining" => Value::Integer(count),
         "__done" => Value::Boolean(false),
+        "next" => Value::NativeFunction(c::ITERATOR_NEXT),
         "map" => Value::NativeFunction(c::ITERATOR_MAP),
         "filter" => Value::NativeFunction(c::ITERATOR_FILTER),
         "take" => Value::NativeFunction(c::ITERATOR_TAKE),
@@ -199,6 +231,7 @@ pub(super) fn native_iterator_drop(
         "__source" => this.clone(),
         "__remaining" => Value::Integer(count),
         "__done" => Value::Boolean(false),
+        "next" => Value::NativeFunction(c::ITERATOR_NEXT),
         "map" => Value::NativeFunction(c::ITERATOR_MAP),
         "filter" => Value::NativeFunction(c::ITERATOR_FILTER),
         "take" => Value::NativeFunction(c::ITERATOR_TAKE),

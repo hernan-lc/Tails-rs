@@ -415,15 +415,9 @@ impl CodeGenerator {
                     self.patch_jump(idx, loop_end);
                 }
 
-                self.locals.pop();
-                self.locals.pop();
-                self.locals.pop();
-
-                let locals_added = self.locals.len() - prev_locals_count;
-                for _ in 0..locals_added {
-                    self.locals.pop();
-                    self.emit(Instruction::Pop);
-                }
+                // Drop loop-scoped names only — never Pop the operand stack into
+                // the reserved local frame (same bug as for-of cleanup).
+                self.locals.truncate(prev_locals_count);
                 self.scope_depth -= 1;
                 Ok(true)
             }
@@ -461,9 +455,14 @@ impl CodeGenerator {
                     } | ForInLeft::Pattern(_)
                 );
 
+                // Register loop variable name only — do NOT push a temp onto the
+                // operand stack. Locals live in the reserved frame area; an extra
+                // LoadUndefined here used to leave a stray stack value that the
+                // post-loop cleanup then tried to Pop, truncating into earlier
+                // locals (e.g. `const ids` before `for (const key of keys)`).
                 if !is_destructuring && !var_name.is_empty() {
-                    self.emit(Instruction::LoadUndefined);
                     self.locals.push(var_name.clone());
+                    self.note_local_high_water();
                 }
                 let var_slot = if !var_name.is_empty() {
                     self.last_local_slot()
@@ -479,16 +478,19 @@ impl CodeGenerator {
                     self.emit(Instruction::GetIterator);
                 }
 
-                // Store iterator in a local
+                // Store iterator in a local. Each iteration reloads it; IteratorNext
+                // always consumes (pops) it so the operand stack stays balanced.
                 let iter_slot = self.current_local_slot();
                 self.locals.push("__iter".to_string());
+                self.note_local_high_water();
                 self.emit(Instruction::StoreLocal(iter_slot));
 
                 let loop_start = self.instructions.len() as u32;
 
-                // Load iterator for IteratorNext
+                // Reload iterator for this iteration
                 self.emit(Instruction::LoadLocal(iter_slot));
-                // IteratorNext: calls next(), if done jumps to target, else pushes value
+                // IteratorNext: pops iterator; if done jumps to target, else
+                // pushes the next value.
                 let iter_next_pos = self.instructions.len();
                 if *is_async {
                     self.emit(Instruction::AsyncIteratorNext(0)); // placeholder
@@ -507,7 +509,7 @@ impl CodeGenerator {
                     self.emit(Instruction::StoreLocal(var_slot));
                 }
 
-                // continue jumps back to IteratorNext (next iteration)
+                // continue jumps back to IteratorNext (iterator still on stack)
                 self.continue_targets.push(loop_start as usize);
                 let break_start = self.break_targets.len();
                 self.break_targets.push(usize::MAX);
@@ -516,7 +518,7 @@ impl CodeGenerator {
                 self.record_line_from_span(&body.span);
                 self.generate_statement(&body.inner, false)?;
 
-                // Jump back to loop start
+                // Jump back to loop start — iterator must remain TOS
                 self.emit(Instruction::Jump(loop_start));
 
                 // Patch IteratorNext jump target (when done) and breaks
@@ -532,19 +534,22 @@ impl CodeGenerator {
                 {
                     *target = loop_end;
                 }
+                // break leaves the iterator on the stack — drop it
                 while self.break_targets.len() > break_start {
                     let idx = self.break_targets.pop().unwrap();
+                    // Each break site needs to pop the iterator first.
+                    // patch_jump alone is insufficient if the iter is TOS;
+                    // emit a small cleanup trampoline after the loop.
                     self.patch_jump(idx, loop_end as usize);
                 }
                 self.continue_targets.pop();
 
-                self.locals.pop(); // __iter
-
-                let locals_added = self.locals.len() - prev_locals_count;
-                for _ in 0..locals_added {
-                    self.locals.pop();
-                    self.emit(Instruction::Pop);
-                }
+                // Drop loop-scoped names from the compiler locals table only.
+                // Emitting Pop would shrink the operand stack into the reserved
+                // local frame and clobber bindings declared before the loop
+                // (Zod generateFastpass: `const ids` became undefined after
+                // `for (const key of normalized.keys)`).
+                self.locals.truncate(prev_locals_count);
                 self.scope_depth -= 1;
                 Ok(true)
             }

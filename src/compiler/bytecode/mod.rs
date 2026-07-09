@@ -44,6 +44,11 @@ pub(crate) struct CodeGenerator {
     /// ES name inference: `var app = function(){}` gives the function name "app".
     /// Set around expression generation when the binding name is known.
     pub(crate) inferred_function_name: Option<String>,
+    /// Peak locals count for the function being compiled (captures + body).
+    /// for-of/for-in temporarily push loop temps then truncate; without
+    /// tracking the peak, `local_count` under-reserves and loop slots
+    /// corrupt earlier locals at runtime.
+    max_local_count: usize,
 }
 
 impl CodeGenerator {
@@ -66,6 +71,16 @@ impl CodeGenerator {
             current_source_col: None,
             pending_closure_snapshots: Vec::new(),
             inferred_function_name: None,
+            max_local_count: 0,
+        }
+    }
+
+    /// Track peak local usage (call after pushing loop/block temps).
+    pub(crate) fn note_local_high_water(&mut self) {
+        let count =
+            self.captured_var_names.len() + self.locals.len().saturating_sub(self.local_start_idx);
+        if count > self.max_local_count {
+            self.max_local_count = count;
         }
     }
 
@@ -395,9 +410,17 @@ impl CodeGenerator {
                     if matches!(&stmt.inner, Statement::FunctionDeclaration { .. }) {
                         continue;
                     }
-                    let is_last = stmts[i + 1..].iter().all(|s| matches!(&s.inner, Statement::FunctionDeclaration { .. }));
+                    let is_last_in_block = stmts[i + 1..]
+                        .iter()
+                        .all(|s| matches!(&s.inner, Statement::FunctionDeclaration { .. }));
+                    // Only leave a value on the stack when this block itself is
+                    // the program's last expression. Loop/if bodies pass
+                    // is_last=false; leaving the last call's return value would
+                    // sit above the for-of iterator and break the next
+                    // IteratorNext (Zod deferred init, etc.).
+                    let leave_value = is_last && is_last_in_block;
                     self.record_line_from_span(&stmt.span);
-                    self.generate_statement(&stmt.inner, is_last)?;
+                    self.generate_statement(&stmt.inner, leave_value)?;
                 }
                 self.flush_closure_snapshots();
                 self.pending_closure_snapshots = saved_pending;
@@ -662,8 +685,10 @@ impl CodeGenerator {
     /// Record how many local slots this function needs. Must be called before
     /// truncating `locals` / restoring `captured_var_names` at end of compile.
     pub(crate) fn finalize_local_count(&mut self, func_idx: u32) {
-        let count =
-            self.captured_var_names.len() + self.locals.len().saturating_sub(self.local_start_idx);
+        self.note_local_high_water();
+        let count = self.max_local_count.max(
+            self.captured_var_names.len() + self.locals.len().saturating_sub(self.local_start_idx),
+        );
         if let Some(fi) = self.functions.get_mut(func_idx as usize) {
             fi.local_count = count;
         }

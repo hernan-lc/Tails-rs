@@ -877,6 +877,11 @@ pub static NATIVE_TABLE: &[NativeFn] = &[
     object_fns::native_object_has_own,
     global_fns::native_debug_noop,
     global_fns::native_debug_logger_noop,
+    http_fns::native_http_res_set_header,
+    http_fns::native_http_res_get_header,
+    http_fns::native_http_res_remove_header,
+    // Iterator.prototype.next (512)
+    iterator_fns::native_iterator_next,
 ];
 
 #[cfg(test)]

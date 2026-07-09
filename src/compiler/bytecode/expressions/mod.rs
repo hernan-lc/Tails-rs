@@ -292,6 +292,8 @@ impl CodeGenerator {
         let saved_start = self.local_start_idx;
         self.captured_var_names = outer_refs.iter().map(|(n, _)| n.clone()).collect();
         self.local_start_idx = self.locals.len();
+        let saved_max_locals = self.max_local_count;
+        self.max_local_count = self.captured_var_names.len();
 
         for param in params {
             self.locals.push(param.clone());
@@ -299,6 +301,7 @@ impl CodeGenerator {
         if let Some(rp) = rest_param {
             self.locals.push(rp.to_string());
         }
+        self.note_local_high_water();
 
         // Match function-declaration compilation: hoist nested function decls
         // and pre-register lexical bindings so `function handle(){}` used before
@@ -327,6 +330,7 @@ impl CodeGenerator {
         self.emit(Instruction::Return);
 
         self.finalize_local_count(func_idx);
+        self.max_local_count = saved_max_locals;
 
         self.scope_depth -= 1;
         self.locals.truncate(prev_locals);
@@ -399,8 +403,10 @@ impl CodeGenerator {
 
         let saved_captured = std::mem::take(&mut self.captured_var_names);
         let saved_start = self.local_start_idx;
+        let saved_max_locals = self.max_local_count;
         self.captured_var_names = outer_refs.iter().map(|(n, _)| n.clone()).collect();
         self.local_start_idx = self.locals.len();
+        self.max_local_count = self.captured_var_names.len();
 
         for param in params {
             self.locals.push(param.clone());
@@ -408,6 +414,7 @@ impl CodeGenerator {
         if let Some(rp) = rest_param {
             self.locals.push(rp.to_string());
         }
+        self.note_local_high_water();
 
         self.compile_default_params(params, defaults)?;
         self.emit_param_destructuring(params, param_patterns)?;
@@ -445,6 +452,7 @@ impl CodeGenerator {
         self.locals.truncate(prev_locals);
         self.captured_var_names = saved_captured;
         self.local_start_idx = saved_start;
+        self.max_local_count = saved_max_locals;
 
         self.patch_jump(jump_over, self.instructions.len());
 

@@ -658,7 +658,15 @@ pub fn create_http_module(heap: &mut Vec<HeapValue>, gc: &mut GarbageCollector) 
         let proto_idx = gc.allocate(
             heap,
             HeapValue::Object(JsObject {
-                properties: PropertyStorage::new(),
+                properties: props! {
+                    // Header accessors Express expects on http.ServerResponse.prototype.
+                    // The runtime's per-request `res` already defines these as own
+                    // properties (so they take precedence), but listing them here keeps
+                    // the prototype chain faithful to Node's http module.
+                    "setHeader" => Value::NativeFunction(c::HTTP_RES_SET_HEADER),
+                    "getHeader" => Value::NativeFunction(c::HTTP_RES_GET_HEADER),
+                    "removeHeader" => Value::NativeFunction(c::HTTP_RES_REMOVE_HEADER),
+                },
                 prototype: None,
                 extensible: true,
             }),
