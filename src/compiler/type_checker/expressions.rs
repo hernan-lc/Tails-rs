@@ -91,7 +91,7 @@ impl TypeChecker {
                     }
                     Type::Array(_) => {
                         if let Expression::Identifier(name) = property.as_ref() {
-                             if !*computed && name == wk::LENGTH {
+                            if !*computed && name == wk::LENGTH {
                                 return Ok(Type::Number);
                             }
                         }

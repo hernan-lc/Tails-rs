@@ -86,9 +86,9 @@ pub(super) fn native_number_to_fixed(
     if n.is_infinite() {
         return Ok(Value::String(
             if n.is_sign_positive() {
-                    wk::INFINITY.to_string()
-                } else {
-                    format!("-{}", wk::INFINITY)
+                wk::INFINITY.to_string()
+            } else {
+                format!("-{}", wk::INFINITY)
             }
             .to_string(),
         ));
@@ -172,9 +172,9 @@ pub(super) fn native_number_to_exponential(
     if n.is_infinite() {
         return Ok(Value::String(
             if n.is_sign_positive() {
-                    wk::INFINITY.to_string()
-                } else {
-                    format!("-{}", wk::INFINITY)
+                wk::INFINITY.to_string()
+            } else {
+                format!("-{}", wk::INFINITY)
             }
             .to_string(),
         ));
@@ -227,9 +227,9 @@ pub(super) fn native_number_to_precision(
     if n.is_infinite() {
         return Ok(Value::String(
             if n.is_sign_positive() {
-                    wk::INFINITY.to_string()
-                } else {
-                    format!("-{}", wk::INFINITY)
+                wk::INFINITY.to_string()
+            } else {
+                format!("-{}", wk::INFINITY)
             }
             .to_string(),
         ));

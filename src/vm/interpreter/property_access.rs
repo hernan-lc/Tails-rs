@@ -469,7 +469,7 @@ impl Interpreter {
                     Some(s) => s,
                     None => return Ok(Value::Undefined),
                 };
-                            if key_str == wk::LENGTH {
+                if key_str == wk::LENGTH {
                     if let Value::Buffer(bidx) = this {
                         if let HeapValue::Buffer(buf) = &self.heap[*bidx] {
                             return Ok(Value::Integer(buf.len() as i64));
@@ -702,7 +702,11 @@ impl Interpreter {
             None => return Ok(Value::Undefined),
         };
         match key_str.as_str() {
-            wk::TO_STRING | "toFixed" | wk::VALUE_OF | "toExponential" | "toPrecision"
+            wk::TO_STRING
+            | "toFixed"
+            | wk::VALUE_OF
+            | "toExponential"
+            | "toPrecision"
             | wk::TO_LOCALE_STRING => {
                 return Ok(self.make_native_number_method(&key_str));
             }
@@ -851,7 +855,7 @@ impl Interpreter {
                 Ok(Value::Boolean(false))
             }
             Value::String(s) => {
-                            if key_str == wk::LENGTH {
+                if key_str == wk::LENGTH {
                     return Ok(Value::Boolean(true));
                 }
                 if let Ok(index) = key_str.parse::<usize>() {

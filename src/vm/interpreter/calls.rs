@@ -2,8 +2,8 @@ use super::*;
 use crate::errors::{Error, Result};
 use crate::objects::Value;
 use crate::runtime_env::native_fns::NATIVE_TABLE;
-use std::rc::Rc;
 use crate::well_known as wk;
+use std::rc::Rc;
 
 impl Interpreter {
     /// Ensure the operand stack has room for all of a function's local slots

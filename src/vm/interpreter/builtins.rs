@@ -171,8 +171,10 @@ impl Interpreter {
             .insert(wk::OBJECT.into(), Value::Object(object_obj_idx));
 
         // Proxy
-        self.globals
-            .insert(wk::PROXY.into(), Value::NativeFunction(c::PROXY_CONSTRUCTOR));
+        self.globals.insert(
+            wk::PROXY.into(),
+            Value::NativeFunction(c::PROXY_CONSTRUCTOR),
+        );
 
         // Reflect
         let reflect_props = props! {
@@ -230,8 +232,10 @@ impl Interpreter {
             .insert(wk::JSON.into(), Value::Object(json_obj_idx));
 
         // Array
-        self.globals
-            .insert(wk::ARRAY.into(), Value::NativeFunction(c::ARRAY_CONSTRUCTOR));
+        self.globals.insert(
+            wk::ARRAY.into(),
+            Value::NativeFunction(c::ARRAY_CONSTRUCTOR),
+        );
 
         // BigInt
         self.globals.insert(
@@ -479,8 +483,10 @@ impl Interpreter {
                 extensible: true,
             }),
         );
-        self.globals
-            .insert(wk::ERROR.into(), Value::NativeFunction(c::ERROR_CONSTRUCTOR));
+        self.globals.insert(
+            wk::ERROR.into(),
+            Value::NativeFunction(c::ERROR_CONSTRUCTOR),
+        );
 
         register_error_subclass(
             self,

@@ -41,9 +41,11 @@ error_constructor!(native_error_constructor, wk::ERROR, find_error_ctor_proto);
 error_constructor!(native_type_error_constructor, wk::TYPE_ERROR, |i| {
     find_error_proto(i, wk::TYPE_ERROR)
 });
-error_constructor!(native_reference_error_constructor, wk::REFERENCE_ERROR, |i| {
-    find_error_proto(i, wk::REFERENCE_ERROR)
-});
+error_constructor!(
+    native_reference_error_constructor,
+    wk::REFERENCE_ERROR,
+    |i| { find_error_proto(i, wk::REFERENCE_ERROR) }
+);
 error_constructor!(native_syntax_error_constructor, wk::SYNTAX_ERROR, |i| {
     find_error_proto(i, wk::SYNTAX_ERROR)
 });

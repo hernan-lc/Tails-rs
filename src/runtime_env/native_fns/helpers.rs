@@ -443,7 +443,8 @@ pub(super) fn get_string(this: &Value) -> Option<String> {
 pub(super) fn find_error_ctor_proto(interp: &Interpreter) -> Option<usize> {
     for hv in &interp.heap {
         if let crate::vm::interpreter::HeapValue::Object(obj) = hv {
-            if obj.properties.contains_key(wk::PROTOTYPE) && !obj.properties.contains_key(wk::NAME) {
+            if obj.properties.contains_key(wk::PROTOTYPE) && !obj.properties.contains_key(wk::NAME)
+            {
                 if let Some(Value::Object(proto_idx)) = obj.properties.get(wk::PROTOTYPE) {
                     return Some(*proto_idx);
                 }
