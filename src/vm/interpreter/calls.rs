@@ -5,6 +5,17 @@ use crate::runtime_env::native_fns::NATIVE_TABLE;
 use std::rc::Rc;
 
 impl Interpreter {
+    /// Ensure the operand stack has room for all of a function's local slots
+    /// (captures + params + body locals) starting at `base_pointer`. Evaluation
+    /// temps then sit above locals, so StoreLocal cannot clobber them.
+    #[inline]
+    pub(crate) fn reserve_frame_locals(&mut self, base_pointer: usize, local_count: usize) {
+        let needed = base_pointer.saturating_add(local_count);
+        if self.stack.len() < needed {
+            self.stack.resize(needed, Value::Undefined);
+        }
+    }
+
     pub fn call_value(&mut self, callee: &Value, this: &Value, args: &[Value]) -> Result<Value> {
         match callee {
             Value::Function(func_idx) => {
@@ -64,6 +75,7 @@ impl Interpreter {
                         let source_line = f.source_line;
                         let rest_param = f.rest_param.is_some();
                         let param_count = f.params.len();
+                        let local_count = f.local_count;
 
                         let func_module: Option<Rc<CompiledModule>> =
                             owner_module.or_else(|| self.current_module.clone());
@@ -140,6 +152,7 @@ impl Interpreter {
                                 self.stack.push(arg.clone());
                             }
                         }
+                        self.reserve_frame_locals(base_pointer, local_count);
 
                         let result = if let Some(module) = func_module {
                             self.execute_from(&module, bytecode_index)

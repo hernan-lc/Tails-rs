@@ -501,6 +501,9 @@ pub const OBJECT_GET_OWN_PROPERTY_DESCRIPTORS: usize = 473;
 pub const OBJECT_DEFINE_PROPERTIES: usize = 474;
 // Object.fromEntries (475)
 pub const OBJECT_FROM_ENTRIES: usize = 475;
+// String.prototype.trimStart / trimEnd (476-477)
+pub const STRING_TRIM_START: usize = 476;
+pub const STRING_TRIM_END: usize = 477;
 
 #[cfg(test)]
 mod tests {

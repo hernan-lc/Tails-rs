@@ -49,6 +49,7 @@ impl Interpreter {
                     params: func_info.params,
                     rest_param: func_info.rest_param,
                     bytecode_index: func_info.bytecode_index,
+                    local_count: func_info.local_count,
                     closure: Rc::new(RefCell::new(Vec::new())),
                     prototype: Some(proto_obj_idx),
                     super_class: Some(super_val.clone()),
@@ -72,6 +73,7 @@ impl Interpreter {
                     params: Vec::new(),
                     rest_param: None,
                     bytecode_index: usize::MAX,
+                    local_count: 0,
                     closure: Rc::new(RefCell::new(Vec::new())),
                     prototype: Some(proto_obj_idx),
                     super_class: Some(super_val.clone()),
@@ -106,6 +108,7 @@ impl Interpreter {
                     params: method_func_info.params,
                     rest_param: method_func_info.rest_param,
                     bytecode_index: method_func_info.bytecode_index,
+                    local_count: method_func_info.local_count,
                     closure: Rc::new(RefCell::new(Vec::new())),
                     prototype: Some(method_proto_idx),
                     super_class: None,
@@ -217,6 +220,7 @@ impl Interpreter {
                             let return_address = *pc + 1;
                             let base_pointer = self.stack.len();
                             let closure_count = f_clone.closure.borrow().len();
+                            let local_count = f_clone.local_count;
                             self.call_stack.push(CallFrame {
                                 return_address,
                                 base_pointer,
@@ -241,6 +245,7 @@ impl Interpreter {
                             for arg in args {
                                 self.stack.push(arg);
                             }
+                            self.reserve_frame_locals(base_pointer, local_count);
                             *pc = f_clone.bytecode_index;
                             return Ok(true);
                         }

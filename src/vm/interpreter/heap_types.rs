@@ -383,6 +383,9 @@ pub struct JsFunction {
     pub params: Vec<String>,
     pub rest_param: Option<String>,
     pub bytecode_index: usize,
+    /// Total local slots (captures + params + body locals). Reserved on the
+    /// operand stack at call time so temps never collide with StoreLocal.
+    pub local_count: usize,
     pub closure: Rc<RefCell<Vec<Value>>>,
     pub prototype: Option<usize>,
     pub super_class: Option<Value>,

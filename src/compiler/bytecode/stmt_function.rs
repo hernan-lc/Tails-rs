@@ -69,6 +69,7 @@ impl CodeGenerator {
             bytecode_index: 0,
             param_count: params.len(),
             closure_var_count: num_captures,
+            local_count: 0,
             is_generator: *is_generator,
             source_line: self.current_source_line,
             is_arrow: false,
@@ -144,6 +145,8 @@ impl CodeGenerator {
         self.emit(Instruction::LoadUndefined);
         self.emit(Instruction::Return);
 
+        self.finalize_local_count(func_idx);
+
         self.scope_depth -= 1;
         self.locals.truncate(prev_locals);
         self.captured_var_names = saved_captured;
@@ -213,6 +216,7 @@ impl CodeGenerator {
                     bytecode_index: 0,
                     param_count: hparams.len(),
                     closure_var_count: orefs.len(),
+                    local_count: 0,
                     is_generator: false,
                     source_line: self.current_source_line,
                     is_arrow: false,
@@ -244,6 +248,8 @@ impl CodeGenerator {
 
                 self.emit(Instruction::LoadUndefined);
                 self.emit(Instruction::Return);
+
+                self.finalize_local_count(func_idx);
 
                 self.scope_depth = saved_scope;
                 self.locals.truncate(saved_locals_len);

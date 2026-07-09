@@ -379,10 +379,22 @@ impl CodeGenerator {
                     self.emit(Instruction::StoreLocal(var_slot));
                 }
 
+                // continue jumps to the increment step (after the body)
+                self.continue_targets.push(usize::MAX);
+                let cont_start = self.continue_patches.len();
+                let break_start = self.break_targets.len();
+                self.break_targets.push(usize::MAX);
+
                 self.record_line_from_span(&body.span);
                 self.generate_statement(&body.inner, false)?;
 
-                // Increment index
+                // Increment index (continue target)
+                while self.continue_patches.len() > cont_start {
+                    let idx = self.continue_patches.pop().unwrap();
+                    self.patch_jump(idx, self.instructions.len());
+                }
+                self.continue_targets.pop();
+
                 self.emit(Instruction::LoadLocal(idx_slot));
                 let one_idx = self.add_constant(Value::Float(1.0));
                 self.emit(Instruction::LoadConst(one_idx));
@@ -391,7 +403,12 @@ impl CodeGenerator {
 
                 self.emit(Instruction::Jump(loop_start));
 
-                self.patch_jump(jump_if_done, self.instructions.len());
+                let loop_end = self.instructions.len();
+                self.patch_jump(jump_if_done, loop_end);
+                while self.break_targets.len() > break_start {
+                    let idx = self.break_targets.pop().unwrap();
+                    self.patch_jump(idx, loop_end);
+                }
 
                 self.locals.pop();
                 self.locals.pop();
@@ -485,6 +502,11 @@ impl CodeGenerator {
                     self.emit(Instruction::StoreLocal(var_slot));
                 }
 
+                // continue jumps back to IteratorNext (next iteration)
+                self.continue_targets.push(loop_start as usize);
+                let break_start = self.break_targets.len();
+                self.break_targets.push(usize::MAX);
+
                 // Execute loop body
                 self.record_line_from_span(&body.span);
                 self.generate_statement(&body.inner, false)?;
@@ -492,7 +514,7 @@ impl CodeGenerator {
                 // Jump back to loop start
                 self.emit(Instruction::Jump(loop_start));
 
-                // Patch IteratorNext jump target (when done)
+                // Patch IteratorNext jump target (when done) and breaks
                 let loop_end = self.instructions.len() as u32;
                 if *is_async {
                     if let Instruction::AsyncIteratorNext(ref mut target) =
@@ -500,13 +522,16 @@ impl CodeGenerator {
                     {
                         *target = loop_end;
                     }
-                } else {
-                    if let Instruction::IteratorNext(ref mut target) =
-                        self.instructions[iter_next_pos]
-                    {
-                        *target = loop_end;
-                    }
+                } else if let Instruction::IteratorNext(ref mut target) =
+                    self.instructions[iter_next_pos]
+                {
+                    *target = loop_end;
                 }
+                while self.break_targets.len() > break_start {
+                    let idx = self.break_targets.pop().unwrap();
+                    self.patch_jump(idx, loop_end as usize);
+                }
+                self.continue_targets.pop();
 
                 self.locals.pop(); // __iter
 

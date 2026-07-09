@@ -371,6 +371,19 @@ impl Interpreter {
                         "isSafeInteger" => {
                             return Ok(Value::NativeFunction(c::NUMBER_IS_SAFE_INTEGER))
                         }
+                        // ES Number static constants
+                        "MAX_SAFE_INTEGER" => {
+                            return Ok(Value::Float(9007199254740991.0));
+                        }
+                        "MIN_SAFE_INTEGER" => {
+                            return Ok(Value::Float(-9007199254740991.0));
+                        }
+                        "MAX_VALUE" => return Ok(Value::Float(f64::MAX)),
+                        "MIN_VALUE" => return Ok(Value::Float(f64::MIN_POSITIVE)),
+                        "POSITIVE_INFINITY" => return Ok(Value::Float(f64::INFINITY)),
+                        "NEGATIVE_INFINITY" => return Ok(Value::Float(f64::NEG_INFINITY)),
+                        "NaN" => return Ok(Value::Float(f64::NAN)),
+                        "EPSILON" => return Ok(Value::Float(f64::EPSILON)),
                         _ => {}
                     }
                 }
@@ -648,6 +661,8 @@ impl Interpreter {
             "replace" => 58,
             "split" => 59,
             "trim" => 60,
+            "trimStart" | "trimLeft" => c::STRING_TRIM_START,
+            "trimEnd" | "trimRight" => c::STRING_TRIM_END,
             "toLowerCase" => 61,
             "toUpperCase" => 62,
             "startsWith" => 63,

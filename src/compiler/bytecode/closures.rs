@@ -25,6 +25,7 @@ impl CodeGenerator {
             bytecode_index: 0,
             param_count: params.len(),
             closure_var_count: num_captures,
+            local_count: 0,
             is_generator,
             source_line: self.current_source_line,
             is_arrow: false,
@@ -71,6 +72,8 @@ impl CodeGenerator {
 
         self.emit(crate::compiler::Instruction::LoadUndefined);
         self.emit(crate::compiler::Instruction::Return);
+
+        self.finalize_local_count(func_idx);
 
         self.scope_depth -= 1;
         self.locals.truncate(prev_locals);

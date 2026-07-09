@@ -89,6 +89,10 @@ pub struct CompiledFunction {
     pub bytecode_index: usize,
     pub param_count: usize,
     pub closure_var_count: usize,
+    /// Total local slots used by this function (captures + params + body locals).
+    /// The VM reserves this many stack slots at call time so evaluation temps
+    /// never overlap local storage (critical for destructuring).
+    pub local_count: usize,
     pub is_generator: bool,
     pub source_line: Option<usize>,
     pub is_arrow: bool,
@@ -163,6 +167,9 @@ pub enum Instruction {
     JumpIfNotUndefined(u32),
     Call(u16),
     CallMethod(u16),
+    /// Call with an argument list built as an array (for spread args).
+    /// Stack: `[argsArray, this, callee]` (callee on top).
+    Apply,
     Construct(u16),
     LoadThis,
     Dup,

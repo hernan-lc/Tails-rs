@@ -606,6 +606,7 @@ mod tests {
                 params: vec![],
                 rest_param: None,
                 bytecode_index: 0,
+                local_count: 0,
                 closure: std::rc::Rc::new(std::cell::RefCell::new(vec![Value::Object(
                     inner_obj_idx,
                 )])),

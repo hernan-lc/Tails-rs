@@ -134,6 +134,7 @@ impl Interpreter {
                                     captured_this,
                                     f.rest_param.is_some(),
                                     f.params.len(),
+                                    f.local_count,
                                 ))
                             } else {
                                 None
@@ -146,6 +147,7 @@ impl Interpreter {
                             captured_this,
                             has_rest,
                             param_count,
+                            local_count,
                         )) = func_info
                         {
                             let return_address = *pc + 1;
@@ -198,6 +200,7 @@ impl Interpreter {
                                     self.stack.push(arg);
                                 }
                             }
+                            self.reserve_frame_locals(base_pointer, local_count);
                             *pc = bytecode_index;
                             return Ok(true);
                         }
@@ -303,6 +306,7 @@ impl Interpreter {
                         captured_this,
                         f.rest_param.is_some(),
                         f.params.len(),
+                        f.local_count,
                     ));
                     let same_module = match (&f.owner_module, &self.current_module) {
                         (Some(om), Some(cm)) => Rc::ptr_eq(om, cm),
@@ -317,6 +321,7 @@ impl Interpreter {
                             captured_this,
                             has_rest,
                             param_count,
+                            local_count,
                         )) = func_info
                         {
                             let return_address = *pc + 1;
@@ -369,6 +374,7 @@ impl Interpreter {
                                     self.stack.push(arg);
                                 }
                             }
+                            self.reserve_frame_locals(base_pointer, local_count);
                             *pc = bytecode_index;
                             return Ok(true);
                         }
@@ -438,6 +444,7 @@ impl Interpreter {
                                             self.throw_stack_overflow(pc)?;
                                             return Ok(true);
                                         }
+                                        let local_count = super_f_clone.local_count;
                                         self.call_stack.push(CallFrame {
                                             return_address,
                                             base_pointer,
@@ -457,6 +464,7 @@ impl Interpreter {
                                         for arg in args {
                                             self.stack.push(arg);
                                         }
+                                        self.reserve_frame_locals(base_pointer, local_count);
                                         *pc = super_f_clone.bytecode_index;
                                         return Ok(true);
                                     }
@@ -489,12 +497,12 @@ impl Interpreter {
                     } else {
                         let func_info = {
                             if let HeapValue::Function(f) = &self.heap[*func_idx] {
-                                Some((f.closure.clone(), f.bytecode_index))
+                                Some((f.closure.clone(), f.bytecode_index, f.local_count))
                             } else {
                                 None
                             }
                         };
-                        if let Some((closure_vars, bytecode_index)) = func_info {
+                        if let Some((closure_vars, bytecode_index, local_count)) = func_info {
                             let same_module = if let HeapValue::Function(f) = &self.heap[*func_idx]
                             {
                                 match (&f.owner_module, &self.current_module) {
@@ -533,6 +541,7 @@ impl Interpreter {
                                 for arg in args {
                                     self.stack.push(arg);
                                 }
+                                self.reserve_frame_locals(base_pointer, local_count);
                                 *pc = bytecode_index;
                                 return Ok(true);
                             }

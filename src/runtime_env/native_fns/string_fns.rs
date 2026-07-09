@@ -184,6 +184,24 @@ pub(super) fn native_string_trim(
     Ok(Value::String(s.trim().to_string()))
 }
 
+pub(super) fn native_string_trim_start(
+    _interp: &mut Interpreter,
+    this: &Value,
+    _args: &[Value],
+) -> Result<Value> {
+    let s = get_string(this).unwrap_or_default();
+    Ok(Value::String(s.trim_start().to_string()))
+}
+
+pub(super) fn native_string_trim_end(
+    _interp: &mut Interpreter,
+    this: &Value,
+    _args: &[Value],
+) -> Result<Value> {
+    let s = get_string(this).unwrap_or_default();
+    Ok(Value::String(s.trim_end().to_string()))
+}
+
 pub(super) fn native_string_to_lower_case(
     _interp: &mut Interpreter,
     this: &Value,

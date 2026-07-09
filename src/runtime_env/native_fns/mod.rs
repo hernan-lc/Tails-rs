@@ -825,6 +825,9 @@ pub static NATIVE_TABLE: &[NativeFn] = &[
     object_fns::native_object_define_properties,
     // Object.fromEntries (475)
     object_fns::native_object_from_entries,
+    // String.prototype.trimStart / trimEnd (476-477)
+    string_fns::native_string_trim_start,
+    string_fns::native_string_trim_end,
 ];
 
 #[cfg(test)]

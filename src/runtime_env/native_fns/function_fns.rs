@@ -82,6 +82,7 @@ pub(super) fn native_function_bind(
                 params: vec![],
                 rest_param: None,
                 bytecode_index: usize::MAX,
+                local_count: 0,
                 closure: closure_rc,
                 prototype: None,
                 super_class: None,

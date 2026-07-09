@@ -550,6 +550,25 @@ impl Interpreter {
                     }
                 }
             }
+            Instruction::Apply => {
+                // Stack: [argsArray, this, callee]
+                let callee = self.stack_pop()?;
+                let this = self.stack_pop()?;
+                let args_val = self.stack_pop()?;
+                let call_args = match args_val {
+                    Value::Array(arr_idx) => {
+                        if let HeapValue::Array(arr) = &self.heap[arr_idx] {
+                            arr.elements.clone()
+                        } else {
+                            Vec::new()
+                        }
+                    }
+                    Value::Undefined | Value::Null => Vec::new(),
+                    other => vec![other],
+                };
+                let result = self.call_value(&callee, &this, &call_args)?;
+                self.stack.push(result);
+            }
             Instruction::SpreadObject => {
                 let source = self.stack_pop()?;
                 if let Value::Object(target_idx) =
