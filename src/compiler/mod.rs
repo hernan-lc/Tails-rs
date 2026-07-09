@@ -171,6 +171,9 @@ pub enum Instruction {
     /// Stack: `[argsArray, this, callee]` (callee on top).
     Apply,
     Construct(u16),
+    /// `new Ctor(...args)` with a pre-built arguments array.
+    /// Stack: `[argsArray, ctor]` (ctor on top).
+    ConstructApply,
     LoadThis,
     Dup,
     Rot3Right,

@@ -494,6 +494,11 @@ impl Interpreter {
                         continue;
                     }
                 }
+                Instruction::ConstructApply => {
+                    if self.exec_construct_apply(module, &mut pc)? {
+                        continue;
+                    }
+                }
                 Instruction::MakeClass(_)
                 | Instruction::SuperConstruct(_)
                 | Instruction::SuperGet => {

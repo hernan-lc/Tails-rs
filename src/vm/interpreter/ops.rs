@@ -569,6 +569,10 @@ impl Interpreter {
                 let result = self.call_value(&callee, &this, &call_args)?;
                 self.stack.push(result);
             }
+            Instruction::ConstructApply => {
+                // Handled in bytecode dispatch via exec_construct_apply
+                return Ok(false);
+            }
             Instruction::SpreadObject => {
                 let source = self.stack_pop()?;
                 if let Value::Object(target_idx) =

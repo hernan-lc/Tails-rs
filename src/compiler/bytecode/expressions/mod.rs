@@ -505,7 +505,9 @@ impl CodeGenerator {
                         self.emit(Instruction::SpreadArray);
                     }
                     _ => {
-                        self.emit(Instruction::Dup);
+                        // ArrayPush pops (array, value) and pushes the array back.
+                        // Do NOT Dup first — that leaves a stale array slot under
+                        // the result and corrupts CallMethod stacks.
                         self.generate_expression(elem)?;
                         self.emit(Instruction::ArrayPush);
                     }

@@ -398,10 +398,38 @@ impl Interpreter {
         Ok(true)
     }
 
+    pub(crate) fn exec_construct_apply(
+        &mut self,
+        module: &CompiledModule,
+        pc: &mut usize,
+    ) -> Result<bool> {
+        // Stack: [argsArray, ctor]
+        let constructor = self
+            .stack
+            .pop()
+            .ok_or_else(|| Error::RuntimeError(super::ERR_STACK_UNDERFLOW.into()))?;
+        let args_val = self
+            .stack
+            .pop()
+            .ok_or_else(|| Error::RuntimeError(super::ERR_STACK_UNDERFLOW.into()))?;
+        let args = match args_val {
+            Value::Array(arr_idx) => {
+                if let HeapValue::Array(arr) = &self.heap[arr_idx] {
+                    arr.elements.clone()
+                } else {
+                    Vec::new()
+                }
+            }
+            Value::Undefined | Value::Null => Vec::new(),
+            other => vec![other],
+        };
+        self.exec_construct_with_args(constructor, args, module, pc)
+    }
+
     pub(crate) fn exec_construct(
         &mut self,
         argc: &u16,
-        _module: &CompiledModule,
+        module: &CompiledModule,
         pc: &mut usize,
     ) -> Result<bool> {
         let mut args = Vec::new();
@@ -417,6 +445,16 @@ impl Interpreter {
             .stack
             .pop()
             .ok_or_else(|| Error::RuntimeError(super::ERR_STACK_UNDERFLOW.into()))?;
+        self.exec_construct_with_args(constructor, args, module, pc)
+    }
+
+    fn exec_construct_with_args(
+        &mut self,
+        constructor: Value,
+        args: Vec<Value>,
+        _module: &CompiledModule,
+        pc: &mut usize,
+    ) -> Result<bool> {
         match &constructor {
             Value::Function(func_idx) => {
                 let proto_idx = if let Value::Object(proto_obj_idx) =

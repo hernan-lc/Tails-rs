@@ -1,14 +1,42 @@
 use super::*;
 
 impl CodeGenerator {
+    fn args_have_spread(args: &[Expression]) -> bool {
+        args.iter()
+            .any(|a| matches!(a, Expression::SpreadElement { .. }))
+    }
+
+    /// Build a single arguments array, expanding any `...spread` elements.
+    /// Leaves the array on the stack.
+    fn generate_args_array(&mut self, args: &[Expression]) -> Result<()> {
+        self.emit(Instruction::NewArray(0));
+        for arg in args {
+            match arg {
+                Expression::SpreadElement { argument } => {
+                    self.generate_expression(argument)?;
+                    self.emit(Instruction::SpreadArray);
+                }
+                _ => {
+                    // ArrayPush pops (array, value) and re-pushes the array —
+                    // no Dup needed (a Dup would leave a stale slot).
+                    self.generate_expression(arg)?;
+                    self.emit(Instruction::ArrayPush);
+                }
+            }
+        }
+        Ok(())
+    }
+
     pub(super) fn generate_call(&mut self, callee: &Expression, args: &[Expression]) -> Result<()> {
+        let has_spread = Self::args_have_spread(args);
+
         if let Expression::Member {
             object,
             property,
             computed,
         } = callee
         {
-            if !computed {
+            if !computed && !has_spread {
                 if let Expression::Identifier(name) = property.as_ref() {
                     match name.as_str() {
                         "set" if args.len() == 2 => {
@@ -55,19 +83,36 @@ impl CodeGenerator {
                     }
                 }
             }
-            self.generate_expression(object)?;
-            if *computed {
-                self.generate_expression(property)?;
-            } else if let Expression::Identifier(name) = property.as_ref() {
-                let idx = self.add_constant(Value::String(name.clone()));
-                self.emit(Instruction::LoadConst(idx));
+            if has_spread {
+                // [argsArray, this, method] then Apply
+                self.generate_args_array(args)?;
+                self.generate_expression(object)?; // [args, this]
+                self.emit(Instruction::Dup); // [args, this, this]
+                if *computed {
+                    self.generate_expression(property)?;
+                } else if let Expression::Identifier(name) = property.as_ref() {
+                    let idx = self.add_constant(Value::String(name.clone()));
+                    self.emit(Instruction::LoadConst(idx));
+                } else {
+                    self.generate_expression(property)?;
+                }
+                self.emit(Instruction::GetProperty); // [args, this, method]
+                self.emit(Instruction::Apply);
             } else {
-                self.generate_expression(property)?;
+                self.generate_expression(object)?;
+                if *computed {
+                    self.generate_expression(property)?;
+                } else if let Expression::Identifier(name) = property.as_ref() {
+                    let idx = self.add_constant(Value::String(name.clone()));
+                    self.emit(Instruction::LoadConst(idx));
+                } else {
+                    self.generate_expression(property)?;
+                }
+                for arg in args {
+                    self.generate_expression(arg)?;
+                }
+                self.emit(Instruction::CallMethod(args.len() as u16));
             }
-            for arg in args {
-                self.generate_expression(arg)?;
-            }
-            self.emit(Instruction::CallMethod(args.len() as u16));
         } else if let Expression::OptionalMember {
             object,
             property,
@@ -75,7 +120,15 @@ impl CodeGenerator {
         } = callee
         {
             // `receiver?.method(args)` — OptionalMember used as call callee.
+            // Spread on optional calls is uncommon; fall back to guarded path
+            // without spread expansion for now.
             self.generate_guarded_method_call(object, property, *computed, args)?;
+        } else if has_spread {
+            // [argsArray, undefined, callee] then Apply
+            self.generate_args_array(args)?;
+            self.emit(Instruction::LoadUndefined);
+            self.generate_expression(callee)?;
+            self.emit(Instruction::Apply);
         } else {
             for arg in args {
                 self.generate_expression(arg)?;
@@ -204,11 +257,17 @@ impl CodeGenerator {
         callee: &Expression,
         args: &[Expression],
     ) -> Result<()> {
-        self.generate_expression(callee)?;
-        for arg in args {
-            self.generate_expression(arg)?;
+        if Self::args_have_spread(args) {
+            self.generate_args_array(args)?;
+            self.generate_expression(callee)?;
+            self.emit(Instruction::ConstructApply);
+        } else {
+            self.generate_expression(callee)?;
+            for arg in args {
+                self.generate_expression(arg)?;
+            }
+            self.emit(Instruction::Construct(args.len() as u16));
         }
-        self.emit(Instruction::Construct(args.len() as u16));
         Ok(())
     }
 }
