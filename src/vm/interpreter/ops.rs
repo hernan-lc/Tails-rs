@@ -505,8 +505,9 @@ impl Interpreter {
                     args.push(self.stack_pop()?);
                 }
                 args.reverse();
-                let this = self.stack_pop()?;
+                // Stack layout: [this, callee] (callee on top).
                 let callee = self.stack_pop()?;
+                let this = self.stack_pop()?;
                 if matches!(callee, Value::Undefined | Value::Null) {
                     self.stack.push(Value::Undefined);
                 } else {

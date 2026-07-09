@@ -74,9 +74,11 @@ impl CodeGenerator {
             computed,
         } = callee
         {
-            self.generate_expression(object)?;
+            // Same as the Member branch: guard the resolved member value, not
+            // just the object, then call with `OptionalCall`.
+            self.generate_expression(object)?; // object (this)
             self.emit(Instruction::Dup);
-            let check_undef = self.instructions.len();
+            let check_obj = self.instructions.len();
             self.emit(Instruction::JumpIfUndefined(0));
             if *computed {
                 self.generate_expression(property)?;
@@ -86,13 +88,20 @@ impl CodeGenerator {
             } else {
                 self.generate_expression(property)?;
             }
+            self.emit(Instruction::GetProperty); // object, method
+            self.emit(Instruction::Dup);
+            let check_callee = self.instructions.len();
+            self.emit(Instruction::JumpIfUndefined(0));
             for arg in args {
                 self.generate_expression(arg)?;
             }
-            self.emit(Instruction::CallMethod(args.len() as u16));
+            // Stack for OptionalCall: args..., this=object, callee=method
+            self.emit(Instruction::OptionalCall(args.len() as u16));
             let skip_end = self.instructions.len();
             self.emit(Instruction::Jump(0));
-            self.patch_jump(check_undef, self.instructions.len());
+            self.patch_jump(check_callee, self.instructions.len());
+            self.emit(Instruction::Pop);
+            self.patch_jump(check_obj, self.instructions.len());
             self.emit(Instruction::Pop);
             self.emit(Instruction::LoadUndefined);
             self.patch_jump(skip_end, self.instructions.len());
@@ -117,9 +126,13 @@ impl CodeGenerator {
             computed,
         } = callee
         {
-            self.generate_expression(object)?;
+            // Resolve `object[property]` (the callable) and guard it. Unlike a
+            // plain optional member access, here we must also support calling
+            // the resolved value, so we keep `object` on the stack as `this`
+            // and the resolved member as the callee.
+            self.generate_expression(object)?; // object (this)
             self.emit(Instruction::Dup);
-            let check_undef = self.instructions.len();
+            let check_obj = self.instructions.len();
             self.emit(Instruction::JumpIfUndefined(0));
             if *computed {
                 self.generate_expression(property)?;
@@ -129,13 +142,24 @@ impl CodeGenerator {
             } else {
                 self.generate_expression(property)?;
             }
+            // Stack: object, object, key -> get_property -> object, method
+            self.emit(Instruction::GetProperty);
+            // Guard the resolved callable, not just the object.
+            self.emit(Instruction::Dup);
+            let check_callee = self.instructions.len();
+            self.emit(Instruction::JumpIfUndefined(0));
             for arg in args {
                 self.generate_expression(arg)?;
             }
-            self.emit(Instruction::CallMethod(args.len() as u16));
+            // Stack for OptionalCall: args..., this=object, callee=method
+            self.emit(Instruction::OptionalCall(args.len() as u16));
             let skip_end = self.instructions.len();
             self.emit(Instruction::Jump(0));
-            self.patch_jump(check_undef, self.instructions.len());
+            self.patch_jump(check_callee, self.instructions.len());
+            // callee was undefined: drop it, leave object on stack to be popped
+            self.emit(Instruction::Pop);
+            self.patch_jump(check_obj, self.instructions.len());
+            // object was undefined (or callee was): drop object, push undefined
             self.emit(Instruction::Pop);
             self.emit(Instruction::LoadUndefined);
             self.patch_jump(skip_end, self.instructions.len());
@@ -145,9 +169,11 @@ impl CodeGenerator {
             computed,
         } = callee
         {
-            self.generate_expression(object)?;
+            // Guard the resolved member value (not just the object) before
+            // calling, preserving `object` as `this`.
+            self.generate_expression(object)?; // object (this)
             self.emit(Instruction::Dup);
-            let check_undef = self.instructions.len();
+            let check_obj = self.instructions.len();
             self.emit(Instruction::JumpIfUndefined(0));
             if *computed {
                 self.generate_expression(property)?;
@@ -157,14 +183,21 @@ impl CodeGenerator {
             } else {
                 self.generate_expression(property)?;
             }
+            self.emit(Instruction::GetProperty); // object, method
+            self.emit(Instruction::Dup);
+            let check_callee = self.instructions.len();
+            self.emit(Instruction::JumpIfUndefined(0));
             for arg in args {
                 self.generate_expression(arg)?;
             }
-            self.emit(Instruction::CallMethod(args.len() as u16));
+            // Stack for OptionalCall: args..., this=object, callee=method
+            self.emit(Instruction::OptionalCall(args.len() as u16));
             let skip_end = self.instructions.len();
             self.emit(Instruction::Jump(0));
-            self.patch_jump(check_undef, self.instructions.len());
-            self.emit(Instruction::Pop);
+            self.patch_jump(check_callee, self.instructions.len());
+            self.emit(Instruction::Pop); // drop method
+            self.patch_jump(check_obj, self.instructions.len());
+            self.emit(Instruction::Pop); // drop object
             self.emit(Instruction::LoadUndefined);
             self.patch_jump(skip_end, self.instructions.len());
         } else {

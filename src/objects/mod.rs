@@ -79,3 +79,17 @@ pub use strings::{
     ConsString, SYMBOL_ASYNC_ITERATOR, SYMBOL_HAS_INSTANCE, SYMBOL_ITERATOR, SYMBOL_SPECIES,
     SYMBOL_TO_PRIMITIVE, SYMBOL_TO_STRING_TAG, SYMBOL_UNSCOPABLES, USER_SYMBOL_START,
 };
+
+#[cfg(test)]
+mod size_probe {
+    #[test]
+    fn print_value_sizes() {
+        use super::*;
+        use std::mem::size_of;
+        eprintln!("Value={}", size_of::<Value>());
+        eprintln!("ConsString={}", size_of::<ConsString>());
+        eprintln!("String={}", size_of::<String>());
+        eprintln!("i128={}", size_of::<i128>());
+        assert!(size_of::<Value>() > 0);
+    }
+}

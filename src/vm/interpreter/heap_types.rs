@@ -492,9 +492,61 @@ fn has_advanced_features(pattern: &str) -> bool {
     false
 }
 
+/// Normalize a JS regular expression pattern into a form the Rust `regex` /
+/// `fancy_regex` engines accept. The primary divergence this handles is the
+/// treatment of `]` inside a character class:
+///
+/// In JavaScript, `\]` inside `[...]` is a literal `]` and the class stays
+/// open. The Rust crates instead treat `\` as an escape and close the class at
+/// the following `]`, which produces a parse error. To preserve JS semantics we
+/// rewrite an escaped `\]` inside a class so that the `]` becomes the first
+/// element of the class (a position where the Rust engines treat it as a
+/// literal), e.g. `[abc\]]` -> `[][abc\\]`.
+fn normalize_js_regex(pattern: &str) -> String {
+    let bytes = pattern.as_bytes();
+    let len = bytes.len();
+    let mut out = String::with_capacity(len);
+    // Stack of indices (into `out`) of currently-open '[' characters.
+    let mut opens: Vec<usize> = Vec::new();
+    let mut j = 0usize;
+    while j < len {
+        let c = bytes[j];
+        if c == b'\\' && j + 1 < len {
+            let next = bytes[j + 1];
+            if next == b']' && !opens.is_empty() {
+                // `\]` inside a class: move a literal `]` to the front of this
+                // class and drop the now-redundant backslash.
+                let open = opens.pop().unwrap();
+                // Everything between the '[' (already in `out`) and the '\':
+                let inner_start = open + 1;
+                let inner = out[inner_start..].to_string();
+                out.truncate(open + 1); // keep the '['
+                out.push(']'); // literal ']' as first element
+                out.push_str(&inner); // original contents (no backslash)
+                out.push(']'); // close the class
+                j += 2; // skip the '\' and ']'
+                continue;
+            }
+            out.push('\\');
+            out.push(next as char);
+            j += 2;
+            continue;
+        }
+        if c == b'[' {
+            opens.push(out.len());
+        } else if c == b']' {
+            opens.pop();
+        }
+        out.push(c as char);
+        j += 1;
+    }
+    out
+}
+
 impl JsRegExp {
     pub fn new(pattern: &str, flags: &str) -> Result<Self, String> {
-        eprintln!("[DBG regex pattern = {:?}]", pattern);
+        //eprintln!("[DBG regex pattern = {:?}]", pattern);
+        let normalized = normalize_js_regex(pattern);
         let mut regex_flags = String::new();
         let global = flags.contains('g');
         let ignore_case = flags.contains('i');
@@ -512,9 +564,9 @@ impl JsRegExp {
         if dot_all {
             regex_flags.push_str("(?s)");
         }
-        regex_flags.push_str(pattern);
+        regex_flags.push_str(&normalized);
 
-        let compiled = if has_advanced_features(pattern) {
+        let compiled = if has_advanced_features(&normalized) {
             JsCompiledRegex::Advanced(
                 fancy_regex::Regex::new(&regex_flags).map_err(|e| e.to_string())?,
             )
