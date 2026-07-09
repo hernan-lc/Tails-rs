@@ -39,11 +39,22 @@ impl NativeString {
         if self.ptr.is_null() || self.len == 0 {
             return String::new();
         }
-        unsafe {
-            let slice = std::slice::from_raw_parts(self.ptr, self.len);
-            String::from_utf8_lossy(slice).to_string()
-        }
+        // Safety: caller of NativeString construction guarantees `ptr` is valid
+        // for `len` bytes for the lifetime of this value (typically a static or
+        // arena-owned buffer owned by the native module).
+        let slice = unsafe { std::slice::from_raw_parts(self.ptr, self.len) };
+        String::from_utf8_lossy(slice).to_string()
     }
+}
+
+/// Take ownership of a `ModuleHandle` allocated by a native module init function.
+///
+/// # Safety
+/// - `handle` must be non-null
+/// - `handle` must point to a valid `ModuleHandle` allocated with `Box::into_raw`
+/// - After this call, the pointer must not be used again
+pub unsafe fn take_module_handle(handle: *mut ModuleHandle) -> Box<ModuleHandle> {
+    Box::from_raw(handle)
 }
 
 pub const TAG_UNDEFINED: u32 = 0;
@@ -151,19 +162,19 @@ pub fn get_string(val: NativeValue) -> String {
         return String::new();
     }
     let ptr = val.data as *const c_char;
-    unsafe {
-        match CStr::from_ptr(ptr).to_str() {
-            Ok(s) => s.to_string(),
-            Err(_) => String::new(),
-        }
+    // Safety: TAG_STRING values store a pointer to a valid NUL-terminated C string
+    // owned by the runtime / caller for the duration of this call.
+    match unsafe { CStr::from_ptr(ptr) }.to_str() {
+        Ok(s) => s.to_string(),
+        Err(_) => String::new(),
     }
 }
 
 pub fn free_string(val: NativeValue) {
     if val.tag == TAG_STRING && val.data != 0 {
-        unsafe {
-            let _ = CString::from_raw(val.data as *mut c_char);
-        }
+        // Safety: data must be a pointer previously created with CString::into_raw
+        // (or equivalent) for this string value; ownership is transferred here.
+        let _ = unsafe { CString::from_raw(val.data as *mut c_char) };
     }
 }
 

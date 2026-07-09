@@ -1,7 +1,8 @@
 use crate::objects::Value;
-use std::ffi::{CStr, CString};
+use std::ffi::CString;
 use std::os::raw::c_char;
 
+use super::safe_wrappers::SafeCStr;
 use super::TailsValue;
 use super::TailsValueType;
 
@@ -121,11 +122,10 @@ pub fn tails_value_to_value(value: TailsValue) -> Value {
                 Value::string("")
             } else {
                 let ptr = value.data as *const c_char;
-                unsafe {
-                    match CStr::from_ptr(ptr).to_str() {
-                        Ok(s) => Value::from_string(s.to_string()),
-                        Err(_) => Value::string(""),
-                    }
+                // Safety: string tag stores a valid NUL-terminated C string pointer.
+                match unsafe { SafeCStr::new(ptr) }.to_str() {
+                    Some(s) => Value::from_string(s.to_string()),
+                    None => Value::string(""),
                 }
             }
         }

@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
-use crate::{NativeFn, NativeValue};
+use crate::{take_module_handle, NativeFn, NativeValue};
 
 pub struct NativeLibrary {
     _library: libloading::Library,
@@ -9,11 +9,14 @@ pub struct NativeLibrary {
     constants: HashMap<String, NativeValue>,
 }
 
+// SAFETY: NativeLibrary is only used from the single runtime thread that owns
+// the interpreter. Function pointers remain valid while `_library` is kept alive.
 unsafe impl Send for NativeLibrary {}
 unsafe impl Sync for NativeLibrary {}
 
 impl NativeLibrary {
     pub fn load(path: &Path) -> Result<Self, String> {
+        // Safety: `Library::new` is the OS dynamic linker; path is a real filesystem path.
         let library = unsafe {
             libloading::Library::new(path)
                 .map_err(|e| format!("Failed to load native library '{}': {}", path.display(), e))?
@@ -25,26 +28,24 @@ impl NativeLibrary {
         // Try module-specific init first (tails_native_init_<name>), then fallback to generic
         type InitFn = fn() -> *mut crate::ModuleHandle;
 
+        // Safety: InitFn must match the exported init symbol; symbols are generated
+        // by tails_module macros with a known signature.
         let init_result = unsafe {
-            // First try to find any tails_native_init_* symbol via nm-like approach
-            // We'll try common module names
             let module_stem = path.file_stem().and_then(|s| s.to_str()).unwrap_or("");
-
-            // Strip lib prefix and convert underscores to hyphens for module name
             let base_name = module_stem.strip_prefix("lib").unwrap_or(module_stem);
 
-            // Try tails_native_init_<base_name> (with underscores)
             let init_name = format!("tails_native_init_{}\0", base_name.replace('-', "_"));
             if let Ok(init_fn) = library.get::<InitFn>(init_name.as_bytes()) {
-                Some(init_fn)
+                Some(*init_fn)
             } else {
-                // Try the original module name pattern
                 let init_name2 = format!("tails_native_init_{}\0", base_name);
                 if let Ok(init_fn) = library.get::<InitFn>(init_name2.as_bytes()) {
-                    Some(init_fn)
+                    Some(*init_fn)
                 } else {
-                    // Fallback to generic tails_native_init for backward compatibility
-                    library.get::<InitFn>(b"tails_native_init\0").ok()
+                    library
+                        .get::<InitFn>(b"tails_native_init\0")
+                        .ok()
+                        .map(|s| *s)
                 }
             }
         };
@@ -57,7 +58,8 @@ impl NativeLibrary {
             return Err("init function returned null".to_string());
         }
 
-        let handle = unsafe { Box::from_raw(handle) };
+        // Safety: handle from tails_native_init, non-null, Box-allocated.
+        let handle = unsafe { take_module_handle(handle) };
         for (func_name, func_ptr) in &handle.module.functions {
             functions.insert(func_name.clone(), *func_ptr);
         }

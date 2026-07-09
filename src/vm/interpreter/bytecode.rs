@@ -179,6 +179,7 @@ impl Interpreter {
                                     // Phase 8.10: Profile loop back-edges for
                                     // JIT compilation.  Tick every 128
                                     // iterations to amortize profiler overhead.
+                                    #[cfg(feature = "jit")]
                                     match counter_val {
                                         Value::Integer(n) if n & 127 == 0 => {
                                             self.jit.tick(pc, module);

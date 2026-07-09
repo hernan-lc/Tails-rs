@@ -1,4 +1,5 @@
 use std::cell::{Cell, RefCell};
+use std::sync::Arc;
 
 use crate::objects::Value;
 
@@ -17,67 +18,14 @@ pub const USER_SYMBOL_START: u64 = 1000;
 /// this many bytes, eagerly flatten instead of building a tree node.
 const EAGER_FLATTEN_THRESHOLD: usize = 64;
 
-/// A reference-counted pointer to a `Value` that is heap-allocated and
-/// shared by reference. Unlike `Box`, cloning this pointer is O(1)
-/// (just incrementing a refcount) instead of O(N) (deep copy).
-///
-/// # Safety
-///
-/// `SharedValue` is `!Send` and `!Sync` — it must only be used from
-/// the single VM thread. The refcount is non-atomic for performance.
-struct SharedValue {
-    ptr: *mut Value,
-    count: Cell<usize>,
-}
-
-impl SharedValue {
-    fn new(val: Value) -> Self {
-        let boxed = Box::new(val);
-        Self {
-            ptr: Box::into_raw(boxed),
-            count: Cell::new(1),
-        }
-    }
-
-    fn clone_ref(&self) -> SharedValue {
-        self.count.set(self.count.get() + 1);
-        SharedValue {
-            ptr: self.ptr,
-            count: Cell::new(self.count.get()),
-        }
-    }
-
-    fn deref(&self) -> &Value {
-        unsafe { &*self.ptr }
-    }
-}
-
-impl Drop for SharedValue {
-    fn drop(&mut self) {
-        let c = self.count.get();
-        if c == 1 {
-            unsafe {
-                drop(Box::from_raw(self.ptr));
-            }
-        } else {
-            self.count.set(c - 1);
-        }
-    }
-}
-
-impl std::fmt::Debug for SharedValue {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        std::fmt::Debug::fmt(self.deref(), f)
-    }
-}
-
 /// Phase 1.7 + Phase 1.8: ConsString — a binary tree (rope) representation
 /// for deferred string concatenation.
 ///
-/// Phase 1.8 improvements:
-/// - Children use `SharedValue` (O(1) clone via refcount) instead of
-///   `Box` (O(N) deep copy). This eliminates the quadratic blowup in
-///   loops like `for (...) s = s + 'x'` where the GC snapshots the stack.
+/// Children use `Arc<Value>` for O(1) clone (atomic refcount) instead of
+/// deep-copying the rope. This replaces the previous custom `SharedValue`
+/// raw pointer/refcount (which required `unsafe` and had a broken layout).
+///
+/// Other improvements:
 /// - `cached` stores a lazily-computed flattened `String` so repeated
 ///   calls to `flatten()` are O(1) after the first.
 /// - `cached_hash` stores a pre-computed `u64` hash so `Hash` impls
@@ -85,25 +33,29 @@ impl std::fmt::Debug for SharedValue {
 /// - Short concatenations (both children are flat strings <= 64 bytes
 ///   total) are eagerly flattened to avoid building a tree node that
 ///   would immediately need flattening anyway.
+///
+/// # Thread safety
+///
+/// `Arc` shares ownership safely; `RefCell`/`Cell` cache fields must only be
+/// accessed from one thread at a time (the VM thread). `Send`/`Sync` are
+/// asserted so `Value` can live in thread-safe containers.
 pub struct ConsString {
-    left: SharedValue,
-    right: SharedValue,
+    left: Arc<Value>,
+    right: Arc<Value>,
     pub total_len: usize,
     cached: RefCell<Option<String>>,
     cached_hash: Cell<u64>,
 }
 
-// SAFETY: ConsString is only accessed from the single VM thread.
-// The RefCell and Cell are used for lazy caching and are never
-// accessed concurrently.
-unsafe impl Sync for ConsString {}
+// SAFETY: See struct docs. Cache cells are VM-thread-only.
 unsafe impl Send for ConsString {}
+unsafe impl Sync for ConsString {}
 
 impl Clone for ConsString {
     fn clone(&self) -> Self {
         Self {
-            left: self.left.clone_ref(),
-            right: self.right.clone_ref(),
+            left: Arc::clone(&self.left),
+            right: Arc::clone(&self.right),
             total_len: self.total_len,
             cached: RefCell::new(None),
             cached_hash: Cell::new(0),
@@ -114,8 +66,8 @@ impl Clone for ConsString {
 impl std::fmt::Debug for ConsString {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("ConsString")
-            .field("left", self.left.deref())
-            .field("right", self.right.deref())
+            .field("left", self.left.as_ref())
+            .field("right", self.right.as_ref())
             .field("total_len", &self.total_len)
             .finish()
     }
@@ -125,8 +77,8 @@ impl ConsString {
     pub fn new(left: Value, right: Value) -> Self {
         let total_len = Self::value_len(&left) + Self::value_len(&right);
         Self {
-            left: SharedValue::new(left),
-            right: SharedValue::new(right),
+            left: Arc::new(left),
+            right: Arc::new(right),
             total_len,
             cached: RefCell::new(None),
             cached_hash: Cell::new(0),
@@ -145,8 +97,8 @@ impl ConsString {
                 buf.push_str(b);
                 let total_len = buf.len();
                 Self {
-                    left: SharedValue::new(Value::from_string(buf)),
-                    right: SharedValue::new(Value::string("")),
+                    left: Arc::new(Value::from_string(buf)),
+                    right: Arc::new(Value::string("")),
                     total_len,
                     cached: RefCell::new(None),
                     cached_hash: Cell::new(0),
@@ -165,11 +117,11 @@ impl ConsString {
     }
 
     pub fn left(&self) -> &Value {
-        self.left.deref()
+        self.left.as_ref()
     }
 
     pub fn right(&self) -> &Value {
-        self.right.deref()
+        self.right.as_ref()
     }
 
     /// Flatten the tree into a single `String`. Memoized: the first call
@@ -260,12 +212,5 @@ impl ConsString {
 
     pub fn lt_cons(&self, other: &ConsString) -> bool {
         self.flatten() < other.flatten()
-    }
-}
-
-impl Drop for ConsString {
-    fn drop(&mut self) {
-        // SharedValue handles its own refcount-based deallocation.
-        // Nothing extra needed here.
     }
 }

@@ -1,5 +1,55 @@
 use crate::objects::Value;
 
+/// Types that can be stored in a TypedArray via native-endian byte conversion.
+/// Implemented for all standard TypedArray element types without `unsafe`.
+pub trait NeBytes: Copy {
+    const SIZE: usize;
+    fn read_from(bytes: &[u8]) -> Self;
+    fn write_to(self, bytes: &mut [u8]);
+}
+
+macro_rules! impl_ne_bytes {
+    ($($t:ty),+ $(,)?) => {$(
+        impl NeBytes for $t {
+            const SIZE: usize = std::mem::size_of::<$t>();
+            fn read_from(bytes: &[u8]) -> Self {
+                let mut arr = [0u8; std::mem::size_of::<$t>()];
+                arr.copy_from_slice(&bytes[..std::mem::size_of::<$t>()]);
+                <$t>::from_ne_bytes(arr)
+            }
+            fn write_to(self, bytes: &mut [u8]) {
+                bytes[..std::mem::size_of::<$t>()].copy_from_slice(&self.to_ne_bytes());
+            }
+        }
+    )+};
+}
+
+impl_ne_bytes!(u8, i8, u16, i16, u32, i32, u64, i64);
+
+impl NeBytes for f32 {
+    const SIZE: usize = 4;
+    fn read_from(bytes: &[u8]) -> Self {
+        let mut arr = [0u8; 4];
+        arr.copy_from_slice(&bytes[..4]);
+        f32::from_ne_bytes(arr)
+    }
+    fn write_to(self, bytes: &mut [u8]) {
+        bytes[..4].copy_from_slice(&self.to_ne_bytes());
+    }
+}
+
+impl NeBytes for f64 {
+    const SIZE: usize = 8;
+    fn read_from(bytes: &[u8]) -> Self {
+        let mut arr = [0u8; 8];
+        arr.copy_from_slice(&bytes[..8]);
+        f64::from_ne_bytes(arr)
+    }
+    fn write_to(self, bytes: &mut [u8]) {
+        bytes[..8].copy_from_slice(&self.to_ne_bytes());
+    }
+}
+
 #[derive(Debug, Clone)]
 pub enum TypedArrayType {
     Int8Array,
@@ -120,35 +170,31 @@ impl TypedArray {
         }
     }
 
-    pub fn get<T: Copy>(&self, index: usize) -> Option<T> {
-        let element_size = Self::element_size(&self.kind);
-        let byte_index = index * element_size;
-
-        if byte_index + element_size > self.byte_length {
+    /// Read an element at `index` using native-endian byte conversion.
+    /// Fully safe: bounds-checked slice copy, no raw pointers.
+    pub fn get<T: NeBytes>(&self, index: usize) -> Option<T> {
+        let element_size = T::SIZE;
+        let byte_index = index.checked_mul(element_size)?;
+        let end = byte_index.checked_add(element_size)?;
+        if end > self.byte_length || end > self.buffer.len() {
             return None;
         }
-
-        // Safety: byte_index is checked to be within bounds
-        unsafe {
-            let ptr = self.buffer.as_ptr().add(byte_index) as *const T;
-            Some(ptr.read_unaligned())
-        }
+        Some(T::read_from(&self.buffer[byte_index..end]))
     }
 
-    pub fn set_value<T: Copy>(&mut self, index: usize, value: T) {
-        let element_size = Self::element_size(&self.kind);
-        let byte_index = index * element_size;
+    /// Write an element at `index` using native-endian byte conversion.
+    /// Fully safe: grows the buffer if needed, then copies bytes.
+    pub fn set_value<T: NeBytes>(&mut self, index: usize, value: T) {
+        let element_size = T::SIZE;
+        let byte_index = index.saturating_mul(element_size);
+        let end = byte_index + element_size;
 
-        if byte_index + element_size > self.byte_length {
-            self.buffer.resize(byte_index + element_size, 0);
+        if end > self.byte_length {
+            self.buffer.resize(end, 0);
             self.byte_length = self.buffer.len();
         }
 
-        // Safety: buffer is resized to accommodate the new element
-        unsafe {
-            let ptr = self.buffer.as_mut_ptr().add(byte_index) as *mut T;
-            ptr.write_unaligned(value);
-        }
+        value.write_to(&mut self.buffer[byte_index..end]);
     }
 
     pub fn fill(&mut self, value: i32) {

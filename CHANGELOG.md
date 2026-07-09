@@ -1,5 +1,30 @@
 # Changelog
 
+## Unreleased — Unsafe Code Safety Plan (full implementation)
+
+Implements `docs/UNSAFE_AUDIT_PLAN.md` end-to-end: eliminate avoidable
+`unsafe`, encapsulate the rest, feature-gate inherent surfaces.
+
+### Eliminated / replaced
+- **TypedArray** (`js_array.rs`): `NeBytes` trait — bounds-checked
+  `from_ne_bytes` / `to_ne_bytes` (no raw pointer read/write).
+- **ConsString**: custom `SharedValue` raw refcount → `Arc<Value>` children
+  (correct shared ownership; documented `Send`/`Sync` for VM-thread cache).
+- **os / process**: raw `libc` → safe **`nix`** wrappers (hostname, uids, kill).
+- **Dynamic native calls**: `Vec<usize>` + `transmute` → `Vec<NativeFn>` (typed).
+
+### Encapsulated
+- FFI (`ffi/mod.rs`, `native.rs`, `conversions.rs`) uses `SafePtr` /
+  `SafeCStr` / `SafeSlice` with documented helpers.
+- ABI: `take_module_handle`, documented string free paths.
+- CLI build: `SafeLibrary` instead of open-coded `libloading`.
+
+### Features & policy
+- **`jit`** (default on): feature-gates JIT / executable memory.
+- **`fast-json`** (default off): optional unsafe simd-json parse; default is safe `serde_json`.
+- `#![warn(unsafe_op_in_unsafe_fn)]` on the crate.
+- `docs/unsafe-code-guide.md` + `scripts/check_unsafe_allowlist.sh`.
+
 ## Unreleased — VM Performance Pass 2b (Lazy Iterators + String Concat Hot Path)
 
 A third round of focused optimizations, complementing Pass 1 (the

@@ -2,6 +2,8 @@ use crate::objects::Value;
 use rustc_hash::FxHashMap;
 use std::sync::{Arc, Mutex};
 
+use super::safe_wrappers::{SafeCStr, SafePtr, SafeSlice};
+
 pub type NativeFunction = fn(args: &[Value]) -> Result<Value, String>;
 
 pub struct NativeRegistry {
@@ -108,7 +110,8 @@ pub extern "C" fn tails_register_native(
         return usize::MAX;
     }
 
-    let registry = unsafe { &mut *registry };
+    // Safety: null-checked; exclusive registry pointer from C ABI.
+    let registry = unsafe { SafePtr::new(registry).as_mut() };
     registry.register(func)
 }
 
@@ -123,12 +126,11 @@ pub extern "C" fn tails_register_native_named(
         return usize::MAX;
     }
 
-    let registry = unsafe { &mut *registry };
-    let name = unsafe { std::ffi::CStr::from_ptr(name) };
-
-    match name.to_str() {
-        Ok(name_str) => registry.register_named(name_str, func),
-        Err(_) => usize::MAX,
+    // Safety: null-checked pointers from C ABI.
+    let registry = unsafe { SafePtr::new(registry).as_mut() };
+    match unsafe { SafeCStr::new(name) }.to_str() {
+        Some(name_str) => registry.register_named(name_str, func),
+        None => usize::MAX,
     }
 }
 
@@ -143,11 +145,13 @@ pub extern "C" fn tails_call_native(
         return super::TailsValue { tag: 0, data: 0 };
     }
 
+    // Safety: null-checked; registry valid for this call.
     let registry = unsafe { &*registry };
     let args = if args.is_null() || args_len == 0 {
         &[]
     } else {
-        unsafe { std::slice::from_raw_parts(args, args_len) }
+        // Safety: caller provides valid array of args_len elements.
+        unsafe { SafeSlice::new(args, args_len).as_slice() }
     };
 
     let values: Vec<Value> = args
@@ -170,9 +174,8 @@ pub extern "C" fn tails_registry_new() -> *mut NativeRegistry {
 #[no_mangle]
 pub extern "C" fn tails_registry_free(registry: *mut NativeRegistry) {
     if !registry.is_null() {
-        unsafe {
-            let _ = Box::from_raw(registry);
-        }
+        // Safety: registry created by tails_registry_new (Box::into_raw).
+        let _ = unsafe { Box::from_raw(registry) };
     }
 }
 
@@ -182,6 +185,7 @@ pub extern "C" fn tails_registry_count(registry: *const NativeRegistry) -> usize
         return 0;
     }
 
+    // Safety: null-checked; registry valid for this call.
     let registry = unsafe { &*registry };
     registry.function_count()
 }

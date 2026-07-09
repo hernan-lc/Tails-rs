@@ -86,7 +86,8 @@ impl<T> FunctionPointerWrapper<T> {
     /// # Safety
     /// The pointer must be valid and properly aligned.
     pub unsafe fn as_ref(&self) -> &T {
-        &*self.ptr
+        // SAFETY: caller guarantees pointer validity.
+        unsafe { &*self.ptr }
     }
 
     /// Get the name of the function.

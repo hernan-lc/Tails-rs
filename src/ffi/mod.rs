@@ -10,8 +10,8 @@ pub mod safe_wrappers;
 use crate::objects::Value;
 use crate::TailsRuntime;
 use conversions::{tails_value_to_value, value_to_tails_value};
-use safe_wrappers::SafeCStr;
-use std::ffi::{CStr, CString};
+use safe_wrappers::{SafeCStr, SafePtr, SafeSlice};
+use std::ffi::CString;
 use std::os::raw::c_char;
 
 #[repr(C)]
@@ -36,6 +36,20 @@ pub enum TailsValueType {
     NativeFunction = 10,
 }
 
+/// # Safety
+/// `runtime` must be non-null and point to a valid `TailsRuntime` for `'a`.
+#[inline]
+unsafe fn runtime_ref<'a>(runtime: *mut TailsRuntime) -> &'a TailsRuntime {
+    unsafe { SafePtr::new(runtime).as_ref() }
+}
+
+/// # Safety
+/// `runtime` must be non-null and point to a valid exclusive `TailsRuntime` for `'a`.
+#[inline]
+unsafe fn runtime_mut<'a>(runtime: *mut TailsRuntime) -> &'a mut TailsRuntime {
+    unsafe { SafePtr::new(runtime).as_mut() }
+}
+
 #[no_mangle]
 pub extern "C" fn tails_runtime_new() -> *mut TailsRuntime {
     let runtime = TailsRuntime::default();
@@ -45,16 +59,16 @@ pub extern "C" fn tails_runtime_new() -> *mut TailsRuntime {
 #[no_mangle]
 pub extern "C" fn tails_runtime_free(runtime: *mut TailsRuntime) {
     if !runtime.is_null() {
-        unsafe {
-            let _ = Box::from_raw(runtime);
-        }
+        // Safety: runtime was created by tails_runtime_new (Box::into_raw).
+        let _ = unsafe { Box::from_raw(runtime) };
     }
 }
 
 #[no_mangle]
 pub extern "C" fn tails_eval(runtime: *mut TailsRuntime, source: *const c_char) -> TailsValue {
     null_guard!(runtime, source);
-    let runtime = unsafe { &mut *runtime };
+    // Safety: null-checked; C ABI ownership of runtime and source for this call.
+    let runtime = unsafe { runtime_mut(runtime) };
     let source = match unsafe { SafeCStr::new(source) }.to_str() {
         Some(s) => s,
         None => return empty_tails_value!(),
@@ -68,7 +82,7 @@ pub extern "C" fn tails_eval(runtime: *mut TailsRuntime, source: *const c_char) 
 #[no_mangle]
 pub extern "C" fn tails_get_global(runtime: *mut TailsRuntime, name: *const c_char) -> TailsValue {
     null_guard!(runtime, name);
-    let runtime = unsafe { &*runtime };
+    let runtime = unsafe { runtime_ref(runtime) };
     let name = match unsafe { SafeCStr::new(name) }.to_str() {
         Some(s) => s,
         None => return empty_tails_value!(),
@@ -86,9 +100,8 @@ pub extern "C" fn tails_set_global(
     value: TailsValue,
 ) {
     null_guard_void!(runtime, name);
-    let runtime = unsafe { &mut *runtime };
-    let name = unsafe { CStr::from_ptr(name) };
-    if let Ok(name_str) = name.to_str() {
+    let runtime = unsafe { runtime_mut(runtime) };
+    if let Some(name_str) = unsafe { SafeCStr::new(name) }.to_str() {
         let val = tails_value_to_value(value);
         runtime.set_global(name_str, val);
     }
@@ -161,34 +174,28 @@ pub extern "C" fn tails_get_string(value: TailsValue) -> *const c_char {
         return std::ptr::null();
     }
 
-    let ptr = value.data as *const u8;
+    let ptr = value.data as *const c_char;
     if ptr.is_null() {
         return std::ptr::null();
     }
 
-    unsafe {
-        let mut len = 0;
-        while *ptr.add(len) != 0 {
-            len += 1;
-        }
-        let slice = std::slice::from_raw_parts(ptr, len);
-        match CStr::from_bytes_with_nul(slice) {
-            Ok(cstr) => cstr.as_ptr(),
-            Err(_) => std::ptr::null(),
-        }
+    // Safety: string values store a pointer to a valid NUL-terminated C string.
+    match unsafe { SafeCStr::new(ptr) }.to_str() {
+        Some(_) => ptr,
+        None => std::ptr::null(),
     }
 }
 
 #[no_mangle]
 pub extern "C" fn tails_string_new(runtime: *mut TailsRuntime, s: *const c_char) -> TailsValue {
     null_guard!(runtime, s);
-    let cstr = unsafe { CStr::from_ptr(s) };
-    match cstr.to_str() {
-        Ok(s) => {
+    let _runtime = unsafe { runtime_ref(runtime) };
+    match unsafe { SafeCStr::new(s) }.to_str() {
+        Some(s) => {
             let value = Value::from_string(s.to_string());
             value_to_tails_value(value)
         }
-        Err(_) => empty_tails_value!(),
+        None => empty_tails_value!(),
     }
 }
 
@@ -227,7 +234,7 @@ pub extern "C" fn tails_undefined() -> TailsValue {
 #[no_mangle]
 pub extern "C" fn tails_object_new(runtime: *mut TailsRuntime) -> TailsValue {
     null_guard_single!(runtime);
-    let runtime = unsafe { &mut *runtime };
+    let runtime = unsafe { runtime_mut(runtime) };
     let value = runtime.new_object();
     value_to_tails_value(value)
 }
@@ -239,17 +246,16 @@ pub extern "C" fn tails_object_get(
     key: *const c_char,
 ) -> TailsValue {
     null_guard!(runtime, key);
-    let runtime = unsafe { &mut *runtime };
-    let key = unsafe { CStr::from_ptr(key) };
-    match key.to_str() {
-        Ok(key_str) => {
+    let runtime = unsafe { runtime_mut(runtime) };
+    match unsafe { SafeCStr::new(key) }.to_str() {
+        Some(key_str) => {
             let obj_value = tails_value_to_value(object);
             match runtime.get_property(&obj_value, key_str) {
                 Some(value) => value_to_tails_value(value),
                 None => empty_tails_value!(),
             }
         }
-        Err(_) => empty_tails_value!(),
+        None => empty_tails_value!(),
     }
 }
 
@@ -261,9 +267,8 @@ pub extern "C" fn tails_object_set(
     value: TailsValue,
 ) {
     null_guard_void!(runtime, key);
-    let runtime = unsafe { &mut *runtime };
-    let key = unsafe { CStr::from_ptr(key) };
-    if let Ok(key_str) = key.to_str() {
+    let runtime = unsafe { runtime_mut(runtime) };
+    if let Some(key_str) = unsafe { SafeCStr::new(key) }.to_str() {
         let obj_value = tails_value_to_value(object);
         let val = tails_value_to_value(value);
         runtime.set_property(&obj_value, key_str, val);
@@ -273,7 +278,7 @@ pub extern "C" fn tails_object_set(
 #[no_mangle]
 pub extern "C" fn tails_array_new(runtime: *mut TailsRuntime) -> TailsValue {
     null_guard_single!(runtime);
-    let runtime = unsafe { &mut *runtime };
+    let runtime = unsafe { runtime_mut(runtime) };
     let value = runtime.new_array();
     value_to_tails_value(value)
 }
@@ -282,7 +287,7 @@ pub extern "C" fn tails_array_new(runtime: *mut TailsRuntime) -> TailsValue {
 pub extern "C" fn tails_array_length(runtime: *mut TailsRuntime, array: TailsValue) -> i32 {
     array_guard_i32!(runtime, array, -1);
 
-    let runtime = unsafe { &*runtime };
+    let runtime = unsafe { runtime_ref(runtime) };
     let arr_value = tails_value_to_value(array);
     runtime.get_array_length(&arr_value).unwrap_or(-1) as i32
 }
@@ -294,7 +299,7 @@ pub extern "C" fn tails_array_get(
     index: i32,
 ) -> TailsValue {
     array_guard!(runtime, array);
-    let runtime = unsafe { &*runtime };
+    let runtime = unsafe { runtime_ref(runtime) };
     let arr_value = tails_value_to_value(array);
     match runtime.get_array_element(&arr_value, index as usize) {
         Some(value) => value_to_tails_value(value),
@@ -309,7 +314,7 @@ pub extern "C" fn tails_array_push(
     value: TailsValue,
 ) -> i32 {
     array_guard_i32!(runtime, array, -1);
-    let runtime = unsafe { &mut *runtime };
+    let runtime = unsafe { runtime_mut(runtime) };
     let arr_value = tails_value_to_value(array);
     let val = tails_value_to_value(value);
     runtime.push_array_element(&arr_value, val);
@@ -325,13 +330,14 @@ pub extern "C" fn tails_call(
     args_len: i32,
 ) -> TailsValue {
     null_guard_single!(runtime);
-    let runtime = unsafe { &mut *runtime };
+    let runtime = unsafe { runtime_mut(runtime) };
     let func_value = tails_value_to_value(func);
     let this_value = tails_value_to_value(this);
     let args = if args.is_null() || args_len <= 0 {
         &[]
     } else {
-        unsafe { std::slice::from_raw_parts(args, args_len as usize) }
+        // Safety: caller provides valid array of args_len TailsValue elements.
+        unsafe { SafeSlice::new(args, args_len as usize).as_slice() }
     };
     let values: Vec<Value> = args.iter().map(|v| tails_value_to_value(*v)).collect();
     match runtime.call_function(&func_value, &this_value, &values) {
@@ -343,8 +349,7 @@ pub extern "C" fn tails_call(
 #[no_mangle]
 pub extern "C" fn tails_free_string(s: *mut c_char) {
     if !s.is_null() {
-        unsafe {
-            let _ = CString::from_raw(s);
-        }
+        // Safety: s was allocated with CString::into_raw / equivalent.
+        let _ = unsafe { CString::from_raw(s) };
     }
 }

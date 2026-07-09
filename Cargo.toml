@@ -12,7 +12,7 @@ license = "MIT"
 autobins = false
 
 [features]
-default = ["fs", "fs-promises", "path", "process", "os", "websocket", "http", "net", "zlib", "tls", "dns"]
+default = ["fs", "fs-promises", "path", "process", "os", "websocket", "http", "net", "zlib", "tls", "dns", "jit"]
 fs = ["dep:tails-fs"]
 fs-promises = ["dep:tails-fs-promises", "dep:tails-fs"]
 path = ["dep:tails-path"]
@@ -24,6 +24,11 @@ net = ["dep:tails-net"]
 zlib = ["dep:flate2", "dep:base64"]
 tls = ["dep:native-tls"]
 dns = ["dep:hickory-resolver"]
+# Baseline JIT for hot loops (executable memory — inherent unsafe).
+jit = []
+# Optional SIMD JSON parse path (uses simd_json::from_str which is unsafe).
+# Default JSON.parse uses fully safe serde_json.
+fast-json = []
 # Opt-in debug binaries under src/bin/ (not built by default).
 dev-bins = []
 

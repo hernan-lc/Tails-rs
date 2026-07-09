@@ -275,89 +275,91 @@ fn generate_dts(lib_path: &Path, package_name: &str) -> Result<String> {
         ));
     }
 
-    // Load the library to read the symbol values
+    // Load the library to read the symbol values via SafeLibrary encapsulation.
     let abs_path = lib_path
         .canonicalize()
         .with_context(|| format!("Failed to canonicalize path: {}", lib_path.display()))?;
 
-    unsafe {
-        let lib = libloading::Library::new(&abs_path)
-            .with_context(|| format!("Failed to load library at: {}", abs_path.display()))?;
+    let lib = crate::vm::interpreter::safe_library::SafeLibrary::new(&abs_path)
+        .map_err(|e| anyhow::anyhow!("Failed to load library at {}: {}", abs_path.display(), e))?;
 
-        let mut dts_entries: Vec<String> = Vec::new();
+    let mut dts_entries: Vec<String> = Vec::new();
 
-        for symbol_name in &dts_symbols {
-            let c_name = format!("{}\0", symbol_name);
-            if let Ok(func) = lib.get::<*const &str>(c_name.as_bytes()) {
+    for symbol_name in &dts_symbols {
+        // Safety: DTS metadata symbols are static `&str` pointers emitted by
+        // tails-native-macros (`__TAILS_DTS_*`). Dereferencing the symbol is
+        // valid for the lifetime of `lib`.
+        unsafe {
+            if let Ok(func) = lib.get_function::<*const &str>(symbol_name) {
                 let s: &str = &**func;
                 if !s.is_empty() {
                     dts_entries.push(s.to_string());
                 }
             }
         }
-
-        // Sort and deduplicate
-        dts_entries.sort();
-        dts_entries.dedup();
-
-        // Parse entries and group into classes vs standalone functions
-        let mut standalone_functions: Vec<String> = Vec::new();
-        let mut classes: HashMap<String, ClassInfo> = HashMap::new();
-
-        // First pass: find constructors
-        for entry in &dts_entries {
-            if let Some((class_name, ctor_sig)) = parse_class_constructor(entry) {
-                classes
-                    .entry(class_name.clone())
-                    .or_insert_with(|| ClassInfo::new(&class_name))
-                    .constructor = Some(ctor_sig);
-            }
-        }
-
-        // Second pass: find methods and filter out class-related entries
-        let class_names: Vec<String> = classes.keys().cloned().collect();
-        for entry in &dts_entries {
-            // Skip if already captured as a constructor
-            if classes
-                .values()
-                .any(|c| c.constructor.as_deref() == Some(entry))
-            {
-                continue;
-            }
-            if let Some((class_name, method_sig)) = parse_class_method(entry, &class_names) {
-                classes
-                    .entry(class_name.clone())
-                    .or_insert_with(|| ClassInfo::new(&class_name))
-                    .methods
-                    .push(method_sig);
-            } else {
-                standalone_functions.push(entry.clone());
-            }
-        }
-
-        // Generate output
-        let mut dts = format!(
-            "// Auto-generated TypeScript definitions for {}\n\n",
-            package_name
-        );
-
-        // Output classes first
-        let mut class_names: Vec<&String> = classes.keys().collect();
-        class_names.sort();
-        for class_name in class_names {
-            let class_info = &classes[class_name];
-            dts.push_str(&class_info.to_dts());
-            dts.push('\n');
-        }
-
-        // Output standalone functions
-        for func in &standalone_functions {
-            dts.push_str(func);
-            dts.push('\n');
-        }
-
-        Ok(dts)
     }
+
+    // Sort and deduplicate
+    dts_entries.sort();
+    dts_entries.dedup();
+
+    // Parse entries and group into classes vs standalone functions
+    let mut standalone_functions: Vec<String> = Vec::new();
+    let mut classes: HashMap<String, ClassInfo> = HashMap::new();
+
+    // First pass: find constructors
+    for entry in &dts_entries {
+        if let Some((class_name, ctor_sig)) = parse_class_constructor(entry) {
+            classes
+                .entry(class_name.clone())
+                .or_insert_with(|| ClassInfo::new(&class_name))
+                .constructor = Some(ctor_sig);
+        }
+    }
+
+    // Second pass: find methods and filter out class-related entries
+    let class_names: Vec<String> = classes.keys().cloned().collect();
+    for entry in &dts_entries {
+        // Skip if already captured as a constructor
+        if classes
+            .values()
+            .any(|c| c.constructor.as_deref() == Some(entry))
+        {
+            continue;
+        }
+        if let Some((class_name, method_sig)) = parse_class_method(entry, &class_names) {
+            classes
+                .entry(class_name.clone())
+                .or_insert_with(|| ClassInfo::new(&class_name))
+                .methods
+                .push(method_sig);
+        } else {
+            standalone_functions.push(entry.clone());
+        }
+    }
+
+    // Generate output
+    let mut dts = format!(
+        "// Auto-generated TypeScript definitions for {}\n\n",
+        package_name
+    );
+
+    // Output classes first
+    let mut class_names: Vec<&String> = classes.keys().collect();
+    class_names.sort();
+    for class_name in class_names {
+        let class_info = &classes[class_name];
+        dts.push_str(&class_info.to_dts());
+        dts.push('\n');
+    }
+
+    // Output standalone functions
+    for func in &standalone_functions {
+        dts.push_str(func);
+        dts.push('\n');
+    }
+
+    Ok(dts)
 }
 
 struct ClassInfo {

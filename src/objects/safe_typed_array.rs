@@ -1,5 +1,4 @@
-use super::js_array::{TypedArray, TypedArrayType};
-use std::marker::PhantomData;
+use super::js_array::{NeBytes, TypedArray, TypedArrayType};
 
 /// A safe wrapper around TypedArray operations
 pub struct SafeTypedArray<'a> {
@@ -61,69 +60,23 @@ impl<'a> SafeTypedArray<'a> {
     pub fn inner_mut(&mut self) -> &mut TypedArray {
         self.inner
     }
-}
 
-/// A type-safe reference to an element in a TypedArray
-pub struct TypedArrayRef<'a, T> {
-    ptr: *mut T,
-    _marker: PhantomData<&'a mut T>,
-}
-
-impl<'a, T> TypedArrayRef<'a, T> {
-    /// Create a new TypedArrayRef from a raw pointer
-    ///
-    /// # Safety
-    /// The pointer must be valid and properly aligned for type T
-    pub unsafe fn new(ptr: *mut T) -> Self {
-        Self {
-            ptr,
-            _marker: PhantomData,
-        }
+    /// Safe element read via `NeBytes`.
+    pub fn get<T: NeBytes>(&self, index: usize) -> Option<T> {
+        self.inner.get(index)
     }
 
-    /// Get a reference to the element
-    ///
-    /// # Safety
-    /// The pointer must be valid
-    pub unsafe fn as_ref(&self) -> &T {
-        &*self.ptr
-    }
-
-    /// Get a mutable reference to the element
-    ///
-    /// # Safety
-    /// The pointer must be valid and no other references exist
-    pub unsafe fn as_mut(&mut self) -> &mut T {
-        &mut *self.ptr
-    }
-
-    /// Get the raw pointer
-    pub fn as_ptr(&self) -> *const T {
-        self.ptr
-    }
-
-    /// Get the raw mutable pointer
-    pub fn as_mut_ptr(&mut self) -> *mut T {
-        self.ptr
+    /// Safe element write via `NeBytes`.
+    pub fn set_value<T: NeBytes>(&mut self, index: usize, value: T) {
+        self.inner.set_value(index, value);
     }
 }
 
-/// Safe typed array access functions
+/// Safe typed array access helpers on `TypedArray` itself.
 impl TypedArray {
-    /// Get a safe reference to an element at the given index
-    ///
-    /// # Safety
-    /// The index must be within bounds and the type T must match the element type
-    pub unsafe fn get_ref<T>(&self, index: usize) -> Option<TypedArrayRef<'_, T>> {
-        let element_size = Self::element_size(&self.kind);
-        let byte_index = index * element_size;
-
-        if byte_index + element_size > self.byte_length {
-            return None;
-        }
-
-        let ptr = self.buffer.as_ptr().add(byte_index) as *mut T;
-        Some(TypedArrayRef::new(ptr))
+    /// Get an element by value (fully safe, no raw pointers).
+    pub fn get_element<T: NeBytes>(&self, index: usize) -> Option<T> {
+        self.get(index)
     }
 }
 
@@ -172,20 +125,7 @@ mod tests {
     }
 
     #[test]
-    fn test_typed_array_ref_creation() {
-        let mut value = 42i32;
-        let ptr = &mut value as *mut i32;
-
-        unsafe {
-            let mut ref_ = TypedArrayRef::new(ptr);
-            assert_eq!(*ref_.as_ref(), 42);
-            *ref_.as_mut() = 100;
-            assert_eq!(value, 100);
-        }
-    }
-
-    #[test]
-    fn test_typed_array_get_ref() {
+    fn test_typed_array_safe_get_set() {
         let mut typed_array = TypedArray {
             kind: TypedArrayType::Int32Array,
             buffer: vec![0; 16],
@@ -193,28 +133,16 @@ mod tests {
             byte_offset: 0,
         };
 
-        // Write some values
         typed_array.set_value(0, 10i32);
         typed_array.set_value(1, 20i32);
         typed_array.set_value(2, 30i32);
         typed_array.set_value(3, 40i32);
 
-        unsafe {
-            let ref0 = typed_array.get_ref::<i32>(0).unwrap();
-            assert_eq!(*ref0.as_ref(), 10);
-
-            let ref1 = typed_array.get_ref::<i32>(1).unwrap();
-            assert_eq!(*ref1.as_ref(), 20);
-
-            let ref2 = typed_array.get_ref::<i32>(2).unwrap();
-            assert_eq!(*ref2.as_ref(), 30);
-
-            let ref3 = typed_array.get_ref::<i32>(3).unwrap();
-            assert_eq!(*ref3.as_ref(), 40);
-
-            // Out of bounds should return None
-            assert!(typed_array.get_ref::<i32>(4).is_none());
-        }
+        assert_eq!(typed_array.get::<i32>(0), Some(10));
+        assert_eq!(typed_array.get::<i32>(1), Some(20));
+        assert_eq!(typed_array.get::<i32>(2), Some(30));
+        assert_eq!(typed_array.get::<i32>(3), Some(40));
+        assert!(typed_array.get::<i32>(4).is_none());
     }
 
     #[test]

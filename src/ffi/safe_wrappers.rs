@@ -35,7 +35,8 @@ impl<'a, T> SafePtr<'a, T> {
     /// # Safety
     /// The pointer must be valid and properly aligned
     pub unsafe fn as_ref(&self) -> &'a T {
-        &*self.ptr
+        // SAFETY: caller guarantees pointer validity (see `# Safety` above).
+        unsafe { &*self.ptr }
     }
 
     /// Get a mutable reference to the underlying data
@@ -43,7 +44,8 @@ impl<'a, T> SafePtr<'a, T> {
     /// # Safety
     /// The pointer must be valid, properly aligned, and no other references exist
     pub unsafe fn as_mut(&mut self) -> &'a mut T {
-        &mut *self.ptr
+        // SAFETY: caller guarantees exclusive valid pointer (see `# Safety` above).
+        unsafe { &mut *self.ptr }
     }
 
     /// Check if the pointer is null
@@ -122,7 +124,8 @@ impl<'a, T> SafeSlice<'a, T> {
     /// # Safety
     /// The pointer must be valid for `len` elements
     pub unsafe fn as_slice(&self) -> &'a [T] {
-        std::slice::from_raw_parts(self.ptr, self.len)
+        // SAFETY: caller guarantees ptr is valid for `len` elements.
+        unsafe { std::slice::from_raw_parts(self.ptr, self.len) }
     }
 
     /// Get the length of the slice

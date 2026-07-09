@@ -38,7 +38,8 @@ impl SafeLibrary {
 
         let c_name = CString::new(name).map_err(|e| format!("Invalid symbol name: {}", e))?;
 
-        match library.get::<T>(c_name.as_bytes_with_nul()) {
+        // SAFETY: caller guarantees `T` matches the exported symbol signature.
+        match unsafe { library.get::<T>(c_name.as_bytes_with_nul()) } {
             Ok(symbol) => Ok(symbol),
             Err(e) => Err(format!("Symbol '{}' not found: {}", name, e)),
         }
@@ -70,11 +71,12 @@ impl<T: 'static> SafeFunction<T> {
     /// The caller must ensure the function pointer `T` has the correct signature
     /// matching the actual symbol in the library.
     pub unsafe fn new(library: Arc<SafeLibrary>, name: &str) -> Result<Self, String> {
-        let func = library.get_function::<T>(name)?;
+        // SAFETY: caller guarantees symbol signature; see `# Safety` on this method.
+        let func = unsafe { library.get_function::<T>(name)? };
 
         // SAFETY: The Arc<SafeLibrary> stored in this struct keeps the library loaded,
         // so the symbol pointer remains valid for 'static.
-        let func = std::mem::transmute::<Symbol<'_, T>, Symbol<'static, T>>(func);
+        let func = unsafe { std::mem::transmute::<Symbol<'_, T>, Symbol<'static, T>>(func) };
 
         Ok(Self {
             func,

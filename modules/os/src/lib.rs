@@ -115,13 +115,11 @@ pub fn hostname() -> std::io::Result<String> {
     }
     #[cfg(unix)]
     {
-        let mut buf = [0u8; 256];
-        if unsafe { libc::gethostname(buf.as_mut_ptr() as *mut libc::c_char, buf.len()) } == 0 {
-            if let Ok(s) = std::ffi::CStr::from_bytes_until_nul(&buf) {
-                let hostname = s.to_string_lossy().to_string();
-                if !hostname.is_empty() {
-                    return Ok(hostname);
-                }
+        // Safe wrapper from nix — no local `unsafe`.
+        if let Ok(name) = nix::unistd::gethostname() {
+            let hostname = name.to_string_lossy().into_owned();
+            if !hostname.is_empty() {
+                return Ok(hostname);
             }
         }
     }
@@ -304,7 +302,8 @@ mod os_native {
     pub fn ppidd() -> f64 {
         #[cfg(unix)]
         {
-            unsafe { libc::getppid() as f64 }
+            // nix::unistd::getppid is a safe wrapper over the syscall.
+            nix::unistd::getppid().as_raw() as f64
         }
         #[cfg(not(unix))]
         {
@@ -316,7 +315,7 @@ mod os_native {
     pub fn getegid() -> f64 {
         #[cfg(unix)]
         {
-            unsafe { libc::getegid() as f64 }
+            nix::unistd::getegid().as_raw() as f64
         }
         #[cfg(not(unix))]
         {
@@ -328,7 +327,7 @@ mod os_native {
     pub fn geteuid() -> f64 {
         #[cfg(unix)]
         {
-            unsafe { libc::geteuid() as f64 }
+            nix::unistd::geteuid().as_raw() as f64
         }
         #[cfg(not(unix))]
         {
@@ -340,7 +339,7 @@ mod os_native {
     pub fn getgid() -> f64 {
         #[cfg(unix)]
         {
-            unsafe { libc::getgid() as f64 }
+            nix::unistd::getgid().as_raw() as f64
         }
         #[cfg(not(unix))]
         {
@@ -352,7 +351,7 @@ mod os_native {
     pub fn getuid() -> f64 {
         #[cfg(unix)]
         {
-            unsafe { libc::getuid() as f64 }
+            nix::unistd::getuid().as_raw() as f64
         }
         #[cfg(not(unix))]
         {

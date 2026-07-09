@@ -1,4 +1,4 @@
-use std::sync::{Mutex, OnceLock};
+use std::cell::RefCell;
 
 use crate::errors::Result;
 use crate::objects::Value;
@@ -12,17 +12,20 @@ use super::helpers::to_string_value;
 // ---------------------------------------------------------------------------
 //
 // Unlike an `EventEmitter`, exit handlers are *append-only* and the
-// only event ever emitted is `"exit"`. We use a process-global
-// `Mutex<Vec<Value>>` so a script can call `process.on('exit', fn)`
-// from any module without needing a per-interpreter registry.
+// only event ever emitted is `"exit"`. The runtime is single-threaded,
+// so a `thread_local!` `RefCell<Vec<Value>>` lets a script call
+// `process.on('exit', fn)` from any module without needing a per-interpreter
+// registry.
 //
 // Handlers are invoked in LIFO order (matching Node's behaviour: most
 // recently registered runs first).
 
-static EXIT_HANDLERS: OnceLock<Mutex<Vec<Value>>> = OnceLock::new();
+thread_local! {
+    static EXIT_HANDLERS: RefCell<Vec<Value>> = RefCell::new(Vec::new());
+}
 
-fn exit_handlers() -> &'static Mutex<Vec<Value>> {
-    EXIT_HANDLERS.get_or_init(|| Mutex::new(Vec::new()))
+fn with_exit_handlers<T>(f: impl FnOnce(&mut Vec<Value>) -> T) -> T {
+    EXIT_HANDLERS.with(|h| f(&mut h.borrow_mut()))
 }
 
 /// Drains and runs all registered exit handlers. Called by
@@ -32,13 +35,7 @@ pub fn run_exit_handlers(interp: &mut Interpreter) {
     // Move the handlers out so that any handler that itself registers
     // more handlers (or throws) does not reentrantly re-run the same
     // callbacks.
-    let handlers = {
-        let mut g = match exit_handlers().lock() {
-            Ok(g) => g,
-            Err(poisoned) => poisoned.into_inner(),
-        };
-        std::mem::take(&mut *g)
-    };
+    let handlers = with_exit_handlers(|g| std::mem::take(g));
     for handler in handlers {
         let _ = interp.call_value(&handler, &Value::Undefined, &[]);
     }
@@ -226,12 +223,8 @@ pub(super) fn native_process_on(
         return Ok(Value::Undefined);
     }
     let listener = args.get(1).cloned().unwrap_or(Value::Undefined);
-    let mut g = match exit_handlers().lock() {
-        Ok(g) => g,
-        Err(poisoned) => poisoned.into_inner(),
-    };
-    // LIFO order: push to the front so the most recent handler runs
+    // LIFO order: insert at the front so the most recent handler runs
     // first (matching Node's behaviour for `process.on('exit', ...)`).
-    g.insert(0, listener);
+    with_exit_handlers(|g| g.insert(0, listener));
     Ok(Value::Undefined)
 }

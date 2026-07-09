@@ -111,6 +111,7 @@ fn test_jit_loop_with_property_access() {
 }
 
 /// Test code buffer allocation and deallocation.
+#[cfg(feature = "jit")]
 #[test]
 fn test_code_buffer_basic() {
     use tails::vm::jit::code_buffer::CodeBuffer;
@@ -122,6 +123,7 @@ fn test_code_buffer_basic() {
 }
 
 /// Test that the JitFrame struct has the expected size and alignment.
+#[cfg(feature = "jit")]
 #[test]
 fn test_jit_frame_layout() {
     use tails::vm::jit::frame::JitFrame;

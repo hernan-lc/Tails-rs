@@ -55,14 +55,17 @@ mod platform {
     use std::ptr;
 
     pub unsafe fn alloc_executable(size: usize) -> *mut u8 {
-        let buf = mmap(
-            ptr::null_mut(),
-            size,
-            PROT_READ | PROT_WRITE,
-            MAP_ANONYMOUS | MAP_PRIVATE,
-            -1,
-            0,
-        );
+        // SAFETY: OS mmap for anonymous private RW pages used as JIT scratch.
+        let buf = unsafe {
+            mmap(
+                ptr::null_mut(),
+                size,
+                PROT_READ | PROT_WRITE,
+                MAP_ANONYMOUS | MAP_PRIVATE,
+                -1,
+                0,
+            )
+        };
         if buf == MAP_FAILED {
             panic!("JIT: mmap failed");
         }
@@ -70,11 +73,15 @@ mod platform {
     }
 
     pub unsafe fn free(ptr: *mut u8, size: usize) {
-        munmap(ptr as *mut libc::c_void, size);
+        // SAFETY: ptr/size from a prior successful alloc_executable.
+        unsafe {
+            munmap(ptr as *mut libc::c_void, size);
+        }
     }
 
     pub unsafe fn make_executable(ptr: *mut u8, size: usize) {
-        let rc = mprotect(ptr as *mut libc::c_void, size, PROT_READ | PROT_EXEC);
+        // SAFETY: ptr/size from a prior successful alloc_executable.
+        let rc = unsafe { mprotect(ptr as *mut libc::c_void, size, PROT_READ | PROT_EXEC) };
         if rc != 0 {
             panic!("JIT: mprotect to RX failed");
         }

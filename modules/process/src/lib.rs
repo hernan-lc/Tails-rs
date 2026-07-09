@@ -76,16 +76,24 @@ pub fn argv() -> Vec<String> {
 ///
 /// Returns `Ok(())` if the kill syscall was dispatched. Note that
 /// signal delivery is best-effort.
+///
+/// Uses the safe `nix` wrappers on Unix (no local `unsafe`).
 pub fn kill(pid: u32, signal: &str) -> std::io::Result<()> {
     let sig = parse_signal(signal);
     #[cfg(unix)]
     {
-        let res = unsafe { libc::kill(pid as libc::pid_t, sig as libc::c_int) };
-        if res == 0 {
-            Ok(())
-        } else {
-            Err(std::io::Error::last_os_error())
-        }
+        use nix::sys::signal::{kill as nix_kill, Signal};
+        use nix::unistd::Pid;
+        use std::convert::TryFrom;
+
+        let signal = Signal::try_from(sig).map_err(|_| {
+            std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                format!("invalid signal number: {}", sig),
+            )
+        })?;
+        nix_kill(Pid::from_raw(pid as i32), signal)
+            .map_err(|e| std::io::Error::from_raw_os_error(e as i32))
     }
     #[cfg(not(unix))]
     {
