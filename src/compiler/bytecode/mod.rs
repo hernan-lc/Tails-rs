@@ -622,8 +622,8 @@ impl CodeGenerator {
     /// Record how many local slots this function needs. Must be called before
     /// truncating `locals` / restoring `captured_var_names` at end of compile.
     pub(crate) fn finalize_local_count(&mut self, func_idx: u32) {
-        let count = self.captured_var_names.len()
-            + self.locals.len().saturating_sub(self.local_start_idx);
+        let count =
+            self.captured_var_names.len() + self.locals.len().saturating_sub(self.local_start_idx);
         if let Some(fi) = self.functions.get_mut(func_idx as usize) {
             fi.local_count = count;
         }

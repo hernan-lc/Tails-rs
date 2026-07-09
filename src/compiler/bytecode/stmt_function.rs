@@ -59,8 +59,9 @@ impl CodeGenerator {
         if let Some(rp) = rest_param {
             all_params.push(rp.clone());
         }
-        let outer_refs =
-            closures::find_outer_refs_with_slots(body, &all_params, |name| self.resolve_local(name));
+        let outer_refs = closures::find_outer_refs_with_slots(body, &all_params, |name| {
+            self.resolve_local(name)
+        });
         let num_captures = outer_refs.len();
 
         self.functions.push(CompiledFunction {

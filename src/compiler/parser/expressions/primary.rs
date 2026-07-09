@@ -16,10 +16,7 @@ impl<'a> Parser<'a> {
         // failure or non-`=>` follow, rewind and parse as a parenthesized expr.
         if matches!(
             self.peek().token,
-            Token::Identifier(_)
-                | Token::Ellipsis
-                | Token::LeftBracket
-                | Token::LeftBrace
+            Token::Identifier(_) | Token::Ellipsis | Token::LeftBracket | Token::LeftBrace
         ) {
             let saved = self.pos;
             let arrow_result = (|| -> Result<SpannedNode<Expression>> {
@@ -91,7 +88,8 @@ impl<'a> Parser<'a> {
             None
         };
         self.expect(&Token::LeftParen)?;
-        let (params, param_types, defaults, rest_param, param_patterns) = self.parse_typed_params()?;
+        let (params, param_types, defaults, rest_param, param_patterns) =
+            self.parse_typed_params()?;
         self.expect(&Token::RightParen)?;
         let return_type = if self.peek().token == Token::Colon {
             self.advance();
@@ -144,7 +142,8 @@ impl<'a> Parser<'a> {
                     None
                 };
                 self.expect(&Token::LeftParen)?;
-                let (params, param_types, defaults, rest_param, param_patterns) = self.parse_typed_params()?;
+                let (params, param_types, defaults, rest_param, param_patterns) =
+                    self.parse_typed_params()?;
                 self.expect(&Token::RightParen)?;
                 let return_type = if self.peek().token == Token::Colon {
                     self.advance();
@@ -169,7 +168,8 @@ impl<'a> Parser<'a> {
                 }))
             } else {
                 self.expect(&Token::LeftParen)?;
-                let (params, param_types, defaults, rest_param, param_patterns) = self.parse_typed_params()?;
+                let (params, param_types, defaults, rest_param, param_patterns) =
+                    self.parse_typed_params()?;
                 self.expect(&Token::RightParen)?;
                 let return_type = if self.peek().token == Token::Colon {
                     self.advance();
@@ -198,7 +198,15 @@ impl<'a> Parser<'a> {
             self.advance();
             if self.peek().token == Token::Arrow {
                 self.advance();
-                self.parse_arrow_body(vec!["async".to_string()], None, vec![], None, None, false, vec![])
+                self.parse_arrow_body(
+                    vec!["async".to_string()],
+                    None,
+                    vec![],
+                    None,
+                    None,
+                    false,
+                    vec![],
+                )
             } else {
                 Ok(self.spanned(Expression::Identifier("async".to_string())))
             }
@@ -338,7 +346,8 @@ impl<'a> Parser<'a> {
                             self.advance();
                         }
                         self.expect(&Token::LeftParen)?;
-                        let (params, param_types, defaults, rest_param, param_patterns) = self.parse_typed_params()?;
+                        let (params, param_types, defaults, rest_param, param_patterns) =
+                            self.parse_typed_params()?;
                         self.expect(&Token::RightParen)?;
                         let return_type = if self.peek().token == Token::Colon {
                             self.advance();
@@ -399,7 +408,8 @@ impl<'a> Parser<'a> {
                             || (self.peek().token == Token::This && (key == "get" || key == "set"));
                         if is_method_like {
                             self.advance();
-                            let (params, param_types, defaults, rest_param, param_patterns) = self.parse_typed_params()?;
+                            let (params, param_types, defaults, rest_param, param_patterns) =
+                                self.parse_typed_params()?;
                             self.expect(&Token::RightParen)?;
                             let return_type = if self.peek().token == Token::Colon {
                                 self.advance();
@@ -571,7 +581,8 @@ impl<'a> Parser<'a> {
         self.skip_type_parameters();
         if self.peek().token == Token::LeftParen {
             self.advance();
-            let (params, param_types, defaults, rest_param, param_patterns) = self.parse_typed_params()?;
+            let (params, param_types, defaults, rest_param, param_patterns) =
+                self.parse_typed_params()?;
             self.expect(&Token::RightParen)?;
             let return_type = if self.peek().token == Token::Colon {
                 self.advance();

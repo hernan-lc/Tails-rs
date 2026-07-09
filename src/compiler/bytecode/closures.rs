@@ -14,8 +14,7 @@ impl CodeGenerator {
         is_generator: bool,
     ) -> Result<u32> {
         let func_idx = self.functions.len() as u32;
-        let outer_refs =
-            find_outer_refs_with_slots(body, params, |name| self.resolve_local(name));
+        let outer_refs = find_outer_refs_with_slots(body, params, |name| self.resolve_local(name));
         let num_captures = outer_refs.len();
 
         self.functions.push(CompiledFunction {

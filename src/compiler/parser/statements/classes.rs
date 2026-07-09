@@ -88,7 +88,8 @@ impl<'a> Parser<'a> {
                     let name = "get".to_string();
                     self.advance();
                     self.advance();
-                    let (params, param_types, _defaults, _rest_param, _param_patterns) = self.parse_typed_params()?;
+                    let (params, param_types, _defaults, _rest_param, _param_patterns) =
+                        self.parse_typed_params()?;
                     self.expect(&Token::RightParen)?;
                     let return_type = if self.peek().token == Token::Colon {
                         self.advance();
@@ -148,7 +149,8 @@ impl<'a> Parser<'a> {
                     let name = "set".to_string();
                     self.advance();
                     self.advance();
-                    let (params, param_types, _defaults, _rest_param, _param_patterns) = self.parse_typed_params()?;
+                    let (params, param_types, _defaults, _rest_param, _param_patterns) =
+                        self.parse_typed_params()?;
                     self.expect(&Token::RightParen)?;
                     let return_type = if self.peek().token == Token::Colon {
                         self.advance();
@@ -244,7 +246,8 @@ impl<'a> Parser<'a> {
                 }
                 if self.peek().token == Token::LeftParen {
                     self.advance();
-                    let (params, param_types, _defaults, _rest_param, _param_patterns) = self.parse_typed_params()?;
+                    let (params, param_types, _defaults, _rest_param, _param_patterns) =
+                        self.parse_typed_params()?;
                     self.expect(&Token::RightParen)?;
                     let return_type = if self.peek().token == Token::Colon {
                         self.advance();

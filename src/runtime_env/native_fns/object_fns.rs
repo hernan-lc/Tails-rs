@@ -104,13 +104,12 @@ pub(super) fn native_object_values(
     let obj_val = args.first().cloned().unwrap_or(Value::Undefined);
     let vals = match &obj_val {
         Value::Object(obj_idx) => {
-            let keys = if let crate::vm::interpreter::HeapValue::Object(obj) =
-                &interp.heap[*obj_idx]
-            {
-                collect_own_enumerable_keys(&obj.properties)
-            } else {
-                Vec::new()
-            };
+            let keys =
+                if let crate::vm::interpreter::HeapValue::Object(obj) = &interp.heap[*obj_idx] {
+                    collect_own_enumerable_keys(&obj.properties)
+                } else {
+                    Vec::new()
+                };
             let mut vals = Vec::with_capacity(keys.len());
             for k in keys {
                 let v = interp
@@ -146,13 +145,12 @@ pub(super) fn native_object_entries(
     let obj_val = args.first().cloned().unwrap_or(Value::Undefined);
     let pairs: Vec<(String, Value)> = match &obj_val {
         Value::Object(obj_idx) => {
-            let keys = if let crate::vm::interpreter::HeapValue::Object(obj) =
-                &interp.heap[*obj_idx]
-            {
-                collect_own_enumerable_keys(&obj.properties)
-            } else {
-                Vec::new()
-            };
+            let keys =
+                if let crate::vm::interpreter::HeapValue::Object(obj) = &interp.heap[*obj_idx] {
+                    collect_own_enumerable_keys(&obj.properties)
+                } else {
+                    Vec::new()
+                };
             let mut pairs = Vec::with_capacity(keys.len());
             for k in keys {
                 let v = interp
