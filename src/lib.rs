@@ -7,6 +7,8 @@ pub mod objects;
 pub mod runtime_env;
 pub mod vm;
 
+pub use vm::well_known;
+
 mod runtime;
 
 pub use errors::{Error, Result};

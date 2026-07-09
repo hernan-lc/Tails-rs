@@ -5,6 +5,7 @@ use crate::compiler::parser::{
 use crate::compiler::Instruction;
 use crate::errors::Result;
 use crate::objects::Value;
+use crate::well_known as wk;
 
 impl CodeGenerator {
     pub(super) fn generate_control_flow_statement(
@@ -351,7 +352,7 @@ impl CodeGenerator {
                 let len_slot = self.current_local_slot();
                 self.locals.push("__len".to_string());
                 self.emit(Instruction::LoadLocal(keys_slot));
-                let len_key = self.add_constant(Value::String("length".to_string()));
+                let len_key = self.add_constant(Value::String(wk::LENGTH.to_string()));
                 self.emit(Instruction::LoadConst(len_key));
                 self.emit(Instruction::GetProperty);
                 self.emit(Instruction::StoreLocal(len_slot));

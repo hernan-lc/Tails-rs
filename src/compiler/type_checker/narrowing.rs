@@ -1,4 +1,5 @@
 use super::*;
+use crate::well_known as wk;
 
 impl TypeChecker {
     pub(crate) fn apply_type_narrowing(
@@ -160,7 +161,7 @@ impl TypeChecker {
                 Type::Object(_) | Type::Null | Type::Array(_) | Type::Tuple(_)
             ),
             "function" => matches!(ty, Type::Function { .. }),
-            "undefined" => matches!(ty, Type::Undefined),
+            wk::UNDEFINED => matches!(ty, Type::Undefined),
             "bigint" => false,
             _ => true,
         }

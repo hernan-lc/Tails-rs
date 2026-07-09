@@ -3,6 +3,7 @@ use crate::compiler::CompiledModule;
 use crate::compiler::Instruction;
 use crate::errors::{Error, Result};
 use crate::objects::Value;
+use crate::well_known as wk;
 
 impl Interpreter {
     fn handle_make_class(&mut self, class_info_idx: &u32, module: &CompiledModule) -> Result<()> {
@@ -20,7 +21,7 @@ impl Interpreter {
         let super_proto = match &super_val {
             Value::Object(super_obj_idx) => {
                 if let HeapValue::Object(super_obj) = &self.heap[*super_obj_idx] {
-                    super_obj.properties.get("prototype").cloned()
+                    super_obj.properties.get(wk::PROTOTYPE).cloned()
                 } else {
                     None
                 }
@@ -91,7 +92,7 @@ impl Interpreter {
         if let HeapValue::Object(proto_obj) = &mut self.heap[proto_obj_idx] {
             proto_obj
                 .properties
-                .insert("constructor".to_string(), Value::Function(ctor_heap_idx));
+                .insert(wk::CONSTRUCTOR.to_string(), Value::Function(ctor_heap_idx));
         }
         for method_info in &class_info.methods {
             let method_func_info = module.functions[method_info.func_idx as usize].clone();
@@ -205,7 +206,7 @@ impl Interpreter {
                             let f_clone = f.clone();
                             let proto_val = self.get_property(
                                 &super_class,
-                                &Value::String("prototype".to_string()),
+                                &Value::String(wk::PROTOTYPE.to_string()),
                             )?;
                             let proto_idx = if let Value::Object(pi) = proto_val {
                                 Some(pi)

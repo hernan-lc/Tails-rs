@@ -2,6 +2,7 @@ use super::Interpreter;
 use crate::errors::{Error, Result};
 use crate::objects::{ConsString, Value};
 use crate::vm::interpreter::HeapValue;
+use crate::well_known as wk;
 macro_rules! compare_values {
     ($name:ident, $op:tt) => {
         pub(super) fn $name(&self, left: &Value, right: &Value) -> Result<bool> {
@@ -155,8 +156,8 @@ impl Interpreter {
 
     pub(crate) fn to_string_coerce(&self, value: &Value) -> String {
         match value {
-            Value::Undefined => "undefined".to_string(),
-            Value::Null => "null".to_string(),
+            Value::Undefined => wk::UNDEFINED.to_string(),
+            Value::Null => wk::NULL.to_string(),
             Value::Boolean(b) => b.to_string(),
             Value::Integer(n) => n.to_string(),
             Value::Float(n) => {
@@ -406,8 +407,8 @@ impl Interpreter {
 
     pub(super) fn value_to_string_raw(&self, value: &Value) -> String {
         match value {
-            Value::Undefined => "undefined".to_string(),
-            Value::Null => "null".to_string(),
+            Value::Undefined => wk::UNDEFINED.to_string(),
+            Value::Null => wk::NULL.to_string(),
             Value::Boolean(b) => b.to_string(),
             Value::Integer(n) => n.to_string(),
             Value::Float(n) => {
@@ -442,8 +443,8 @@ impl Interpreter {
 
     pub(super) fn value_to_string(&self, value: &Value) -> String {
         match value {
-            Value::Undefined => "undefined".to_string(),
-            Value::Null => "null".to_string(),
+            Value::Undefined => wk::UNDEFINED.to_string(),
+            Value::Null => wk::NULL.to_string(),
             Value::Boolean(b) => b.to_string(),
             Value::Integer(n) => n.to_string(),
             Value::Float(n) => n.to_string(),
@@ -476,7 +477,7 @@ impl Interpreter {
     fn format_object_value(&self, idx: usize) -> String {
         if let HeapValue::Object(obj) = &self.heap[idx] {
             // Check if this looks like an Error object
-            if obj.properties.contains_key("message") || obj.properties.contains_key("name") {
+            if obj.properties.contains_key(wk::MESSAGE) || obj.properties.contains_key(wk::NAME) {
                 return self.format_rejection_reason(&Value::Object(idx));
             }
         }

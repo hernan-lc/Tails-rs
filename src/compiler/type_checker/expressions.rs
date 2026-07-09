@@ -1,5 +1,6 @@
 use super::*;
 use crate::errors::Result;
+use crate::well_known as wk;
 
 impl TypeChecker {
     pub(crate) fn check_expression(&mut self, expr: &Expression) -> Result<Type> {
@@ -90,7 +91,7 @@ impl TypeChecker {
                     }
                     Type::Array(_) => {
                         if let Expression::Identifier(name) = property.as_ref() {
-                            if !*computed && name == "length" {
+                             if !*computed && name == wk::LENGTH {
                                 return Ok(Type::Number);
                             }
                         }

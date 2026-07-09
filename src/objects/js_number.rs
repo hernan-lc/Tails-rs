@@ -1,3 +1,5 @@
+use crate::well_known as wk;
+
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct JsNumber {
     value: f64,
@@ -128,12 +130,12 @@ impl JsNumber {
     
     pub fn to_string(&self) -> String {
         if self.is_nan() {
-            "NaN".to_string()
+            wk::NAN.to_string()
         } else if self.is_infinite() {
             if self.value > 0.0 {
-                "Infinity".to_string()
+                wk::INFINITY.to_string()
             } else {
-                "-Infinity".to_string()
+                format!("-{}", wk::INFINITY)
             }
         } else if self.value == 0.0 {
             "0".to_string()

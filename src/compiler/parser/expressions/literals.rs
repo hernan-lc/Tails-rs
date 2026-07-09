@@ -1,6 +1,7 @@
 use super::super::*;
 use crate::compiler::lexer::TemplatePart;
 use crate::errors::{Error, Result};
+use crate::well_known as wk;
 
 impl<'a> Parser<'a> {
     pub(crate) fn parse_literal(&mut self) -> Result<SpannedNode<Expression>> {
@@ -42,12 +43,12 @@ impl<'a> Parser<'a> {
             Token::Identifier(name) => {
                 self.advance();
                 match name.as_str() {
-                    "true" => Ok(self.spanned(Expression::BooleanLiteral(true))),
-                    "false" => Ok(self.spanned(Expression::BooleanLiteral(false))),
-                    "null" => Ok(self.spanned(Expression::NullLiteral)),
-                    "undefined" => Ok(self.spanned(Expression::UndefinedLiteral)),
-                    "NaN" => Ok(self.spanned(Expression::NaNLiteral)),
-                    "Infinity" => Ok(self.spanned(Expression::InfinityLiteral)),
+                    wk::TRUE => Ok(self.spanned(Expression::BooleanLiteral(true))),
+                    wk::FALSE => Ok(self.spanned(Expression::BooleanLiteral(false))),
+                    wk::NULL => Ok(self.spanned(Expression::NullLiteral)),
+                    wk::UNDEFINED => Ok(self.spanned(Expression::UndefinedLiteral)),
+                    wk::NAN => Ok(self.spanned(Expression::NaNLiteral)),
+                    wk::INFINITY => Ok(self.spanned(Expression::InfinityLiteral)),
                     _ => {
                         if self.peek().token == Token::Arrow {
                             self.advance();
@@ -90,8 +91,8 @@ impl<'a> Parser<'a> {
             Token::Break => Some("break"),
             Token::Continue => Some("continue"),
             Token::Try => Some("try"),
-            Token::Catch => Some("catch"),
-            Token::Finally => Some("finally"),
+            Token::Catch => Some(wk::CATCH),
+            Token::Finally => Some(wk::FINALLY),
             Token::Throw => Some("throw"),
             Token::Const => Some("const"),
             Token::Let => Some("let"),
@@ -108,7 +109,7 @@ impl<'a> Parser<'a> {
             Token::Interface => Some("interface"),
             Token::Yield => Some("yield"),
             Token::Await => Some("await"),
-            Token::Constructor => Some("constructor"),
+            Token::Constructor => Some(wk::CONSTRUCTOR),
             Token::From => Some("from"),
             Token::As => Some("as"),
             Token::Default => Some("default"),

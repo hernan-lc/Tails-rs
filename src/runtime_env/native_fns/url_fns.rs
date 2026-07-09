@@ -4,6 +4,8 @@ use crate::props;
 use crate::runtime_env::native_fns::constants as c;
 use crate::vm::interpreter::{HeapValue, Interpreter, JsObject};
 
+use crate::well_known as wk;
+
 use super::helpers::to_string_value;
 
 pub(super) fn native_url_constructor(
@@ -47,7 +49,7 @@ pub(super) fn native_url_constructor(
         "search" => Value::String(search),
         "hash" => Value::String(hash),
         "searchParams" => Value::Object(search_params_idx),
-        "toString" => Value::NativeFunction(c::URL_TO_STRING),
+        wk::TO_STRING => Value::NativeFunction(c::URL_TO_STRING),
         "toJSON" => Value::NativeFunction(c::URL_TO_JSON),
     };
 
@@ -87,7 +89,7 @@ fn create_search_params(interp: &mut Interpreter, query: &str) -> usize {
         "set" => Value::NativeFunction(c::SEARCH_PARAMS_SET),
         "append" => Value::NativeFunction(c::SEARCH_PARAMS_APPEND),
         "delete" => Value::NativeFunction(c::SEARCH_PARAMS_DELETE),
-        "toString" => Value::NativeFunction(c::SEARCH_PARAMS_TO_STRING),
+        wk::TO_STRING => Value::NativeFunction(c::SEARCH_PARAMS_TO_STRING),
         "entries" => Value::NativeFunction(c::SEARCH_PARAMS_ENTRIES),
         "keys" => Value::NativeFunction(c::SEARCH_PARAMS_KEYS),
         "values" => Value::NativeFunction(c::SEARCH_PARAMS_VALUES),

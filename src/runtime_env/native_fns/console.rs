@@ -7,6 +7,8 @@ use colored::Colorize;
 use rustc_hash::FxHashMap;
 use std::cell::RefCell;
 
+use crate::well_known as wk;
+
 const MAX_DEPTH: usize = 4;
 const INDENT: &str = "  ";
 
@@ -63,7 +65,7 @@ fn collect_object_properties<'a>(
 
     if let crate::vm::interpreter::HeapValue::Object(obj) = &interp.heap[obj_idx] {
         for (k, v) in &obj.properties {
-            if k == "constructor" {
+            if k == wk::CONSTRUCTOR {
                 continue;
             }
             if let Some(prop_name) = k.strip_prefix("__getter_") {
@@ -244,16 +246,16 @@ fn pretty_format(
         }
         Value::Null => {
             if use_colors {
-                "null".red().bold().to_string()
+                wk::NULL.red().bold().to_string()
             } else {
-                "null".to_string()
+                wk::NULL.to_string()
             }
         }
         Value::Undefined => {
             if use_colors {
-                "undefined".dimmed().to_string()
+                wk::UNDEFINED.dimmed().to_string()
             } else {
-                "undefined".to_string()
+                wk::UNDEFINED.to_string()
             }
         }
         Value::Map(idx) => {
@@ -470,7 +472,7 @@ pub(super) fn native_console_table(
                                 let val_str = if let Some(val) = obj.properties.get(key) {
                                     colorize_value(interp, val)
                                 } else {
-                                    "undefined".to_string()
+                                    wk::UNDEFINED.to_string()
                                 };
                                 row.push_str(&format!(
                                     " | {:width$}",

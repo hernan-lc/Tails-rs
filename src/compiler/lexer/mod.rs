@@ -2,6 +2,7 @@ mod token;
 pub use token::*;
 
 use crate::errors::{Error, Result};
+use crate::well_known as wk;
 
 fn tokenize_template_literal(
     chars: &mut std::iter::Peekable<std::str::CharIndices>,
@@ -391,21 +392,21 @@ pub fn tokenize(source: &str) -> Result<Vec<SpannedToken>> {
                     "await" => Token::Await,
                     "yield" => Token::Yield,
                     "try" => Token::Try,
-                    "catch" => Token::Catch,
-                    "finally" => Token::Finally,
+                    wk::CATCH => Token::Catch,
+                    wk::FINALLY => Token::Finally,
                     "throw" => Token::Throw,
                     "static" => Token::Static,
                     "public" => Token::Public,
                     "private" => Token::Private,
                     "protected" => Token::Protected,
                     "readonly" => Token::Identifier("readonly".to_string()),
-                    "constructor" => Token::Constructor,
+                    wk::CONSTRUCTOR => Token::Constructor,
                     "get" => Token::Get,
                     "set" => Token::Set,
-                    "true" => Token::Identifier("true".into()),
-                    "false" => Token::Identifier("false".into()),
-                    "null" => Token::Identifier("null".into()),
-                    "undefined" => Token::Identifier("undefined".into()),
+                    wk::TRUE => Token::Identifier(wk::TRUE.into()),
+                    wk::FALSE => Token::Identifier(wk::FALSE.into()),
+                    wk::NULL => Token::Identifier(wk::NULL.into()),
+                    wk::UNDEFINED => Token::Identifier(wk::UNDEFINED.into()),
                     _ => Token::Identifier(ident),
                 };
                 push(&mut tokens, token, tok_line, tok_col, tok_offset);

@@ -4,6 +4,7 @@ use crate::errors::runtime_errors::runtime_error_stack_overflow;
 use crate::errors::{Error, Result};
 use crate::objects::Value;
 use crate::props;
+use crate::well_known as wk;
 
 impl Interpreter {
     pub(crate) fn exec_exception(
@@ -132,13 +133,13 @@ impl Interpreter {
     pub(crate) fn throw_stack_overflow(&mut self, pc: &mut usize) -> Result<bool> {
         let message = "Maximum call stack size exceeded";
         let obj_idx = self.heap.len();
-        let stack = self.build_stack_trace("RangeError", message);
+        let stack = self.build_stack_trace(wk::RANGE_ERROR, message);
         let props = props! {
-            "message" => Value::String(message.into()),
-            "name" => Value::String("RangeError".into()),
-            "stack" => Value::String(stack),
+            wk::MESSAGE => Value::String(message.into()),
+            wk::NAME => Value::String(wk::RANGE_ERROR.into()),
+            wk::STACK => Value::String(stack),
         };
-        let proto_idx = self.find_error_prototype("RangeError");
+        let proto_idx = self.find_error_prototype(wk::RANGE_ERROR);
         self.heap.push(HeapValue::Object(JsObject {
             properties: props,
             prototype: proto_idx,
@@ -179,7 +180,7 @@ impl Interpreter {
     fn find_error_prototype(&self, type_name: &str) -> Option<usize> {
         for (i, hv) in self.heap.iter().enumerate() {
             if let HeapValue::Object(obj) = hv {
-                if let Some(Value::String(name)) = obj.properties.get("name") {
+                if let Some(Value::String(name)) = obj.properties.get(wk::NAME) {
                     if name == type_name {
                         return Some(i);
                     }

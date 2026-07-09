@@ -1,6 +1,7 @@
 use crate::errors::Result;
 use crate::objects::Value;
 use crate::vm::interpreter::Interpreter;
+use crate::well_known as wk;
 
 use super::helpers::{get_string, to_f64, to_string_value};
 
@@ -135,7 +136,7 @@ pub(super) fn native_string_replace(
     };
     let replacement = match args.get(1) {
         Some(v) => to_string_value(interp, v),
-        None => "undefined".to_string(),
+        None => wk::UNDEFINED.to_string(),
     };
     match s.find(pattern) {
         Some(pos) => {

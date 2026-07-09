@@ -2,6 +2,7 @@ use crate::errors::Result;
 use crate::objects::Value;
 use crate::props;
 use crate::vm::interpreter::Interpreter;
+use crate::well_known as wk;
 
 pub(super) fn native_promise_constructor(
     interp: &mut Interpreter,
@@ -478,7 +479,7 @@ pub(super) fn native_promise_any(
         ));
         // Create an AggregateError-like object
         let props = props! {
-            "message" => Value::String("All promises were rejected".to_string()),
+            wk::MESSAGE => Value::String("All promises were rejected".to_string()),
             "errors" => Value::Array(errors_idx),
         };
         let err_obj_idx = interp.heap.len();

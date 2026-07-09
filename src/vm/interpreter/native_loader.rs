@@ -3,6 +3,7 @@ use crate::props;
 use crate::runtime_env::native_fns::constants as c;
 use crate::vm::gc::GarbageCollector;
 use crate::vm::interpreter::{HeapValue, JsObject, PropertyStorage};
+use crate::well_known as wk;
 use rustc_hash::FxHashMap;
 
 type NativeModuleFactory = fn(&mut Vec<HeapValue>, &mut GarbageCollector) -> PropertyStorage;
@@ -56,36 +57,36 @@ pub fn extract_module_name(source: &str) -> &str {
 pub fn discover_module(name: &str, registry: &mut NativeModuleRegistry) {
     match name {
         #[cfg(feature = "fs")]
-        "fs" => registry.register("fs", create_fs_module),
+        wk::MOD_FS => registry.register(wk::MOD_FS, create_fs_module),
         #[cfg(feature = "fs")]
-        "fs/promises" => registry.register("fs/promises", create_fs_promises_module),
+        wk::MOD_FS_PROMISES => registry.register(wk::MOD_FS_PROMISES, create_fs_promises_module),
         #[cfg(feature = "path")]
-        "path" => registry.register("path", create_path_module),
+        wk::MOD_PATH => registry.register(wk::MOD_PATH, create_path_module),
         #[cfg(feature = "process")]
-        "process" => registry.register("process", create_process_module),
-        "buffer" => registry.register("buffer", create_buffer_module),
+        wk::MOD_PROCESS => registry.register(wk::MOD_PROCESS, create_process_module),
+        wk::MOD_BUFFER => registry.register(wk::MOD_BUFFER, create_buffer_module),
         "intl" => registry.register("intl", create_intl_module),
-        "events" => registry.register("events", create_events_module),
+        wk::MOD_EVENTS => registry.register(wk::MOD_EVENTS, create_events_module),
         #[cfg(feature = "os")]
-        "os" => registry.register("os", create_os_module),
-        "crypto" => registry.register("crypto", create_crypto_module),
-        "assert" => registry.register("assert", create_assert_module),
+        wk::MOD_OS => registry.register(wk::MOD_OS, create_os_module),
+        wk::MOD_CRYPTO => registry.register(wk::MOD_CRYPTO, create_crypto_module),
+        wk::MOD_ASSERT => registry.register(wk::MOD_ASSERT, create_assert_module),
         "child_process" => registry.register("child_process", create_child_process_module),
-        "url" => registry.register("url", create_url_module),
-        "util" => registry.register("util", create_util_module),
-        "timers" => registry.register("timers", create_timers_module),
-        "querystring" => registry.register("querystring", create_querystring_module),
-        "stream" => registry.register("stream", create_stream_module),
+        wk::MOD_URL => registry.register(wk::MOD_URL, create_url_module),
+        wk::MOD_UTIL => registry.register(wk::MOD_UTIL, create_util_module),
+        wk::MOD_TIMERS => registry.register(wk::MOD_TIMERS, create_timers_module),
+        wk::MOD_QUERYSTRING => registry.register(wk::MOD_QUERYSTRING, create_querystring_module),
+        wk::MOD_STREAM => registry.register(wk::MOD_STREAM, create_stream_module),
         #[cfg(feature = "zlib")]
-        "zlib" => registry.register("zlib", create_zlib_module),
+        wk::MOD_ZLIB => registry.register(wk::MOD_ZLIB, create_zlib_module),
         #[cfg(feature = "tls")]
-        "tls" => registry.register("tls", create_tls_module),
+        wk::MOD_TLS => registry.register(wk::MOD_TLS, create_tls_module),
         #[cfg(feature = "dns")]
-        "dns" => registry.register("dns", create_dns_module),
+        wk::MOD_DNS => registry.register(wk::MOD_DNS, create_dns_module),
         #[cfg(feature = "http")]
-        "http" => registry.register("http", create_http_module),
+        wk::MOD_HTTP => registry.register(wk::MOD_HTTP, create_http_module),
         #[cfg(feature = "net")]
-        "net" => registry.register("net", create_net_module),
+        wk::MOD_NET => registry.register(wk::MOD_NET, create_net_module),
         _ => {}
     }
 }
@@ -258,7 +259,7 @@ pub fn create_buffer_module(
         heap,
         HeapValue::Object(JsObject {
             properties: props! {
-                "toString" => Value::NativeFunction(c::BUFFER_TO_STRING),
+                wk::TO_STRING => Value::NativeFunction(c::BUFFER_TO_STRING),
                 "write" => Value::NativeFunction(c::BUFFER_WRITE),
                 "slice" => Value::NativeFunction(c::BUFFER_SLICE),
                 "copy" => Value::NativeFunction(c::BUFFER_COPY),
@@ -266,7 +267,7 @@ pub fn create_buffer_module(
                 "compare" => Value::NativeFunction(c::BUFFER_COMPARE),
                 "equals" => Value::NativeFunction(c::BUFFER_EQUALS),
                 "indexOf" => Value::NativeFunction(c::BUFFER_INDEX_OF),
-                "length" => Value::Integer(0),
+                wk::LENGTH => Value::Integer(0),
             },
             prototype: None,
             extensible: true,
@@ -280,7 +281,7 @@ pub fn create_buffer_module(
         "isEncoding" => Value::NativeFunction(c::BUFFER_IS_ENCODING),
         "byteLength" => Value::NativeFunction(c::BUFFER_BYTE_LENGTH),
         "transcode" => Value::NativeFunction(c::BUFFER_TRANSCODE),
-        "toString" => Value::NativeFunction(c::BUFFER_TO_STRING),
+        wk::TO_STRING => Value::NativeFunction(c::BUFFER_TO_STRING),
         "write" => Value::NativeFunction(c::BUFFER_WRITE),
         "slice" => Value::NativeFunction(c::BUFFER_SLICE),
         "copy" => Value::NativeFunction(c::BUFFER_COPY),
@@ -288,7 +289,7 @@ pub fn create_buffer_module(
         "compare" => Value::NativeFunction(c::BUFFER_COMPARE),
         "equals" => Value::NativeFunction(c::BUFFER_EQUALS),
         "indexOf" => Value::NativeFunction(c::BUFFER_INDEX_OF),
-        "prototype" => Value::Object(buffer_proto_idx),
+        wk::PROTOTYPE => Value::Object(buffer_proto_idx),
     }
 }
 
@@ -328,7 +329,7 @@ pub fn create_events_module(
     );
     props! {
         "EventEmitter" => Value::NativeFunction(c::EVENT_EMITTER_CONSTRUCTOR),
-        "prototype" => Value::Object(proto_idx),
+        wk::PROTOTYPE => Value::Object(proto_idx),
     }
 }
 

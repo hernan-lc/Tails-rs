@@ -2,6 +2,7 @@ use crate::errors::{Error, Result};
 use crate::objects::Value;
 use crate::props;
 use crate::vm::interpreter::Interpreter;
+use crate::well_known as wk;
 
 /// Converts an internal property key string back to the appropriate Value.
 /// Keys like `"__sym_123"` are converted to `Value::Symbol(123)`.
@@ -196,7 +197,7 @@ pub(super) fn native_reflect_own_keys(
                 for i in 0..arr.elements.len() {
                     keys.push(Value::String(i.to_string()));
                 }
-                keys.push(Value::String("length".to_string()));
+                keys.push(Value::String(wk::LENGTH.to_string()));
             }
         }
         Value::Function(func_idx) => {
@@ -343,7 +344,7 @@ pub(super) fn native_reflect_get_own_property_descriptor(
         }
         Value::Array(arr_idx) => {
             if let crate::vm::interpreter::HeapValue::Array(arr) = &interp.heap[*arr_idx] {
-                if property == "length" {
+                if property == wk::LENGTH {
                     let descriptor = props! {
                         "value" => Value::Float(arr.elements.len() as f64),
                         "writable" => Value::Boolean(false),

@@ -3,6 +3,7 @@ use crate::errors::{Error, Result};
 use crate::objects::js_promise::PromiseState;
 use crate::objects::Value;
 use crate::runtime_env::native_fns::constants as c;
+use crate::well_known as wk;
 
 fn key_to_str(key: &Value) -> Option<String> {
     match key {
@@ -102,7 +103,7 @@ impl Interpreter {
             }
             Value::Array(arr_idx) => {
                 if let HeapValue::Array(arr) = &mut self.heap[*arr_idx] {
-                    if key_str == "length" {
+                    if key_str == wk::LENGTH {
                         let new_len = to_i64_value(&value).max(0) as usize;
                         if new_len < arr.elements.len() {
                             arr.elements.truncate(new_len);
@@ -198,7 +199,7 @@ impl Interpreter {
                 if let HeapValue::Array(arr) = &self.heap[*arr_idx] {
                     match key {
                         Value::String(key_str) => {
-                            if key_str == "length" {
+                            if key_str == wk::LENGTH {
                                 return Ok(Value::Float(arr.elements.len() as f64));
                             }
                             if let Ok(index) = key_str.parse::<usize>() {
@@ -212,7 +213,7 @@ impl Interpreter {
                         }
                         Value::Cons(c) => {
                             let s = c.flatten();
-                            if s == "length" {
+                            if s == wk::LENGTH {
                                 return Ok(Value::Float(arr.elements.len() as f64));
                             }
                             if let Ok(index) = s.parse::<usize>() {
@@ -260,7 +261,7 @@ impl Interpreter {
                 if let Some(val) = check_call_apply_bind(&key_str) {
                     return Ok(val);
                 }
-                if key_str == "prototype" {
+                if key_str == wk::PROTOTYPE {
                     if let HeapValue::Function(f) = &self.heap[*func_idx] {
                         if let Some(proto_idx) = f.prototype {
                             return Ok(Value::Object(proto_idx));
@@ -287,9 +288,9 @@ impl Interpreter {
                     None => return Ok(Value::Undefined),
                 };
                 match key_str.as_str() {
-                    "then" => return Ok(Value::NativeFunction(c::PROMISE_THEN)),
-                    "catch" => return Ok(Value::NativeFunction(c::PROMISE_CATCH)),
-                    "finally" => return Ok(Value::NativeFunction(c::PROMISE_FINALLY)),
+                    wk::THEN => return Ok(Value::NativeFunction(c::PROMISE_THEN)),
+                    wk::CATCH => return Ok(Value::NativeFunction(c::PROMISE_CATCH)),
+                    wk::FINALLY => return Ok(Value::NativeFunction(c::PROMISE_FINALLY)),
                     "state" => {
                         if let HeapValue::Promise(p) = &self.heap[*promise_idx] {
                             return Ok(Value::String(format!("{:?}", p.state)));
@@ -395,7 +396,7 @@ impl Interpreter {
                         "MIN_VALUE" => return Ok(Value::Float(f64::MIN_POSITIVE)),
                         "POSITIVE_INFINITY" => return Ok(Value::Float(f64::INFINITY)),
                         "NEGATIVE_INFINITY" => return Ok(Value::Float(f64::NEG_INFINITY)),
-                        "NaN" => return Ok(Value::Float(f64::NAN)),
+                        wk::NAN => return Ok(Value::Float(f64::NAN)),
                         "EPSILON" => return Ok(Value::Float(f64::EPSILON)),
                         _ => {}
                     }
@@ -468,7 +469,7 @@ impl Interpreter {
                     Some(s) => s,
                     None => return Ok(Value::Undefined),
                 };
-                if key_str == "length" {
+                            if key_str == wk::LENGTH {
                     if let Value::Buffer(bidx) = this {
                         if let HeapValue::Buffer(buf) = &self.heap[*bidx] {
                             return Ok(Value::Integer(buf.len() as i64));
@@ -560,7 +561,7 @@ impl Interpreter {
                     None => return Ok(Value::Undefined),
                 };
                 match key_str.as_str() {
-                    "length" => {
+                    wk::LENGTH => {
                         if let Value::TypedArray(ta_idx) = this {
                             if let HeapValue::TypedArray(ta) = &self.heap[*ta_idx] {
                                 let elem_size =
@@ -657,7 +658,7 @@ impl Interpreter {
             Some(s) => s,
             None => return Ok(Value::Undefined),
         };
-        if key_str == "length" {
+        if key_str == wk::LENGTH {
             return Ok(Value::Float(s.len() as f64));
         }
         self.get_string_method(&key_str)
@@ -701,8 +702,8 @@ impl Interpreter {
             None => return Ok(Value::Undefined),
         };
         match key_str.as_str() {
-            "toString" | "toFixed" | "valueOf" | "toExponential" | "toPrecision"
-            | "toLocaleString" => {
+            wk::TO_STRING | "toFixed" | wk::VALUE_OF | "toExponential" | "toPrecision"
+            | wk::TO_LOCALE_STRING => {
                 return Ok(self.make_native_number_method(&key_str));
             }
             _ => {}
@@ -720,7 +721,7 @@ impl Interpreter {
             None => return Ok(Value::Undefined),
         };
         match key_str.as_str() {
-            "toString" | "valueOf" => {
+            wk::TO_STRING | wk::VALUE_OF => {
                 return Ok(self.make_native_boolean_method(&key_str));
             }
             _ => {}
@@ -731,8 +732,8 @@ impl Interpreter {
     pub(super) fn make_native_number_method(&self, name: &str) -> Value {
         match name {
             "toFixed" => Value::NativeFunction(c::NUMBER_TO_FIXED),
-            "toString" | "toLocaleString" => Value::NativeFunction(c::NUMBER_TO_STRING),
-            "valueOf" => Value::NativeFunction(c::NUMBER_VALUE_OF),
+            wk::TO_STRING | wk::TO_LOCALE_STRING => Value::NativeFunction(c::NUMBER_TO_STRING),
+            wk::VALUE_OF => Value::NativeFunction(c::NUMBER_VALUE_OF),
             "toExponential" => Value::NativeFunction(c::NUMBER_TO_EXPONENTIAL),
             "toPrecision" => Value::NativeFunction(c::NUMBER_TO_PRECISION),
             _ => Value::Undefined,
@@ -741,8 +742,8 @@ impl Interpreter {
 
     pub(super) fn make_native_boolean_method(&self, name: &str) -> Value {
         match name {
-            "toString" | "toLocaleString" => Value::NativeFunction(c::BOOLEAN_TO_STRING),
-            "valueOf" => Value::NativeFunction(c::BOOLEAN_VALUE_OF),
+            wk::TO_STRING | wk::TO_LOCALE_STRING => Value::NativeFunction(c::BOOLEAN_TO_STRING),
+            wk::VALUE_OF => Value::NativeFunction(c::BOOLEAN_VALUE_OF),
             _ => Value::Undefined,
         }
     }
@@ -777,7 +778,7 @@ impl Interpreter {
     }
 
     pub(super) fn instanceof_check(&mut self, left: &Value, right: &Value) -> Result<Value> {
-        let proto_key = Value::String("prototype".to_string());
+        let proto_key = Value::String(wk::PROTOTYPE.to_string());
         let right_proto = match self.get_property(right, &proto_key) {
             Ok(val) => val,
             Err(_) => return Ok(Value::Boolean(false)),
@@ -840,7 +841,7 @@ impl Interpreter {
             }
             Value::Array(arr_idx) => {
                 if let HeapValue::Array(arr) = &self.heap[*arr_idx] {
-                    if key_str == "length" {
+                    if key_str == wk::LENGTH {
                         return Ok(Value::Boolean(true));
                     }
                     if let Ok(index) = key_str.parse::<usize>() {
@@ -850,7 +851,7 @@ impl Interpreter {
                 Ok(Value::Boolean(false))
             }
             Value::String(s) => {
-                if key_str == "length" {
+                            if key_str == wk::LENGTH {
                     return Ok(Value::Boolean(true));
                 }
                 if let Ok(index) = key_str.parse::<usize>() {

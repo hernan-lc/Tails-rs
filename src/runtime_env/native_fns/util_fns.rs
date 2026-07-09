@@ -1,6 +1,7 @@
 use crate::errors::Result;
 use crate::objects::Value;
 use crate::vm::interpreter::{HeapValue, Interpreter, JsObject};
+use crate::well_known as wk;
 
 use super::helpers::{to_f64, to_string_value};
 
@@ -28,7 +29,7 @@ pub(super) fn native_util_format(
                     let arg = args.get(arg_idx).cloned().unwrap_or(Value::Undefined);
                     let n = to_f64(&arg);
                     if n.is_nan() {
-                        result.push_str("NaN");
+                        result.push_str(wk::NAN);
                     } else {
                         result.push_str(&(n as i64).to_string());
                     }
@@ -106,7 +107,7 @@ pub(super) fn native_util_promisify(
         HeapValue::Object(JsObject {
             properties: crate::props! {
                 "_original" => original,
-                "name" => Value::String(name),
+                wk::NAME => Value::String(name),
             },
             prototype: None,
             extensible: true,
@@ -127,7 +128,7 @@ pub(super) fn native_util_callbackify(
         HeapValue::Object(JsObject {
             properties: crate::props! {
                 "_original" => original,
-                "name" => Value::String(name),
+                wk::NAME => Value::String(name),
             },
             prototype: None,
             extensible: true,
@@ -141,8 +142,8 @@ fn inspect_value(interp: &Interpreter, value: &Value, depth: usize, indent: usiz
         return "[Object]".to_string();
     }
     match value {
-        Value::Undefined => "undefined".to_string(),
-        Value::Null => "null".to_string(),
+        Value::Undefined => wk::UNDEFINED.to_string(),
+        Value::Null => wk::NULL.to_string(),
         Value::Boolean(b) => b.to_string(),
         Value::Integer(n) => n.to_string(),
         Value::Float(n) => {

@@ -7,6 +7,7 @@ pub use types::{TypeAnnotation, TypeLiteral, TypedParams};
 
 use crate::compiler::lexer::{SpannedToken, Token};
 use crate::errors::{Error, Result, Span};
+use crate::well_known as wk;
 
 #[derive(Debug, Clone)]
 pub struct SpannedNode<T> {
@@ -480,8 +481,8 @@ fn token_keyword_string(t: &Token) -> Option<String> {
     match t {
         Token::Identifier(n) => Some(n.clone()),
         Token::String(s) => Some(s.clone()),
-        Token::Catch => Some("catch".to_string()),
-        Token::Finally => Some("finally".to_string()),
+        Token::Catch => Some(wk::CATCH.to_string()),
+        Token::Finally => Some(wk::FINALLY.to_string()),
         Token::Throw => Some("throw".to_string()),
         Token::Get => Some("get".to_string()),
         Token::Set => Some("set".to_string()),
@@ -522,7 +523,7 @@ fn token_keyword_string(t: &Token) -> Option<String> {
         Token::Async => Some("async".to_string()),
         Token::Await => Some("await".to_string()),
         Token::Try => Some("try".to_string()),
-        Token::Constructor => Some("constructor".to_string()),
+        Token::Constructor => Some(wk::CONSTRUCTOR.to_string()),
         Token::Of => Some("of".to_string()),
         Token::Enum => Some("enum".to_string()),
         Token::Interface => Some("interface".to_string()),

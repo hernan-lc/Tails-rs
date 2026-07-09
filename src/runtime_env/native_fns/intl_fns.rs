@@ -3,6 +3,7 @@ use crate::objects::Value;
 use crate::props;
 use crate::runtime_env::native_fns::constants as c;
 use crate::vm::interpreter::{HeapValue, Interpreter, JsObject};
+use crate::well_known as wk;
 use rustc_hash::FxHashMap;
 
 use super::helpers::{to_f64, to_string_value};
@@ -537,10 +538,14 @@ pub(super) fn native_number_format_format(
 
 fn format_number(n: f64, min_frac: usize, max_frac: usize) -> String {
     if n.is_nan() {
-        return "NaN".to_string();
+        return wk::NAN.to_string();
     }
     if n.is_infinite() {
-        return if n > 0.0 { "Infinity" } else { "-Infinity" }.to_string();
+        return if n > 0.0 {
+            wk::INFINITY.to_string()
+        } else {
+            format!("-{}", wk::INFINITY)
+        };
     }
 
     // Determine precision

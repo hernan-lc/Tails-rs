@@ -3,6 +3,7 @@ use crate::errors::{Error, Result};
 use crate::objects::Value;
 use crate::runtime_env::native_fns::NATIVE_TABLE;
 use std::rc::Rc;
+use crate::well_known as wk;
 
 impl Interpreter {
     /// Ensure the operand stack has room for all of a function's local slots
@@ -339,17 +340,17 @@ impl Interpreter {
 
     pub(crate) fn find_native_prototype(&self, native_idx: usize) -> Option<usize> {
         let ctor_name = match native_idx {
-            72 => "Error",
-            73 => "TypeError",
-            74 => "ReferenceError",
-            75 => "SyntaxError",
-            76 => "RangeError",
+            72 => wk::ERROR,
+            73 => wk::TYPE_ERROR,
+            74 => wk::REFERENCE_ERROR,
+            75 => wk::SYNTAX_ERROR,
+            76 => wk::RANGE_ERROR,
             170 => return self.date_proto_idx,
             214 => return self.regexp_proto_idx,
             312 => {
                 // EventEmitter - search module registry for events module prototype
-                if let Some(events_props) = self.module_registry.get("events") {
-                    if let Some(Value::Object(proto_idx)) = events_props.get("prototype") {
+                if let Some(events_props) = self.module_registry.get(wk::MOD_EVENTS) {
+                    if let Some(Value::Object(proto_idx)) = events_props.get(wk::PROTOTYPE) {
                         return Some(*proto_idx);
                     }
                 }
@@ -359,7 +360,7 @@ impl Interpreter {
         };
         for (i, hv) in self.heap.iter().enumerate() {
             if let HeapValue::Object(obj) = hv {
-                if let Some(Value::String(name)) = obj.properties.get("name") {
+                if let Some(Value::String(name)) = obj.properties.get(wk::NAME) {
                     if name == ctor_name {
                         return Some(i);
                     }

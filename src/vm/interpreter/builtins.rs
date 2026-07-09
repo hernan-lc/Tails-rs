@@ -3,6 +3,7 @@ use crate::objects::js_array::{TypedArray, TypedArrayType};
 use crate::objects::Value;
 use crate::props;
 use crate::runtime_env::native_fns::constants as c;
+use crate::well_known as wk;
 
 fn register_error_subclass(
     interp: &mut Interpreter,
@@ -11,7 +12,7 @@ fn register_error_subclass(
     ctor_const: usize,
 ) {
     let proto_props = props! {
-        "name" => Value::String(name.into()),
+        wk::NAME => Value::String(name.into()),
     };
     let proto_idx = interp.gc.allocate(
         &mut interp.heap,
@@ -22,7 +23,7 @@ fn register_error_subclass(
         }),
     );
     let ctor_props = props! {
-        "prototype" => Value::Object(proto_idx),
+        wk::PROTOTYPE => Value::Object(proto_idx),
     };
     interp.gc.allocate(
         &mut interp.heap,
@@ -41,14 +42,14 @@ impl Interpreter {
     pub(super) fn init_builtins(&mut self) {
         // Global constants
         self.globals
-            .insert("Infinity".into(), Value::Float(f64::INFINITY));
+            .insert(wk::INFINITY.into(), Value::Float(f64::INFINITY));
 
         // globalThis — an object that represents the global scope
         let global_this_idx = self
             .gc
             .allocate(&mut self.heap, HeapValue::Object(JsObject::new()));
         self.globals
-            .insert("globalThis".into(), Value::Object(global_this_idx));
+            .insert(wk::GLOBAL_THIS.into(), Value::Object(global_this_idx));
         self.globals
             .insert("-Infinity".into(), Value::Float(f64::NEG_INFINITY));
 
@@ -120,7 +121,7 @@ impl Interpreter {
             }),
         );
         self.globals
-            .insert("console".into(), Value::Object(console_obj_idx));
+            .insert(wk::CONSOLE.into(), Value::Object(console_obj_idx));
 
         // Object
         let object_proto_props = props! {
@@ -155,7 +156,7 @@ impl Interpreter {
             "seal" => Value::NativeFunction(c::OBJECT_SEAL),
             "getPrototypeOf" => Value::NativeFunction(c::REFLECT_GET_PROTOTYPE_OF),
             "setPrototypeOf" => Value::NativeFunction(c::REFLECT_SET_PROTOTYPE_OF),
-            "prototype" => Value::Object(object_proto_idx),
+            wk::PROTOTYPE => Value::Object(object_proto_idx),
         };
 
         let object_obj_idx = self.gc.allocate(
@@ -167,11 +168,11 @@ impl Interpreter {
             }),
         );
         self.globals
-            .insert("Object".into(), Value::Object(object_obj_idx));
+            .insert(wk::OBJECT.into(), Value::Object(object_obj_idx));
 
         // Proxy
         self.globals
-            .insert("Proxy".into(), Value::NativeFunction(c::PROXY_CONSTRUCTOR));
+            .insert(wk::PROXY.into(), Value::NativeFunction(c::PROXY_CONSTRUCTOR));
 
         // Reflect
         let reflect_props = props! {
@@ -198,17 +199,17 @@ impl Interpreter {
             }),
         );
         self.globals
-            .insert("Reflect".into(), Value::Object(reflect_obj_idx));
+            .insert(wk::REFLECT.into(), Value::Object(reflect_obj_idx));
 
         // Symbol - registered as NativeFunction(c::SYMBOL_CONSTRUCTOR) with well-known symbols accessible via GetProperty
         self.globals.insert(
-            "Symbol".into(),
+            wk::SYMBOL.into(),
             Value::NativeFunction(c::SYMBOL_CONSTRUCTOR),
         );
 
         // Function constructor (for dynamic code generation, e.g. new Function(...args, body))
         self.globals.insert(
-            "Function".into(),
+            wk::FUNCTION.into(),
             Value::NativeFunction(c::FUNCTION_CONSTRUCTOR),
         );
 
@@ -226,15 +227,15 @@ impl Interpreter {
             }),
         );
         self.globals
-            .insert("JSON".into(), Value::Object(json_obj_idx));
+            .insert(wk::JSON.into(), Value::Object(json_obj_idx));
 
         // Array
         self.globals
-            .insert("Array".into(), Value::NativeFunction(c::ARRAY_CONSTRUCTOR));
+            .insert(wk::ARRAY.into(), Value::NativeFunction(c::ARRAY_CONSTRUCTOR));
 
         // BigInt
         self.globals.insert(
-            "BigInt".into(),
+            wk::BIGINT.into(),
             Value::NativeFunction(c::BIGINT_CONSTRUCTOR),
         );
 
@@ -325,13 +326,13 @@ impl Interpreter {
             "setUTCMinutes" => Value::NativeFunction(c::DATE_SET_UTC_MINUTES),
             "setUTCSeconds" => Value::NativeFunction(c::DATE_SET_UTC_SECONDS),
             "setUTCMilliseconds" => Value::NativeFunction(c::DATE_SET_UTC_MILLISECONDS),
-            "toString" => Value::NativeFunction(c::DATE_TO_STRING),
+            wk::TO_STRING => Value::NativeFunction(c::DATE_TO_STRING),
             "toISOString" => Value::NativeFunction(c::DATE_TO_ISO_STRING),
             "toUTCString" => Value::NativeFunction(c::DATE_TO_UTC_STRING),
             "toDateString" => Value::NativeFunction(c::DATE_TO_DATE_STRING),
             "toTimeString" => Value::NativeFunction(c::DATE_TO_TIME_STRING),
             "toJSON" => Value::NativeFunction(c::DATE_TO_JSON),
-            "valueOf" => Value::NativeFunction(c::DATE_VALUE_OF),
+            wk::VALUE_OF => Value::NativeFunction(c::DATE_VALUE_OF),
         };
         let date_proto_idx = self.gc.allocate(
             &mut self.heap,
@@ -343,7 +344,7 @@ impl Interpreter {
         );
         // Register Date as a NativeFunction for constructor
         self.globals
-            .insert("Date".into(), Value::NativeFunction(c::DATE_CONSTRUCTOR));
+            .insert(wk::DATE.into(), Value::NativeFunction(c::DATE_CONSTRUCTOR));
         // Store the prototype index for Date constructor
         self.date_proto_idx = Some(date_proto_idx);
 
@@ -351,7 +352,7 @@ impl Interpreter {
         let regexp_proto_props = props! {
             "test" => Value::NativeFunction(c::REGEXP_TEST),
             "exec" => Value::NativeFunction(c::REGEXP_EXEC),
-            "toString" => Value::NativeFunction(c::REGEXP_TO_STRING),
+            wk::TO_STRING => Value::NativeFunction(c::REGEXP_TO_STRING),
             "source" => Value::NativeFunction(c::REGEXP_SOURCE),
             "flags" => Value::NativeFunction(c::REGEXP_FLAGS),
             "global" => Value::NativeFunction(c::REGEXP_GLOBAL),
@@ -372,7 +373,7 @@ impl Interpreter {
         );
         // Register RegExp as a NativeFunction for constructor
         self.globals.insert(
-            "RegExp".into(),
+            wk::REGEXP.into(),
             Value::NativeFunction(c::REGEXP_CONSTRUCTOR),
         );
         // Store the prototype index for RegExp constructor
@@ -408,31 +409,31 @@ impl Interpreter {
             }),
         );
         self.globals
-            .insert("Math".into(), Value::Object(math_obj_idx));
+            .insert(wk::MATH.into(), Value::Object(math_obj_idx));
 
         // Number constructor (callable as Number(), with static methods via property lookup)
         self.globals.insert(
-            "Number".into(),
+            wk::NUMBER.into(),
             Value::NativeFunction(c::NUMBER_CONSTRUCTOR),
         );
 
         // String constructor
         self.globals.insert(
-            "String".into(),
+            wk::STRING.into(),
             Value::NativeFunction(c::STRING_CONSTRUCTOR),
         );
 
         // Boolean constructor
         self.globals.insert(
-            "Boolean".into(),
+            wk::BOOLEAN.into(),
             Value::NativeFunction(c::BOOLEAN_CONSTRUCTOR),
         );
 
         // Promise constructor and prototype
         let promise_proto_props = props! {
-            "then" => Value::NativeFunction(c::PROMISE_THEN),
-            "catch" => Value::NativeFunction(c::PROMISE_CATCH),
-            "finally" => Value::NativeFunction(c::PROMISE_FINALLY),
+            wk::THEN => Value::NativeFunction(c::PROMISE_THEN),
+            wk::CATCH => Value::NativeFunction(c::PROMISE_CATCH),
+            wk::FINALLY => Value::NativeFunction(c::PROMISE_FINALLY),
         };
         let promise_proto_idx = self.gc.allocate(
             &mut self.heap,
@@ -444,7 +445,7 @@ impl Interpreter {
         );
 
         let promise_ctor_props = props! {
-            "prototype" => Value::Object(promise_proto_idx),
+            wk::PROTOTYPE => Value::Object(promise_proto_idx),
             "resolve" => Value::NativeFunction(c::PROMISE_RESOLVE),
             "reject" => Value::NativeFunction(c::PROMISE_REJECT),
             "all" => Value::NativeFunction(c::PROMISE_ALL),
@@ -459,7 +460,7 @@ impl Interpreter {
             }),
         );
         self.globals.insert(
-            "Promise".into(),
+            wk::PROMISE.into(),
             Value::NativeFunction(c::PROMISE_CONSTRUCTOR),
         );
 
@@ -468,7 +469,7 @@ impl Interpreter {
             .gc
             .allocate(&mut self.heap, HeapValue::Object(JsObject::new()));
         let error_ctor_props = props! {
-            "prototype" => Value::Object(error_proto_idx),
+            wk::PROTOTYPE => Value::Object(error_proto_idx),
         };
         self.gc.allocate(
             &mut self.heap,
@@ -479,32 +480,32 @@ impl Interpreter {
             }),
         );
         self.globals
-            .insert("Error".into(), Value::NativeFunction(c::ERROR_CONSTRUCTOR));
+            .insert(wk::ERROR.into(), Value::NativeFunction(c::ERROR_CONSTRUCTOR));
 
         register_error_subclass(
             self,
-            "TypeError",
+            wk::TYPE_ERROR,
             error_proto_idx,
             c::TYPE_ERROR_CONSTRUCTOR,
         );
 
         register_error_subclass(
             self,
-            "ReferenceError",
+            wk::REFERENCE_ERROR,
             error_proto_idx,
             c::REFERENCE_ERROR_CONSTRUCTOR,
         );
 
         register_error_subclass(
             self,
-            "SyntaxError",
+            wk::SYNTAX_ERROR,
             error_proto_idx,
             c::SYNTAX_ERROR_CONSTRUCTOR,
         );
 
         register_error_subclass(
             self,
-            "RangeError",
+            wk::RANGE_ERROR,
             error_proto_idx,
             c::RANGE_ERROR_CONSTRUCTOR,
         );
@@ -529,7 +530,7 @@ impl Interpreter {
             let bytes_per_element = TypedArray::element_size(&parse_typed_array_type(name)) as i64;
             let proto_props = props! {
                 "BYTES_PER_ELEMENT" => Value::Integer(bytes_per_element),
-                "length" => Value::NativeFunction(c::TYPED_ARRAY_LENGTH),
+                wk::LENGTH => Value::NativeFunction(c::TYPED_ARRAY_LENGTH),
                 "get" => Value::NativeFunction(c::TYPED_ARRAY_GET),
                 "set" => Value::NativeFunction(c::TYPED_ARRAY_SET),
                 "subarray" => Value::NativeFunction(c::TYPED_ARRAY_SUBARRAY),
@@ -546,7 +547,7 @@ impl Interpreter {
 
             // Create constructor
             let ctor_props = props! {
-                "prototype" => Value::Object(proto_idx),
+                wk::PROTOTYPE => Value::Object(proto_idx),
                 "BYTES_PER_ELEMENT" => Value::Integer(bytes_per_element),
                 "from" => Value::NativeFunction(c::TYPED_ARRAY_FROM),
                 "of" => Value::NativeFunction(c::TYPED_ARRAY_OF),
@@ -586,7 +587,7 @@ impl Interpreter {
         );
 
         let map_ctor_props = props! {
-            "prototype" => Value::Object(map_proto_idx),
+            wk::PROTOTYPE => Value::Object(map_proto_idx),
         };
         let _map_ctor_idx = self.gc.allocate(
             &mut self.heap,
@@ -597,7 +598,7 @@ impl Interpreter {
             }),
         );
         self.globals
-            .insert("Map".into(), Value::NativeFunction(c::MAP_CONSTRUCTOR));
+            .insert(wk::MAP.into(), Value::NativeFunction(c::MAP_CONSTRUCTOR));
 
         // Set
         let set_proto_props = props! {
@@ -621,7 +622,7 @@ impl Interpreter {
         );
 
         let set_ctor_props = props! {
-            "prototype" => Value::Object(set_proto_idx),
+            wk::PROTOTYPE => Value::Object(set_proto_idx),
         };
         let _set_ctor_idx = self.gc.allocate(
             &mut self.heap,
@@ -632,7 +633,7 @@ impl Interpreter {
             }),
         );
         self.globals
-            .insert("Set".into(), Value::NativeFunction(c::SET_CONSTRUCTOR));
+            .insert(wk::SET.into(), Value::NativeFunction(c::SET_CONSTRUCTOR));
 
         // WeakMap
         let weakmap_proto_props = props! {
@@ -651,7 +652,7 @@ impl Interpreter {
         );
 
         let weakmap_ctor_props = props! {
-            "prototype" => Value::Object(weakmap_proto_idx),
+            wk::PROTOTYPE => Value::Object(weakmap_proto_idx),
         };
         let _weakmap_ctor_idx = self.gc.allocate(
             &mut self.heap,
@@ -682,7 +683,7 @@ impl Interpreter {
         );
 
         let weakset_ctor_props = props! {
-            "prototype" => Value::Object(weakset_proto_idx),
+            wk::PROTOTYPE => Value::Object(weakset_proto_idx),
         };
         let _weakset_ctor_idx = self.gc.allocate(
             &mut self.heap,
@@ -702,7 +703,7 @@ impl Interpreter {
             "next" => Value::NativeFunction(c::GENERATOR_NEXT),
             "return" => Value::NativeFunction(c::GENERATOR_RETURN),
             "throw" => Value::NativeFunction(c::GENERATOR_THROW),
-            "Symbol.iterator" => Value::NativeFunction(c::GENERATOR_SYMBOL_ITERATOR),
+            wk::SYMBOL_ITERATOR => Value::NativeFunction(c::GENERATOR_SYMBOL_ITERATOR),
         };
         let generator_proto_idx = self.gc.allocate(
             &mut self.heap,
@@ -715,7 +716,7 @@ impl Interpreter {
         self.generator_proto_idx = Some(generator_proto_idx);
 
         let generator_ctor_props = props! {
-            "prototype" => Value::Object(generator_proto_idx),
+            wk::PROTOTYPE => Value::Object(generator_proto_idx),
         };
         let generator_ctor_idx = self.gc.allocate(
             &mut self.heap,
@@ -758,7 +759,7 @@ impl Interpreter {
             // only be set when the module is imported explicitly, and
             // bare `Buffer.from(x).toString("utf8")` would crash with
             // "undefined is not a function".
-            if let Some(Value::Object(proto_idx)) = buffer_props.get("prototype") {
+            if let Some(Value::Object(proto_idx)) = buffer_props.get(wk::PROTOTYPE) {
                 self.buffer_proto_idx = Some(*proto_idx);
             }
             let buffer_idx = self.gc.allocate(
@@ -795,7 +796,7 @@ impl Interpreter {
                 }),
             );
             self.globals
-                .insert("process".into(), Value::Object(process_idx));
+                .insert(wk::PROCESS.into(), Value::Object(process_idx));
         }
     }
 }

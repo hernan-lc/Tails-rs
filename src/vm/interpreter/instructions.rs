@@ -3,6 +3,7 @@ use crate::compiler::CompiledModule;
 use crate::compiler::Instruction;
 use crate::errors::{Error, Result};
 use crate::objects::{ConsString, Value};
+use crate::well_known as wk;
 
 impl Interpreter {
     pub(crate) fn exec_load_store(
@@ -68,7 +69,7 @@ impl Interpreter {
                     })
                     .unwrap_or(Value::Undefined);
                 let type_str = match &value {
-                    Value::Undefined => "undefined",
+                    Value::Undefined => wk::UNDEFINED,
                     Value::Null => "object",
                     Value::Boolean(_) => "boolean",
                     Value::Integer(_) | Value::Float(_) => "number",

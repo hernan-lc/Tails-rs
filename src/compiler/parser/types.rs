@@ -1,5 +1,6 @@
 use super::*;
 use crate::errors::{Error, Result};
+use crate::well_known as wk;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum TypeAnnotation {
@@ -96,8 +97,8 @@ impl<'a> Parser<'a> {
                     "number" => Ok(TypeAnnotation::Number),
                     "string" => Ok(TypeAnnotation::String),
                     "boolean" => Ok(TypeAnnotation::Boolean),
-                    "null" => Ok(TypeAnnotation::Null),
-                    "undefined" => Ok(TypeAnnotation::Undefined),
+                    wk::NULL => Ok(TypeAnnotation::Null),
+                    wk::UNDEFINED => Ok(TypeAnnotation::Undefined),
                     "void" => Ok(TypeAnnotation::Void),
                     "any" => Ok(TypeAnnotation::Any),
                     "unknown" => Ok(TypeAnnotation::Unknown),

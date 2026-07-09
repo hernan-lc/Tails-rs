@@ -8,6 +8,8 @@ use crate::vm::interpreter::{Interpreter, PropertyStorage};
 
 use super::reflect_fns::native_reflect_get_own_property_descriptor;
 
+use crate::well_known as wk;
+
 pub(super) fn native_object_keys(
     interp: &mut Interpreter,
     _this: &Value,
@@ -316,7 +318,7 @@ fn define_property_on(
         }
         Value::Array(arr_idx) => {
             if let crate::vm::interpreter::HeapValue::Array(arr) = &mut interp.heap[*arr_idx] {
-                if property == "length" {
+                if property == wk::LENGTH {
                     if let Some(val) = value {
                         let new_len = match &val {
                             Value::Integer(n) => (*n).max(0) as usize,
@@ -464,7 +466,7 @@ pub(super) fn native_object_get_own_property_descriptors(
                     entries.push((i.to_string(), v.clone(), None, None));
                 }
                 entries.push((
-                    "length".to_string(),
+                    wk::LENGTH.to_string(),
                     Value::Float(arr.elements.len() as f64),
                     None,
                     None,
@@ -689,7 +691,7 @@ pub(super) fn native_object_has_own_property(
         }
         Value::Array(arr_idx) => {
             if let crate::vm::interpreter::HeapValue::Array(arr) = &interp.heap[*arr_idx] {
-                if prop == "length" {
+                if prop == wk::LENGTH {
                     return Ok(Value::Boolean(true));
                 }
                 if let Some(index) =

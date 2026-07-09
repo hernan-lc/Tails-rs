@@ -1,12 +1,13 @@
 use std::fmt;
 
 use crate::objects::Value;
+use crate::well_known as wk;
 
 impl fmt::Display for Value {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Value::Undefined => write!(f, "undefined"),
-            Value::Null => write!(f, "null"),
+            Value::Undefined => write!(f, "{}", wk::UNDEFINED),
+            Value::Null => write!(f, "{}", wk::NULL),
             Value::Boolean(b) => write!(f, "{}", b),
             Value::Integer(i) => write!(f, "{}", i),
             Value::Float(fl) => write!(f, "{}", fl),

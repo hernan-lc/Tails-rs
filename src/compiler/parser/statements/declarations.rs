@@ -1,5 +1,6 @@
 use super::super::*;
 use crate::errors::{Error, Result};
+use crate::well_known as wk;
 
 impl<'a> Parser<'a> {
     pub(crate) fn parse_variable_declaration(&mut self) -> Result<SpannedNode<Statement>> {
@@ -67,8 +68,8 @@ impl<'a> Parser<'a> {
                     Token::Instanceof => "instanceof".to_string(),
                     Token::In => "in".to_string(),
                     Token::Void => "void".to_string(),
-                    Token::Catch => "catch".to_string(),
-                    Token::Finally => "finally".to_string(),
+                    Token::Catch => wk::CATCH.to_string(),
+                    Token::Finally => wk::FINALLY.to_string(),
                     Token::Throw => "throw".to_string(),
                     Token::Async => "async".to_string(),
                     Token::Await => "await".to_string(),
@@ -88,8 +89,8 @@ impl<'a> Parser<'a> {
                     Token::Extends => "extends".to_string(),
                     Token::Super => "super".to_string(),
                     Token::Of => "of".to_string(),
-                    Token::Constructor => "constructor".to_string(),
-                    Token::Promise => "Promise".to_string(),
+                    Token::Constructor => wk::CONSTRUCTOR.to_string(),
+                    Token::Promise => wk::PROMISE.to_string(),
                     Token::Try => "try".to_string(),
                     Token::Public => "public".to_string(),
                     Token::Private => "private".to_string(),

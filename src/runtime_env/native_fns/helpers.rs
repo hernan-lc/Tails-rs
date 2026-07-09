@@ -1,5 +1,6 @@
 use crate::objects::Value;
 use crate::vm::interpreter::Interpreter;
+use crate::well_known as wk;
 use rustc_hash::FxHashMap;
 
 pub(super) fn to_f64(v: &Value) -> f64 {
@@ -97,8 +98,8 @@ pub(super) fn to_i64(v: &Value) -> i64 {
 
 pub(super) fn to_string_value(interp: &Interpreter, v: &Value) -> String {
     match v {
-        Value::Undefined => "undefined".to_string(),
-        Value::Null => "null".to_string(),
+        Value::Undefined => wk::UNDEFINED.to_string(),
+        Value::Null => wk::NULL.to_string(),
         Value::Boolean(b) => b.to_string(),
         Value::Integer(n) => n.to_string(),
         Value::Float(n) => {
@@ -310,16 +311,16 @@ fn to_json_value_inner(
     depth: usize,
 ) -> String {
     if depth > 64 {
-        return "null".to_string();
+        return wk::NULL.to_string();
     }
     match v {
-        Value::Null => "null".to_string(),
-        Value::Undefined => "undefined".to_string(),
+        Value::Null => wk::NULL.to_string(),
+        Value::Undefined => wk::UNDEFINED.to_string(),
         Value::Boolean(b) => b.to_string(),
         Value::Integer(n) => n.to_string(),
         Value::Float(n) => {
             if n.is_nan() {
-                "null".to_string()
+                wk::NULL.to_string()
             } else if *n == (*n as i64) as f64 {
                 (*n as i64).to_string()
             } else {
@@ -330,7 +331,7 @@ fn to_json_value_inner(
         Value::Array(arr_idx) => {
             if let crate::vm::interpreter::HeapValue::Array(arr) = &interp.heap[*arr_idx] {
                 if !visited.insert(*arr_idx) {
-                    return "null".to_string();
+                    return wk::NULL.to_string();
                 }
                 let parts: Vec<String> = arr
                     .elements
@@ -345,7 +346,7 @@ fn to_json_value_inner(
         Value::Object(obj_idx) => {
             if let crate::vm::interpreter::HeapValue::Object(obj) = &interp.heap[*obj_idx] {
                 if !visited.insert(*obj_idx) {
-                    return "null".to_string();
+                    return wk::NULL.to_string();
                 }
                 let parts: Vec<String> = obj
                     .properties
@@ -364,8 +365,8 @@ fn to_json_value_inner(
                 "{}".to_string()
             }
         }
-        Value::Proxy(_) => "null".to_string(),
-        _ => "null".to_string(),
+        Value::Proxy(_) => wk::NULL.to_string(),
+        _ => wk::NULL.to_string(),
     }
 }
 
@@ -442,8 +443,8 @@ pub(super) fn get_string(this: &Value) -> Option<String> {
 pub(super) fn find_error_ctor_proto(interp: &Interpreter) -> Option<usize> {
     for hv in &interp.heap {
         if let crate::vm::interpreter::HeapValue::Object(obj) = hv {
-            if obj.properties.contains_key("prototype") && !obj.properties.contains_key("name") {
-                if let Some(Value::Object(proto_idx)) = obj.properties.get("prototype") {
+            if obj.properties.contains_key(wk::PROTOTYPE) && !obj.properties.contains_key(wk::NAME) {
+                if let Some(Value::Object(proto_idx)) = obj.properties.get(wk::PROTOTYPE) {
                     return Some(*proto_idx);
                 }
             }
@@ -455,7 +456,7 @@ pub(super) fn find_error_ctor_proto(interp: &Interpreter) -> Option<usize> {
 pub(crate) fn find_error_proto(interp: &Interpreter, type_name: &str) -> Option<usize> {
     for (i, hv) in interp.heap.iter().enumerate() {
         if let crate::vm::interpreter::HeapValue::Object(obj) = hv {
-            if let Some(Value::String(name)) = obj.properties.get("name") {
+            if let Some(Value::String(name)) = obj.properties.get(wk::NAME) {
                 if name == type_name {
                     return Some(i);
                 }
@@ -488,7 +489,7 @@ fn collect_all_properties<'a>(
     }
     if let crate::vm::interpreter::HeapValue::Object(obj) = &interp.heap[obj_idx] {
         for (k, v) in &obj.properties {
-            if k == "constructor" {
+            if k == wk::CONSTRUCTOR {
                 continue;
             }
             out.push((k.to_string(), v));

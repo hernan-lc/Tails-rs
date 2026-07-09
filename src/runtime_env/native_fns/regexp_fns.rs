@@ -1,6 +1,7 @@
 use crate::errors::{Error, Result};
 use crate::objects::Value;
 use crate::vm::interpreter::{HeapValue, Interpreter, JsRegExp};
+use crate::well_known as wk;
 
 fn get_regexp_idx(this: &Value) -> Option<usize> {
     match this {
@@ -155,7 +156,7 @@ pub(super) fn native_regexp_exec(
                     for (i, cap) in captures.iter().enumerate() {
                         props.insert(i.to_string(), Value::String(cap.clone()));
                     }
-                    props.insert("length".to_string(), Value::Float(captures.len() as f64));
+                    props.insert(wk::LENGTH.to_string(), Value::Float(captures.len() as f64));
                     props.insert("index".to_string(), Value::Float(match_start as f64));
                     props.insert("input".to_string(), Value::String(input.to_string()));
                     if named_groups.is_empty() {
@@ -336,7 +337,7 @@ pub(super) fn native_string_match(
                     for (i, cap) in captures.iter().enumerate() {
                         props.insert(i.to_string(), Value::String(cap.clone()));
                     }
-                    props.insert("length".to_string(), Value::Float(captures.len() as f64));
+                    props.insert(wk::LENGTH.to_string(), Value::Float(captures.len() as f64));
                     props.insert("index".to_string(), Value::Float(match_start as f64));
                     props.insert("input".to_string(), Value::String(input));
                     if named_groups.is_empty() {
@@ -387,7 +388,7 @@ pub(super) fn native_string_replace(
     let search = args.first().cloned().unwrap_or(Value::Undefined);
     let replacement = match args.get(1) {
         Some(v) => interp.to_string_coerce(v),
-        None => "undefined".to_string(),
+        None => wk::UNDEFINED.to_string(),
     };
 
     match search {

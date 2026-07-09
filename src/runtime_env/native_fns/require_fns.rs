@@ -1,6 +1,7 @@
 use crate::errors::Result;
 use crate::objects::Value;
 use crate::vm::interpreter::{Interpreter, PropertyStorage};
+use crate::well_known as wk;
 use rustc_hash::FxHashMap;
 
 /// native_require(specifier) — CommonJS require() function
@@ -50,8 +51,8 @@ pub(super) fn native_require(
                     &mut interp.heap,
                     &mut interp.gc,
                 )?;
-                if module_name == "buffer" {
-                    if let Some(Value::Object(proto_idx)) = exports.get("prototype") {
+                if module_name == wk::MOD_BUFFER {
+                    if let Some(Value::Object(proto_idx)) = exports.get(wk::PROTOTYPE) {
                         interp.buffer_proto_idx = Some(*proto_idx);
                     }
                 }
@@ -114,21 +115,21 @@ pub(super) fn native_require(
 
     // 8. Restore built-in globals + CJS globals
     for key in saved_globals.keys() {
-        if key == "console"
-            || key == "Object"
-            || key == "JSON"
-            || key == "Math"
-            || key == "Proxy"
-            || key == "Reflect"
-            || key == "Error"
-            || key == "TypeError"
-            || key == "ReferenceError"
-            || key == "SyntaxError"
-            || key == "RangeError"
-            || key == "Array"
-            || key == "String"
-            || key == "Number"
-            || key == "Boolean"
+        if key == wk::CONSOLE
+            || key == wk::OBJECT
+            || key == wk::JSON
+            || key == wk::MATH
+            || key == wk::PROXY
+            || key == wk::REFLECT
+            || key == wk::ERROR
+            || key == wk::TYPE_ERROR
+            || key == wk::REFERENCE_ERROR
+            || key == wk::SYNTAX_ERROR
+            || key == wk::RANGE_ERROR
+            || key == wk::ARRAY
+            || key == wk::STRING
+            || key == wk::NUMBER
+            || key == wk::BOOLEAN
             || key == "parseInt"
             || key == "parseFloat"
             || key == "isNaN"
@@ -137,21 +138,21 @@ pub(super) fn native_require(
             || key == "setInterval"
             || key == "clearTimeout"
             || key == "clearInterval"
-            || key == "Map"
-            || key == "Set"
+            || key == wk::MAP
+            || key == wk::SET
             || key == "WeakMap"
             || key == "WeakSet"
-            || key == "Promise"
-            || key == "Symbol"
-            || key == "BigInt"
-            || key == "Date"
-            || key == "RegExp"
+            || key == wk::PROMISE
+            || key == wk::SYMBOL
+            || key == wk::BIGINT
+            || key == wk::DATE
+            || key == wk::REGEXP
             || key == "URL"
             || key == "URLSearchParams"
             || key == "Headers"
             || key == "Request"
             || key == "Response"
-            || key == "globalThis"
+            || key == wk::GLOBAL_THIS
             || key == "fetch"
             || key == "WebSocket"
             || key == "require"

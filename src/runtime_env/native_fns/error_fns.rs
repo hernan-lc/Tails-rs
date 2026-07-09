@@ -4,6 +4,7 @@ use crate::props;
 use crate::vm::interpreter::Interpreter;
 
 use super::helpers::{find_error_ctor_proto, find_error_proto, to_string_value};
+use crate::well_known as wk;
 
 macro_rules! error_constructor {
     ($name:ident, $type_name:expr, $proto_finder:expr) => {
@@ -19,9 +20,9 @@ macro_rules! error_constructor {
             let obj_idx = interp.heap.len();
             let stack = interp.build_stack_trace($type_name, &message);
             let props = props! {
-                "message" => Value::String(message.clone()),
-                "name" => Value::String($type_name.into()),
-                "stack" => Value::String(stack),
+                wk::MESSAGE => Value::String(message.clone()),
+                wk::NAME => Value::String($type_name.into()),
+                wk::STACK => Value::String(stack),
             };
             let proto_idx = $proto_finder(interp);
             interp.heap.push(crate::vm::interpreter::HeapValue::Object(
@@ -36,16 +37,16 @@ macro_rules! error_constructor {
     };
 }
 
-error_constructor!(native_error_constructor, "Error", find_error_ctor_proto);
-error_constructor!(native_type_error_constructor, "TypeError", |i| {
-    find_error_proto(i, "TypeError")
+error_constructor!(native_error_constructor, wk::ERROR, find_error_ctor_proto);
+error_constructor!(native_type_error_constructor, wk::TYPE_ERROR, |i| {
+    find_error_proto(i, wk::TYPE_ERROR)
 });
-error_constructor!(native_reference_error_constructor, "ReferenceError", |i| {
-    find_error_proto(i, "ReferenceError")
+error_constructor!(native_reference_error_constructor, wk::REFERENCE_ERROR, |i| {
+    find_error_proto(i, wk::REFERENCE_ERROR)
 });
-error_constructor!(native_syntax_error_constructor, "SyntaxError", |i| {
-    find_error_proto(i, "SyntaxError")
+error_constructor!(native_syntax_error_constructor, wk::SYNTAX_ERROR, |i| {
+    find_error_proto(i, wk::SYNTAX_ERROR)
 });
-error_constructor!(native_range_error_constructor, "RangeError", |i| {
-    find_error_proto(i, "RangeError")
+error_constructor!(native_range_error_constructor, wk::RANGE_ERROR, |i| {
+    find_error_proto(i, wk::RANGE_ERROR)
 });

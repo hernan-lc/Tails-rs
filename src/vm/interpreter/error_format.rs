@@ -1,5 +1,6 @@
 use super::*;
 use crate::objects::Value;
+use crate::well_known as wk;
 
 impl Interpreter {
     pub(crate) fn build_stack_trace(&self, error_name: &str, message: &str) -> String {
@@ -45,23 +46,23 @@ impl Interpreter {
             if let HeapValue::Object(obj) = &self.heap[*obj_idx] {
                 let name = obj
                     .properties
-                    .get("name")
+                    .get(wk::NAME)
                     .map(|v| match v {
                         Value::String(s) => s.clone(),
                         Value::Cons(c) => c.flatten(),
-                        _ => "Error".to_string(),
+                        _ => wk::ERROR.to_string(),
                     })
-                    .unwrap_or_else(|| "Error".to_string());
+                    .unwrap_or_else(|| wk::ERROR.to_string());
                 let message = obj
                     .properties
-                    .get("message")
+                    .get(wk::MESSAGE)
                     .map(|v| match v {
                         Value::String(s) => s.clone(),
                         Value::Cons(c) => c.flatten(),
                         _ => String::new(),
                     })
                     .unwrap_or_default();
-                let stack = obj.properties.get("stack").map(|v| match v {
+                let stack = obj.properties.get(wk::STACK).map(|v| match v {
                     Value::String(s) => s.clone(),
                     Value::Cons(c) => c.flatten(),
                     _ => String::new(),

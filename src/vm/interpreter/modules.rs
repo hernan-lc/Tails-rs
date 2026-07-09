@@ -8,6 +8,8 @@ use rustc_hash::FxHashMap;
 use std::path::Path;
 use std::rc::Rc;
 
+use crate::well_known as wk;
+
 impl Interpreter {
     fn load_native_library(&mut self, lib_path: &Path) -> Option<FxHashMap<String, Value>> {
         let library = SafeLibrary::new(lib_path).ok()?;
@@ -91,21 +93,21 @@ impl Interpreter {
         let saved_globals = std::mem::take(&mut self.globals);
         // Restore built-in globals into the fresh scope
         for key in saved_globals.keys() {
-            if key == "console"
-                || key == "Object"
-                || key == "JSON"
-                || key == "Math"
-                || key == "Proxy"
-                || key == "Reflect"
-                || key == "Error"
-                || key == "TypeError"
-                || key == "ReferenceError"
-                || key == "SyntaxError"
-                || key == "RangeError"
-                || key == "Array"
-                || key == "String"
-                || key == "Number"
-                || key == "Boolean"
+            if key == wk::CONSOLE
+                || key == wk::OBJECT
+                || key == wk::JSON
+                || key == wk::MATH
+                || key == wk::PROXY
+                || key == wk::REFLECT
+                || key == wk::ERROR
+                || key == wk::TYPE_ERROR
+                || key == wk::REFERENCE_ERROR
+                || key == wk::SYNTAX_ERROR
+                || key == wk::RANGE_ERROR
+                || key == wk::ARRAY
+                || key == wk::STRING
+                || key == wk::NUMBER
+                || key == wk::BOOLEAN
                 || key == "parseInt"
                 || key == "parseFloat"
                 || key == "isNaN"
@@ -116,29 +118,29 @@ impl Interpreter {
                 || key == "clearInterval"
                 || key == "setImmediate"
                 || key == "clearImmediate"
-                || key == "Map"
-                || key == "Set"
+                || key == wk::MAP
+                || key == wk::SET
                 || key == "WeakMap"
                 || key == "WeakSet"
-                || key == "Promise"
-                || key == "Symbol"
-                || key == "BigInt"
-                || key == "Date"
-                || key == "RegExp"
+                || key == wk::PROMISE
+                || key == wk::SYMBOL
+                || key == wk::BIGINT
+                || key == wk::DATE
+                || key == wk::REGEXP
                 || key == "URL"
                 || key == "URLSearchParams"
                 || key == "Headers"
                 || key == "Request"
                 || key == "Response"
-                || key == "globalThis"
-                || key == "globalThis"
-                || key == "globalThis"
+                || key == wk::GLOBAL_THIS
+                || key == wk::GLOBAL_THIS
+                || key == wk::GLOBAL_THIS
                 || key == "fetch"
                 || key == "WebSocket"
                 || key == "require"
                 || key == "Buffer"
-                || key == "process"
-                || key == "Function"
+                || key == wk::PROCESS
+                || key == wk::FUNCTION
             {
                 self.globals.insert(key.clone(), saved_globals[key].clone());
             }
@@ -385,8 +387,8 @@ impl Interpreter {
                     self.native_loader
                         .load_module(module_name, &mut self.heap, &mut self.gc)?;
                 // Set buffer_proto_idx when buffer module is loaded
-                if module_name == "buffer" {
-                    if let Some(Value::Object(proto_idx)) = exports.get("prototype") {
+                if module_name == wk::MOD_BUFFER {
+                    if let Some(Value::Object(proto_idx)) = exports.get(wk::PROTOTYPE) {
                         self.buffer_proto_idx = Some(*proto_idx);
                     }
                 }
@@ -430,8 +432,8 @@ impl Interpreter {
                         &mut self.heap,
                         &mut self.gc,
                     )?;
-                    if module_name == "buffer" {
-                        if let Some(Value::Object(proto_idx)) = exports.get("prototype") {
+                    if module_name == wk::MOD_BUFFER {
+                        if let Some(Value::Object(proto_idx)) = exports.get(wk::PROTOTYPE) {
                             self.buffer_proto_idx = Some(*proto_idx);
                         }
                     }
@@ -703,7 +705,7 @@ impl Interpreter {
     pub(crate) fn build_error_promise(&mut self, message: String) -> Value {
         let reason_idx = self.heap.len();
         let props = props! {
-            "message" => Value::String(message),
+            wk::MESSAGE => Value::String(message),
         };
         self.heap.push(HeapValue::Object(JsObject {
             properties: props,

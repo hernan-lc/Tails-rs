@@ -2,13 +2,14 @@ use super::*;
 use crate::compiler::Instruction;
 use crate::errors::{Error, Result};
 use crate::objects::Value;
+use crate::well_known as wk;
 
 const PROXY_SET_TRAP: &str = "set";
 const PROXY_DELETE_TRAP: &str = "deleteProperty";
 const SETTER_PREFIX: &str = "__setter_";
 const GETTER_PREFIX: &str = "__getter_";
 const METHOD_PREFIX: &str = "__method_";
-const TYPE_UNDEFINED: &str = "undefined";
+const TYPE_UNDEFINED: &str = wk::UNDEFINED;
 const TYPE_OBJECT: &str = "object";
 const TYPE_BOOLEAN: &str = "boolean";
 const TYPE_NUMBER: &str = "number";
@@ -494,7 +495,7 @@ impl Interpreter {
                         }
                         Value::Array(arr_idx) => {
                             if let HeapValue::Array(arr) = &mut self.heap[*arr_idx] {
-                                if resolved_key == "length" {
+                                if resolved_key == wk::LENGTH {
                                     let new_len = match &value {
                                         Value::Integer(n) => (*n).max(0) as usize,
                                         Value::Float(n) => (*n as i64).max(0) as usize,

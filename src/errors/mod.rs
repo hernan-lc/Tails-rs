@@ -1,4 +1,5 @@
 pub(crate) mod runtime_errors;
+use crate::well_known as wk;
 use std::fmt;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -82,13 +83,17 @@ impl Error {
     }
 
     pub fn kind_name(&self) -> &str {
+        self.as_str()
+    }
+
+    pub fn as_str(&self) -> &'static str {
         match &self.kind {
-            ErrorKind::ParseError(_) => "ParseError",
-            ErrorKind::TypeError(_) => "TypeError",
-            ErrorKind::ReferenceError(_) => "ReferenceError",
-            ErrorKind::SyntaxError(_) => "SyntaxError",
-            ErrorKind::RuntimeError(_) => "RuntimeError",
-            ErrorKind::InternalError(_) => "InternalError",
+            ErrorKind::ParseError(_) => wk::PARSE_ERROR,
+            ErrorKind::TypeError(_) => wk::TYPE_ERROR,
+            ErrorKind::ReferenceError(_) => wk::REFERENCE_ERROR,
+            ErrorKind::SyntaxError(_) => wk::SYNTAX_ERROR,
+            ErrorKind::RuntimeError(_) => wk::RUNTIME_ERROR,
+            ErrorKind::InternalError(_) => wk::INTERNAL_ERROR,
         }
     }
 

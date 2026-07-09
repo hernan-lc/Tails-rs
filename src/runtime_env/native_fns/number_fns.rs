@@ -1,6 +1,7 @@
 use crate::errors::{Error, Result};
 use crate::objects::Value;
 use crate::vm::interpreter::Interpreter;
+use crate::well_known as wk;
 
 use super::helpers::to_f64;
 
@@ -76,18 +77,18 @@ pub(super) fn native_number_to_fixed(
     let n = match this {
         Value::Float(f) => *f,
         Value::Integer(i) => *i as f64,
-        _ => return Ok(Value::String("NaN".to_string())),
+        _ => return Ok(Value::String(wk::NAN.to_string())),
     };
     let digits = args.first().map(|v| to_f64(v) as u32).unwrap_or(0);
     if n.is_nan() {
-        return Ok(Value::String("NaN".to_string()));
+        return Ok(Value::String(wk::NAN.to_string()));
     }
     if n.is_infinite() {
         return Ok(Value::String(
             if n.is_sign_positive() {
-                "Infinity"
-            } else {
-                "-Infinity"
+                    wk::INFINITY.to_string()
+                } else {
+                    format!("-{}", wk::INFINITY)
             }
             .to_string(),
         ));
@@ -120,7 +121,7 @@ pub(super) fn native_number_to_string(
                 Ok(Value::String(format_int(*i, radix)))
             }
         }
-        _ => Ok(Value::String("NaN".to_string())),
+        _ => Ok(Value::String(wk::NAN.to_string())),
     }
 }
 
@@ -139,7 +140,7 @@ pub(super) fn native_boolean_to_string(
 ) -> Result<Value> {
     match this {
         Value::Boolean(b) => Ok(Value::String(b.to_string())),
-        _ => Ok(Value::String("true".to_string())),
+        _ => Ok(Value::String(wk::TRUE.to_string())),
     }
 }
 
@@ -159,21 +160,21 @@ pub(super) fn native_number_to_exponential(
     let n = match this {
         Value::Float(f) => *f,
         Value::Integer(i) => *i as f64,
-        _ => return Ok(Value::String("NaN".to_string())),
+        _ => return Ok(Value::String(wk::NAN.to_string())),
     };
     let digits = match args.first() {
         Some(v) => to_f64(v) as usize,
         None => 20,
     };
     if n.is_nan() {
-        return Ok(Value::String("NaN".to_string()));
+        return Ok(Value::String(wk::NAN.to_string()));
     }
     if n.is_infinite() {
         return Ok(Value::String(
             if n.is_sign_positive() {
-                "Infinity"
-            } else {
-                "-Infinity"
+                    wk::INFINITY.to_string()
+                } else {
+                    format!("-{}", wk::INFINITY)
             }
             .to_string(),
         ));
@@ -217,18 +218,18 @@ pub(super) fn native_number_to_precision(
     let n = match this {
         Value::Float(f) => *f,
         Value::Integer(i) => *i as f64,
-        _ => return Ok(Value::String("NaN".to_string())),
+        _ => return Ok(Value::String(wk::NAN.to_string())),
     };
     let precision = args.first().map(|v| to_f64(v) as usize).unwrap_or(0);
     if n.is_nan() {
-        return Ok(Value::String("NaN".to_string()));
+        return Ok(Value::String(wk::NAN.to_string()));
     }
     if n.is_infinite() {
         return Ok(Value::String(
             if n.is_sign_positive() {
-                "Infinity"
-            } else {
-                "-Infinity"
+                    wk::INFINITY.to_string()
+                } else {
+                    format!("-{}", wk::INFINITY)
             }
             .to_string(),
         ));
@@ -302,7 +303,7 @@ fn format_int(n: i64, radix: u32) -> String {
         return n.to_string();
     }
     if !(2..=36).contains(&radix) {
-        return "NaN".to_string();
+        return wk::NAN.to_string();
     }
     if n == 0 {
         return "0".to_string();
