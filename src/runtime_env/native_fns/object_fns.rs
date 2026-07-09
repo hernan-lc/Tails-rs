@@ -100,6 +100,17 @@ pub(super) fn native_object_keys(
                 Vec::new()
             }
         }
+        // Functions are objects with a property bag (e.g. Express `app`).
+        Value::Function(idx) => {
+            if let crate::vm::interpreter::HeapValue::Function(f) = &interp.heap[*idx] {
+                collect_own_enumerable_keys(&f.properties)
+                    .into_iter()
+                    .map(Value::from_string)
+                    .collect()
+            } else {
+                Vec::new()
+            }
+        }
         _ => Vec::new(),
     };
     let heap_idx = interp.heap.len();
@@ -192,6 +203,22 @@ pub(super) fn native_object_values(
                 Vec::new()
             }
         }
+        Value::Function(idx) => {
+            let keys =
+                if let crate::vm::interpreter::HeapValue::Function(f) = &interp.heap[*idx] {
+                    collect_own_enumerable_keys(&f.properties)
+                } else {
+                    Vec::new()
+                };
+            let mut vals = Vec::with_capacity(keys.len());
+            for k in keys {
+                let v = interp
+                    .get_property_str(&obj_val, &k)
+                    .unwrap_or(Value::Undefined);
+                vals.push(v);
+            }
+            vals
+        }
         _ => Vec::new(),
     };
     let heap_idx = interp.heap.len();
@@ -235,6 +262,22 @@ pub(super) fn native_object_entries(
                 Vec::new()
             }
         }
+        Value::Function(idx) => {
+            let keys =
+                if let crate::vm::interpreter::HeapValue::Function(f) = &interp.heap[*idx] {
+                    collect_own_enumerable_keys(&f.properties)
+                } else {
+                    Vec::new()
+                };
+            let mut pairs = Vec::with_capacity(keys.len());
+            for k in keys {
+                let v = interp
+                    .get_property_str(&obj_val, &k)
+                    .unwrap_or(Value::Undefined);
+                pairs.push((k, v));
+            }
+            pairs
+        }
         _ => Vec::new(),
     };
     let mut entries = Vec::with_capacity(pairs.len());
@@ -263,21 +306,42 @@ pub(super) fn native_object_assign(
         return Ok(Value::Undefined);
     }
     let target = args[0].clone();
-    if let Value::Object(target_idx) = &target {
-        for src in &args[1..] {
-            if let Value::Object(src_idx) = src {
-                let cloned: Vec<(String, Value)> =
-                    if let crate::vm::interpreter::HeapValue::Object(src_obj) =
-                        &interp.heap[*src_idx]
-                    {
-                        let mut cloned = Vec::with_capacity(src_obj.properties.len());
-                        for (k, v) in src_obj.properties.iter() {
-                            cloned.push((k.to_string(), v.clone()));
-                        }
-                        cloned
-                    } else {
-                        Vec::new()
-                    };
+
+    // Collect enumerable own properties from each source, then write into target.
+    // Supports Object and Function sources/targets (functions are objects).
+    for src in &args[1..] {
+        let cloned: Vec<(String, Value)> = match src {
+            Value::Object(src_idx) => {
+                if let crate::vm::interpreter::HeapValue::Object(src_obj) = &interp.heap[*src_idx]
+                {
+                    collect_own_enumerable_keys(&src_obj.properties)
+                        .into_iter()
+                        .filter_map(|k| {
+                            src_obj
+                                .properties
+                                .get(&k)
+                                .map(|v| (k, v.clone()))
+                        })
+                        .collect()
+                } else {
+                    Vec::new()
+                }
+            }
+            Value::Function(src_idx) => {
+                if let crate::vm::interpreter::HeapValue::Function(f) = &interp.heap[*src_idx] {
+                    collect_own_enumerable_keys(&f.properties)
+                        .into_iter()
+                        .filter_map(|k| f.properties.get(&k).map(|v| (k, v.clone())))
+                        .collect()
+                } else {
+                    Vec::new()
+                }
+            }
+            _ => Vec::new(),
+        };
+
+        match &target {
+            Value::Object(target_idx) => {
                 if let crate::vm::interpreter::HeapValue::Object(tgt_obj) =
                     &mut interp.heap[*target_idx]
                 {
@@ -286,6 +350,16 @@ pub(super) fn native_object_assign(
                     }
                 }
             }
+            Value::Function(target_idx) => {
+                if let crate::vm::interpreter::HeapValue::Function(f) =
+                    &mut interp.heap[*target_idx]
+                {
+                    for (k, v) in cloned {
+                        f.properties.insert(k, v);
+                    }
+                }
+            }
+            _ => {}
         }
     }
     Ok(target)
@@ -809,6 +883,16 @@ pub(super) fn native_object_has_own_property(
                 }
             }
             Ok(Value::Boolean(false))
+        }
+        Value::Function(idx) => {
+            if let crate::vm::interpreter::HeapValue::Function(f) = &interp.heap[*idx] {
+                let has = f.properties.contains_key(&prop)
+                    || f.properties.contains_key(&getter_key(&prop))
+                    || f.properties.contains_key(&setter_key(&prop));
+                Ok(Value::Boolean(has))
+            } else {
+                Ok(Value::Boolean(false))
+            }
         }
         _ => Ok(Value::Boolean(false)),
     }

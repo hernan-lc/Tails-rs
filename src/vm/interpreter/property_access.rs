@@ -1052,6 +1052,27 @@ impl Interpreter {
                 }
                 Ok(Value::Boolean(false))
             }
+            Value::Function(func_idx) => {
+                if let HeapValue::Function(f) = &self.heap[*func_idx] {
+                    if f.properties.contains_key(&key_str) {
+                        return Ok(Value::Boolean(true));
+                    }
+                    if f.properties.has_accessors()
+                        && (find_accessor(&f.properties, "__getter_", &key_str).is_some()
+                            || find_accessor(&f.properties, "__setter_", &key_str).is_some())
+                    {
+                        return Ok(Value::Boolean(true));
+                    }
+                    // Walk Function.prototype / custom [[Prototype]] if present.
+                    if let Some(proto) = f.properties.get("__[[Prototype]]__").cloned() {
+                        return self.in_check_mut(key, &proto);
+                    }
+                    if let Some(proto_idx) = self.function_proto_idx {
+                        return self.in_check_mut(key, &Value::Object(proto_idx));
+                    }
+                }
+                Ok(Value::Boolean(false))
+            }
             Value::Proxy(proxy_idx) => {
                 if let HeapValue::Proxy(proxy) = &self.heap[*proxy_idx] {
                     let handler = proxy.handler.clone();

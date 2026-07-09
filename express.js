@@ -9,3 +9,7 @@ app.listen(port, () => {
   console.log(`Example app listening on port ${port}`);
 });
 console.log(app)
+setTimeout(() => {
+  console.log("exiting")
+  process.exit();
+},10000)

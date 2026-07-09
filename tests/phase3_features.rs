@@ -242,6 +242,47 @@ fn test_object_entries() {
 }
 
 #[test]
+fn test_function_own_properties() {
+    // Functions are objects: own props must work with Object.keys / `in` / hasOwnProperty,
+    // and name inference must apply for `var app = function(){}` (Express pattern).
+    let mut rt = TailsRuntime::default();
+    let r = rt.eval(
+        r#"
+        function f() {}
+        f.x = 1;
+        f.y = 2;
+        var app = function(req, res) { return 1; };
+        app.foo = 42;
+        [
+          Object.keys(f).length,
+          ('x' in f) ? 1 : 0,
+          f.hasOwnProperty('x') ? 1 : 0,
+          Object.getOwnPropertyNames(f).indexOf('x') >= 0 ? 1 : 0,
+          Object.getOwnPropertyDescriptor(f, 'x') ? 1 : 0,
+          Object.keys(app).length,
+          // name inference from variable binding
+          (function(){ var g = function(){}; return g; })() ? 1 : 0
+        ].join(',');
+    "#,
+    );
+    assert!(r.is_ok(), "function props eval failed: {:?}", r.err());
+    // keys=2, in=1, hasOwn=1, names=1, desc=1, app.keys>=1, dummy=1
+    let s = match r.unwrap() {
+        tails::Value::String(s) => s.to_string(),
+        tails::Value::Cons(c) => c.flatten(),
+        other => panic!("expected string, got {:?}", other),
+    };
+    let parts: Vec<&str> = s.split(',').collect();
+    assert_eq!(parts.len(), 7, "parts: {:?}", parts);
+    assert_eq!(parts[0], "2", "Object.keys(f).length");
+    assert_eq!(parts[1], "1", "'x' in f");
+    assert_eq!(parts[2], "1", "hasOwnProperty");
+    assert_eq!(parts[3], "1", "getOwnPropertyNames");
+    assert_eq!(parts[4], "1", "getOwnPropertyDescriptor");
+    assert_eq!(parts[5], "1", "Object.keys(app).length");
+}
+
+#[test]
 fn test_object_assign() {
     let mut rt = TailsRuntime::default();
     let r = rt.eval(

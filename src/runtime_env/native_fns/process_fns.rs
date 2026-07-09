@@ -1,4 +1,6 @@
 use std::cell::RefCell;
+use std::io::Write;
+use std::sync::atomic::{AtomicBool, AtomicI32, Ordering};
 
 use crate::errors::Result;
 use crate::objects::Value;
@@ -6,6 +8,53 @@ use crate::props;
 use crate::vm::interpreter::Interpreter;
 
 use super::helpers::to_string_value;
+
+/// Set by `process.exit` / SIGINT / SIGTERM so the event loop can stop
+/// cooperatively when an immediate hard-exit is not used.
+static EXIT_REQUESTED: AtomicBool = AtomicBool::new(false);
+static EXIT_CODE: AtomicI32 = AtomicI32::new(0);
+
+/// Returns `true` once `process.exit` or a termination signal has been seen.
+#[inline]
+pub fn exit_requested() -> bool {
+    EXIT_REQUESTED.load(Ordering::SeqCst)
+}
+
+/// Exit status requested by `process.exit` / signal handlers.
+#[inline]
+pub fn take_exit_code() -> i32 {
+    EXIT_CODE.load(Ordering::SeqCst)
+}
+
+/// Mark that the process should exit (used by signal handlers and tests).
+pub fn request_exit(code: i32) {
+    EXIT_CODE.store(code, Ordering::SeqCst);
+    EXIT_REQUESTED.store(true, Ordering::SeqCst);
+}
+
+/// Install SIGINT/SIGTERM handlers that request a clean exit so the event
+/// loop can unwind instead of dying with an uncaught signal (fish/bash then
+/// report "terminated by signal SIGTERM").
+pub fn install_signal_handlers() {
+    // SAFETY: only registers simple signal handlers that touch atomics.
+    // No heap allocation or locks in the handler path.
+    unsafe {
+        libc::signal(
+            libc::SIGINT,
+            signal_handler as *const () as libc::sighandler_t,
+        );
+        libc::signal(
+            libc::SIGTERM,
+            signal_handler as *const () as libc::sighandler_t,
+        );
+    }
+}
+
+extern "C" fn signal_handler(sig: libc::c_int) {
+    // Node uses 128 + signal for terminal signals; request cooperative exit.
+    let code = 128i32.saturating_add(sig);
+    request_exit(code);
+}
 
 // ---------------------------------------------------------------------------
 // `process.on('exit', ...)` handler registry
@@ -49,6 +98,15 @@ pub(super) fn native_process_exit(
     let code = match args.first() {
         Some(Value::Integer(n)) => *n as i32,
         Some(Value::Float(n)) => *n as i32,
+        Some(Value::Boolean(b)) => {
+            if *b {
+                1
+            } else {
+                0
+            }
+        }
+        Some(Value::String(s)) => s.parse::<i32>().unwrap_or(0),
+        Some(Value::Cons(c)) => c.flatten().parse::<i32>().unwrap_or(0),
         _ => 0,
     };
     // Run user-registered exit handlers before terminating. We do
@@ -56,6 +114,12 @@ pub(super) fn native_process_exit(
     // swallow any errors so a misbehaving handler does not prevent
     // the process from actually exiting.
     run_exit_handlers(interp);
+    request_exit(code);
+    // Flush so `console.log("exiting")` is visible before the process dies.
+    let _ = std::io::stdout().flush();
+    let _ = std::io::stderr().flush();
+    // Hard-exit like Node: drop everything and terminate immediately so
+    // open HTTP listeners / the event loop cannot keep the process alive.
     std::process::exit(code);
 }
 

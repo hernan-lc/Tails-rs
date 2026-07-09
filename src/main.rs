@@ -103,6 +103,10 @@ fn discover_imports(script_path: &Path) -> Vec<PathBuf> {
 }
 
 fn run_script(script_path: &Path) -> Result<()> {
+    // So Ctrl+C / SIGTERM stop the event loop cleanly (normal exit code)
+    // instead of an uncaught signal that shells report as "terminated by SIGTERM".
+    tails::runtime_env::native_fns::process_fns::install_signal_handlers();
+
     let source = std::fs::read_to_string(script_path)
         .with_context(|| format!("Failed to read '{}'", script_path.display()))?;
 
@@ -133,6 +137,7 @@ fn run_script(script_path: &Path) -> Result<()> {
             let e_with_file = e.with_file(file_str);
             eprint!("{}", e_with_file.display(Some(&source)));
             eprintln!("[tails] Failed in {}ms.", elapsed.as_millis());
+            std::process::exit(1);
         }
     }
 

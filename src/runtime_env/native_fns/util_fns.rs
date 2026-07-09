@@ -249,7 +249,47 @@ fn inspect_value(interp: &Interpreter, value: &Value, depth: usize, indent: usiz
         }
         Value::Function(idx) => {
             if let HeapValue::Function(f) = &interp.heap[*idx] {
-                f.name.clone().unwrap_or_else(|| "[Function]".to_string())
+                let name = f.name.as_deref().unwrap_or("anonymous");
+                let tag = if name == "anonymous" {
+                    "[Function (anonymous)]".to_string()
+                } else {
+                    format!("[Function: {}]", name)
+                };
+                // Own properties (cloned so we can recurse without holding a borrow).
+                let items_src: Vec<(String, Value)> = f
+                    .properties
+                    .keys()
+                    .filter(|k| {
+                        !k.starts_with("__getter_")
+                            && !k.starts_with("__setter_")
+                            && !k.starts_with("__method_")
+                            && *k != "__[[Prototype]]__"
+                            && *k != "constructor"
+                    })
+                    .filter_map(|k| {
+                        f.properties
+                            .get(k)
+                            .map(|v| (k.to_string(), v.clone()))
+                    })
+                    .collect();
+                if items_src.is_empty() {
+                    tag
+                } else {
+                    let prefix = " ".repeat(indent);
+                    let inner = " ".repeat(indent + 2);
+                    let items: Vec<String> = items_src
+                        .iter()
+                        .map(|(k, v)| {
+                            format!(
+                                "{}{}: {}",
+                                inner,
+                                k,
+                                inspect_value(interp, v, depth.saturating_sub(1), indent + 2)
+                            )
+                        })
+                        .collect();
+                    format!("{} {{\n{}\n{}}}", tag, items.join(",\n"), prefix)
+                }
             } else {
                 "[Function]".to_string()
             }

@@ -52,42 +52,83 @@ fn get_timestamp() -> String {
     })
 }
 
-fn collect_object_properties<'a>(
-    interp: &'a Interpreter,
-    obj_idx: usize,
-    visited: &mut std::collections::HashSet<usize>,
-) -> Vec<(String, &'a Value)> {
-    if !visited.insert(obj_idx) {
-        return Vec::new();
-    }
+/// Own enumerable string properties only (matches Node util.inspect).
+/// Values are cloned so callers can recurse into the heap freely.
+/// `is_getter` is true for accessor-only properties.
+fn collect_own_properties_owned(
+    properties: &crate::vm::interpreter::PropertyStorage,
+) -> Vec<(String, Value, bool)> {
+    let mut all_props: Vec<(String, Value, bool)> = Vec::new();
+    let mut seen = std::collections::HashSet::new();
 
-    let mut all_props: Vec<(String, &'a Value)> = Vec::new();
-
-    if let crate::vm::interpreter::HeapValue::Object(obj) = &interp.heap[obj_idx] {
-        for (k, v) in &obj.properties {
-            if k == wk::CONSTRUCTOR {
-                continue;
-            }
-            if let Some(prop_name) = k.strip_prefix("__getter_") {
-                all_props.push((prop_name.to_string(), v));
-                continue;
-            }
-            if !is_user_visible_key(k) {
-                continue;
-            }
-            all_props.push((k.to_string(), v));
+    for (k, v) in properties {
+        if k == wk::CONSTRUCTOR {
+            continue;
         }
-        if let Some(proto_idx) = obj.prototype {
-            let proto_props = collect_object_properties(interp, proto_idx, visited);
-            for (k, v) in proto_props {
-                if !all_props.iter().any(|(existing_k, _)| existing_k == &k) {
-                    all_props.push((k, v));
-                }
+        if let Some(prop_name) = k.strip_prefix("__getter_") {
+            if is_user_visible_key(prop_name) && seen.insert(prop_name.to_string()) {
+                let has_setter = properties.contains_key(&format!("__setter_{}", prop_name));
+                // Pure getter (no data, optional setter) → show as [Getter]
+                let is_accessor_only = !properties.contains_key(prop_name);
+                all_props.push((
+                    prop_name.to_string(),
+                    v.clone(),
+                    is_accessor_only && !has_setter,
+                ));
             }
+            continue;
+        }
+        if !is_user_visible_key(k) {
+            continue;
+        }
+        if seen.insert(k.to_string()) {
+            all_props.push((k.to_string(), v.clone(), false));
         }
     }
-
     all_props
+}
+
+fn format_props_block(
+    interp: &Interpreter,
+    props: &[(String, Value, bool)],
+    depth: usize,
+    use_colors: bool,
+    include_quotes: bool,
+    ancestors: &mut std::collections::HashSet<usize>,
+) -> String {
+    if props.is_empty() {
+        return "{}".to_string();
+    }
+
+    let pad = INDENT.repeat(depth + 1);
+    let closing_pad = INDENT.repeat(depth);
+    let mut lines: Vec<String> = Vec::with_capacity(props.len());
+
+    for (key, val, is_getter) in props {
+        let val_str = if *is_getter {
+            if use_colors {
+                "[Getter]".dimmed().to_string()
+            } else {
+                "[Getter]".to_string()
+            }
+        } else {
+            pretty_format_inner(
+                interp,
+                val,
+                depth + 1,
+                use_colors,
+                include_quotes,
+                ancestors,
+            )
+        };
+        if use_colors {
+            lines.push(format!("{}{}: {}", pad, key.bold(), val_str));
+        } else {
+            lines.push(format!("{}{}: {}", pad, key, val_str));
+        }
+    }
+
+    format!("{{\n{}\n{}}}", lines.join(",\n"), closing_pad)
 }
 
 fn pretty_format(
@@ -97,105 +138,158 @@ fn pretty_format(
     use_colors: bool,
     include_quotes: bool,
 ) -> String {
+    let mut ancestors = std::collections::HashSet::new();
+    pretty_format_inner(interp, v, depth, use_colors, include_quotes, &mut ancestors)
+}
+
+fn pretty_format_inner(
+    interp: &Interpreter,
+    v: &Value,
+    depth: usize,
+    use_colors: bool,
+    include_quotes: bool,
+    ancestors: &mut std::collections::HashSet<usize>,
+) -> String {
     if depth >= MAX_DEPTH {
         return match v {
             Value::Object(_) => "[Object]".to_string(),
             Value::Array(_) => "[Array]".to_string(),
+            Value::Function(_) => "[Function]".to_string(),
             _ => to_display_string(interp, v),
         };
     }
 
     match v {
         Value::Object(obj_idx) => {
-            let mut visited = std::collections::HashSet::new();
-            let all_props = collect_object_properties(interp, *obj_idx, &mut visited);
-
-            if all_props.is_empty() {
-                return "{}".to_string();
+            if !ancestors.insert(*obj_idx) {
+                return if use_colors {
+                    "[Circular]".dimmed().to_string()
+                } else {
+                    "[Circular]".to_string()
+                };
             }
 
-            let mut props = all_props;
-            props.sort_by(|a, b| a.0.cmp(&b.0));
-
-            let pad = INDENT.repeat(depth + 1);
-            let closing_pad = INDENT.repeat(depth);
-
-            let mut lines: Vec<String> = Vec::with_capacity(props.len());
-            for (key, val) in &props {
-                let getter_key = format!("__getter_{}", key);
-                let setter_key = format!("__setter_{}", key);
-                let is_getter = if let crate::vm::interpreter::HeapValue::Object(obj) =
-                    &interp.heap[*obj_idx]
-                {
-                    obj.properties.contains_key(&getter_key)
-                        && !obj.properties.contains_key(&setter_key)
+            let (props, is_null_proto) =
+                if let crate::vm::interpreter::HeapValue::Object(obj) = &interp.heap[*obj_idx] {
+                    (
+                        collect_own_properties_owned(&obj.properties),
+                        obj.prototype.is_none(),
+                    )
                 } else {
-                    false
+                    (Vec::new(), false)
                 };
-                let is_setter = if let crate::vm::interpreter::HeapValue::Object(obj) =
-                    &interp.heap[*obj_idx]
-                {
-                    !obj.properties.contains_key(&getter_key)
-                        && obj.properties.contains_key(&setter_key)
-                } else {
-                    false
-                };
-                let val_str = if is_getter || is_setter {
-                    if use_colors {
-                        "[Getter]".dimmed().to_string()
-                    } else {
-                        "[Getter]".to_string()
-                    }
-                } else {
-                    pretty_format(interp, val, depth + 1, use_colors, include_quotes)
-                };
-                if use_colors {
-                    lines.push(format!("{}{}: {}", pad, key.bold(), val_str));
-                } else {
-                    lines.push(format!("{}{}: {}", pad, key, val_str));
-                }
-            }
 
-            format!("{{\n{}\n{}}}", lines.join(",\n"), closing_pad)
+            let body = format_props_block(
+                interp,
+                &props,
+                depth,
+                use_colors,
+                include_quotes,
+                ancestors,
+            );
+            let result = if is_null_proto && body != "{}" {
+                format!("[Object: null prototype] {}", body)
+            } else if is_null_proto {
+                "[Object: null prototype] {}".to_string()
+            } else {
+                body
+            };
+
+            ancestors.remove(obj_idx);
+            result
         }
         Value::Array(arr_idx) => {
-            if let crate::vm::interpreter::HeapValue::Array(arr) = &interp.heap[*arr_idx] {
-                if arr.elements.is_empty() {
-                    return "[]".to_string();
-                }
-
+            if !ancestors.insert(*arr_idx) {
+                return if use_colors {
+                    "[Circular]".dimmed().to_string()
+                } else {
+                    "[Circular]".to_string()
+                };
+            }
+            let elems = if let crate::vm::interpreter::HeapValue::Array(arr) =
+                &interp.heap[*arr_idx]
+            {
+                arr.elements.clone()
+            } else {
+                Vec::new()
+            };
+            let result = if elems.is_empty() {
+                "[]".to_string()
+            } else {
                 let pad = INDENT.repeat(depth + 1);
                 let closing_pad = INDENT.repeat(depth);
-
-                let mut lines: Vec<String> = Vec::with_capacity(arr.elements.len());
-                for elem in &arr.elements {
-                    let val_str =
-                        pretty_format(interp, elem, depth + 1, use_colors, include_quotes);
+                let mut lines: Vec<String> = Vec::with_capacity(elems.len());
+                for elem in &elems {
+                    let val_str = pretty_format_inner(
+                        interp,
+                        elem,
+                        depth + 1,
+                        use_colors,
+                        include_quotes,
+                        ancestors,
+                    );
                     lines.push(format!("{}{}", pad, val_str));
                 }
-
                 format!("[\n{}\n{}]", lines.join(",\n"), closing_pad)
-            } else {
-                "[Array]".to_string()
-            }
+            };
+            ancestors.remove(arr_idx);
+            result
         }
         Value::Function(idx) => {
-            if let crate::vm::interpreter::HeapValue::Function(f) = &interp.heap[*idx] {
-                let name = f.name.as_deref().unwrap_or("anonymous");
-                if f.prototype.is_some() && f.super_class.is_some() {
-                    if use_colors {
-                        format!("[class {}]", name.cyan())
-                    } else {
-                        format!("[class {}]", name)
-                    }
-                } else if use_colors {
-                    format!("[Function: {}]", name.cyan())
+            if !ancestors.insert(*idx) {
+                return if use_colors {
+                    "[Circular]".dimmed().to_string()
                 } else {
-                    format!("[Function: {}]", name)
-                }
-            } else {
-                "[Function]".to_string()
+                    "[Circular]".to_string()
+                };
             }
+
+            let (tag, props) =
+                if let crate::vm::interpreter::HeapValue::Function(f) = &interp.heap[*idx] {
+                    let name = f.name.as_deref().unwrap_or("anonymous");
+                    let tag = if f.prototype.is_some() && f.super_class.is_some() {
+                        if use_colors {
+                            format!("[class {}]", name.cyan())
+                        } else {
+                            format!("[class {}]", name)
+                        }
+                    } else if name == "anonymous" {
+                        // Match Node: `[Function (anonymous)]` for unnamed functions.
+                        if use_colors {
+                            format!("[Function ({})]", "anonymous".cyan())
+                        } else {
+                            "[Function (anonymous)]".to_string()
+                        }
+                    } else if use_colors {
+                        format!("[Function: {}]", name.cyan())
+                    } else {
+                        format!("[Function: {}]", name)
+                    };
+
+                    // Node util.inspect shows own properties on functions that have them
+                    // (e.g. Express `app` is a function with dozens of methods attached).
+                    let props = collect_own_properties_owned(&f.properties);
+                    (tag, props)
+                } else {
+                    ("[Function]".to_string(), Vec::new())
+                };
+
+            let result = if props.is_empty() {
+                tag
+            } else {
+                let body = format_props_block(
+                    interp,
+                    &props,
+                    depth,
+                    use_colors,
+                    include_quotes,
+                    ancestors,
+                );
+                format!("{} {}", tag, body)
+            };
+
+            ancestors.remove(idx);
+            result
         }
         Value::NativeFunction(_) => {
             if use_colors {

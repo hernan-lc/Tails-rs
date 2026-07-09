@@ -38,9 +38,10 @@ pub fn bind(port: u16) -> std::io::Result<TcpListener> {
 /// Reads the request line, headers, and (if `Content-Length` is present) the
 /// request body. Lowercases header names for case-insensitive lookup.
 pub fn read_request(stream: &mut TcpStream) -> std::io::Result<HttpRequest> {
-    // A short read timeout keeps a misbehaving client from stalling the loop.
-    stream.set_read_timeout(Some(std::time::Duration::from_secs(5)))?;
-    stream.set_write_timeout(Some(std::time::Duration::from_secs(5)))?;
+    // Keep timeouts short: the Tails event loop is single-threaded, so a slow
+    // or incomplete client must not stall timers / `process.exit()` for seconds.
+    stream.set_read_timeout(Some(std::time::Duration::from_millis(200)))?;
+    stream.set_write_timeout(Some(std::time::Duration::from_millis(200)))?;
 
     let mut reader = BufReader::new(stream);
 

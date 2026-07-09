@@ -46,7 +46,7 @@ impl CodeGenerator {
             } => self.generate_optional_member(object, property, *computed),
             Expression::OptionalCall { callee, args } => self.generate_optional_call(callee, args),
             Expression::FunctionExpression {
-                name: _,
+                name,
                 params,
                 param_patterns,
                 body,
@@ -56,14 +56,21 @@ impl CodeGenerator {
                 is_generator,
                 defaults,
                 rest_param,
-            } => self.generate_function_expression(
-                params,
-                body,
-                *is_generator,
-                rest_param.as_deref(),
-                defaults,
-                param_patterns,
-            ),
+            } => {
+                // Prefer explicit name; fall back to ES name inference from binding.
+                let inferred = name
+                    .clone()
+                    .or_else(|| self.inferred_function_name.take());
+                self.generate_function_expression(
+                    inferred,
+                    params,
+                    body,
+                    *is_generator,
+                    rest_param.as_deref(),
+                    defaults,
+                    param_patterns,
+                )
+            }
             Expression::ArrowFunction {
                 params,
                 param_patterns,
@@ -241,6 +248,7 @@ impl CodeGenerator {
 
     fn generate_function_expression(
         &mut self,
+        name: Option<String>,
         params: &[String],
         body: &[SpannedNode<Statement>],
         is_generator: bool,
@@ -259,7 +267,7 @@ impl CodeGenerator {
         let num_captures = outer_refs.len();
 
         self.functions.push(CompiledFunction {
-            name: None,
+            name,
             params: params.to_vec(),
             rest_param: rest_param.map(|s| s.to_string()),
             bytecode_index: 0,

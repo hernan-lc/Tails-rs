@@ -209,11 +209,26 @@ impl TailsRuntime {
     /// This is called after the top-level script/module finishes to keep the
     /// process alive for long-running services (HTTP servers, TCP connections,
     /// scheduled timers, …).
+    ///
+    /// Returns early when `process.exit` or SIGINT/SIGTERM request termination.
+    /// The requested status is available via
+    /// [`crate::runtime_env::native_fns::process_fns::take_exit_code`].
     pub fn run_event_loop(&mut self) -> Result<()> {
+        use crate::runtime_env::native_fns::process_fns::{exit_requested, take_exit_code};
+
         // Drain any sources registered during script execution.
         self.drain_pending_sources();
 
         while self.has_pending_work() {
+            // process.exit / Ctrl+C / SIGTERM — stop the loop cleanly.
+            if exit_requested() {
+                let code = take_exit_code();
+                // Hard exit so open listeners cannot re-enter the loop.
+                let _ = std::io::Write::flush(&mut std::io::stdout());
+                let _ = std::io::Write::flush(&mut std::io::stderr());
+                std::process::exit(code);
+            }
+
             // Drain sources that may have been added during this tick.
             self.drain_pending_sources();
 
@@ -228,18 +243,33 @@ impl TailsRuntime {
             self.interpreter.drain_microtasks();
 
             // Fire any ready macrotasks (setTimeout callbacks).
+            // process.exit inside a timer never returns (hard-exits).
             let macrotasks = self.interpreter.async_runtime.run_macrotasks();
             for task in macrotasks {
                 let _ = self
                     .interpreter
                     .call_value(&task.callback, &Value::Undefined, &[]);
+                if exit_requested() {
+                    let code = take_exit_code();
+                    let _ = std::io::Write::flush(&mut std::io::stdout());
+                    let _ = std::io::Write::flush(&mut std::io::stderr());
+                    std::process::exit(code);
+                }
             }
 
             // Remove inactive sources so they are not polled again.
             self.event_sources.retain(|s| s.is_active());
 
-            // Brief sleep to avoid busy-spinning when all sources are waiting.
-            std::thread::sleep(std::time::Duration::from_millis(1));
+            // Sleep until the next timer (capped) so we don't busy-spin, but
+            // wake often enough to notice SIGINT/SIGTERM and due timers.
+            let sleep_ms = self
+                .interpreter
+                .async_runtime
+                .next_timer_delay_ms()
+                .unwrap_or(50)
+                .min(50)
+                .max(1);
+            std::thread::sleep(std::time::Duration::from_millis(sleep_ms));
         }
 
         Ok(())

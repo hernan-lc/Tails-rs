@@ -41,7 +41,21 @@ pub(super) fn normalize_index(index: i64, len: i64) -> i64 {
 }
 
 pub(super) fn is_user_visible_key(k: &str) -> bool {
-    !k.starts_with("__getter_") && !k.starts_with("__setter_") && !k.starts_with("__method_")
+    // Hide internal storage keys and runtime bookkeeping that must not
+    // surface via Object.keys / console.log / util.inspect.
+    if k.starts_with("__getter_")
+        || k.starts_with("__setter_")
+        || k.starts_with("__method_")
+        || k.starts_with("__sym_")
+        || k.starts_with("__[[")
+        || k.starts_with("__listeners_")
+        || k == "__module_path"
+        || k == "__[[Prototype]]__"
+        || k.starts_with("@@symbol:")
+    {
+        return false;
+    }
+    true
 }
 
 const GETTER_PREFIX: &str = "__getter_";

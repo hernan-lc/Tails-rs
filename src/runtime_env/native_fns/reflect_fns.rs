@@ -383,6 +383,52 @@ pub(super) fn native_reflect_get_own_property_descriptor(
                 }
             }
         }
+        Value::Function(func_idx) => {
+            if let crate::vm::interpreter::HeapValue::Function(f) = &interp.heap[*func_idx] {
+                let getter_key = format!("__getter_{}", property);
+                let setter_key = format!("__setter_{}", property);
+                let getter = f.properties.get(&getter_key).cloned();
+                let setter = f.properties.get(&setter_key).cloned();
+                let data = f.properties.get(&property).cloned();
+
+                if let Some(data) = data {
+                    if getter.is_none() && setter.is_none() {
+                        let descriptor = props! {
+                            "value" => data,
+                            "writable" => Value::Boolean(true),
+                            "enumerable" => Value::Boolean(true),
+                            "configurable" => Value::Boolean(true),
+                        };
+                        let desc_idx = interp.heap.len();
+                        interp.heap.push(crate::vm::interpreter::HeapValue::Object(
+                            crate::vm::interpreter::JsObject {
+                                properties: descriptor,
+                                prototype: None,
+                                extensible: true,
+                            },
+                        ));
+                        return Ok(Value::Object(desc_idx));
+                    }
+                }
+                if getter.is_some() || setter.is_some() {
+                    let descriptor = props! {
+                        "get" => getter.unwrap_or(Value::Undefined),
+                        "set" => setter.unwrap_or(Value::Undefined),
+                        "enumerable" => Value::Boolean(true),
+                        "configurable" => Value::Boolean(true),
+                    };
+                    let desc_idx = interp.heap.len();
+                    interp.heap.push(crate::vm::interpreter::HeapValue::Object(
+                        crate::vm::interpreter::JsObject {
+                            properties: descriptor,
+                            prototype: None,
+                            extensible: true,
+                        },
+                    ));
+                    return Ok(Value::Object(desc_idx));
+                }
+            }
+        }
         _ => {}
     }
     Ok(Value::Undefined)

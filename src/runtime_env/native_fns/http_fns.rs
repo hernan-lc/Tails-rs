@@ -240,9 +240,14 @@ pub(super) fn native_http_server_listen(
         handled: 0,
     }));
 
-    // Invoke the "listening" callback synchronously.
+    // Match Node: fire the listening callback asynchronously (next macrotask)
+    // so code after `server.listen(...)` runs before the ready callback.
+    // e.g. `app.listen(port, () => console.log("listening")); console.log(app);`
+    // should print `app` first, then "listening".
     if let Some(cb) = ready_cb {
-        let _ = interp.call_value(&cb, &Value::Undefined, &[]);
+        if !matches!(cb, Value::Undefined | Value::Null) {
+            interp.async_runtime.enqueue_macrotask(cb, 0.0);
+        }
     }
 
     Ok(Value::Undefined)

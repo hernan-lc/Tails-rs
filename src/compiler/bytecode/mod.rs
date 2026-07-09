@@ -41,6 +41,9 @@ pub(crate) struct CodeGenerator {
     /// bindings are initialized. Re-emitted after variable declarations and
     /// before returns so captures see real values (not undefined).
     pending_closure_snapshots: Vec<(u16, Vec<u16>)>,
+    /// ES name inference: `var app = function(){}` gives the function name "app".
+    /// Set around expression generation when the binding name is known.
+    pub(crate) inferred_function_name: Option<String>,
 }
 
 impl CodeGenerator {
@@ -62,6 +65,7 @@ impl CodeGenerator {
             current_source_line: None,
             current_source_col: None,
             pending_closure_snapshots: Vec::new(),
+            inferred_function_name: None,
         }
     }
 
@@ -316,7 +320,18 @@ impl CodeGenerator {
             } => {
                 for decl in declarations {
                     if let Some(init) = &decl.init {
+                        // ES name inference: `var app = function() {}` → name "app"
+                        if let BindingPattern::Identifier(id) = &decl.id {
+                            if matches!(
+                                init,
+                                Expression::FunctionExpression { name: None, .. }
+                                    | Expression::ArrowFunction { .. }
+                            ) {
+                                self.inferred_function_name = Some(id.clone());
+                            }
+                        }
                         self.generate_expression(init)?;
+                        self.inferred_function_name = None;
                         self.generate_destructuring_pattern(&decl.id)?;
                     } else {
                         match &decl.id {

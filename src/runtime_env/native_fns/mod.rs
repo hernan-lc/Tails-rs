@@ -175,9 +175,9 @@ mod path_fns {
     );
 }
 #[cfg(feature = "process")]
-mod process_fns;
+pub mod process_fns;
 #[cfg(not(feature = "process"))]
-mod process_fns {
+pub mod process_fns {
     use crate::errors::{Error, Result};
     use crate::objects::Value;
     use crate::vm::interpreter::Interpreter;
@@ -196,6 +196,19 @@ mod process_fns {
         native_process_memory_usage,
         native_process_on,
     );
+
+    #[inline]
+    pub fn exit_requested() -> bool {
+        false
+    }
+    #[inline]
+    pub fn take_exit_code() -> i32 {
+        0
+    }
+    #[inline]
+    pub fn install_signal_handlers() {}
+    #[inline]
+    pub fn request_exit(_code: i32) {}
 }
 mod promise_fns;
 mod proxy_fns;
