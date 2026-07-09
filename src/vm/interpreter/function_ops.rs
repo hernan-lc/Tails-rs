@@ -70,20 +70,13 @@ impl Interpreter {
                             .unwrap_or(Value::Undefined)
                     })
                     .collect();
-                let closure_vars: Rc<RefCell<Vec<Value>>> = {
-                    // Each closure gets its own copy of the captured values.
-                    // The shared_closure_env optimization was causing closures
-                    // created in a loop body to share the same environment,
-                    // meaning all closures captured only the first iteration's
-                    // values instead of their respective per-iteration values.
-                    let rc = Rc::new(RefCell::new(snapshot));
-                    if let Some(frame) = self.call_stack.last_mut() {
-                        frame
-                            .get_or_init_closure_env()
-                            .insert(*func_idx, rc.clone());
-                    }
-                    rc
-                };
+                // Each closure gets its own copy of the captured values.
+                // Do not stash into `shared_closure_env`: that map was for a
+                // sibling-share optimization that incorrectly made loop-body
+                // closures capture only the first iteration's values. Keeping
+                // the insert also allocated a HashMap on every MakeClosure
+                // call site and held an extra Rc root until the frame returned.
+                let closure_vars: Rc<RefCell<Vec<Value>>> = Rc::new(RefCell::new(snapshot));
                 let owner = self.current_module.clone();
                 let scope = self.module_globals_rc();
                 let heap_idx = self.gc.allocate(

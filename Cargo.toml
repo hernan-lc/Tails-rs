@@ -21,14 +21,31 @@ net = ["dep:tails-net"]
 zlib = ["dep:flate2", "dep:base64"]
 tls = ["dep:native-tls"]
 dns = ["dep:hickory-resolver"]
+# Opt-in debug binaries under src/bin/ (not built by default).
+dev-bins = []
 
 [lib]
 name = "tails"
 path = "src/lib.rs"
 
+# Disable auto-discovery of src/bin/* debug tools so release/bench builds
+# do not LTO-link dump_new / test_promise on every cargo bench.
+autobins = false
+
 [[bin]]
 name = "tails"
 path = "src/main.rs"
+
+# Dev-only helpers (build explicitly: cargo run --bin dump_new)
+[[bin]]
+name = "dump_new"
+path = "src/bin/dump_new.rs"
+required-features = ["dev-bins"]
+
+[[bin]]
+name = "test_promise"
+path = "src/bin/test_promise.rs"
+required-features = ["dev-bins"]
 
 [dependencies]
 tails-abi = { path = "modules/abi" }
@@ -105,6 +122,16 @@ criterion = { version = "0.5", features = ["html_reports"] }
 lto = true
 codegen-units = 1
 strip = true
+
+# Benches inherit release by default; full LTO + codegen-units=1 makes
+# `cargo bench` appear to hang (multi-minute link of lib + bins + criterion).
+# Keep opt-level=3 but skip fat LTO so benches actually compile and run.
+[profile.bench]
+inherits = "release"
+lto = false
+codegen-units = 16
+strip = false
+debug = false
 
 [[bench]]
 name = "runtime"

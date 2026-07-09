@@ -293,14 +293,21 @@ impl Interpreter {
     }
 
     pub(crate) fn collect_garbage(&mut self) {
-        eprintln!(
-            "[GC] BEFORE heap={} globals={} stack={} allocs={} threshold={}",
-            self.heap.len(),
-            self.globals.len(),
-            self.stack.len(),
-            self.gc.allocation_count,
-            self.gc.threshold
-        );
+        // GC path is hot under allocation-heavy workloads (closures, arrays).
+        // Never print by default — stderr spam made benches look hung/leaky.
+        // Enable with: TAILS_GC_TRACE=1
+        static GC_TRACE: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+        let trace = *GC_TRACE.get_or_init(|| std::env::var_os("TAILS_GC_TRACE").is_some());
+        if trace {
+            eprintln!(
+                "[GC] BEFORE heap={} globals={} stack={} allocs={} threshold={}",
+                self.heap.len(),
+                self.globals.len(),
+                self.stack.len(),
+                self.gc.allocation_count,
+                self.gc.threshold
+            );
+        }
         // Build the GC root set for global bindings. `self.globals` holds the
         // built-in globals (Object, Array, …) as well as module-level function
         // and export bindings that were merged back after each module finished
@@ -347,12 +354,14 @@ impl Interpreter {
             &stack_snapshot,
             &call_stack_snapshot,
         );
-        eprintln!(
-            "[GC] AFTER heap={} freed={} live={}",
-            self.heap.len(),
-            freed,
-            self.gc.live_count(self.heap.len())
-        );
+        if trace {
+            eprintln!(
+                "[GC] AFTER heap={} freed={} live={}",
+                self.heap.len(),
+                freed,
+                self.gc.live_count(self.heap.len())
+            );
+        }
     }
 
     pub(crate) fn current_source_line(&self, pc: usize) -> Option<usize> {

@@ -1,6 +1,15 @@
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use std::ffi::CString;
+use std::time::Duration;
 use tails::ffi::safe_wrappers::{SafeCStr, SafePtr, SafeSlice};
+
+fn bench_config() -> Criterion {
+    Criterion::default()
+        .sample_size(50)
+        .measurement_time(Duration::from_secs(1))
+        .warm_up_time(Duration::from_millis(300))
+        .without_plots()
+}
 
 fn bench_safe_ptr_creation(c: &mut Criterion) {
     let value = 42i32;
@@ -58,13 +67,15 @@ fn bench_safe_slice_as_slice(c: &mut Criterion) {
     });
 }
 
-criterion_group!(
-    safe_wrappers,
-    bench_safe_ptr_creation,
-    bench_safe_ptr_as_ref,
-    bench_safe_cstr_creation,
-    bench_safe_cstr_to_str,
-    bench_safe_slice_creation,
-    bench_safe_slice_as_slice,
-);
+criterion_group! {
+    name = safe_wrappers;
+    config = bench_config();
+    targets =
+        bench_safe_ptr_creation,
+        bench_safe_ptr_as_ref,
+        bench_safe_cstr_creation,
+        bench_safe_cstr_to_str,
+        bench_safe_slice_creation,
+        bench_safe_slice_as_slice
+}
 criterion_main!(safe_wrappers);
