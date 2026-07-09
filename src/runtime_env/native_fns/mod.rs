@@ -819,6 +819,12 @@ pub static NATIVE_TABLE: &[NativeFn] = &[
     math_fns::native_math_hypot,
     // Function constructor (472)
     function_fns::native_function_constructor,
+    // Object.getOwnPropertyDescriptors (473)
+    object_fns::native_object_get_own_property_descriptors,
+    // Object.defineProperties (474)
+    object_fns::native_object_define_properties,
+    // Object.fromEntries (475)
+    object_fns::native_object_from_entries,
 ];
 
 #[cfg(test)]

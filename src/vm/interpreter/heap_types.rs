@@ -494,6 +494,7 @@ fn has_advanced_features(pattern: &str) -> bool {
 
 impl JsRegExp {
     pub fn new(pattern: &str, flags: &str) -> Result<Self, String> {
+        eprintln!("[DBG regex pattern = {:?}]", pattern);
         let mut regex_flags = String::new();
         let global = flags.contains('g');
         let ignore_case = flags.contains('i');

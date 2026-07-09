@@ -153,8 +153,75 @@ pub fn tokenize(source: &str) -> Result<Vec<SpannedToken>> {
                     loop {
                         match chars.next() {
                             Some((_, '\\')) if !escaped => {
-                                pattern.push('\\');
+                                // Start of an escape sequence; the following
+                                // character is processed in the `escaped` arm.
                                 escaped = true;
+                                col += 1;
+                            }
+                            Some((_, c)) if escaped => {
+                                match c {
+                                    '\\' => pattern.push('\\'),
+                                    'n' => pattern.push('\n'),
+                                    't' => pattern.push('\t'),
+                                    'r' => pattern.push('\r'),
+                                    'f' => pattern.push('\x0c'),
+                                    'v' => pattern.push('\x0b'),
+                                    '0' => pattern.push('\0'),
+                                    'x' => {
+                                        let mut hex = String::new();
+                                        for _ in 0..2 {
+                                            if let Some(&(_, hc)) = chars.peek() {
+                                                if hc.is_ascii_hexdigit() {
+                                                    hex.push(hc);
+                                                    chars.next();
+                                                    col += 1;
+                                                } else {
+                                                    break;
+                                                }
+                                            } else {
+                                                break;
+                                            }
+                                        }
+                                        match u8::from_str_radix(&hex, 16) {
+                                            Ok(b) => pattern.push(b as char),
+                                            Err(_) => pattern.push('x'),
+                                        }
+                                    }
+                                    'u' => {
+                                        let mut hex = String::new();
+                                        for _ in 0..4 {
+                                            if let Some(&(_, hc)) = chars.peek() {
+                                                if hc.is_ascii_hexdigit() {
+                                                    hex.push(hc);
+                                                    chars.next();
+                                                    col += 1;
+                                                } else {
+                                                    break;
+                                                }
+                                            } else {
+                                                break;
+                                            }
+                                        }
+                                        match u32::from_str_radix(&hex, 16) {
+                                            Ok(cp) => {
+                                                if let Some(ch) = char::from_u32(cp) {
+                                                    pattern.push(ch);
+                                                } else {
+                                                    pattern.push('u');
+                                                }
+                                            }
+                                            Err(_) => pattern.push('u'),
+                                        }
+                                    }
+                                    // Everything else (e.g. \d \w \. \( \* ) is a
+                                    // regex metacharacter: keep the backslash so
+                                    // the engine interprets the escape.
+                                    other => {
+                                        pattern.push('\\');
+                                        pattern.push(other);
+                                    }
+                                }
+                                escaped = false;
                                 col += 1;
                             }
                             Some((_, '[')) if !escaped && bracket_depth == 0 => {

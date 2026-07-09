@@ -52,6 +52,57 @@ pub(super) fn native_object_keys(
     Ok(Value::Array(heap_idx))
 }
 
+pub(super) fn native_object_from_entries(
+    interp: &mut Interpreter,
+    _this: &Value,
+    args: &[Value],
+) -> Result<Value> {
+    let list = args.first().cloned().unwrap_or(Value::Undefined);
+
+    // First gather (key, value) pairs while only borrowing the heap immutably.
+    let mut collected: Vec<(String, Value)> = Vec::new();
+    if let Value::Array(list_idx) = &list {
+        if let crate::vm::interpreter::HeapValue::Array(list_arr) = &interp.heap[*list_idx] {
+            for entry in list_arr.elements.iter() {
+                let pair_idx = match entry {
+                    Value::Array(i) => *i,
+                    _ => continue,
+                };
+                if let crate::vm::interpreter::HeapValue::Array(pair) = &interp.heap[pair_idx] {
+                    if pair.elements.len() < 2 {
+                        continue;
+                    }
+                    let key = match &pair.elements[0] {
+                        Value::String(s) => s.clone(),
+                        Value::Cons(c) => c.flatten(),
+                        Value::Integer(i) => i.to_string(),
+                        Value::Float(f) => f.to_string(),
+                        Value::Boolean(b) => b.to_string(),
+                        other => format!("{:?}", other),
+                    };
+                    collected.push((key, pair.elements[1].clone()));
+                }
+            }
+        }
+    }
+
+    let obj_idx = interp.heap.len();
+    interp.heap.push(crate::vm::interpreter::HeapValue::Object(
+        crate::vm::interpreter::JsObject {
+            properties: PropertyStorage::new(),
+            prototype: None,
+            extensible: true,
+        },
+    ));
+    if let crate::vm::interpreter::HeapValue::Object(obj) = &mut interp.heap[obj_idx] {
+        for (key, value) in collected {
+            obj.properties.insert(key, value);
+        }
+    }
+
+    Ok(Value::Object(obj_idx))
+}
+
 pub(super) fn native_object_values(
     interp: &mut Interpreter,
     _this: &Value,
@@ -179,27 +230,19 @@ pub(super) fn native_object_assign(
     Ok(target)
 }
 
-pub(super) fn native_object_define_property(
+fn define_property_on(
     interp: &mut Interpreter,
-    _this: &Value,
-    args: &[Value],
-) -> Result<Value> {
-    let target = args.first().cloned().unwrap_or(Value::Undefined);
-    let property = match args.get(1) {
-        Some(Value::String(s)) => s.clone(),
-        Some(Value::Cons(c)) => c.flatten(),
-        Some(Value::Symbol(id)) => format!("__sym_{}", id),
-        _ => return Ok(target),
-    };
-    let descriptor = args.get(2).cloned().unwrap_or(Value::Undefined);
-
-    if let Value::Object(obj_idx) = &descriptor {
+    target: &Value,
+    property: &str,
+    descriptor: &Value,
+) -> Result<()> {
+    if let Value::Object(obj_idx) = descriptor {
         if let crate::vm::interpreter::HeapValue::Object(desc) = &interp.heap[*obj_idx] {
             let getter = desc.properties.get("get").cloned();
             let setter = desc.properties.get("set").cloned();
             let value = desc.properties.get("value").cloned();
 
-            match &target {
+            match target {
                 Value::Object(tgt_idx) => {
                     if let crate::vm::interpreter::HeapValue::Object(tgt) =
                         &mut interp.heap[*tgt_idx]
@@ -217,7 +260,7 @@ pub(super) fn native_object_define_property(
                             }
                         }
                         if let Some(val) = value {
-                            tgt.properties.insert(property, val);
+                            tgt.properties.insert(property.to_string(), val);
                         }
                     }
                 }
@@ -238,14 +281,14 @@ pub(super) fn native_object_define_property(
                             }
                         }
                         if let Some(val) = value {
-                            f.properties.insert(property, val);
+                            f.properties.insert(property.to_string(), val);
                         }
                     }
                 }
                 _ => {}
             }
         }
-    } else if let Some(val) = match &descriptor {
+    } else if let Some(val) = match descriptor {
         Value::Object(obj_idx) => {
             if let crate::vm::interpreter::HeapValue::Object(obj) = &interp.heap[*obj_idx] {
                 obj.properties.get("value").cloned()
@@ -255,19 +298,58 @@ pub(super) fn native_object_define_property(
         }
         _ => None,
     } {
-        match &target {
+        match target {
             Value::Object(obj_idx) => {
                 if let crate::vm::interpreter::HeapValue::Object(obj) = &mut interp.heap[*obj_idx] {
-                    obj.properties.insert(property, val);
+                    obj.properties.insert(property.to_string(), val);
                 }
             }
             Value::Function(func_idx) => {
                 if let crate::vm::interpreter::HeapValue::Function(f) = &mut interp.heap[*func_idx]
                 {
-                    f.properties.insert(property, val);
+                    f.properties.insert(property.to_string(), val);
                 }
             }
             _ => {}
+        }
+    }
+    Ok(())
+}
+
+pub(super) fn native_object_define_property(
+    interp: &mut Interpreter,
+    _this: &Value,
+    args: &[Value],
+) -> Result<Value> {
+    let target = args.first().cloned().unwrap_or(Value::Undefined);
+    let property = match args.get(1) {
+        Some(Value::String(s)) => s.clone(),
+        Some(Value::Cons(c)) => c.flatten(),
+        Some(Value::Symbol(id)) => format!("__sym_{}", id),
+        _ => return Ok(target),
+    };
+    let descriptor = args.get(2).cloned().unwrap_or(Value::Undefined);
+    define_property_on(interp, &target, &property, &descriptor)?;
+    Ok(target)
+}
+
+pub(super) fn native_object_define_properties(
+    interp: &mut Interpreter,
+    _this: &Value,
+    args: &[Value],
+) -> Result<Value> {
+    let target = args.first().cloned().unwrap_or(Value::Undefined);
+    let descriptors = args.get(1).cloned().unwrap_or(Value::Undefined);
+    if let Value::Object(d_idx) = &descriptors {
+        if let crate::vm::interpreter::HeapValue::Object(d_obj) = &interp.heap[*d_idx] {
+            let items: Vec<(String, Value)> = d_obj
+                .properties
+                .iter()
+                .map(|(k, v)| (k.to_string(), v.clone()))
+                .collect();
+            for (key, desc) in items {
+                define_property_on(interp, &target, &key, &desc)?;
+            }
         }
     }
     Ok(target)
@@ -279,6 +361,91 @@ pub(super) fn native_object_get_own_property_descriptor(
     args: &[Value],
 ) -> Result<Value> {
     native_reflect_get_own_property_descriptor(interp, _this, args)
+}
+
+pub(super) fn native_object_get_own_property_descriptors(
+    interp: &mut Interpreter,
+    _this: &Value,
+    args: &[Value],
+) -> Result<Value> {
+    let obj_val = args.first().cloned().unwrap_or(Value::Undefined);
+
+    // Collect (key, value, getter, setter) for every own property.
+    let mut entries: Vec<(String, Value, Option<Value>, Option<Value>)> = Vec::new();
+    match &obj_val {
+        Value::Object(obj_idx) => {
+            if let crate::vm::interpreter::HeapValue::Object(obj) = &interp.heap[*obj_idx] {
+                let mut getters: std::collections::HashMap<String, Value> =
+                    std::collections::HashMap::new();
+                let mut setters: std::collections::HashMap<String, Value> =
+                    std::collections::HashMap::new();
+                for (k, v) in obj.properties.iter() {
+                    if let Some(real) = k.strip_prefix("__getter_") {
+                        getters.insert(real.to_string(), v.clone());
+                    } else if let Some(real) = k.strip_prefix("__setter_") {
+                        setters.insert(real.to_string(), v.clone());
+                    }
+                }
+                for (k, v) in obj.properties.iter() {
+                    if k.starts_with("__getter_") || k.starts_with("__setter_") {
+                        continue;
+                    }
+                    let getter = getters.get(k).cloned();
+                    let setter = setters.get(k).cloned();
+                    entries.push((k.to_string(), v.clone(), getter, setter));
+                }
+            }
+        }
+        Value::Array(arr_idx) => {
+            if let crate::vm::interpreter::HeapValue::Array(arr) = &interp.heap[*arr_idx] {
+                for (i, v) in arr.elements.iter().enumerate() {
+                    entries.push((i.to_string(), v.clone(), None, None));
+                }
+                entries.push((
+                    "length".to_string(),
+                    Value::Float(arr.elements.len() as f64),
+                    None,
+                    None,
+                ));
+            }
+        }
+        _ => {}
+    }
+
+    let mut result_props = PropertyStorage::new();
+    for (key, value, getter, setter) in entries {
+        let mut desc = PropertyStorage::new();
+        if getter.is_some() || setter.is_some() {
+            desc.insert("get".into(), getter.unwrap_or(Value::Undefined));
+            desc.insert("set".into(), setter.unwrap_or(Value::Undefined));
+            desc.insert("enumerable".into(), Value::Boolean(true));
+            desc.insert("configurable".into(), Value::Boolean(true));
+        } else {
+            desc.insert("value".into(), value);
+            desc.insert("writable".into(), Value::Boolean(true));
+            desc.insert("enumerable".into(), Value::Boolean(true));
+            desc.insert("configurable".into(), Value::Boolean(true));
+        }
+        let desc_idx = interp.heap.len();
+        interp.heap.push(crate::vm::interpreter::HeapValue::Object(
+            crate::vm::interpreter::JsObject {
+                properties: desc,
+                prototype: None,
+                extensible: true,
+            },
+        ));
+        result_props.insert(key, Value::Object(desc_idx));
+    }
+
+    let result_idx = interp.heap.len();
+    interp.heap.push(crate::vm::interpreter::HeapValue::Object(
+        crate::vm::interpreter::JsObject {
+            properties: result_props,
+            prototype: None,
+            extensible: true,
+        },
+    ));
+    Ok(Value::Object(result_idx))
 }
 
 pub(super) fn native_object_freeze(

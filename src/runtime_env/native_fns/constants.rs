@@ -495,6 +495,12 @@ pub const MATH_SIGN: usize = 470;
 pub const MATH_HYPOT: usize = 471;
 // Function constructor (472)
 pub const FUNCTION_CONSTRUCTOR: usize = 472;
+// Object.getOwnPropertyDescriptors (473)
+pub const OBJECT_GET_OWN_PROPERTY_DESCRIPTORS: usize = 473;
+// Object.defineProperties (474)
+pub const OBJECT_DEFINE_PROPERTIES: usize = 474;
+// Object.fromEntries (475)
+pub const OBJECT_FROM_ENTRIES: usize = 475;
 
 #[cfg(test)]
 mod tests {

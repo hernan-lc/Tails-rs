@@ -28,6 +28,21 @@ fn test_object_assign() {
 }
 
 #[test]
+fn test_object_get_own_property_descriptors_and_define_properties() {
+    let mut rt = TailsRuntime::default();
+    let r = rt.eval(
+        r#"
+    let src = { a: 1, b: 2 };
+    let descs = Object.getOwnPropertyDescriptors(src);
+    let out = Object.defineProperties({}, descs);
+    out.a + "," + out.b + "," + (descs.a.value) + "," + (descs.b.enumerable);
+    "#,
+    );
+    assert!(r.is_ok());
+    assert_eq!(r.unwrap(), Value::String("1,2,1,true".to_string()));
+}
+
+#[test]
 fn test_array_methods() {
     let mut rt = TailsRuntime::default();
     let r = rt.eval(
