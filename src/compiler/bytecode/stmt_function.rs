@@ -4,7 +4,7 @@ use crate::errors::Result;
 
 use super::{closures, CodeGenerator};
 
-fn collect_binding_names(pattern: &BindingPattern, out: &mut Vec<String>) {
+pub(super) fn collect_binding_names(pattern: &BindingPattern, out: &mut Vec<String>) {
     match pattern {
         BindingPattern::Identifier(name) => out.push(name.clone()),
         BindingPattern::Array(elements) => {
@@ -95,40 +95,26 @@ impl CodeGenerator {
             self.locals.push(rp.clone());
         }
 
-        // JavaScript hoisting: pre-register all function names
-        for stmt in body.iter() {
-            if let Statement::FunctionDeclaration { name, .. } = &stmt.inner {
-                self.locals.push(name.clone());
-            }
-        }
-
-        // Pre-register let/const/var declarations so closure analysis can find them
-        for stmt in body.iter() {
-            if let Statement::VariableDeclaration { declarations, .. } = &stmt.inner {
-                for decl in declarations {
-                    let mut names = Vec::new();
-                    collect_binding_names(&decl.id, &mut names);
-                    for name in names {
-                        if !self.locals.iter().any(|l| l == &name) {
-                            self.locals.push(name);
-                        }
-                    }
-                }
-            }
-        }
+        // JavaScript hoisting: pre-register every declaration (function,
+        // var/let/const, and class) so sibling functions defined later can
+        // resolve them via closure capture regardless of source order.
+        self.pre_register_declarations(body);
 
         self.compile_default_params(params, defaults)?;
 
         let mut deferred_snapshots: Vec<(u16, Box<Vec<u16>>)> = Vec::new();
         self.compile_hoisted_functions(body, &mut deferred_snapshots)?;
 
-        // First compile variable declarations so captured vars are initialized
-        // before SnapshotClosure runs.
+        // First compile declarations (var/let/const AND class) so captured vars
+        // are initialized before SnapshotClosure runs below.
         for stmt in body {
             if matches!(&stmt.inner, Statement::FunctionDeclaration { .. }) {
                 continue;
             }
-            if !matches!(&stmt.inner, Statement::VariableDeclaration { .. }) {
+            if !matches!(
+                &stmt.inner,
+                Statement::VariableDeclaration { .. } | Statement::ClassDeclaration { .. }
+            ) {
                 continue;
             }
             self.record_line_from_span(&stmt.span);
@@ -140,12 +126,15 @@ impl CodeGenerator {
             self.emit(Instruction::SnapshotClosure(local_slot, capture_slots));
         }
 
-        // Then compile remaining non-function, non-variable statements.
+        // Then compile remaining non-function, non-declaration statements.
         for stmt in body {
             if matches!(&stmt.inner, Statement::FunctionDeclaration { .. }) {
                 continue;
             }
-            if matches!(&stmt.inner, Statement::VariableDeclaration { .. }) {
+            if matches!(
+                &stmt.inner,
+                Statement::VariableDeclaration { .. } | Statement::ClassDeclaration { .. }
+            ) {
                 continue;
             }
             self.record_line_from_span(&stmt.span);
@@ -291,11 +280,7 @@ impl CodeGenerator {
         &mut self,
         body: &[SpannedNode<Statement>],
     ) -> Result<()> {
-        for stmt in body.iter() {
-            if let Statement::FunctionDeclaration { name, .. } = &stmt.inner {
-                self.locals.push(name.clone());
-            }
-        }
+        self.pre_register_declarations(body);
         for stmt in body.iter() {
             if let Statement::FunctionDeclaration { .. } = &stmt.inner {
                 self.record_line_from_span(&stmt.span);

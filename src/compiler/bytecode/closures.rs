@@ -46,12 +46,11 @@ impl CodeGenerator {
             self.locals.push(param.clone());
         }
 
-        // JavaScript hoisting: pre-register all function names first
-        for stmt in body {
-            if let Statement::FunctionDeclaration { name, .. } = &stmt.inner {
-                self.locals.push(name.clone());
-            }
-        }
+        // JavaScript hoisting: pre-register every declaration (function,
+        // var/let/const, and class) so sibling functions defined later can
+        // resolve them via closure capture regardless of source order.
+        self.pre_register_declarations(body);
+
         // JavaScript hoisting: compile function declarations first
         for stmt in body {
             if let Statement::FunctionDeclaration { .. } = &stmt.inner {

@@ -359,29 +359,75 @@ impl CodeGenerator {
         }
     }
 
+    // Pre-register every declaration
+
+    // Pre-register every declaration in a function/block body so that lexical
+    // bindings (function, var/let/const, and class) are visible to *sibling*
+    // functions defined later in the same scope. In JavaScript, a class (or
+    // const) declared in a function body is in scope for any nested function
+    // declared afterwards; without this, a hoisted sibling function that
+    // references the class resolves it to `undefined` at capture time.
+    pub(crate) fn pre_register_declarations(&mut self, body: &[SpannedNode<Statement>]) {
+        for stmt in body {
+            match &stmt.inner {
+                Statement::FunctionDeclaration { name, .. } => {
+                    if !self.locals.iter().any(|l| l == name) {
+                        self.locals.push(name.clone());
+                    }
+                }
+                Statement::VariableDeclaration { declarations, .. } => {
+                    for decl in declarations {
+                        let mut names = Vec::new();
+                        stmt_function::collect_binding_names(&decl.id, &mut names);
+                        for name in names {
+                            if !self.locals.iter().any(|l| l == &name) {
+                                self.locals.push(name);
+                            }
+                        }
+                    }
+                }
+                Statement::ClassDeclaration { name, .. } => {
+                    if !self.locals.iter().any(|l| l == name) {
+                        self.locals.push(name.clone());
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
+
     fn generate_statement_in_branch(&mut self, stmt: &Statement) -> Result<()> {
         match stmt {
             Statement::BlockStatement(stmts) => {
                 self.scope_depth += 1;
                 let prev_locals_count = self.locals.len();
                 self.emit(Instruction::BlockEnter);
-                for stmt in stmts.iter() {
-                    if let Statement::FunctionDeclaration { name, .. } = &stmt.inner {
-                        self.locals.push(name.clone());
-                    }
-                }
+                self.pre_register_declarations(stmts);
                 let mut deferred_snapshots: Vec<(u16, Box<Vec<u16>>)> = Vec::new();
                 self.compile_hoisted_functions(stmts, &mut deferred_snapshots)?;
+                for stmt in stmts.iter() {
+                    if matches!(&stmt.inner, Statement::FunctionDeclaration { .. }) {
+                        continue;
+                    }
+                    if !matches!(&stmt.inner, Statement::VariableDeclaration { .. } | Statement::ClassDeclaration { .. }) {
+                        continue;
+                    }
+                    self.record_line_from_span(&stmt.span);
+                    self.generate_statement(&stmt.inner, false)?;
+                }
+                for (local_slot, capture_slots) in deferred_snapshots {
+                    self.emit(Instruction::SnapshotClosure(local_slot, capture_slots));
+                }
                 for (i, stmt) in stmts.iter().enumerate() {
                     if matches!(&stmt.inner, Statement::FunctionDeclaration { .. }) {
+                        continue;
+                    }
+                    if matches!(&stmt.inner, Statement::VariableDeclaration { .. } | Statement::ClassDeclaration { .. }) {
                         continue;
                     }
                     let is_last = stmts[i + 1..].iter().all(|s| matches!(&s.inner, Statement::FunctionDeclaration { .. }));
                     self.record_line_from_span(&stmt.span);
                     self.generate_statement(&stmt.inner, is_last)?;
-                }
-                for (local_slot, capture_slots) in deferred_snapshots {
-                    self.emit(Instruction::SnapshotClosure(local_slot, capture_slots));
                 }
                 let locals_added = self.locals.len() - prev_locals_count;
                 for _ in 0..locals_added {

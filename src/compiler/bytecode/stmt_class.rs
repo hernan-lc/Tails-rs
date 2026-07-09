@@ -104,8 +104,12 @@ impl CodeGenerator {
                 if self.scope_depth == 0 {
                     self.emit(Instruction::StoreGlobal(class_name));
                 } else {
-                    self.locals.push(class_name);
-                    let slot = self.last_local_slot();
+                    if !self.locals.iter().any(|l| l == &class_name) {
+                        self.locals.push(class_name.clone());
+                    }
+                    let slot = self
+                        .resolve_local(&class_name)
+                        .unwrap_or_else(|| self.last_local_slot());
                     self.emit(Instruction::StoreLocal(slot));
                 }
                 Ok(true)
