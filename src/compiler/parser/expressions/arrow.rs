@@ -10,6 +10,7 @@ impl<'a> Parser<'a> {
         rest_param: Option<String>,
         return_type: Option<TypeAnnotation>,
         is_async: bool,
+        param_patterns: Vec<Option<crate::compiler::parser::BindingPattern>>,
     ) -> Result<SpannedNode<Expression>> {
         if self.peek().token == Token::LeftBrace {
             self.advance();
@@ -17,6 +18,7 @@ impl<'a> Parser<'a> {
             self.expect(&Token::RightBrace)?;
             Ok(self.spanned(Expression::ArrowFunction {
                 params,
+                param_patterns,
                 param_types,
                 defaults,
                 rest_param,
@@ -28,6 +30,7 @@ impl<'a> Parser<'a> {
             let expr = self.parse_assignment()?;
             Ok(self.spanned(Expression::ArrowFunction {
                 params,
+                param_patterns,
                 param_types,
                 defaults,
                 rest_param,

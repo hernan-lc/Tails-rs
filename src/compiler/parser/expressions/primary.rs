@@ -8,34 +8,50 @@ impl<'a> Parser<'a> {
             self.advance();
             if self.peek().token == Token::Arrow {
                 self.advance();
-                return self.parse_arrow_body(vec![], None, vec![], None, None, false);
+                return self.parse_arrow_body(vec![], None, vec![], None, None, false, vec![]);
             }
             return Err(Error::ParseError("Unexpected )".into()));
         }
-        if matches!(self.peek().token, Token::Identifier(_) | Token::Ellipsis) {
+        // Speculatively parse as arrow params (including destructuring). On any
+        // failure or non-`=>` follow, rewind and parse as a parenthesized expr.
+        if matches!(
+            self.peek().token,
+            Token::Identifier(_)
+                | Token::Ellipsis
+                | Token::LeftBracket
+                | Token::LeftBrace
+        ) {
             let saved = self.pos;
-            let (params, param_types, defaults, rest_param) = self.parse_typed_params()?;
-            if self.peek().token == Token::RightParen {
-                self.advance();
+            let arrow_result = (|| -> Result<SpannedNode<Expression>> {
+                let (params, param_types, defaults, rest_param, param_patterns) =
+                    self.parse_typed_params()?;
+                self.expect(&Token::RightParen)?;
                 let return_type = if self.peek().token == Token::Colon {
                     self.advance();
                     Some(self.parse_type_annotation()?)
                 } else {
                     None
                 };
-                if self.peek().token == Token::Arrow {
-                    self.advance();
-                    return self.parse_arrow_body(
-                        params,
-                        Some(param_types),
-                        defaults,
-                        rest_param,
-                        return_type,
-                        false,
-                    );
+                if self.peek().token != Token::Arrow {
+                    return Err(Error::ParseError("not an arrow".into()));
+                }
+                self.advance();
+                self.parse_arrow_body(
+                    params,
+                    Some(param_types),
+                    defaults,
+                    rest_param,
+                    return_type,
+                    false,
+                    param_patterns,
+                )
+            })();
+            match arrow_result {
+                Ok(expr) => return Ok(expr),
+                Err(_) => {
+                    self.pos = saved;
                 }
             }
-            self.pos = saved;
         }
         let expr = self.parse_expression()?;
         self.expect(&Token::RightParen)?;
@@ -55,7 +71,7 @@ impl<'a> Parser<'a> {
                 _ => return Err(Error::ParseError("Invalid arrow function parameter".into())),
             };
             self.advance();
-            return self.parse_arrow_body(params, None, vec![], None, None, false);
+            return self.parse_arrow_body(params, None, vec![], None, None, false, vec![]);
         }
         Ok(expr)
     }
@@ -75,7 +91,7 @@ impl<'a> Parser<'a> {
             None
         };
         self.expect(&Token::LeftParen)?;
-        let (params, param_types, defaults, rest_param) = self.parse_typed_params()?;
+        let (params, param_types, defaults, rest_param, param_patterns) = self.parse_typed_params()?;
         self.expect(&Token::RightParen)?;
         let return_type = if self.peek().token == Token::Colon {
             self.advance();
@@ -89,6 +105,7 @@ impl<'a> Parser<'a> {
         Ok(self.spanned(Expression::FunctionExpression {
             name,
             params,
+            param_patterns,
             param_types: Some(param_types),
             defaults,
             rest_param,
@@ -127,7 +144,7 @@ impl<'a> Parser<'a> {
                     None
                 };
                 self.expect(&Token::LeftParen)?;
-                let (params, param_types, defaults, rest_param) = self.parse_typed_params()?;
+                let (params, param_types, defaults, rest_param, param_patterns) = self.parse_typed_params()?;
                 self.expect(&Token::RightParen)?;
                 let return_type = if self.peek().token == Token::Colon {
                     self.advance();
@@ -141,6 +158,7 @@ impl<'a> Parser<'a> {
                 Ok(self.spanned(Expression::FunctionExpression {
                     name,
                     params,
+                    param_patterns,
                     param_types: Some(param_types),
                     defaults,
                     rest_param,
@@ -151,7 +169,7 @@ impl<'a> Parser<'a> {
                 }))
             } else {
                 self.expect(&Token::LeftParen)?;
-                let (params, param_types, defaults, rest_param) = self.parse_typed_params()?;
+                let (params, param_types, defaults, rest_param, param_patterns) = self.parse_typed_params()?;
                 self.expect(&Token::RightParen)?;
                 let return_type = if self.peek().token == Token::Colon {
                     self.advance();
@@ -168,6 +186,7 @@ impl<'a> Parser<'a> {
                         rest_param,
                         return_type,
                         true,
+                        param_patterns,
                     )
                 } else {
                     Err(Error::ParseError(
@@ -179,7 +198,7 @@ impl<'a> Parser<'a> {
             self.advance();
             if self.peek().token == Token::Arrow {
                 self.advance();
-                self.parse_arrow_body(vec!["async".to_string()], None, vec![], None, None, false)
+                self.parse_arrow_body(vec!["async".to_string()], None, vec![], None, None, false, vec![])
             } else {
                 Ok(self.spanned(Expression::Identifier("async".to_string())))
             }
@@ -319,8 +338,7 @@ impl<'a> Parser<'a> {
                             self.advance();
                         }
                         self.expect(&Token::LeftParen)?;
-                        let (params, param_types, defaults, rest_param) =
-                            self.parse_typed_params()?;
+                        let (params, param_types, defaults, rest_param, param_patterns) = self.parse_typed_params()?;
                         self.expect(&Token::RightParen)?;
                         let return_type = if self.peek().token == Token::Colon {
                             self.advance();
@@ -336,6 +354,7 @@ impl<'a> Parser<'a> {
                             value: Expression::FunctionExpression {
                                 name: None,
                                 params,
+                                param_patterns,
                                 param_types: Some(param_types),
                                 defaults,
                                 rest_param,
@@ -380,8 +399,7 @@ impl<'a> Parser<'a> {
                             || (self.peek().token == Token::This && (key == "get" || key == "set"));
                         if is_method_like {
                             self.advance();
-                            let (params, param_types, defaults, rest_param) =
-                                self.parse_typed_params()?;
+                            let (params, param_types, defaults, rest_param, param_patterns) = self.parse_typed_params()?;
                             self.expect(&Token::RightParen)?;
                             let return_type = if self.peek().token == Token::Colon {
                                 self.advance();
@@ -399,6 +417,7 @@ impl<'a> Parser<'a> {
                                 value: Expression::FunctionExpression {
                                     name: Some(key.clone()),
                                     params,
+                                    param_patterns,
                                     param_types: Some(param_types),
                                     defaults,
                                     rest_param,
@@ -450,6 +469,7 @@ impl<'a> Parser<'a> {
                                 Expression::FunctionExpression {
                                     name: Some(prop_name.clone()),
                                     params: vec![],
+                                    param_patterns: vec![],
                                     param_types: Some(vec![]),
                                     defaults: vec![],
                                     rest_param: None,
@@ -464,6 +484,7 @@ impl<'a> Parser<'a> {
                                     params: vec![
                                         setter_param.unwrap_or_else(|| "__set_val".to_string())
                                     ],
+                                    param_patterns: vec![None],
                                     param_types: Some(vec![None]),
                                     defaults: vec![],
                                     rest_param: None,
@@ -550,7 +571,7 @@ impl<'a> Parser<'a> {
         self.skip_type_parameters();
         if self.peek().token == Token::LeftParen {
             self.advance();
-            let (params, param_types, defaults, rest_param) = self.parse_typed_params()?;
+            let (params, param_types, defaults, rest_param, param_patterns) = self.parse_typed_params()?;
             self.expect(&Token::RightParen)?;
             let return_type = if self.peek().token == Token::Colon {
                 self.advance();
@@ -567,6 +588,7 @@ impl<'a> Parser<'a> {
                     rest_param,
                     return_type,
                     false,
+                    param_patterns,
                 );
             }
             let expr = self.parse_assignment()?;

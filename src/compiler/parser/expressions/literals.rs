@@ -51,7 +51,7 @@ impl<'a> Parser<'a> {
                     _ => {
                         if self.peek().token == Token::Arrow {
                             self.advance();
-                            self.parse_arrow_body(vec![name], None, vec![], None, None, false)
+                            self.parse_arrow_body(vec![name], None, vec![], None, None, false, vec![])
                         } else {
                             Ok(self.spanned(Expression::Identifier(name)))
                         }

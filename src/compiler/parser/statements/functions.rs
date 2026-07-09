@@ -41,7 +41,7 @@ impl<'a> Parser<'a> {
         };
         self.skip_type_parameters();
         self.expect(&Token::LeftParen)?;
-        let (params, param_types, defaults, rest_param) = self.parse_typed_params()?;
+        let (params, param_types, defaults, rest_param, param_patterns) = self.parse_typed_params()?;
         self.expect(&Token::RightParen)?;
         let return_type = if self.peek().token == Token::Colon {
             self.advance();
@@ -57,6 +57,7 @@ impl<'a> Parser<'a> {
         let result = self.spanned(Statement::FunctionDeclaration {
             name,
             params,
+            param_patterns,
             param_types: Some(param_types),
             defaults,
             rest_param,

@@ -41,6 +41,7 @@ impl CodeGenerator {
         let Statement::FunctionDeclaration {
             name,
             params,
+            param_patterns,
             body,
             is_async: _,
             param_types: _,
@@ -102,6 +103,23 @@ impl CodeGenerator {
         self.pre_register_declarations(body);
 
         self.compile_default_params(params, defaults)?;
+        // Emit parameter destructuring for patterned params (e.g. `([a,b]) => ...`).
+        for (i, pattern_opt) in param_patterns.iter().enumerate() {
+            if let Some(pattern) = pattern_opt {
+                let mut names = Vec::new();
+                collect_binding_names(pattern, &mut names);
+                for name in &names {
+                    if !self.locals.iter().any(|l| l == name) {
+                        self.locals.push(name.clone());
+                    }
+                }
+                let param_slot = self
+                    .resolve_local(&params[i])
+                    .unwrap_or_else(|| self.last_local_slot());
+                self.emit(Instruction::LoadLocal(param_slot));
+                self.generate_destructuring_pattern(pattern)?;
+            }
+        }
 
         let mut deferred_snapshots: Vec<(u16, Box<Vec<u16>>)> = Vec::new();
         self.compile_hoisted_functions(body, &mut deferred_snapshots)?;

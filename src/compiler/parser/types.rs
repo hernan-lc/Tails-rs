@@ -46,11 +46,15 @@ pub enum TypeLiteral {
     Boolean(bool),
 }
 
+/// (params, param_types, defaults, rest_param, param_patterns).
+/// `param_patterns[i]` is `Some` when params[i] is a synthetic `__destr_N`
+/// name standing in for a destructuring binding pattern.
 pub type TypedParams = (
     Vec<String>,
     Vec<Option<TypeAnnotation>>,
     Vec<Option<Expression>>,
     Option<String>,
+    Vec<Option<crate::compiler::parser::BindingPattern>>,
 );
 
 impl<'a> Parser<'a> {

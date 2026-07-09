@@ -45,6 +45,7 @@ pub enum Statement {
     FunctionDeclaration {
         name: String,
         params: Vec<String>,
+        param_patterns: Vec<Option<BindingPattern>>,
         param_types: Option<Vec<Option<TypeAnnotation>>>,
         defaults: Vec<Option<Expression>>,
         rest_param: Option<String>,
@@ -319,6 +320,7 @@ pub enum Expression {
     FunctionExpression {
         name: Option<String>,
         params: Vec<String>,
+        param_patterns: Vec<Option<BindingPattern>>,
         param_types: Option<Vec<Option<TypeAnnotation>>>,
         defaults: Vec<Option<Expression>>,
         rest_param: Option<String>,
@@ -329,6 +331,7 @@ pub enum Expression {
     },
     ArrowFunction {
         params: Vec<String>,
+        param_patterns: Vec<Option<BindingPattern>>,
         param_types: Option<Vec<Option<TypeAnnotation>>>,
         defaults: Vec<Option<Expression>>,
         rest_param: Option<String>,
@@ -697,6 +700,7 @@ impl<'a> Parser<'a> {
 
     pub(crate) fn parse_typed_params(&mut self) -> Result<TypedParams> {
         let mut params = Vec::new();
+        let mut param_patterns = Vec::new();
         let mut param_types = Vec::new();
         let mut defaults = Vec::new();
         let mut rest_param = None;
@@ -736,14 +740,14 @@ impl<'a> Parser<'a> {
                     rest_param = Some(param);
                     break;
                 }
-                let param = match self.peek().token.clone() {
+                let (param, pattern) = match self.peek().token.clone() {
                     Token::Identifier(_) => match self.advance().token {
-                        Token::Identifier(name) => name,
+                        Token::Identifier(name) => (name, None),
                         _ => unreachable!(),
                     },
                     Token::LeftBracket | Token::LeftBrace => {
-                        let _pattern = self.parse_binding_pattern()?;
-                        format!("__destr_{}", params.len())
+                        let pattern = self.parse_binding_pattern()?;
+                        (format!("__destr_{}", params.len()), Some(pattern))
                     }
                     token => {
                         return Err(Error::ParseError(format!(
@@ -773,6 +777,7 @@ impl<'a> Parser<'a> {
                     None
                 };
                 params.push(param);
+                param_patterns.push(pattern);
                 param_types.push(ty);
                 defaults.push(default);
                 if self.peek().token == Token::Comma {
@@ -785,7 +790,7 @@ impl<'a> Parser<'a> {
                 }
             }
         }
-        Ok((params, param_types, defaults, rest_param))
+        Ok((params, param_types, defaults, rest_param, param_patterns))
     }
 
     pub(crate) fn parse_constructor_params(&mut self) -> Result<Vec<ConstructorParam>> {

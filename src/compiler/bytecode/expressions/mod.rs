@@ -48,6 +48,7 @@ impl CodeGenerator {
             Expression::FunctionExpression {
                 name: _,
                 params,
+                param_patterns,
                 body,
                 is_async: _,
                 param_types: _,
@@ -61,16 +62,24 @@ impl CodeGenerator {
                 *is_generator,
                 rest_param.as_deref(),
                 defaults,
+                param_patterns,
             ),
             Expression::ArrowFunction {
                 params,
+                param_patterns,
                 body,
                 is_async: _,
                 param_types: _,
                 return_type: _,
                 defaults,
                 rest_param,
-            } => self.generate_arrow_function(params, body, rest_param.as_deref(), defaults),
+            } => self.generate_arrow_function(
+                params,
+                body,
+                rest_param.as_deref(),
+                defaults,
+                param_patterns,
+            ),
             Expression::NewExpression { callee, args } => {
                 self.generate_new_expression(callee, args)
             }
@@ -204,6 +213,31 @@ impl CodeGenerator {
         Ok(())
     }
 
+    fn emit_param_destructuring(
+        &mut self,
+        params: &[String],
+        param_patterns: &[Option<crate::compiler::parser::BindingPattern>],
+    ) -> Result<()> {
+        for (i, pattern_opt) in param_patterns.iter().enumerate() {
+            if let Some(pattern) = pattern_opt {
+                // Register pattern binding names as locals before destructuring.
+                let mut names = Vec::new();
+                super::stmt_function::collect_binding_names(pattern, &mut names);
+                for name in &names {
+                    if !self.locals.iter().any(|l| l == name) {
+                        self.locals.push(name.clone());
+                    }
+                }
+                let param_slot = self
+                    .resolve_local(&params[i])
+                    .unwrap_or_else(|| self.last_local_slot());
+                self.emit(Instruction::LoadLocal(param_slot));
+                self.generate_destructuring_pattern(pattern)?;
+            }
+        }
+        Ok(())
+    }
+
     fn generate_function_expression(
         &mut self,
         params: &[String],
@@ -211,6 +245,7 @@ impl CodeGenerator {
         is_generator: bool,
         rest_param: Option<&str>,
         defaults: &[Option<Expression>],
+        param_patterns: &[Option<crate::compiler::parser::BindingPattern>],
     ) -> Result<()> {
         let func_idx = self.functions.len() as u32;
         let mut all_params = params.to_vec();
@@ -259,6 +294,7 @@ impl CodeGenerator {
         }
 
         self.compile_default_params(params, defaults)?;
+        self.emit_param_destructuring(params, param_patterns)?;
 
         for stmt in body {
             self.record_line_from_span(&stmt.span);
@@ -292,6 +328,7 @@ impl CodeGenerator {
         body: &ArrowFunctionBody,
         rest_param: Option<&str>,
         defaults: &[Option<Expression>],
+        param_patterns: &[Option<crate::compiler::parser::BindingPattern>],
     ) -> Result<()> {
         let func_idx = self.functions.len() as u32;
 
@@ -352,6 +389,7 @@ impl CodeGenerator {
         }
 
         self.compile_default_params(params, defaults)?;
+        self.emit_param_destructuring(params, param_patterns)?;
 
         for stmt in &body_stmts {
             self.record_line_from_span(&stmt.span);

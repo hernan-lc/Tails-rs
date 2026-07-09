@@ -272,9 +272,31 @@ pub(super) fn native_map_entries(
 pub(super) fn native_set_constructor(
     interp: &mut Interpreter,
     _this: &Value,
-    _args: &[Value],
+    args: &[Value],
 ) -> Result<Value> {
-    let set = JsSet::new();
+    let mut set = JsSet::new();
+    // `new Set(iterable)` — support Array and Set sources (common cases).
+    if let Some(iterable) = args.first() {
+        match iterable {
+            Value::Array(arr_idx) => {
+                if let crate::vm::interpreter::HeapValue::Array(arr) = &interp.heap[*arr_idx] {
+                    let elements = arr.elements.clone();
+                    for v in elements {
+                        set.add(v);
+                    }
+                }
+            }
+            Value::Set(set_idx) => {
+                if let crate::vm::interpreter::HeapValue::Set(src) = &interp.heap[*set_idx] {
+                    for v in src.values() {
+                        set.add(v);
+                    }
+                }
+            }
+            Value::Undefined | Value::Null => {}
+            _ => {}
+        }
+    }
     let heap_idx = interp.heap.len();
     interp
         .heap
