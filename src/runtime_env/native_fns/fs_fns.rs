@@ -324,9 +324,7 @@ pub(super) fn native_fs_read_file(
         Ok(content) => {
             let promise_idx = interp.heap.len();
             interp.heap.push(HeapValue::Promise(
-                crate::objects::js_promise::JsPromise::fulfilled(Value::from_string(
-                    content,
-                )),
+                crate::objects::js_promise::JsPromise::fulfilled(Value::from_string(content)),
             ));
             Ok(Value::Promise(promise_idx))
         }

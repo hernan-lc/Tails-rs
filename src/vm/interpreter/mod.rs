@@ -77,7 +77,7 @@ pub struct Interpreter {
     pub(crate) call_stack: Vec<CallFrame>,
     pub(crate) current_module: Option<Rc<CompiledModule>>,
     pub(crate) exception_handlers: Vec<ExceptionHandler>,
-    pending_exception: Option<Value>,
+    pub(crate) pending_exception: Option<Value>,
     pub(crate) async_runtime: AsyncRuntime,
     pub(crate) _promise_stack: Vec<usize>,
     _timer_id_counter: u32,
@@ -99,6 +99,17 @@ pub struct Interpreter {
     pub(crate) regexp_proto_idx: Option<usize>,
     pub(crate) buffer_proto_idx: Option<usize>,
     pub(crate) generator_proto_idx: Option<usize>,
+    /// `Error.prototype` heap index (shared by Error subclasses).
+    pub(crate) error_proto_idx: Option<usize>,
+    /// `Object.prototype` heap index (for module exports / plain objects).
+    pub(crate) object_proto_idx: Option<usize>,
+    pub(crate) boolean_proto_idx: Option<usize>,
+    pub(crate) number_proto_idx: Option<usize>,
+    pub(crate) string_proto_idx: Option<usize>,
+    pub(crate) function_proto_idx: Option<usize>,
+    pub(crate) array_proto_idx: Option<usize>,
+    pub(crate) bigint_proto_idx: Option<usize>,
+    pub(crate) symbol_proto_idx: Option<usize>,
     pub(crate) native_loader: native_loader::NativeModuleRegistry,
     pub(crate) current_pc: usize,
     pub(crate) suspended_frames: VecDeque<SuspendedFrame>,
@@ -114,6 +125,10 @@ pub struct Interpreter {
     /// Baseline JIT compiler for hot loops (feature `jit`).
     #[cfg(feature = "jit")]
     pub(crate) jit: crate::vm::jit::JitCompiler,
+    /// `Error.stackTraceLimit` — max frames for captureStackTrace (V8/Node).
+    pub(crate) error_stack_trace_limit: i64,
+    /// `Error.prepareStackTrace` — optional formatter `(err, sites) => any`.
+    pub(crate) error_prepare_stack_trace: Option<Value>,
 }
 
 impl Interpreter {
@@ -144,6 +159,15 @@ impl Interpreter {
             regexp_proto_idx: None,
             buffer_proto_idx: None,
             generator_proto_idx: None,
+            error_proto_idx: None,
+            object_proto_idx: None,
+            boolean_proto_idx: None,
+            number_proto_idx: None,
+            string_proto_idx: None,
+            function_proto_idx: None,
+            array_proto_idx: None,
+            bigint_proto_idx: None,
+            symbol_proto_idx: None,
             native_loader: native_loader::NativeModuleRegistry::new(),
             current_pc: 0,
             suspended_frames: VecDeque::new(),
@@ -154,6 +178,8 @@ impl Interpreter {
             pending_event_sources: Vec::new(),
             #[cfg(feature = "jit")]
             jit: crate::vm::jit::JitCompiler::new(),
+            error_stack_trace_limit: 10,
+            error_prepare_stack_trace: None,
         };
         interp.init_builtins();
         Ok(interp)
@@ -181,6 +207,7 @@ impl Interpreter {
             } else {
                 self.exception_handlers.clone()
             },
+            arguments: None,
         });
         let mut result = self.execute_from(module, 0);
 

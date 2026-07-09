@@ -161,7 +161,12 @@ pub fn tokenize(source: &str) -> Result<Vec<SpannedToken>> {
                             }
                             Some((_, c)) if escaped => {
                                 match c {
-                                    '\\' => pattern.push('\\'),
+                                    // JS `/\\/` has `.source === "\\\\"` (two
+                                    // backslashes): match one literal `\`.
+                                    '\\' => {
+                                        pattern.push('\\');
+                                        pattern.push('\\');
+                                    }
                                     'n' => pattern.push('\n'),
                                     't' => pattern.push('\t'),
                                     'r' => pattern.push('\r'),
@@ -203,15 +208,17 @@ pub fn tokenize(source: &str) -> Result<Vec<SpannedToken>> {
                                                 break;
                                             }
                                         }
-                                        match u32::from_str_radix(&hex, 16) {
-                                            Ok(cp) => {
-                                                if let Some(ch) = char::from_u32(cp) {
-                                                    pattern.push(ch);
-                                                } else {
-                                                    pattern.push('u');
-                                                }
-                                            }
-                                            Err(_) => pattern.push('u'),
+                                        // Keep as Rust-style `\x{HHHH}` so the
+                                        // regex engine sees explicit codepoints
+                                        // (avoids class corruption with raw
+                                        // U+0080–U+00FF bytes in latin1 ranges
+                                        // used by content-type / iconv codecs).
+                                        if hex.len() == 4 {
+                                            pattern.push_str("\\x{");
+                                            pattern.push_str(&hex);
+                                            pattern.push('}');
+                                        } else {
+                                            pattern.push('u');
                                         }
                                     }
                                     // Everything else (e.g. \d \w \. \( \* ) is a
@@ -293,10 +300,135 @@ pub fn tokenize(source: &str) -> Result<Vec<SpannedToken>> {
                 let tok_line = line;
                 let tok_col = col;
                 let tok_offset = pos;
+                // Numeric literals: decimal, 0x/0X hex, 0b/0B binary, 0o/0O octal.
+                // content-type uses `0x22` for the quote character code.
+                // First digit is still at peek (same as decimal path below).
+                if ch == '0' {
+                    chars.next(); // consume leading zero
+                    col += 1;
+                    if let Some(&(_, base_ch @ ('x' | 'X' | 'b' | 'B' | 'o' | 'O'))) = chars.peek()
+                    {
+                        chars.next(); // consume base marker
+                        col += 1;
+                        let (radix, is_digit): (u32, fn(char) -> bool) = match base_ch {
+                            'x' | 'X' => (16, |d| d.is_ascii_hexdigit()),
+                            'b' | 'B' => (2, |d| d == '0' || d == '1'),
+                            _ => (8, |d| matches!(d, '0'..='7')),
+                        };
+                        let mut digits = String::new();
+                        while let Some(&(_, d)) = chars.peek() {
+                            if d == '_' {
+                                chars.next();
+                                col += 1;
+                                continue;
+                            }
+                            if is_digit(d) {
+                                digits.push(d);
+                                chars.next();
+                                col += 1;
+                            } else {
+                                break;
+                            }
+                        }
+                        if digits.is_empty() {
+                            return Err(Error::ParseError(format!(
+                                "Invalid numeric literal at {}:{}",
+                                tok_line, tok_col
+                            )));
+                        }
+                        if let Some(&(_, 'n')) = chars.peek() {
+                            chars.next();
+                            col += 1;
+                            let prefix = match base_ch {
+                                'x' | 'X' => "0x",
+                                'b' | 'B' => "0b",
+                                _ => "0o",
+                            };
+                            push(
+                                &mut tokens,
+                                Token::BigInt(format!("{}{}", prefix, digits)),
+                                tok_line,
+                                tok_col,
+                                tok_offset,
+                            );
+                        } else {
+                            let value = u64::from_str_radix(&digits, radix).unwrap_or(0) as f64;
+                            push(
+                                &mut tokens,
+                                Token::Number(value),
+                                tok_line,
+                                tok_col,
+                                tok_offset,
+                            );
+                        }
+                        expects_regex = false;
+                        continue;
+                    }
+                    // Not a radix prefix: keep the leading zero in the decimal path.
+                    // Push it back by reconstructing from a digit string starting with '0'.
+                    let mut num = String::from("0");
+                    while let Some(&(_, dig)) = chars.peek() {
+                        if dig == '_' {
+                            chars.next();
+                            col += 1;
+                            continue;
+                        }
+                        if dig.is_ascii_digit() || dig == '.' {
+                            num.push(dig);
+                            chars.next();
+                            col += 1;
+                        } else {
+                            break;
+                        }
+                    }
+                    if let Some(&(_, 'e' | 'E')) = chars.peek() {
+                        num.push(chars.next().unwrap().1);
+                        col += 1;
+                        if let Some(&(_, '+' | '-')) = chars.peek() {
+                            num.push(chars.next().unwrap().1);
+                            col += 1;
+                        }
+                        while let Some(&(_, dig)) = chars.peek() {
+                            if dig.is_ascii_digit() {
+                                num.push(dig);
+                                chars.next();
+                                col += 1;
+                            } else {
+                                break;
+                            }
+                        }
+                    }
+                    if let Some(&(_, 'n')) = chars.peek() {
+                        chars.next();
+                        col += 1;
+                        push(
+                            &mut tokens,
+                            Token::BigInt(num),
+                            tok_line,
+                            tok_col,
+                            tok_offset,
+                        );
+                    } else {
+                        push(
+                            &mut tokens,
+                            Token::Number(num.parse().unwrap_or(0.0)),
+                            tok_line,
+                            tok_col,
+                            tok_offset,
+                        );
+                    }
+                    expects_regex = false;
+                    continue;
+                }
                 let mut num = String::new();
-                while let Some(&(_, c)) = chars.peek() {
-                    if c.is_ascii_digit() || c == '.' {
-                        num.push(c);
+                while let Some(&(_, dig)) = chars.peek() {
+                    if dig == '_' {
+                        chars.next();
+                        col += 1;
+                        continue;
+                    }
+                    if dig.is_ascii_digit() || dig == '.' {
+                        num.push(dig);
                         chars.next();
                         col += 1;
                     } else {
@@ -310,9 +442,9 @@ pub fn tokenize(source: &str) -> Result<Vec<SpannedToken>> {
                         num.push(chars.next().unwrap().1);
                         col += 1;
                     }
-                    while let Some(&(_, c)) = chars.peek() {
-                        if c.is_ascii_digit() {
-                            num.push(c);
+                    while let Some(&(_, ch)) = chars.peek() {
+                        if ch.is_ascii_digit() {
+                            num.push(ch);
                             chars.next();
                             col += 1;
                         } else {
@@ -807,7 +939,19 @@ pub fn tokenize(source: &str) -> Result<Vec<SpannedToken>> {
                 if let Some(&(_, '<')) = chars.peek() {
                     chars.next();
                     col += 1;
-                    push(&mut tokens, Token::ShiftLeft, tok_line, tok_col, tok_offset);
+                    if let Some(&(_, '=')) = chars.peek() {
+                        chars.next();
+                        col += 1;
+                        push(
+                            &mut tokens,
+                            Token::ShiftLeftAssign,
+                            tok_line,
+                            tok_col,
+                            tok_offset,
+                        );
+                    } else {
+                        push(&mut tokens, Token::ShiftLeft, tok_line, tok_col, tok_offset);
+                    }
                 } else if let Some(&(_, '=')) = chars.peek() {
                     chars.next();
                     col += 1;
@@ -825,13 +969,48 @@ pub fn tokenize(source: &str) -> Result<Vec<SpannedToken>> {
                 if let Some(&(_, '>')) = chars.peek() {
                     chars.next();
                     col += 1;
-                    push(
-                        &mut tokens,
-                        Token::ShiftRight,
-                        tok_line,
-                        tok_col,
-                        tok_offset,
-                    );
+                    // `>>>` / `>>>=` (unsigned) or `>>` / `>>=`
+                    if let Some(&(_, '>')) = chars.peek() {
+                        chars.next();
+                        col += 1;
+                        if let Some(&(_, '=')) = chars.peek() {
+                            chars.next();
+                            col += 1;
+                            push(
+                                &mut tokens,
+                                Token::UnsignedShiftRightAssign,
+                                tok_line,
+                                tok_col,
+                                tok_offset,
+                            );
+                        } else {
+                            push(
+                                &mut tokens,
+                                Token::UnsignedShiftRight,
+                                tok_line,
+                                tok_col,
+                                tok_offset,
+                            );
+                        }
+                    } else if let Some(&(_, '=')) = chars.peek() {
+                        chars.next();
+                        col += 1;
+                        push(
+                            &mut tokens,
+                            Token::ShiftRightAssign,
+                            tok_line,
+                            tok_col,
+                            tok_offset,
+                        );
+                    } else {
+                        push(
+                            &mut tokens,
+                            Token::ShiftRight,
+                            tok_line,
+                            tok_col,
+                            tok_offset,
+                        );
+                    }
                 } else if let Some(&(_, '=')) = chars.peek() {
                     chars.next();
                     col += 1;

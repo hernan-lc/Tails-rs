@@ -6,6 +6,36 @@ use crate::objects::Value;
 use rustc_hash::FxHashMap;
 
 impl Interpreter {
+    /// Re-fill a function's closure after self-referential assignment
+    /// (`var f = function(){ return f }`). Only runs when the function is
+    /// stored into a local that it actually captures — never when the same
+    /// function value is later assigned to an unrelated local (e.g. wrappy's
+    /// `var ret = once(...)`), which would re-read wrong parent-frame slots.
+    pub(crate) fn resnapshot_function_closure(
+        &mut self,
+        heap_idx: usize,
+        base_pointer: usize,
+        stored_to_slot: u16,
+    ) {
+        let slots = match &self.heap[heap_idx] {
+            HeapValue::Function(f) if !f.capture_slots.is_empty() => f.capture_slots.clone(),
+            _ => return,
+        };
+        if !slots.contains(&stored_to_slot) {
+            return;
+        }
+        let new_values: Vec<Value> = slots
+            .iter()
+            .map(|slot| {
+                let s = base_pointer + *slot as usize;
+                self.stack.get(s).cloned().unwrap_or(Value::Undefined)
+            })
+            .collect();
+        if let HeapValue::Function(f) = &mut self.heap[heap_idx] {
+            *f.closure.borrow_mut() = new_values;
+        }
+    }
+
     fn module_globals_rc(&mut self) -> std::rc::Rc<std::cell::RefCell<FxHashMap<String, Value>>> {
         self.module_globals_rc
             .get_or_insert_with(|| {
@@ -52,15 +82,17 @@ impl Interpreter {
                         } else {
                             None
                         },
+                        capture_slots: Vec::new(),
                     }),
                 );
                 self.stack.push(Value::Function(heap_idx));
             }
-            Instruction::MakeClosure(func_idx, _capture_slots) => {
+            Instruction::MakeClosure(func_idx, capture_slots) => {
                 let fi = &module.functions[*func_idx as usize];
                 let base_pointer: usize =
                     self.call_stack.last().map(|f| f.base_pointer).unwrap_or(0);
-                let snapshot: Vec<Value> = _capture_slots
+                let slots: Vec<u16> = capture_slots.to_vec();
+                let snapshot: Vec<Value> = slots
                     .iter()
                     .map(|slot| {
                         let abs_slot = base_pointer + *slot as usize;
@@ -102,6 +134,7 @@ impl Interpreter {
                         } else {
                             None
                         },
+                        capture_slots: slots,
                     }),
                 );
                 self.stack.push(Value::Function(heap_idx));
@@ -119,6 +152,7 @@ impl Interpreter {
                                 self.stack.get(s).cloned().unwrap_or(Value::Undefined)
                             })
                             .collect();
+                        f.capture_slots = capture_slots.to_vec();
                         *f.closure.borrow_mut() = new_values;
                     }
                 }

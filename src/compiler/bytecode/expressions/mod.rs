@@ -156,6 +156,7 @@ impl CodeGenerator {
             BinaryOperator::BitXor => self.emit(Instruction::BitXor),
             BinaryOperator::ShiftLeft => self.emit(Instruction::ShiftLeft),
             BinaryOperator::ShiftRight => self.emit(Instruction::ShiftRight),
+            BinaryOperator::UnsignedShiftRight => self.emit(Instruction::UnsignedShiftRight),
             BinaryOperator::Instanceof => self.emit(Instruction::InstanceOf),
             BinaryOperator::In => self.emit(Instruction::In),
             BinaryOperator::NullishCoalescing => self.emit(Instruction::NullishCoalescing),
@@ -291,13 +292,28 @@ impl CodeGenerator {
             self.locals.push(rp.to_string());
         }
 
+        // Match function-declaration compilation: hoist nested function decls
+        // and pre-register lexical bindings so `function handle(){}` used before
+        // its source position resolves (e.g. express Router.prototype.route).
+        self.pre_register_declarations(body);
         self.compile_default_params(params, defaults)?;
         self.emit_param_destructuring(params, param_patterns)?;
 
+        let saved_pending = std::mem::take(&mut self.pending_closure_snapshots);
+        let mut deferred_snapshots: Vec<(u16, Vec<u16>)> = Vec::new();
+        self.compile_hoisted_functions(body, &mut deferred_snapshots)?;
+        self.pending_closure_snapshots = deferred_snapshots;
+
         for stmt in body {
+            if matches!(&stmt.inner, Statement::FunctionDeclaration { .. }) {
+                continue;
+            }
             self.record_line_from_span(&stmt.span);
             self.generate_statement(&stmt.inner, false)?;
         }
+
+        self.flush_closure_snapshots();
+        self.pending_closure_snapshots = saved_pending;
 
         self.emit(Instruction::LoadUndefined);
         self.emit(Instruction::Return);
@@ -388,14 +404,31 @@ impl CodeGenerator {
         self.compile_default_params(params, defaults)?;
         self.emit_param_destructuring(params, param_patterns)?;
 
-        for stmt in &body_stmts {
-            self.record_line_from_span(&stmt.span);
-            self.generate_statement(&stmt.inner, false)?;
-        }
-
         if !is_expr {
+            self.pre_register_declarations(&body_stmts);
+            let saved_pending = std::mem::take(&mut self.pending_closure_snapshots);
+            let mut deferred_snapshots: Vec<(u16, Vec<u16>)> = Vec::new();
+            self.compile_hoisted_functions(&body_stmts, &mut deferred_snapshots)?;
+            self.pending_closure_snapshots = deferred_snapshots;
+
+            for stmt in &body_stmts {
+                if matches!(&stmt.inner, Statement::FunctionDeclaration { .. }) {
+                    continue;
+                }
+                self.record_line_from_span(&stmt.span);
+                self.generate_statement(&stmt.inner, false)?;
+            }
+
+            self.flush_closure_snapshots();
+            self.pending_closure_snapshots = saved_pending;
+
             self.emit(Instruction::LoadUndefined);
             self.emit(Instruction::Return);
+        } else {
+            for stmt in &body_stmts {
+                self.record_line_from_span(&stmt.span);
+                self.generate_statement(&stmt.inner, false)?;
+            }
         }
 
         self.finalize_local_count(func_idx);

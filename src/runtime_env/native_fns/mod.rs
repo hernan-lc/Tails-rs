@@ -828,6 +828,42 @@ pub static NATIVE_TABLE: &[NativeFn] = &[
     // String.prototype.trimStart / trimEnd (476-477)
     string_fns::native_string_trim_start,
     string_fns::native_string_trim_end,
+    // tty.isatty (478)
+    process_fns::native_tty_isatty,
+    // util.deprecate (479)
+    util_fns::native_util_deprecate,
+    // Error.captureStackTrace (480)
+    error_fns::native_error_capture_stack_trace,
+    // CallSite methods (481-489)
+    error_fns::native_callsite_get_file_name,
+    error_fns::native_callsite_get_line_number,
+    error_fns::native_callsite_get_column_number,
+    error_fns::native_callsite_is_eval,
+    error_fns::native_callsite_get_function_name,
+    error_fns::native_callsite_get_method_name,
+    error_fns::native_callsite_get_type_name,
+    error_fns::native_callsite_get_this,
+    error_fns::native_callsite_to_string,
+    // Object.prototype.toString / Function.prototype.toString
+    object_fns::native_object_to_string,
+    function_fns::native_function_to_string,
+    object_fns::native_object_get_own_property_symbols,
+    global_fns::native_decode_uri,
+    global_fns::native_decode_uri_component,
+    global_fns::native_encode_uri,
+    global_fns::native_encode_uri_component,
+    global_fns::native_eval,
+    iterator_fns::native_string_iterator,
+    global_fns::native_get_intrinsic,
+    encoding_fns::native_text_encoder_constructor,
+    encoding_fns::native_text_decoder_constructor,
+    encoding_fns::native_text_encoder_encode,
+    encoding_fns::native_text_decoder_decode,
+    util_fns::native_util_inherits,
+    object_fns::native_object_get_own_property_names,
+    object_fns::native_object_has_own,
+    global_fns::native_debug_noop,
+    global_fns::native_debug_logger_noop,
 ];
 
 #[cfg(test)]

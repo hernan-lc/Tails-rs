@@ -192,3 +192,154 @@ pub(super) fn native_number_is_finite(
 ) -> Result<Value> {
     native_is_finite(interp, this, args)
 }
+
+/// decodeURIComponent — percent-decode (throws on malformed sequences in real ES;
+/// we best-effort decode).
+pub(super) fn native_decode_uri_component(
+    interp: &mut Interpreter,
+    _this: &Value,
+    args: &[Value],
+) -> Result<Value> {
+    let s = match args.first() {
+        Some(v) => to_string_value(interp, v),
+        None => "undefined".into(),
+    };
+    match urlencoding::decode(&s) {
+        Ok(decoded) => Ok(Value::from_string(decoded.into_owned())),
+        Err(_) => Ok(Value::from_string(s)),
+    }
+}
+
+/// encodeURIComponent
+pub(super) fn native_encode_uri_component(
+    interp: &mut Interpreter,
+    _this: &Value,
+    args: &[Value],
+) -> Result<Value> {
+    let s = match args.first() {
+        Some(v) => to_string_value(interp, v),
+        None => "undefined".into(),
+    };
+    Ok(Value::from_string(urlencoding::encode(&s).into_owned()))
+}
+
+/// decodeURI — same as decodeURIComponent for our purposes (full ES differs on reserved chars).
+pub(super) fn native_decode_uri(
+    interp: &mut Interpreter,
+    this: &Value,
+    args: &[Value],
+) -> Result<Value> {
+    native_decode_uri_component(interp, this, args)
+}
+
+/// encodeURI
+pub(super) fn native_encode_uri(
+    interp: &mut Interpreter,
+    this: &Value,
+    args: &[Value],
+) -> Result<Value> {
+    native_encode_uri_component(interp, this, args)
+}
+
+/// No-op `debug` package factory: `require('debug')(ns)` returns a logger.
+pub(super) fn native_debug_noop(
+    _interp: &mut Interpreter,
+    _this: &Value,
+    _args: &[Value],
+) -> Result<Value> {
+    Ok(Value::NativeFunction(
+        crate::runtime_env::native_fns::constants::DEBUG_LOGGER_NOOP,
+    ))
+}
+
+/// Instance logger returned by `require('debug')(namespace)`.
+pub(super) fn native_debug_logger_noop(
+    _interp: &mut Interpreter,
+    _this: &Value,
+    _args: &[Value],
+) -> Result<Value> {
+    Ok(Value::Undefined)
+}
+
+/// Native `get-intrinsic` shim: resolve `%Name%` / `Name.prototype.method`
+/// against the interpreter globals and standard prototypes.
+pub(super) fn native_get_intrinsic(
+    interp: &mut Interpreter,
+    _this: &Value,
+    args: &[Value],
+) -> Result<Value> {
+    let name = match args.first() {
+        Some(Value::String(s)) => s.to_string(),
+        Some(Value::Cons(c)) => c.flatten(),
+        _ => {
+            return Err(crate::errors::Error::TypeError(
+                "intrinsic name must be a non-empty string".into(),
+            ))
+        }
+    };
+    let allow_missing = matches!(args.get(1), Some(Value::Boolean(true)));
+    let trimmed = name.trim_matches('%');
+    let parts: Vec<&str> = trimmed.split('.').filter(|p| !p.is_empty()).collect();
+    if parts.is_empty() {
+        if allow_missing {
+            return Ok(Value::Undefined);
+        }
+        return Err(crate::errors::Error::SyntaxError(format!(
+            "intrinsic {} does not exist!",
+            name
+        )));
+    }
+    let mut cur = match parts[0] {
+        "globalThis" | "global" => interp
+            .globals
+            .get("globalThis")
+            .cloned()
+            .unwrap_or(Value::Undefined),
+        other => interp
+            .globals
+            .get(other)
+            .cloned()
+            .unwrap_or(Value::Undefined),
+    };
+    if matches!(cur, Value::Undefined) {
+        if allow_missing {
+            return Ok(Value::Undefined);
+        }
+        return Err(crate::errors::Error::TypeError(format!(
+            "intrinsic {} exists, but is not available",
+            name
+        )));
+    }
+    for part in parts.iter().skip(1) {
+        cur = interp.get_property(&cur, &Value::from_string((*part).to_string()))?;
+        if matches!(cur, Value::Undefined) {
+            if allow_missing {
+                return Ok(Value::Undefined);
+            }
+            return Err(crate::errors::Error::TypeError(format!(
+                "intrinsic {} exists, but is not available",
+                name
+            )));
+        }
+    }
+    Ok(cur)
+}
+
+/// Minimal `eval` — compiles and runs a string expression/statement list.
+/// Used by get-intrinsic which only needs the global binding at load time;
+/// full ES scope rules are not replicated.
+pub(super) fn native_eval(
+    interp: &mut Interpreter,
+    _this: &Value,
+    args: &[Value],
+) -> Result<Value> {
+    let source = match args.first() {
+        Some(Value::String(s)) => s.to_string(),
+        Some(Value::Cons(c)) => c.flatten(),
+        Some(v) => return Ok(v.clone()), // non-string: return as-is (ES)
+        None => return Ok(Value::Undefined),
+    };
+    let compiler = crate::compiler::Compiler::new(false);
+    let compiled = compiler.compile(&source)?;
+    interp.execute(&compiled)
+}

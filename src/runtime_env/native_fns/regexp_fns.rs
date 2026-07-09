@@ -400,9 +400,11 @@ pub(super) fn native_string_replace(
             };
             Ok(Value::from_string(result))
         }
-        Value::String(search_str) => Ok(Value::from_string(
-            input.replacen(&*search_str, &replacement, 1),
-        )),
+        Value::String(search_str) => Ok(Value::from_string(input.replacen(
+            &*search_str,
+            &replacement,
+            1,
+        ))),
         _ => Ok(Value::from_string(input.clone())),
     }
 }

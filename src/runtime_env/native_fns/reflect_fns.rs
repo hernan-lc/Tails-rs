@@ -143,6 +143,7 @@ pub(super) fn native_reflect_construct(
                 source_line: None,
                 source_col: None,
                 exception_handlers_snapshot: interp.exception_handlers.clone(),
+                arguments: None,
             });
 
             for closure_var in f.closure.borrow().iter().cloned() {
@@ -451,6 +452,17 @@ pub(super) fn native_reflect_get_prototype_of(
                 Ok(Value::Null)
             }
         }
+        Value::Function(func_idx) => {
+            if let crate::vm::interpreter::HeapValue::Function(f) = &interp.heap[*func_idx] {
+                if let Some(proto) = f.properties.get("__[[Prototype]]__") {
+                    return Ok(proto.clone());
+                }
+                if let Some(proto_idx) = interp.function_proto_idx {
+                    return Ok(Value::Object(proto_idx));
+                }
+            }
+            Ok(Value::Null)
+        }
         _ => Ok(Value::Null),
     }
 }
@@ -472,6 +484,28 @@ pub(super) fn native_reflect_set_prototype_of(
             };
             if let crate::vm::interpreter::HeapValue::Object(obj) = &mut interp.heap[*obj_idx] {
                 obj.prototype = new_proto;
+                return Ok(Value::Boolean(true));
+            }
+            Ok(Value::Boolean(false))
+        }
+        Value::Function(func_idx) => {
+            // Functions also have an internal [[Prototype]] chain (used by
+            // Express Router: `Object.setPrototypeOf(router, this)`).
+            let new_proto = match &proto {
+                Value::Object(p_idx) => Some(Value::Object(*p_idx)),
+                Value::Function(p_idx) => Some(Value::Function(*p_idx)),
+                Value::Null => None,
+                _ => return Ok(Value::Boolean(false)),
+            };
+            if let crate::vm::interpreter::HeapValue::Function(f) = &mut interp.heap[*func_idx] {
+                match new_proto {
+                    Some(p) => {
+                        f.properties.insert("__[[Prototype]]__".into(), p);
+                    }
+                    None => {
+                        f.properties.remove("__[[Prototype]]__");
+                    }
+                }
                 return Ok(Value::Boolean(true));
             }
             Ok(Value::Boolean(false))

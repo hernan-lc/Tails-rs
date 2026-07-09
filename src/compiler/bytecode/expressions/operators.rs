@@ -144,6 +144,11 @@ impl CodeGenerator {
                 CompoundAssignmentOp::XorAssign => self.emit(Instruction::BitXor),
                 CompoundAssignmentOp::BitAndAssign => self.emit(Instruction::BitAnd),
                 CompoundAssignmentOp::BitOrAssign => self.emit(Instruction::BitOr),
+                CompoundAssignmentOp::ShiftLeftAssign => self.emit(Instruction::ShiftLeft),
+                CompoundAssignmentOp::ShiftRightAssign => self.emit(Instruction::ShiftRight),
+                CompoundAssignmentOp::UnsignedShiftRightAssign => {
+                    self.emit(Instruction::UnsignedShiftRight)
+                }
                 CompoundAssignmentOp::NullishCoalescingAssign => {
                     self.emit(Instruction::NullishCoalescing)
                 }
@@ -186,6 +191,12 @@ impl CodeGenerator {
                 computed,
             } = target
             {
+                // Assignment expression result is the RHS value (ES):
+                //   `var Safer = safer.Buffer = {}` must bind Safer to `{}`,
+                //   not to `safer`. SetProperty leaves the receiver, so Dup
+                //   the value and Pop the object afterward (same as compound).
+                self.generate_expression(value)?;
+                self.emit(Instruction::Dup);
                 self.generate_expression(object)?;
                 if *computed {
                     self.generate_expression(property)?;
@@ -195,8 +206,9 @@ impl CodeGenerator {
                 } else {
                     self.generate_expression(property)?;
                 }
-                self.generate_expression(value)?;
+                self.emit(Instruction::Rot3Right);
                 self.emit(Instruction::SetProperty);
+                self.emit(Instruction::Pop);
             } else if let Expression::Identifier(name) = target {
                 self.generate_expression(value)?;
                 self.emit(Instruction::Dup);

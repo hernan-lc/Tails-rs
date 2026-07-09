@@ -97,67 +97,14 @@ impl Interpreter {
         self.current_module = Some(Rc::new(module.clone()));
         let prev_exports = std::mem::take(&mut self.module_exports);
         let saved_globals = std::mem::take(&mut self.globals);
-        // Restore built-in globals into the fresh scope
-        for key in saved_globals.keys() {
-            if key == wk::CONSOLE
-                || key == wk::OBJECT
-                || key == wk::JSON
-                || key == wk::MATH
-                || key == wk::PROXY
-                || key == wk::REFLECT
-                || key == wk::ERROR
-                || key == wk::TYPE_ERROR
-                || key == wk::REFERENCE_ERROR
-                || key == wk::SYNTAX_ERROR
-                || key == wk::RANGE_ERROR
-                || key == wk::ARRAY
-                || key == wk::STRING
-                || key == wk::NUMBER
-                || key == wk::BOOLEAN
-                || key == "parseInt"
-                || key == "parseFloat"
-                || key == "isNaN"
-                || key == "isFinite"
-                || key == "setTimeout"
-                || key == "setInterval"
-                || key == "clearTimeout"
-                || key == "clearInterval"
-                || key == "setImmediate"
-                || key == "clearImmediate"
-                || key == wk::MAP
-                || key == wk::SET
-                || key == "WeakMap"
-                || key == "WeakSet"
-                || key == wk::PROMISE
-                || key == wk::SYMBOL
-                || key == wk::BIGINT
-                || key == wk::DATE
-                || key == wk::REGEXP
-                || key == "URL"
-                || key == "URLSearchParams"
-                || key == "Headers"
-                || key == "Request"
-                || key == "Response"
-                || key == wk::GLOBAL_THIS
-                || key == wk::GLOBAL_THIS
-                || key == wk::GLOBAL_THIS
-                || key == "fetch"
-                || key == "WebSocket"
-                || key == "require"
-                || key == "Buffer"
-                || key == wk::PROCESS
-                || key == wk::FUNCTION
-            {
-                self.globals.insert(key.clone(), saved_globals[key].clone());
-            }
-        }
+        // Node-compatible: every built-in global is visible inside modules.
+        // (A narrow allow-list previously omitted TypedArrays, Error helpers, …)
+        self.globals = saved_globals.clone();
 
         // Inject __filename, __dirname, module, exports globals
         if let Some(ref path) = self.current_module_path {
-            self.globals.insert(
-                "__filename".to_string(),
-                Value::from_string(path.clone()),
-            );
+            self.globals
+                .insert("__filename".to_string(), Value::from_string(path.clone()));
             let dir = std::path::Path::new(path)
                 .parent()
                 .map(|p| p.to_string_lossy().to_string())
@@ -217,7 +164,12 @@ impl Interpreter {
         self.module_globals = Some(module_globals_cell.clone());
         self.module_globals_rc = Some(module_globals_cell.clone());
 
+        // Isolate exception state (same rationale as native_require).
+        let saved_exception_handlers = std::mem::take(&mut self.exception_handlers);
+        let saved_pending_exception = self.pending_exception.take();
         let result = self.execute(module);
+        self.exception_handlers = saved_exception_handlers;
+        self.pending_exception = saved_pending_exception;
 
         self.module_globals = saved_mg;
         self.module_globals_rc = saved_mg_rc;
@@ -500,10 +452,11 @@ impl Interpreter {
             if normalized.exists() && normalized.is_file() {
                 return Ok(normalized.to_string_lossy().to_string());
             }
-            for ext in &[".ts", ".js", ".cjs"] {
-                let stem = normalized.with_extension("");
+            // Append extensions rather than Path::with_extension, so multi-dot
+            // names like `./util.inspect` resolve to `util.inspect.js` (not `util.js`).
+            for ext in &[".ts", ".js", ".cjs", ".mjs"] {
                 let candidate =
-                    std::path::PathBuf::from(format!("{}{}", stem.to_string_lossy(), ext));
+                    std::path::PathBuf::from(format!("{}{}", normalized.to_string_lossy(), ext));
                 if candidate.exists() {
                     return Ok(candidate.to_string_lossy().to_string());
                 }
@@ -670,10 +623,9 @@ impl Interpreter {
         if path.exists() && path.is_file() {
             return Some(path.to_string_lossy().to_string());
         }
+        // Append extensions (do not strip multi-dot stems like `util.inspect`).
         for ext in &[".ts", ".js", ".mjs", ".cjs"] {
-            let with_ext = path.with_extension("");
-            let candidate =
-                std::path::PathBuf::from(format!("{}{}", with_ext.to_string_lossy(), ext));
+            let candidate = std::path::PathBuf::from(format!("{}{}", path.to_string_lossy(), ext));
             if candidate.exists() {
                 return Some(candidate.to_string_lossy().to_string());
             }
@@ -705,9 +657,11 @@ impl Interpreter {
                 Value::from_string(path.clone()),
             );
         }
+        // Inherit Object.prototype so `exports.hasOwnProperty` etc. work
+        // (Node module.exports is an ordinary object).
         self.heap.push(HeapValue::Object(JsObject {
             properties: PropertyStorage::Map(props),
-            prototype: None,
+            prototype: self.object_proto_idx,
             extensible: true,
         }));
         Value::Object(heap_idx)

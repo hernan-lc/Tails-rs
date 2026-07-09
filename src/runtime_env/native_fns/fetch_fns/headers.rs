@@ -79,10 +79,8 @@ where
                 .iter()
                 .map(|(k, v)| format!("{}\0{}", k, v))
                 .collect();
-            obj.properties.insert(
-                "__headers".into(),
-                Value::from_string(new_raw.join("\n")),
-            );
+            obj.properties
+                .insert("__headers".into(), Value::from_string(new_raw.join("\n")));
         }
     }
 }

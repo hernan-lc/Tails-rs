@@ -73,12 +73,18 @@ impl<'a> Parser<'a> {
 
     pub(crate) fn parse_return_statement(&mut self) -> Result<SpannedNode<Statement>> {
         self.expect(&Token::Return)?;
-        let value =
-            if self.peek().token != Token::Semicolon && self.peek().token != Token::RightBrace {
-                Some(self.parse_expression()?.inner)
-            } else {
-                None
-            };
+        // Restricted production (ASI): a LineTerminator after `return` ends the
+        // statement with no argument — so `return\n expr` is `return; expr`, not
+        // `return expr`. Also stop at `;` / `}`.
+        let value = if self.peek().token != Token::Semicolon
+            && self.peek().token != Token::RightBrace
+            && self.peek().token != Token::Eof
+            && self.peek().span.line == self.current_span.line
+        {
+            Some(self.parse_expression()?.inner)
+        } else {
+            None
+        };
         self.expect_statement_semicolon()?;
         Ok(self.spanned(Statement::ReturnStatement(value)))
     }

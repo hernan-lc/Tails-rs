@@ -1,7 +1,6 @@
-use crate::errors::Result;
+use crate::errors::{Error, Result};
 use crate::objects::Value;
-use crate::vm::interpreter::Interpreter;
-use crate::well_known as wk;
+use crate::vm::interpreter::{HeapValue, Interpreter};
 
 use super::helpers::{get_string, to_f64, to_string_value};
 
@@ -130,21 +129,118 @@ pub(super) fn native_string_replace(
     args: &[Value],
 ) -> Result<Value> {
     let s = get_string(this).unwrap_or_default();
-    let pattern = match args.first() {
-        Some(Value::String(ss)) => ss.as_ref(),
-        _ => return Ok(Value::from_string(s)),
-    };
-    let replacement = match args.get(1) {
-        Some(v) => to_string_value(interp, v),
-        None => wk::UNDEFINED.to_string(),
-    };
-    match s.find(pattern) {
-        Some(pos) => {
-            let end = pos + pattern.len();
-            let result = format!("{}{}{}", &s[..pos], replacement, &s[end..]);
-            Ok(Value::from_string(result))
+    let search = args.first().cloned().unwrap_or(Value::Undefined);
+    let replacer = args.get(1).cloned().unwrap_or(Value::Undefined);
+
+    // Function replacer: String.prototype.replace(pattern, (match, ...groups, offset, string) => ...)
+    let is_fn = matches!(replacer, Value::Function(_) | Value::NativeFunction(_));
+
+    match search {
+        Value::RegExp(idx) => {
+            // Collect matches first to avoid borrow issues across call_value.
+            let (matches, global) = {
+                let HeapValue::RegExp(ref regexp) = &interp.heap[idx] else {
+                    return Err(Error::TypeError("Not a RegExp".into()));
+                };
+                let global = regexp.global;
+                let compiled = regexp.compiled.as_ref();
+                let mut matches: Vec<(usize, usize, String, Vec<String>)> = Vec::new();
+                if let Some(compiled) = compiled {
+                    match compiled {
+                        crate::vm::interpreter::JsCompiledRegex::Simple(r) => {
+                            for caps in r.captures_iter(&s) {
+                                let m = caps.get(0).unwrap();
+                                let groups: Vec<String> = caps
+                                    .iter()
+                                    .skip(1)
+                                    .map(|g| g.map(|x| x.as_str().to_string()).unwrap_or_default())
+                                    .collect();
+                                matches.push((m.start(), m.end(), m.as_str().to_string(), groups));
+                                if !global {
+                                    break;
+                                }
+                            }
+                        }
+                        crate::vm::interpreter::JsCompiledRegex::Advanced(r) => {
+                            for caps in r.captures_iter(&s).flatten() {
+                                let m = caps.get(0).unwrap();
+                                let groups: Vec<String> = (1..caps.len())
+                                    .map(|i| {
+                                        caps.get(i)
+                                            .map(|x| x.as_str().to_string())
+                                            .unwrap_or_default()
+                                    })
+                                    .collect();
+                                matches.push((m.start(), m.end(), m.as_str().to_string(), groups));
+                                if !global {
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+                (matches, global)
+            };
+            let _ = global;
+            if matches.is_empty() {
+                return Ok(Value::from_string(s));
+            }
+            let mut out = String::new();
+            let mut last = 0usize;
+            for (start, end, full, groups) in matches {
+                out.push_str(&s[last..start]);
+                if is_fn {
+                    let mut call_args = vec![Value::from_string(full)];
+                    for g in groups {
+                        call_args.push(Value::from_string(g));
+                    }
+                    call_args.push(Value::Integer(start as i64));
+                    call_args.push(Value::from_string(s.clone()));
+                    let rep = interp.call_value(&replacer, &Value::Undefined, &call_args)?;
+                    out.push_str(&to_string_value(interp, &rep));
+                } else {
+                    out.push_str(&to_string_value(interp, &replacer));
+                }
+                last = end;
+            }
+            out.push_str(&s[last..]);
+            Ok(Value::from_string(out))
         }
-        None => Ok(Value::from_string(s)),
+        Value::String(pattern) => {
+            if is_fn {
+                if let Some(pos) = s.find(pattern.as_ref()) {
+                    let end = pos + pattern.len();
+                    let call_args = vec![
+                        Value::from_string(pattern.to_string()),
+                        Value::Integer(pos as i64),
+                        Value::from_string(s.clone()),
+                    ];
+                    let rep = interp.call_value(&replacer, &Value::Undefined, &call_args)?;
+                    let rep_s = to_string_value(interp, &rep);
+                    return Ok(Value::from_string(format!(
+                        "{}{}{}",
+                        &s[..pos],
+                        rep_s,
+                        &s[end..]
+                    )));
+                }
+                return Ok(Value::from_string(s));
+            }
+            let replacement = to_string_value(interp, &replacer);
+            match s.find(pattern.as_ref()) {
+                Some(pos) => {
+                    let end = pos + pattern.len();
+                    Ok(Value::from_string(format!(
+                        "{}{}{}",
+                        &s[..pos],
+                        replacement,
+                        &s[end..]
+                    )))
+                }
+                None => Ok(Value::from_string(s)),
+            }
+        }
+        _ => Ok(Value::from_string(s)),
     }
 }
 
@@ -288,9 +384,9 @@ pub(super) fn native_string_pad_start(
         Some(Value::String(ss)) => ss.chars().next().unwrap_or(' '),
         _ => ' ',
     };
-    Ok(Value::from_string(
-        pad_string(&s, target_len, pad_char, true),
-    ))
+    Ok(Value::from_string(pad_string(
+        &s, target_len, pad_char, true,
+    )))
 }
 
 pub(super) fn native_string_pad_end(
@@ -304,9 +400,9 @@ pub(super) fn native_string_pad_end(
         Some(Value::String(ss)) => ss.chars().next().unwrap_or(' '),
         _ => ' ',
     };
-    Ok(Value::from_string(
-        pad_string(&s, target_len, pad_char, false),
-    ))
+    Ok(Value::from_string(pad_string(
+        &s, target_len, pad_char, false,
+    )))
 }
 
 pub(super) fn native_string_match_all(

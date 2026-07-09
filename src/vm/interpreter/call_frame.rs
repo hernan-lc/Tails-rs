@@ -15,6 +15,8 @@ pub(crate) struct CallFrame {
     pub(crate) source_line: Option<usize>,
     pub(crate) source_col: Option<usize>,
     pub(crate) exception_handlers_snapshot: Vec<ExceptionHandler>,
+    /// Non-arrow functions expose the `arguments` object (array-like).
+    pub(crate) arguments: Option<Value>,
 }
 
 #[derive(Debug, Clone)]

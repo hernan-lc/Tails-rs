@@ -30,12 +30,47 @@ pub(super) fn native_require(
         }
     };
 
+    // Strip Node's `node:` builtin prefix (e.g. `node:events` → `events`).
+    let bare_specifier = specifier
+        .strip_prefix("node:")
+        .unwrap_or(specifier.as_str());
+
+    // Shim `get-intrinsic`: the real package's GetIntrinsic hits several
+    // unfinished edges (complex regex + large free-var functions causing stack
+    // underflows). A native walk of known globals is enough for express /
+    // side-channel / call-bound.
+    if bare_specifier == "get-intrinsic" {
+        if let Some(cached) = interp.require_cache.get("get-intrinsic") {
+            return Ok(cached.clone());
+        }
+        let fn_val =
+            Value::NativeFunction(crate::runtime_env::native_fns::constants::GET_INTRINSIC);
+        // call-bound does `require('get-intrinsic')` and calls the export as a
+        // function — module.exports = GetIntrinsic (function, not {default}).
+        interp
+            .require_cache
+            .insert("get-intrinsic".into(), fn_val.clone());
+        return Ok(fn_val);
+    }
+
+    // Shim `debug`: the real package relies on rest-params + function accessors
+    // + complex closures that still trip stack underflows when invoked. Express
+    // only needs a no-op logger at load/init time.
+    if bare_specifier == "debug" {
+        if let Some(cached) = interp.require_cache.get("debug") {
+            return Ok(cached.clone());
+        }
+        let fn_val = Value::NativeFunction(crate::runtime_env::native_fns::constants::DEBUG_NOOP);
+        interp.require_cache.insert("debug".into(), fn_val.clone());
+        return Ok(fn_val);
+    }
+
     // 1. Resolve the module path (fallback to native modules for bare names)
-    let module_path = match interp.resolve_module_path(&specifier) {
+    let module_path = match interp.resolve_module_path(bare_specifier) {
         Ok(p) => p,
         Err(_) => {
-            // Try as a native module (e.g., "path", "fs", "process")
-            let module_name = &specifier;
+            // Try as a native module (e.g., "path", "fs", "process", "tty")
+            let module_name = bare_specifier;
             if !interp.native_loader.has_module(module_name) {
                 crate::vm::interpreter::native_loader::discover_module(
                     module_name,
@@ -43,7 +78,7 @@ pub(super) fn native_require(
                 );
             }
             if interp.native_loader.has_module(module_name) {
-                if let Some(cached) = interp.require_cache.get(module_name.as_str()) {
+                if let Some(cached) = interp.require_cache.get(module_name) {
                     return Ok(cached.clone());
                 }
                 let exports = interp.native_loader.load_module(
@@ -51,9 +86,19 @@ pub(super) fn native_require(
                     &mut interp.heap,
                     &mut interp.gc,
                 )?;
-                if **module_name == *wk::MOD_BUFFER {
+                if module_name == wk::MOD_BUFFER {
                     if let Some(Value::Object(proto_idx)) = exports.get(wk::PROTOTYPE) {
                         interp.buffer_proto_idx = Some(*proto_idx);
+                    }
+                    // Buffer constructor object needs Object.prototype for hasOwnProperty
+                    if let Some(Value::Object(ctor_idx)) = exports.get("Buffer") {
+                        if let crate::vm::interpreter::HeapValue::Object(obj) =
+                            &mut interp.heap[*ctor_idx]
+                        {
+                            if obj.prototype.is_none() {
+                                obj.prototype = interp.object_proto_idx;
+                            }
+                        }
                     }
                 }
                 let mut props: FxHashMap<String, Value> = FxHashMap::default();
@@ -63,7 +108,21 @@ pub(super) fn native_require(
                 interp
                     .module_registry
                     .insert(module_name.to_string(), props.clone());
-                let result = interp.build_module_object_from_exports(&props);
+                // Build the export object *without* tagging `__module_path` with
+                // the caller's path. `build_module_object_from_exports` would
+                // stamp the current CJS file path onto the native module, and
+                // live-binding lookup in `get_property` would then resolve
+                // every property against the *caller's* registry entry
+                // (returning undefined for `util.deprecate`, `path.join`, etc.).
+                let heap_idx = interp.heap.len();
+                interp.heap.push(crate::vm::interpreter::HeapValue::Object(
+                    crate::vm::interpreter::JsObject {
+                        properties: PropertyStorage::Map(props),
+                        prototype: interp.object_proto_idx,
+                        extensible: true,
+                    },
+                ));
+                let result = Value::Object(heap_idx);
                 interp
                     .require_cache
                     .insert(module_name.to_string(), result.clone());
@@ -96,6 +155,18 @@ pub(super) fn native_require(
         crate::errors::Error::RuntimeError(format!("Cannot read module '{}': {}", specifier, e))
     })?;
 
+    // 4b. JSON modules — Node returns the parsed object as module.exports
+    if module_path.ends_with(".json") {
+        let json: serde_json::Value = serde_json::from_str(&source_code).map_err(|e| {
+            crate::errors::Error::SyntaxError(format!("JSON parse error in '{}': {}", specifier, e))
+        })?;
+        let value = super::helpers::from_json_value(interp, json);
+        interp
+            .require_cache
+            .insert(module_path.clone(), value.clone());
+        return Ok(value);
+    }
+
     // 5. Compile
     let compiler = crate::compiler::Compiler::new(false);
     let compiled = compiler.compile(&source_code)?;
@@ -113,55 +184,9 @@ pub(super) fn native_require(
     let saved_module_globals = interp.module_globals.take();
     let saved_module_globals_rc = interp.module_globals_rc.take();
 
-    // 8. Restore built-in globals + CJS globals
-    for key in saved_globals.keys() {
-        if key == wk::CONSOLE
-            || key == wk::OBJECT
-            || key == wk::JSON
-            || key == wk::MATH
-            || key == wk::PROXY
-            || key == wk::REFLECT
-            || key == wk::ERROR
-            || key == wk::TYPE_ERROR
-            || key == wk::REFERENCE_ERROR
-            || key == wk::SYNTAX_ERROR
-            || key == wk::RANGE_ERROR
-            || key == wk::ARRAY
-            || key == wk::STRING
-            || key == wk::NUMBER
-            || key == wk::BOOLEAN
-            || key == "parseInt"
-            || key == "parseFloat"
-            || key == "isNaN"
-            || key == "isFinite"
-            || key == "setTimeout"
-            || key == "setInterval"
-            || key == "clearTimeout"
-            || key == "clearInterval"
-            || key == wk::MAP
-            || key == wk::SET
-            || key == "WeakMap"
-            || key == "WeakSet"
-            || key == wk::PROMISE
-            || key == wk::SYMBOL
-            || key == wk::BIGINT
-            || key == wk::DATE
-            || key == wk::REGEXP
-            || key == "URL"
-            || key == "URLSearchParams"
-            || key == "Headers"
-            || key == "Request"
-            || key == "Response"
-            || key == wk::GLOBAL_THIS
-            || key == "fetch"
-            || key == "WebSocket"
-            || key == "require"
-        {
-            interp
-                .globals
-                .insert(key.clone(), saved_globals[key].clone());
-        }
-    }
+    // 8. Node-compatible: every built-in global is visible inside CJS modules.
+    // (A narrow allow-list previously omitted helpers some packages need.)
+    interp.globals = saved_globals.clone();
 
     // 9. Set module path and pre-register (for circular deps)
     interp.current_module_path = Some(module_path.clone());
@@ -190,12 +215,28 @@ pub(super) fn native_require(
         .globals
         .insert("__dirname".to_string(), Value::from_string(dirname));
 
-    // 12. Execute the module
+    // 12. Execute the module on an isolated operand stack so nested
+    // `require()` / if-else / BlockExit cannot corrupt the caller's stack
+    // (which may hold intermediate assignment slots like `module`, `"exports"`).
+    //
+    // Also isolate exception handlers and pending exceptions: parent try/catch
+    // PCs are meaningless inside the child module bytecode. Leaking them made
+    // host TypeErrors (e.g. `process.binding` missing) jump to the wrong PC,
+    // leave `pending_exception` set, and rethrow after `require()` returned
+    // (breaks safer-buffer under an outer try, and express's require tree).
     let module_scope_rc: std::rc::Rc<std::cell::RefCell<rustc_hash::FxHashMap<String, Value>>> =
         std::rc::Rc::new(std::cell::RefCell::new(interp.globals.clone()));
     interp.module_globals = Some(module_scope_rc.clone());
     interp.module_globals_rc = Some(module_scope_rc);
+    let saved_stack = std::mem::take(&mut interp.stack);
+    let saved_block_scopes = std::mem::take(&mut interp.block_scope_stack);
+    let saved_exception_handlers = std::mem::take(&mut interp.exception_handlers);
+    let saved_pending_exception = interp.pending_exception.take();
     let result = interp.execute(&compiled);
+    interp.stack = saved_stack;
+    interp.block_scope_stack = saved_block_scopes;
+    interp.exception_handlers = saved_exception_handlers;
+    interp.pending_exception = saved_pending_exception;
 
     // 13. Read module.exports (may have been reassigned by the module)
     let final_exports = interp

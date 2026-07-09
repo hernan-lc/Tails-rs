@@ -92,8 +92,18 @@ pub enum Statement {
         discriminant: Expression,
         cases: Vec<SwitchCase>,
     },
-    BreakStatement,
-    ContinueStatement,
+    /// `break;` or `break label;`
+    BreakStatement(Option<String>),
+    /// `continue;` or `continue label;`
+    ContinueStatement(Option<String>),
+    /// `label: statement` — used by content-type and other loops that
+    /// `continue label` / `break label`.
+    LabeledStatement {
+        label: String,
+        body: Box<SpannedNode<Statement>>,
+    },
+    /// Bare `;` empty statement.
+    EmptyStatement,
     TryStatement {
         block: Vec<SpannedNode<Statement>>,
         handler: Option<CatchClause>,
@@ -423,6 +433,9 @@ pub enum CompoundAssignmentOp {
     XorAssign,
     BitAndAssign,
     BitOrAssign,
+    ShiftLeftAssign,
+    ShiftRightAssign,
+    UnsignedShiftRightAssign,
     NullishCoalescingAssign,
 }
 
@@ -454,6 +467,7 @@ pub enum BinaryOperator {
     BitXor,
     ShiftLeft,
     ShiftRight,
+    UnsignedShiftRight,
     Power,
     Instanceof,
     In,
@@ -477,7 +491,7 @@ pub fn parse(tokens: &mut [SpannedToken]) -> Result<AstNode> {
     parser.parse_program()
 }
 
-fn token_keyword_string(t: &Token) -> Option<String> {
+pub(crate) fn token_keyword_string(t: &Token) -> Option<String> {
     match t {
         Token::Identifier(n) => Some(n.clone()),
         Token::String(s) => Some(s.clone()),
@@ -635,19 +649,24 @@ impl<'a> Parser<'a> {
     }
 
     /// Consume a statement-terminating semicolon, applying Automatic Semicolon
-    /// Insertion: a semicolon is implied at end-of-input or when the next token
-    /// begins on a later line than the token just consumed. For-loop headers do
-    /// NOT use this and must keep their mandatory semicolons.
+    /// Insertion (ECMAScript):
+    /// 1. Explicit `;`
+    /// 2. End of input
+    /// 3. Next token starts on a later line (line-break ASI)
+    /// 4. Next token is `}` (block close ASI — e.g. `return value}` / `x = fn() { return y }`)
+    ///
+    /// For-loop headers do NOT use this and must keep their mandatory semicolons.
     pub(crate) fn expect_statement_semicolon(&mut self) -> Result<()> {
         let next = self.peek().token.clone();
         if next == Token::Semicolon {
             self.advance();
             return Ok(());
         }
-        if next == Token::Eof {
-            return Ok(());
-        }
-        if self.peek().span.line > self.current_span.line {
+        // ASI: EOF, line break before next token, or closing `}` of a block.
+        if next == Token::Eof
+            || next == Token::RightBrace
+            || self.peek().span.line > self.current_span.line
+        {
             return Ok(());
         }
         Err(Error::ParseError(format!(
@@ -725,12 +744,13 @@ impl<'a> Parser<'a> {
                 }
                 if self.peek().token == Token::Ellipsis {
                     self.advance();
-                    let param = match self.advance().token {
-                        Token::Identifier(name) => name,
-                        token => {
+                    let st = self.advance();
+                    let param = match token_keyword_string(&st.token) {
+                        Some(name) => name,
+                        None => {
                             return Err(Error::ParseError(format!(
                                 "Expected parameter name after '...', got {:?}",
-                                token
+                                st.token
                             )))
                         }
                     };
@@ -742,19 +762,21 @@ impl<'a> Parser<'a> {
                     break;
                 }
                 let (param, pattern) = match self.peek().token.clone() {
-                    Token::Identifier(_) => match self.advance().token {
-                        Token::Identifier(name) => (name, None),
-                        _ => unreachable!(),
-                    },
                     Token::LeftBracket | Token::LeftBrace => {
                         let pattern = self.parse_binding_pattern()?;
                         (format!("__destr_{}", params.len()), Some(pattern))
                     }
-                    token => {
-                        return Err(Error::ParseError(format!(
-                            "Expected parameter name, got {:?}",
-                            token
-                        )))
+                    _ => {
+                        // Allow reserved words as parameter names (e.g. `from` in object-inspect).
+                        if let Some(name) = token_keyword_string(&self.peek().token) {
+                            self.advance();
+                            (name, None)
+                        } else {
+                            return Err(Error::ParseError(format!(
+                                "Expected parameter name, got {:?}",
+                                self.peek().token
+                            )));
+                        }
                     }
                 };
                 let ty = if self.peek().token == Token::Colon {

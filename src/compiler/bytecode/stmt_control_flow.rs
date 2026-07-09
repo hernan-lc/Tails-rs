@@ -11,7 +11,7 @@ impl CodeGenerator {
     pub(super) fn generate_control_flow_statement(
         &mut self,
         stmt: &Statement,
-        _is_last: bool,
+        is_last: bool,
     ) -> Result<bool> {
         match stmt {
             Statement::IfStatement {
@@ -23,13 +23,17 @@ impl CodeGenerator {
                 let jump_if_not = self.instructions.len();
                 self.emit(Instruction::JumpIfNot(0));
                 self.record_line_from_span(&consequent.span);
-                self.generate_statement_in_branch(&consequent.inner)?;
+                // Only leave a value when the whole `if` is the last statement
+                // of an eval/script (expression-like `if (c) { 1 } else { 2 }`).
+                // Nested statement contexts (e.g. CJS modules) pass is_last=false
+                // so branch results are Pop'd and do not pollute the operand stack.
+                self.generate_statement_in_branch(&consequent.inner, is_last)?;
                 if let Some(alt) = alternate {
                     let jump_to_end = self.instructions.len();
                     self.emit(Instruction::Jump(0));
                     self.patch_jump(jump_if_not, self.instructions.len());
                     self.record_line_from_span(&alt.span);
-                    self.generate_statement_in_branch(&alt.inner)?;
+                    self.generate_statement_in_branch(&alt.inner, is_last)?;
                     self.patch_jump(jump_to_end, self.instructions.len());
                 } else {
                     self.patch_jump(jump_if_not, self.instructions.len());
@@ -628,7 +632,9 @@ impl CodeGenerator {
 
                 Ok(true)
             }
-            Statement::BreakStatement => {
+            Statement::BreakStatement(_label) => {
+                // Label is currently ignored: break the innermost loop/switch.
+                // Sufficient for single-level labeled loops (content-type).
                 if !self.break_targets.is_empty() {
                     self.emit(Instruction::Jump(0));
                     self.break_targets.push(self.instructions.len() - 1);
@@ -638,7 +644,8 @@ impl CodeGenerator {
                 }
                 Ok(true)
             }
-            Statement::ContinueStatement => {
+            Statement::ContinueStatement(_label) => {
+                // Label is currently ignored: continue the innermost loop.
                 if let Some(target) = self.continue_targets.last().copied() {
                     if target == usize::MAX {
                         // placeholder - push Jump(0) and record for patching
@@ -651,6 +658,11 @@ impl CodeGenerator {
                     self.emit(Instruction::LoadUndefined);
                     self.emit(Instruction::Return);
                 }
+                Ok(true)
+            }
+            Statement::LabeledStatement { body, .. } => {
+                // Labels are parse-level only for now; emit the body as-is.
+                self.generate_statement(&body.inner, false)?;
                 Ok(true)
             }
             _ => Ok(false),

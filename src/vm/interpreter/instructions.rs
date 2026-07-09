@@ -134,7 +134,29 @@ impl Interpreter {
                     self.stack.resize(idx + 1, Value::Undefined);
                 }
                 // Direct index write — avoid the Vec::Index trait overhead.
-                self.stack[idx] = value;
+                self.stack[idx] = value.clone();
+                // Immediately publish mutations of captured slots to the shared
+                // closure Rc so nested/recursive calls (e.g. express `next()`)
+                // see updates before the outer frame returns.
+                if let Some(frame) = self.call_stack.last() {
+                    let slot_usize = *slot as usize;
+                    if slot_usize < frame.closure_var_count {
+                        if let Some(heap_idx) = frame.func_heap_idx {
+                            if let HeapValue::Function(f) = &self.heap[heap_idx] {
+                                let mut closure = f.closure.borrow_mut();
+                                if slot_usize < closure.len() {
+                                    closure[slot_usize] = value.clone();
+                                }
+                            }
+                        }
+                    }
+                }
+                // Self-referential closures (`var f = function(){ f.x }`):
+                // MakeClosure runs before the assignment, so `f` was undefined.
+                // Re-snapshot only when storing into a slot this function captures.
+                if let Value::Function(heap_idx) = value {
+                    self.resnapshot_function_closure(heap_idx, base, *slot);
+                }
             }
             Instruction::IncLocal(slot, delta) => {
                 if let Some(frame) = self.call_stack.last() {
@@ -148,6 +170,18 @@ impl Interpreter {
                                 self.stack[idx] = Value::Float(n + *delta as f64);
                             }
                             _ => {}
+                        }
+                        // Publish capture-slot increments for nested next()-style calls.
+                        let slot_usize = *slot as usize;
+                        if slot_usize < frame.closure_var_count {
+                            if let Some(heap_idx) = frame.func_heap_idx {
+                                if let HeapValue::Function(f) = &self.heap[heap_idx] {
+                                    let mut closure = f.closure.borrow_mut();
+                                    if slot_usize < closure.len() {
+                                        closure[slot_usize] = self.stack[idx].clone();
+                                    }
+                                }
+                            }
                         }
                     }
                 } else if (*slot as usize) < self.stack.len() {

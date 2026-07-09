@@ -56,10 +56,8 @@ pub(super) fn native_websocket_send(
 
         if let HeapValue::Object(obj) = &mut interp.heap[*obj_idx] {
             let msg_len = message.len();
-            obj.properties.insert(
-                "__pendingMessage".into(),
-                Value::from_string(message),
-            );
+            obj.properties
+                .insert("__pendingMessage".into(), Value::from_string(message));
 
             let buffered = obj
                 .properties

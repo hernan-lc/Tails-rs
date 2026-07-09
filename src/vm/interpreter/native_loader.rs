@@ -77,6 +77,7 @@ pub fn discover_module(name: &str, registry: &mut NativeModuleRegistry) {
         wk::MOD_TIMERS => registry.register(wk::MOD_TIMERS, create_timers_module),
         wk::MOD_QUERYSTRING => registry.register(wk::MOD_QUERYSTRING, create_querystring_module),
         wk::MOD_STREAM => registry.register(wk::MOD_STREAM, create_stream_module),
+        "tty" => registry.register("tty", create_tty_module),
         #[cfg(feature = "zlib")]
         wk::MOD_ZLIB => registry.register(wk::MOD_ZLIB, create_zlib_module),
         #[cfg(feature = "tls")]
@@ -214,9 +215,11 @@ pub fn create_process_module(
     );
     props.insert("argv".into(), Value::Array(argv_idx));
 
-    // process.stdout
+    // process.stdout — Node exposes `.fd` (1) used by `tty.isatty(process.stdout.fd)`.
     let stdout_props = props! {
         "write" => Value::NativeFunction(c::PROCESS_STDOUT_WRITE),
+        "fd" => Value::Integer(1),
+        "isTTY" => Value::Boolean(atty_stdout()),
     };
     let stdout_idx = gc.allocate(
         heap,
@@ -228,9 +231,11 @@ pub fn create_process_module(
     );
     props.insert("stdout".into(), Value::Object(stdout_idx));
 
-    // process.stderr
+    // process.stderr — `.fd` is 2 (Node convention).
     let stderr_props = props! {
         "write" => Value::NativeFunction(c::PROCESS_STDOUT_WRITE),
+        "fd" => Value::Integer(2),
+        "isTTY" => Value::Boolean(atty_stderr()),
     };
     let stderr_idx = gc.allocate(
         heap,
@@ -243,6 +248,26 @@ pub fn create_process_module(
     props.insert("stderr".into(), Value::Object(stderr_idx));
 
     props
+}
+
+fn atty_stdout() -> bool {
+    use std::io::IsTerminal;
+    std::io::stdout().is_terminal()
+}
+
+fn atty_stderr() -> bool {
+    use std::io::IsTerminal;
+    std::io::stderr().is_terminal()
+}
+
+/// Minimal Node-compatible `tty` module (`isatty`).
+pub fn create_tty_module(
+    _heap: &mut Vec<HeapValue>,
+    _gc: &mut GarbageCollector,
+) -> PropertyStorage {
+    props! {
+        "isatty" => Value::NativeFunction(c::TTY_ISATTY),
+    }
 }
 
 pub fn create_buffer_module(
@@ -267,7 +292,8 @@ pub fn create_buffer_module(
             extensible: true,
         }),
     );
-    props! {
+    // Buffer constructor object (Buffer.from, Buffer.alloc, Buffer.prototype, …)
+    let buffer_ctor_props = props! {
         "alloc" => Value::NativeFunction(c::BUFFER_ALLOC),
         "from" => Value::NativeFunction(c::BUFFER_FROM),
         "concat" => Value::NativeFunction(c::BUFFER_CONCAT),
@@ -283,6 +309,28 @@ pub fn create_buffer_module(
         "compare" => Value::NativeFunction(c::BUFFER_COMPARE),
         "equals" => Value::NativeFunction(c::BUFFER_EQUALS),
         "indexOf" => Value::NativeFunction(c::BUFFER_INDEX_OF),
+        wk::PROTOTYPE => Value::Object(buffer_proto_idx),
+    };
+    let buffer_ctor_idx = gc.allocate(
+        heap,
+        HeapValue::Object(JsObject {
+            properties: buffer_ctor_props,
+            prototype: None,
+            extensible: true,
+        }),
+    );
+    // Node's `require('buffer')` is `{ Buffer, ... }` — not the ctor itself.
+    // safer-buffer does `var Buffer = require('buffer').Buffer`.
+    props! {
+        "Buffer" => Value::Object(buffer_ctor_idx),
+        // Also re-export statics at top level for callers that treat the
+        // module as the constructor (legacy / our global Buffer).
+        "alloc" => Value::NativeFunction(c::BUFFER_ALLOC),
+        "from" => Value::NativeFunction(c::BUFFER_FROM),
+        "concat" => Value::NativeFunction(c::BUFFER_CONCAT),
+        "isBuffer" => Value::NativeFunction(c::BUFFER_IS_BUFFER),
+        "isEncoding" => Value::NativeFunction(c::BUFFER_IS_ENCODING),
+        "byteLength" => Value::NativeFunction(c::BUFFER_BYTE_LENGTH),
         wk::PROTOTYPE => Value::Object(buffer_proto_idx),
     }
 }
@@ -410,6 +458,8 @@ pub fn create_util_module(
         "inspect" => Value::NativeFunction(c::UTIL_INSPECT),
         "promisify" => Value::NativeFunction(c::UTIL_PROMISIFY),
         "callbackify" => Value::NativeFunction(c::UTIL_CALLBACKIFY),
+        "deprecate" => Value::NativeFunction(c::UTIL_DEPRECATE),
+        "inherits" => Value::NativeFunction(c::UTIL_INHERITS),
     }
 }
 
@@ -467,6 +517,30 @@ pub fn create_stream_module(
             extensible: true,
         }),
     );
+    // Transform/PassThrough expose both readable and writable methods (Node Duplex-like).
+    let transform_proto_idx = gc.allocate(
+        heap,
+        HeapValue::Object(JsObject {
+            properties: props! {
+                "read" => Value::NativeFunction(c::STREAM_READABLE_READ),
+                "pipe" => Value::NativeFunction(c::STREAM_READABLE_PIPE),
+                "unpipe" => Value::NativeFunction(c::STREAM_READABLE_UNPIPE),
+                "push" => Value::NativeFunction(c::STREAM_READABLE_PUSH),
+                "destroy" => Value::NativeFunction(c::STREAM_READABLE_DESTROY),
+                "write" => Value::NativeFunction(c::STREAM_WRITABLE_WRITE),
+                "end" => Value::NativeFunction(c::STREAM_WRITABLE_END),
+                "cork" => Value::NativeFunction(c::STREAM_WRITABLE_CORK),
+                "uncork" => Value::NativeFunction(c::STREAM_WRITABLE_UNCORK),
+            },
+            prototype: None,
+            extensible: true,
+        }),
+    );
+    // Constructor objects so `Transform.prototype` works (iconv-lite, etc.).
+    // They remain constructible via NativeFunction stored under a private key
+    // looked up by Construct / property_access, OR we expose them as
+    // NativeFunctions and serve `.prototype` from property_access using the
+    // prototype objects stored here.
     props! {
         "Readable" => Value::NativeFunction(c::STREAM_CONSTRUCTOR),
         "Writable" => Value::NativeFunction(c::STREAM_CONSTRUCTOR),
@@ -476,6 +550,10 @@ pub fn create_stream_module(
         "finished" => Value::NativeFunction(c::STREAM_FINISHED),
         "readablePrototype" => Value::Object(readable_proto_idx),
         "writablePrototype" => Value::Object(writable_proto_idx),
+        "transformPrototype" => Value::Object(transform_proto_idx),
+        // Node-compatible: also surface as the constructors' .prototype via
+        // find_native_prototype / property_access (see STREAM_CONSTRUCTOR).
+        wk::PROTOTYPE => Value::Object(transform_proto_idx),
     }
 }
 
@@ -526,12 +604,84 @@ pub fn create_dns_module(
 }
 
 #[cfg(feature = "http")]
-pub fn create_http_module(
-    _heap: &mut Vec<HeapValue>,
-    _gc: &mut GarbageCollector,
-) -> PropertyStorage {
+pub fn create_http_module(heap: &mut Vec<HeapValue>, gc: &mut GarbageCollector) -> PropertyStorage {
+    // Node.js `http.METHODS` — used by Express (`var { METHODS } = require('node:http')`).
+    const METHODS: &[&str] = &[
+        "ACL",
+        "BIND",
+        "CHECKOUT",
+        "CONNECT",
+        "COPY",
+        "DELETE",
+        "GET",
+        "HEAD",
+        "LINK",
+        "LOCK",
+        "M-SEARCH",
+        "MERGE",
+        "MKACTIVITY",
+        "MKCALENDAR",
+        "MKCOL",
+        "MOVE",
+        "NOTIFY",
+        "OPTIONS",
+        "PATCH",
+        "POST",
+        "PROPFIND",
+        "PROPPATCH",
+        "PURGE",
+        "PUT",
+        "REBIND",
+        "REPORT",
+        "SEARCH",
+        "SOURCE",
+        "SUBSCRIBE",
+        "TRACE",
+        "UNBIND",
+        "UNLINK",
+        "UNLOCK",
+        "UNSUBSCRIBE",
+    ];
+    let method_vals: Vec<Value> = METHODS
+        .iter()
+        .map(|m| Value::from_string((*m).to_string()))
+        .collect();
+    let methods_idx = gc.allocate(
+        heap,
+        HeapValue::Array(crate::vm::interpreter::JsArray {
+            elements: method_vals,
+        }),
+    );
+    // Stub constructors so Express can do
+    // `Object.create(http.IncomingMessage.prototype)`.
+    let make_ctor = |heap: &mut Vec<HeapValue>, gc: &mut GarbageCollector| {
+        let proto_idx = gc.allocate(
+            heap,
+            HeapValue::Object(JsObject {
+                properties: PropertyStorage::new(),
+                prototype: None,
+                extensible: true,
+            }),
+        );
+        let ctor_idx = gc.allocate(
+            heap,
+            HeapValue::Object(JsObject {
+                properties: props! {
+                    wk::PROTOTYPE => Value::Object(proto_idx),
+                },
+                prototype: None,
+                extensible: true,
+            }),
+        );
+        Value::Object(ctor_idx)
+    };
+    let incoming = make_ctor(heap, gc);
+    let server_response = make_ctor(heap, gc);
     props! {
         "createServer" => Value::NativeFunction(c::HTTP_CREATE_SERVER),
+        "METHODS" => Value::Array(methods_idx),
+        "IncomingMessage" => incoming,
+        "ServerResponse" => server_response,
     }
 }
 

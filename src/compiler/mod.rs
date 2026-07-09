@@ -160,6 +160,7 @@ pub enum Instruction {
     BitXor,
     ShiftLeft,
     ShiftRight,
+    UnsignedShiftRight,
     Jump(u32),
     JumpIf(u32),
     JumpIfNot(u32),

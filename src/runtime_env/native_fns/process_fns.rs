@@ -21,7 +21,7 @@ use super::helpers::to_string_value;
 // recently registered runs first).
 
 thread_local! {
-    static EXIT_HANDLERS: RefCell<Vec<Value>> = RefCell::new(Vec::new());
+    static EXIT_HANDLERS: RefCell<Vec<Value>> = const { RefCell::new(Vec::new()) };
 }
 
 fn with_exit_handlers<T>(f: impl FnOnce(&mut Vec<Value>) -> T) -> T {
@@ -35,7 +35,7 @@ pub fn run_exit_handlers(interp: &mut Interpreter) {
     // Move the handlers out so that any handler that itself registers
     // more handlers (or throws) does not reentrantly re-run the same
     // callbacks.
-    let handlers = with_exit_handlers(|g| std::mem::take(g));
+    let handlers = with_exit_handlers(std::mem::take);
     for handler in handlers {
         let _ = interp.call_value(&handler, &Value::Undefined, &[]);
     }
@@ -102,6 +102,33 @@ pub(super) fn native_process_stdout_write(
         .unwrap_or_default();
     let _ = tails_process::stdout_write(&data);
     Ok(Value::Boolean(true))
+}
+
+/// `tty.isatty(fd)` — returns whether the given file descriptor is a TTY.
+/// Accepts a number (fd) or falls back to checking stdout/stderr by convention.
+pub(super) fn native_tty_isatty(
+    _interp: &mut Interpreter,
+    _this: &Value,
+    args: &[Value],
+) -> Result<Value> {
+    use std::io::IsTerminal;
+    let fd = match args.first() {
+        Some(Value::Integer(n)) => *n,
+        Some(Value::Float(n)) => *n as i64,
+        _ => return Ok(Value::Boolean(false)),
+    };
+    let is_tty = match fd {
+        0 => std::io::stdin().is_terminal(),
+        1 => std::io::stdout().is_terminal(),
+        2 => std::io::stderr().is_terminal(),
+        #[cfg(unix)]
+        n if n >= 0 => {
+            // Safety: isatty is a pure query on a file descriptor.
+            unsafe { libc::isatty(n as i32) == 1 }
+        }
+        _ => false,
+    };
+    Ok(Value::Boolean(is_tty))
 }
 
 pub(super) fn native_process_hrtime(

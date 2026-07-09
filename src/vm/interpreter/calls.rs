@@ -1,6 +1,7 @@
 use super::*;
 use crate::errors::{Error, Result};
 use crate::objects::Value;
+use crate::runtime_env::native_fns::constants as c;
 use crate::runtime_env::native_fns::NATIVE_TABLE;
 use crate::well_known as wk;
 use std::rc::Rc;
@@ -118,6 +119,17 @@ impl Interpreter {
                             let msg = "Maximum call stack size exceeded".to_string();
                             return Err(crate::errors::Error::RuntimeError(msg));
                         }
+                        let arguments_val = if !is_arrow {
+                            let arr_idx = self.gc.allocate(
+                                &mut self.heap,
+                                HeapValue::Array(JsArray {
+                                    elements: args.to_vec(),
+                                }),
+                            );
+                            Some(Value::Array(arr_idx))
+                        } else {
+                            None
+                        };
                         self.call_stack.push(CallFrame {
                             return_address,
                             base_pointer,
@@ -130,6 +142,7 @@ impl Interpreter {
                             source_line,
                             source_col: None,
                             exception_handlers_snapshot,
+                            arguments: arguments_val,
                         });
 
                         for closure_var in closure.borrow().iter().cloned() {
@@ -328,7 +341,13 @@ impl Interpreter {
 
     pub(crate) fn find_native_prototype(&self, native_idx: usize) -> Option<usize> {
         let ctor_name = match native_idx {
-            72 => wk::ERROR,
+            72 => {
+                // Prefer the stored Error.prototype index
+                if let Some(idx) = self.error_proto_idx {
+                    return Some(idx);
+                }
+                wk::ERROR
+            }
             73 => wk::TYPE_ERROR,
             74 => wk::REFERENCE_ERROR,
             75 => wk::SYNTAX_ERROR,
@@ -339,6 +358,20 @@ impl Interpreter {
                 // EventEmitter - search module registry for events module prototype
                 if let Some(events_props) = self.module_registry.get(wk::MOD_EVENTS) {
                     if let Some(Value::Object(proto_idx)) = events_props.get(wk::PROTOTYPE) {
+                        return Some(*proto_idx);
+                    }
+                }
+                return None;
+            }
+            // stream.Readable / Writable / Transform / PassThrough
+            idx if idx == c::STREAM_CONSTRUCTOR || idx == c::STREAM_PASSTHROUGH_CONSTRUCTOR => {
+                if let Some(stream_props) = self.module_registry.get(wk::MOD_STREAM) {
+                    // Prefer transformPrototype (Duplex-like); fall back to module prototype.
+                    if let Some(Value::Object(proto_idx)) = stream_props
+                        .get("transformPrototype")
+                        .or_else(|| stream_props.get(wk::PROTOTYPE))
+                        .or_else(|| stream_props.get("readablePrototype"))
+                    {
                         return Some(*proto_idx);
                     }
                 }

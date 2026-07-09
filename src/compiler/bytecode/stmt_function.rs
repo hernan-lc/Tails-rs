@@ -122,44 +122,26 @@ impl CodeGenerator {
             }
         }
 
-        let mut deferred_snapshots: Vec<(u16, Box<Vec<u16>>)> = Vec::new();
+        let saved_pending = std::mem::take(&mut self.pending_closure_snapshots);
+        let mut deferred_snapshots: Vec<(u16, Vec<u16>)> = Vec::new();
         self.compile_hoisted_functions(body, &mut deferred_snapshots)?;
+        // Defer SnapshotClosure until after variable initializers run (and
+        // again before returns). Snapshotting here captured `undefined` for
+        // every `const`/`let`/`var` that is initialized later in the body.
+        self.pending_closure_snapshots = deferred_snapshots;
 
-        // First compile declarations (var/let/const AND class) so captured vars
-        // are initialized before SnapshotClosure runs below.
+        // Compile body statements in source order (skip function decls already
+        // emitted by compile_hoisted_functions).
         for stmt in body {
             if matches!(&stmt.inner, Statement::FunctionDeclaration { .. }) {
-                continue;
-            }
-            if !matches!(
-                &stmt.inner,
-                Statement::VariableDeclaration { .. } | Statement::ClassDeclaration { .. }
-            ) {
                 continue;
             }
             self.record_line_from_span(&stmt.span);
             self.generate_statement(&stmt.inner, false)?;
         }
 
-        // Now emit SnapshotClosure - captured variables have their values.
-        for (local_slot, capture_slots) in deferred_snapshots {
-            self.emit(Instruction::SnapshotClosure(local_slot, capture_slots));
-        }
-
-        // Then compile remaining non-function, non-declaration statements.
-        for stmt in body {
-            if matches!(&stmt.inner, Statement::FunctionDeclaration { .. }) {
-                continue;
-            }
-            if matches!(
-                &stmt.inner,
-                Statement::VariableDeclaration { .. } | Statement::ClassDeclaration { .. }
-            ) {
-                continue;
-            }
-            self.record_line_from_span(&stmt.span);
-            self.generate_statement(&stmt.inner, false)?;
-        }
+        self.flush_closure_snapshots();
+        self.pending_closure_snapshots = saved_pending;
 
         self.emit(Instruction::LoadUndefined);
         self.emit(Instruction::Return);
@@ -173,29 +155,36 @@ impl CodeGenerator {
 
         self.patch_jump(jump_over, self.instructions.len());
 
-        if num_captures > 0 {
-            let capture_slots: Vec<u16> = outer_refs.iter().map(|(_, s)| *s).collect();
-            self.emit(Instruction::MakeClosure(func_idx, Box::new(capture_slots)));
-        } else {
-            self.emit(Instruction::MakeFunction(func_idx));
-        }
+        // Always MakeFunction first. When there are outer captures, defer the
+        // value snapshot until after the enclosing frame initializes those
+        // bindings (pending_closure_snapshots). Immediate MakeClosure here
+        // would capture `undefined` for every later `const`/`let`/`var`.
+        self.emit(Instruction::MakeFunction(func_idx));
         if self.scope_depth == 0 {
             self.emit(Instruction::StoreGlobal(name.clone()));
-        } else if let Some(slot) = self.resolve_local(name) {
-            self.emit(Instruction::StoreLocal(slot));
+            // Top-level: no local slots to snapshot; free vars are globals.
         } else {
-            self.locals.push(name.clone());
-            let slot = self.last_local_slot();
-            self.emit(Instruction::StoreLocal(slot));
+            let slot = if let Some(slot) = self.resolve_local(name) {
+                self.emit(Instruction::StoreLocal(slot));
+                slot
+            } else {
+                self.locals.push(name.clone());
+                let slot = self.last_local_slot();
+                self.emit(Instruction::StoreLocal(slot));
+                slot
+            };
+            if num_captures > 0 {
+                let capture_slots: Vec<u16> = outer_refs.iter().map(|(_, s)| *s).collect();
+                self.pending_closure_snapshots.push((slot, capture_slots));
+            }
         }
         Ok(true)
     }
 
-    #[allow(clippy::box_collection)]
     pub(crate) fn compile_hoisted_functions(
         &mut self,
         body: &[SpannedNode<Statement>],
-        deferred_snapshots: &mut Vec<(u16, Box<Vec<u16>>)>,
+        deferred_snapshots: &mut Vec<(u16, Vec<u16>)>,
     ) -> Result<()> {
         let mut hoisted: Vec<HoistedFunc> = Vec::new();
 
@@ -265,7 +254,13 @@ impl CodeGenerator {
                     self.locals.push(rp.clone());
                 }
 
+                // Nested function decls in this body push onto
+                // pending_closure_snapshots; keep them scoped to this body so
+                // SnapshotClosure ops are emitted into *this* function.
+                let saved_pending_body = std::mem::take(&mut self.pending_closure_snapshots);
                 self.generate_body_statements(hbody)?;
+                self.flush_closure_snapshots();
+                self.pending_closure_snapshots = saved_pending_body;
 
                 self.emit(Instruction::LoadUndefined);
                 self.emit(Instruction::Return);
@@ -288,7 +283,8 @@ impl CodeGenerator {
         }
 
         // Phase 3: For functions needing captures, defer SnapshotClosure so it
-        // runs after variable initializers in the calling function.
+        // runs after variable initializers (and before returns) via
+        // pending_closure_snapshots — not immediately after MakeFunction.
         for h in &hoisted {
             let mut all_p = h.params.clone();
             if let Some(rp) = &h.rest_param {
@@ -299,7 +295,7 @@ impl CodeGenerator {
             });
             if !orefs.is_empty() {
                 let capture_slots: Vec<u16> = orefs.iter().map(|(_, s)| *s).collect();
-                deferred_snapshots.push((h.slot, Box::new(capture_slots)));
+                deferred_snapshots.push((h.slot, capture_slots));
             }
         }
 
@@ -308,6 +304,8 @@ impl CodeGenerator {
 
     fn generate_body_statements(&mut self, body: &[SpannedNode<Statement>]) -> Result<()> {
         self.pre_register_declarations(body);
+        // Hoist nested function declarations first (JS semantics). Captures are
+        // registered on pending_closure_snapshots and flushed after inits.
         for stmt in body.iter() {
             if let Statement::FunctionDeclaration { .. } = &stmt.inner {
                 self.record_line_from_span(&stmt.span);

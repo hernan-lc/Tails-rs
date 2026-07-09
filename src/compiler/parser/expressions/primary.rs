@@ -79,10 +79,15 @@ impl<'a> Parser<'a> {
         if is_generator {
             self.advance();
         }
-        let name = if let Token::Identifier(_) = self.peek().token.clone() {
-            match self.advance().token {
-                Token::Identifier(n) => Some(n),
-                _ => unreachable!(),
+        // Named function expressions may use reserved words as the name
+        // (e.g. `function set(setting, val)` in Express).
+        let name = if let Some(n) = token_keyword_string(&self.peek().token) {
+            // Only consume if it's not `(` — optional name.
+            if self.peek().token != Token::LeftParen {
+                self.advance();
+                Some(n)
+            } else {
+                None
             }
         } else {
             None

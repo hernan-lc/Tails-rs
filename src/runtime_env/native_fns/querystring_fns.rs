@@ -99,9 +99,7 @@ pub(super) fn native_querystring_encode(
         .first()
         .map(|v| to_string_value(interp, v))
         .unwrap_or_default();
-    Ok(Value::from_string(
-        urlencoding::encode(&input).into_owned(),
-    ))
+    Ok(Value::from_string(urlencoding::encode(&input).into_owned()))
 }
 
 pub(super) fn native_querystring_decode(

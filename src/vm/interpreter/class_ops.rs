@@ -62,6 +62,7 @@ impl Interpreter {
                     source_line: src_line,
                     is_arrow: false,
                     captured_this: None,
+                    capture_slots: Vec::new(),
                 }),
             )
         } else {
@@ -86,6 +87,7 @@ impl Interpreter {
                     source_line: src_line,
                     is_arrow: false,
                     captured_this: None,
+                    capture_slots: Vec::new(),
                 }),
             )
         };
@@ -121,6 +123,7 @@ impl Interpreter {
                     source_line: src_line,
                     is_arrow: false,
                     captured_this: None,
+                    capture_slots: Vec::new(),
                 }),
             );
             let method_val = Value::Function(method_heap_idx);
@@ -238,6 +241,7 @@ impl Interpreter {
                                 } else {
                                     self.exception_handlers.clone()
                                 },
+                                arguments: None,
                             });
                             for closure_var in f_clone.closure.borrow().iter().cloned() {
                                 self.stack.push(closure_var);

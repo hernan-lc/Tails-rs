@@ -92,9 +92,7 @@ pub(super) fn native_util_inspect(
             _ => None,
         })
         .unwrap_or(2);
-    Ok(Value::from_string(
-        inspect_value(interp, &value, depth, 0),
-    ))
+    Ok(Value::from_string(inspect_value(interp, &value, depth, 0)))
 }
 
 pub(super) fn native_util_promisify(
@@ -137,6 +135,49 @@ pub(super) fn native_util_callbackify(
         }),
     );
     Ok(Value::Object(wrapper_idx))
+}
+
+/// `util.inherits(ctor, superCtor)` — classical inheritance helper.
+pub(super) fn native_util_inherits(
+    interp: &mut Interpreter,
+    _this: &Value,
+    args: &[Value],
+) -> Result<Value> {
+    let ctor = args.first().cloned().unwrap_or(Value::Undefined);
+    let super_ctor = args.get(1).cloned().unwrap_or(Value::Undefined);
+    if matches!(ctor, Value::Undefined | Value::Null)
+        || matches!(super_ctor, Value::Undefined | Value::Null)
+    {
+        return Err(crate::errors::Error::TypeError(
+            "util.inherits requires two arguments".into(),
+        ));
+    }
+    // superCtor.prototype
+    let super_proto = interp.get_property(&super_ctor, &Value::from_string("prototype".into()))?;
+    // Object.create(superCtor.prototype)
+    let child_proto = crate::runtime_env::native_fns::object_fns::native_object_create(
+        interp,
+        &Value::Undefined,
+        &[super_proto],
+    )?;
+    // child_proto.constructor = ctor
+    interp.set_property_str(&child_proto, "constructor", ctor.clone());
+    // ctor.prototype = child_proto
+    interp.set_property_str(&ctor, "prototype", child_proto);
+    // ctor.super_ = superCtor
+    interp.set_property_str(&ctor, "super_", super_ctor);
+    Ok(Value::Undefined)
+}
+
+/// `util.deprecate(fn, msg[, code])` — Node returns a wrapper that emits a
+/// one-time warning. We return the original function unchanged (no warning
+/// emission yet), which is enough for libraries that only need the identity.
+pub(super) fn native_util_deprecate(
+    _interp: &mut Interpreter,
+    _this: &Value,
+    args: &[Value],
+) -> Result<Value> {
+    Ok(args.first().cloned().unwrap_or(Value::Undefined))
 }
 
 fn inspect_value(interp: &Interpreter, value: &Value, depth: usize, indent: usize) -> String {

@@ -344,7 +344,10 @@ impl TypeChecker {
             Statement::ExportDefaultDeclaration { declaration } => {
                 self.check_statement(&declaration.inner)
             }
-            Statement::BreakStatement | Statement::ContinueStatement => Ok(Type::Void),
+            Statement::BreakStatement(_)
+            | Statement::ContinueStatement(_)
+            | Statement::LabeledStatement { .. }
+            | Statement::EmptyStatement => Ok(Type::Void),
             Statement::ImportDeclaration { .. } => Ok(Type::Void),
             Statement::DoWhileStatement { condition, body } => {
                 self.check_expression(condition)?;

@@ -33,9 +33,7 @@ pub(super) fn native_path_basename(
         .unwrap_or_default();
     let ext = args.get(1).map(|v| to_string_value(interp, v));
     let ext_ref = ext.as_deref();
-    Ok(Value::from_string(
-        tails_path::basename(&path, ext_ref),
-    ))
+    Ok(Value::from_string(tails_path::basename(&path, ext_ref)))
 }
 
 pub(super) fn native_path_dirname(

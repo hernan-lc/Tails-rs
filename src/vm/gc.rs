@@ -620,6 +620,7 @@ mod tests {
                 source_line: None,
                 is_arrow: false,
                 captured_this: None,
+                capture_slots: Vec::new(),
             }),
         );
 

@@ -29,7 +29,7 @@ impl Interpreter {
     pub fn new_object(&mut self) -> Value {
         let idx = self.heap.len();
         self.heap.push(HeapValue::Object(
-            crate::vm::interpreter::heap_types::JsObject::new(),
+            crate::vm::interpreter::heap_types::JsObject::with_prototype(self.object_proto_idx),
         ));
         Value::Object(idx)
     }
@@ -134,12 +134,29 @@ impl Interpreter {
                     }
                 }
             }
+            Value::NativeFunction(idx) if *idx == c::ERROR_CONSTRUCTOR => match key_str.as_str() {
+                "stackTraceLimit" => {
+                    self.error_stack_trace_limit = match &value {
+                        Value::Integer(n) => *n,
+                        Value::Float(n) => *n as i64,
+                        _ => 10,
+                    };
+                }
+                "prepareStackTrace" => {
+                    self.error_prepare_stack_trace = if matches!(value, Value::Undefined) {
+                        None
+                    } else {
+                        Some(value)
+                    };
+                }
+                _ => {}
+            },
             _ => {}
         }
         Ok(())
     }
 
-    pub(super) fn get_property(&mut self, object: &Value, key: &Value) -> Result<Value> {
+    pub(crate) fn get_property(&mut self, object: &Value, key: &Value) -> Result<Value> {
         self.get_property_with_this(object, key, object)
     }
 
@@ -280,6 +297,22 @@ impl Interpreter {
                     if let Some(val) = f.properties.get(&key_str) {
                         return Ok(val.clone());
                     }
+                    if f.properties.has_accessors() {
+                        if let Some(getter_val) =
+                            find_accessor(&f.properties, "__getter_", &key_str)
+                        {
+                            return self.call_value(&getter_val, this, &[]);
+                        }
+                    }
+                    // Walk [[Prototype]] set via Object.setPrototypeOf.
+                    if let Some(proto) = f.properties.get("__[[Prototype]]__").cloned() {
+                        return self.get_property_with_this(&proto, key, this);
+                    }
+                    // Default: Function.prototype
+                    if let Some(proto_idx) = self.function_proto_idx {
+                        let proto_val = Value::Object(proto_idx);
+                        return self.get_property_with_this(&proto_val, key, this);
+                    }
                 }
             }
             Value::Promise(promise_idx) => {
@@ -335,6 +368,41 @@ impl Interpreter {
                         _ => {}
                     }
                 }
+                if *idx == c::ERROR_CONSTRUCTOR {
+                    match key_str.as_str() {
+                        "captureStackTrace" => {
+                            return Ok(Value::NativeFunction(c::ERROR_CAPTURE_STACK_TRACE))
+                        }
+                        "stackTraceLimit" => {
+                            return Ok(Value::Integer(self.error_stack_trace_limit))
+                        }
+                        "prepareStackTrace" => {
+                            return Ok(self
+                                .error_prepare_stack_trace
+                                .clone()
+                                .unwrap_or(Value::Undefined))
+                        }
+                        "prototype" => {
+                            if let Some(proto_idx) = self.error_proto_idx {
+                                return Ok(Value::Object(proto_idx));
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+                // Subclass constructors also expose `.prototype`
+                if matches!(
+                    *idx,
+                    c::TYPE_ERROR_CONSTRUCTOR
+                        | c::REFERENCE_ERROR_CONSTRUCTOR
+                        | c::SYNTAX_ERROR_CONSTRUCTOR
+                        | c::RANGE_ERROR_CONSTRUCTOR
+                ) && key_str == wk::PROTOTYPE
+                {
+                    if let Some(proto_idx) = self.find_native_prototype(*idx) {
+                        return Ok(Value::Object(proto_idx));
+                    }
+                }
                 if *idx == c::SYMBOL_CONSTRUCTOR {
                     match key_str.as_str() {
                         "for" => return Ok(Value::NativeFunction(c::SYMBOL_FOR)),
@@ -356,6 +424,11 @@ impl Interpreter {
                         "asyncIterator" => {
                             return Ok(Value::Symbol(crate::objects::SYMBOL_ASYNC_ITERATOR))
                         }
+                        s if s == wk::PROTOTYPE => {
+                            if let Some(proto_idx) = self.symbol_proto_idx {
+                                return Ok(Value::Object(proto_idx));
+                            }
+                        }
                         _ => {}
                     }
                 }
@@ -372,6 +445,64 @@ impl Interpreter {
                         "isArray" => return Ok(Value::NativeFunction(c::ARRAY_IS_ARRAY)),
                         "from" => return Ok(Value::NativeFunction(c::ARRAY_FROM)),
                         "of" => return Ok(Value::NativeFunction(c::ARRAY_OF)),
+                        s if s == wk::PROTOTYPE => {
+                            // Array.prototype is a real array instance methods map.
+                            // Build a shared prototype object once if needed.
+                            if let Some(proto_idx) = self.array_proto_idx {
+                                return Ok(Value::Object(proto_idx));
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+                // stream.Readable / Writable / Transform / PassThrough.prototype
+                if (*idx == c::STREAM_CONSTRUCTOR || *idx == c::STREAM_PASSTHROUGH_CONSTRUCTOR)
+                    && key_str == wk::PROTOTYPE
+                {
+                    if let Some(proto_idx) = self.find_native_prototype(*idx) {
+                        return Ok(Value::Object(proto_idx));
+                    }
+                }
+                // TypedArray constructors are bare NativeFunctions; expose
+                // statics (from/of/BYTES_PER_ELEMENT/prototype) here.
+                if matches!(
+                    *idx,
+                    c::INT8_ARRAY_CONSTRUCTOR
+                        | c::UINT8_ARRAY_CONSTRUCTOR
+                        | c::UINT8_CLAMPED_ARRAY_CONSTRUCTOR
+                        | c::INT16_ARRAY_CONSTRUCTOR
+                        | c::UINT16_ARRAY_CONSTRUCTOR
+                        | c::INT32_ARRAY_CONSTRUCTOR
+                        | c::UINT32_ARRAY_CONSTRUCTOR
+                        | c::FLOAT32_ARRAY_CONSTRUCTOR
+                        | c::FLOAT64_ARRAY_CONSTRUCTOR
+                        | c::BIGINT64_ARRAY_CONSTRUCTOR
+                        | c::BIGUINT64_ARRAY_CONSTRUCTOR
+                ) {
+                    match key_str.as_str() {
+                        "from" => return Ok(Value::NativeFunction(c::TYPED_ARRAY_FROM)),
+                        "of" => return Ok(Value::NativeFunction(c::TYPED_ARRAY_OF)),
+                        "BYTES_PER_ELEMENT" => {
+                            let bpe = match *idx {
+                                c::INT8_ARRAY_CONSTRUCTOR
+                                | c::UINT8_ARRAY_CONSTRUCTOR
+                                | c::UINT8_CLAMPED_ARRAY_CONSTRUCTOR => 1,
+                                c::INT16_ARRAY_CONSTRUCTOR | c::UINT16_ARRAY_CONSTRUCTOR => 2,
+                                c::INT32_ARRAY_CONSTRUCTOR
+                                | c::UINT32_ARRAY_CONSTRUCTOR
+                                | c::FLOAT32_ARRAY_CONSTRUCTOR => 4,
+                                c::FLOAT64_ARRAY_CONSTRUCTOR
+                                | c::BIGINT64_ARRAY_CONSTRUCTOR
+                                | c::BIGUINT64_ARRAY_CONSTRUCTOR => 8,
+                                _ => 1,
+                            };
+                            return Ok(Value::Integer(bpe));
+                        }
+                        s if s == wk::PROTOTYPE => {
+                            if let Some(proto_idx) = self.find_native_prototype(*idx) {
+                                return Ok(Value::Object(proto_idx));
+                            }
+                        }
                         _ => {}
                     }
                 }
@@ -384,6 +515,11 @@ impl Interpreter {
                         "isInteger" => return Ok(Value::NativeFunction(c::NUMBER_IS_INTEGER)),
                         "isSafeInteger" => {
                             return Ok(Value::NativeFunction(c::NUMBER_IS_SAFE_INTEGER))
+                        }
+                        s if s == wk::PROTOTYPE => {
+                            if let Some(proto_idx) = self.number_proto_idx {
+                                return Ok(Value::Object(proto_idx));
+                            }
                         }
                         // ES Number static constants
                         "MAX_SAFE_INTEGER" => {
@@ -399,6 +535,41 @@ impl Interpreter {
                         wk::NAN => return Ok(Value::Float(f64::NAN)),
                         "EPSILON" => return Ok(Value::Float(f64::EPSILON)),
                         _ => {}
+                    }
+                }
+                if *idx == c::BOOLEAN_CONSTRUCTOR && key_str == wk::PROTOTYPE {
+                    if let Some(proto_idx) = self.boolean_proto_idx {
+                        return Ok(Value::Object(proto_idx));
+                    }
+                }
+                if *idx == c::STRING_CONSTRUCTOR && key_str == wk::PROTOTYPE {
+                    if let Some(proto_idx) = self.string_proto_idx {
+                        return Ok(Value::Object(proto_idx));
+                    }
+                }
+                if *idx == c::FUNCTION_CONSTRUCTOR && key_str == wk::PROTOTYPE {
+                    if let Some(proto_idx) = self.function_proto_idx {
+                        return Ok(Value::Object(proto_idx));
+                    }
+                }
+                if *idx == c::REGEXP_CONSTRUCTOR && key_str == wk::PROTOTYPE {
+                    if let Some(proto_idx) = self.regexp_proto_idx {
+                        return Ok(Value::Object(proto_idx));
+                    }
+                }
+                if *idx == c::DATE_CONSTRUCTOR && key_str == wk::PROTOTYPE {
+                    if let Some(proto_idx) = self.date_proto_idx {
+                        return Ok(Value::Object(proto_idx));
+                    }
+                }
+                if *idx == c::BIGINT_CONSTRUCTOR && key_str == wk::PROTOTYPE {
+                    if let Some(proto_idx) = self.bigint_proto_idx {
+                        return Ok(Value::Object(proto_idx));
+                    }
+                }
+                if *idx == c::EVENT_EMITTER_CONSTRUCTOR && key_str == wk::PROTOTYPE {
+                    if let Some(proto_idx) = self.find_native_prototype(*idx) {
+                        return Ok(Value::Object(proto_idx));
                     }
                 }
                 if *idx == c::URL_CONSTRUCTOR {
@@ -482,6 +653,12 @@ impl Interpreter {
                 }
             }
             Value::Map(_map_idx) => {
+                if let Value::Symbol(sym_id) = key {
+                    if *sym_id == crate::objects::SYMBOL_ITERATOR {
+                        // Map.prototype[Symbol.iterator] === entries
+                        return Ok(Value::NativeFunction(c::MAP_ENTRIES));
+                    }
+                }
                 let key_str = match key_to_str(key) {
                     Some(s) => s,
                     None => return Ok(Value::Undefined),
@@ -507,6 +684,12 @@ impl Interpreter {
                 }
             }
             Value::Set(_set_idx) => {
+                if let Value::Symbol(sym_id) = key {
+                    if *sym_id == crate::objects::SYMBOL_ITERATOR {
+                        // Set.prototype[Symbol.iterator] === values
+                        return Ok(Value::NativeFunction(c::SET_VALUES));
+                    }
+                }
                 let key_str = match key_to_str(key) {
                     Some(s) => s,
                     None => return Ok(Value::Undefined),
@@ -654,6 +837,12 @@ impl Interpreter {
     }
 
     pub(super) fn get_property_from_primitive_string(&self, s: &str, key: &Value) -> Result<Value> {
+        if let Value::Symbol(sym_id) = key {
+            if *sym_id == crate::objects::SYMBOL_ITERATOR {
+                // String.prototype[Symbol.iterator] — reuse array iterator after split.
+                return Ok(Value::NativeFunction(c::STRING_ITERATOR));
+            }
+        }
         let key_str = match key_to_str(key) {
             Some(s) => s,
             None => return Ok(Value::Undefined),

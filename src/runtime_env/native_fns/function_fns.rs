@@ -4,6 +4,29 @@ use crate::vm::interpreter::{Interpreter, PropertyStorage};
 use std::cell::RefCell;
 use std::rc::Rc;
 
+/// Function.prototype.toString — returns a native function source string.
+pub(super) fn native_function_to_string(
+    interp: &mut Interpreter,
+    this: &Value,
+    _args: &[Value],
+) -> Result<Value> {
+    let name = match this {
+        Value::Function(idx) => {
+            if let crate::vm::interpreter::HeapValue::Function(f) = &interp.heap[*idx] {
+                f.name.clone().unwrap_or_else(|| "".into())
+            } else {
+                "".into()
+            }
+        }
+        Value::NativeFunction(_) => "native".into(),
+        _ => "".into(),
+    };
+    Ok(Value::from_string(format!(
+        "function {}() {{ [native code] }}",
+        name
+    )))
+}
+
 /// Function.prototype.call(thisArg, ...args)
 /// Calls a function with a given this value and arguments provided individually.
 pub(super) fn native_function_call(
@@ -94,6 +117,7 @@ pub(super) fn native_function_bind(
                 source_line: None,
                 is_arrow: false,
                 captured_this: None,
+                capture_slots: Vec::new(),
             },
         ));
 

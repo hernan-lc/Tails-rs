@@ -209,6 +209,21 @@ impl<'a> Parser<'a> {
                 }
                 Ok(self.spanned(expr))
             }
+            // `new this(...)` — used by ipaddr.js constructor helpers.
+            Token::This => {
+                self.advance();
+                let mut expr = Expression::Identifier("this".to_string());
+                while self.peek().token == Token::Dot {
+                    self.advance();
+                    let prop_name = self.token_to_property_name()?;
+                    expr = Expression::Member {
+                        object: Box::new(expr),
+                        property: Box::new(prop_name),
+                        computed: false,
+                    };
+                }
+                Ok(self.spanned(expr))
+            }
             Token::LeftParen => {
                 self.advance();
                 let expr = self.parse_expression()?;

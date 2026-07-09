@@ -90,3 +90,96 @@ pub(super) fn native_btoa(
     let encoded = base64_encode(input.as_bytes());
     Ok(Value::from_string(encoded))
 }
+
+use crate::props;
+use crate::runtime_env::native_fns::constants as c;
+use crate::vm::interpreter::{HeapValue, JsObject};
+
+/// `new TextEncoder()` — returns `{ encode }`
+pub(super) fn native_text_encoder_constructor(
+    interp: &mut Interpreter,
+    _this: &Value,
+    _args: &[Value],
+) -> Result<Value> {
+    let obj_idx = interp.gc.allocate(
+        &mut interp.heap,
+        HeapValue::Object(JsObject {
+            properties: props! {
+                "encode" => Value::NativeFunction(c::TEXT_ENCODER_ENCODE),
+                "encoding" => Value::from_string("utf-8".into()),
+            },
+            prototype: None,
+            extensible: true,
+        }),
+    );
+    Ok(Value::Object(obj_idx))
+}
+
+/// `new TextDecoder([label])` — returns `{ decode }`
+pub(super) fn native_text_decoder_constructor(
+    interp: &mut Interpreter,
+    _this: &Value,
+    _args: &[Value],
+) -> Result<Value> {
+    let obj_idx = interp.gc.allocate(
+        &mut interp.heap,
+        HeapValue::Object(JsObject {
+            properties: props! {
+                "decode" => Value::NativeFunction(c::TEXT_DECODER_DECODE),
+                "encoding" => Value::from_string("utf-8".into()),
+            },
+            prototype: None,
+            extensible: true,
+        }),
+    );
+    Ok(Value::Object(obj_idx))
+}
+
+/// TextEncoder.prototype.encode(string) → Buffer
+pub(super) fn native_text_encoder_encode(
+    interp: &mut Interpreter,
+    _this: &Value,
+    args: &[Value],
+) -> Result<Value> {
+    let s = match args.first() {
+        Some(Value::String(s)) => s.to_string(),
+        Some(Value::Cons(c)) => c.flatten(),
+        Some(v) => to_string_value(interp, v),
+        None => String::new(),
+    };
+    let bytes = s.into_bytes();
+    let buf_idx = interp
+        .gc
+        .allocate(&mut interp.heap, HeapValue::Buffer(bytes));
+    Ok(Value::Buffer(buf_idx))
+}
+
+/// TextDecoder.prototype.decode(input) → string
+pub(super) fn native_text_decoder_decode(
+    interp: &mut Interpreter,
+    _this: &Value,
+    args: &[Value],
+) -> Result<Value> {
+    let bytes = match args.first() {
+        Some(Value::Buffer(idx)) => {
+            if let HeapValue::Buffer(b) = &interp.heap[*idx] {
+                b.clone()
+            } else {
+                Vec::new()
+            }
+        }
+        Some(Value::TypedArray(idx)) => {
+            if let HeapValue::TypedArray(ta) = &interp.heap[*idx] {
+                // Best-effort: decode via Debug if raw bytes unavailable.
+                let _ = ta;
+                Vec::new()
+            } else {
+                Vec::new()
+            }
+        }
+        Some(Value::String(s)) => s.as_bytes().to_vec(),
+        _ => Vec::new(),
+    };
+    let s = String::from_utf8_lossy(&bytes).into_owned();
+    Ok(Value::from_string(s))
+}

@@ -37,6 +37,10 @@ pub(crate) struct CodeGenerator {
     source_cols: Vec<Option<usize>>,
     current_source_line: Option<usize>,
     current_source_col: Option<usize>,
+    /// Hoisted function declarations that need SnapshotClosure after outer
+    /// bindings are initialized. Re-emitted after variable declarations and
+    /// before returns so captures see real values (not undefined).
+    pending_closure_snapshots: Vec<(u16, Vec<u16>)>,
 }
 
 impl CodeGenerator {
@@ -57,6 +61,7 @@ impl CodeGenerator {
             source_cols: Vec::new(),
             current_source_line: None,
             current_source_col: None,
+            pending_closure_snapshots: Vec::new(),
         }
     }
 
@@ -64,6 +69,18 @@ impl CodeGenerator {
         self.instructions.push(instr);
         self.source_lines.push(self.current_source_line);
         self.source_cols.push(self.current_source_col);
+    }
+
+    /// Refresh hoisted closures from current local slot values.
+    pub(crate) fn flush_closure_snapshots(&mut self) {
+        for (local_slot, capture_slots) in &self.pending_closure_snapshots {
+            self.instructions.push(Instruction::SnapshotClosure(
+                *local_slot,
+                Box::new(capture_slots.clone()),
+            ));
+            self.source_lines.push(self.current_source_line);
+            self.source_cols.push(self.current_source_col);
+        }
     }
 
     fn peephole_optimize(&mut self) {
@@ -145,7 +162,10 @@ impl CodeGenerator {
                 }
             }
 
-            // Pattern 3: Pop after side-effect-free instruction → remove both
+            // Pattern 3: Pop after side-effect-free instruction → remove both.
+            // NOTE: `LoadGlobal` is intentionally NOT included — resolving an
+            // undeclared free variable throws ReferenceError (used by try/catch
+            // feature-detection patterns like `try { localStorage } catch {}`).
             if i + 1 < self.instructions.len() {
                 if let Instruction::Pop = &self.instructions[i + 1] {
                     match &self.instructions[i] {
@@ -155,7 +175,6 @@ impl CodeGenerator {
                         | Instruction::LoadUndefined
                         | Instruction::LoadTrue
                         | Instruction::LoadFalse
-                        | Instruction::LoadGlobal(_)
                         | Instruction::LoadGlobalOrUndefined(_) => {
                             i += 2;
                             continue;
@@ -224,8 +243,22 @@ impl CodeGenerator {
     fn generate(&mut self, ast: &AstNode) -> Result<CompiledModule> {
         match ast {
             AstNode::Program(statements) => {
+                // JavaScript hoisting: emit all top-level function declarations
+                // first so they are defined (as globals) before any other
+                // statement runs, regardless of source order.
+                for stmt in statements {
+                    if matches!(&stmt.inner, Statement::FunctionDeclaration { .. }) {
+                        self.record_line_from_span(&stmt.span);
+                        self.generate_statement(&stmt.inner, false)?;
+                    }
+                }
                 for (i, stmt) in statements.iter().enumerate() {
-                    let is_last = i == statements.len() - 1;
+                    if matches!(&stmt.inner, Statement::FunctionDeclaration { .. }) {
+                        continue;
+                    }
+                    let is_last = statements[i + 1..]
+                        .iter()
+                        .all(|s| matches!(&s.inner, Statement::FunctionDeclaration { .. }));
                     self.record_line_from_span(&stmt.span);
                     self.generate_statement(&stmt.inner, is_last)?;
                 }
@@ -269,6 +302,7 @@ impl CodeGenerator {
             return Ok(());
         }
         match stmt {
+            Statement::EmptyStatement => Ok(()),
             Statement::Expression(expr) => {
                 self.generate_expression(expr)?;
                 if !is_last {
@@ -305,9 +339,13 @@ impl CodeGenerator {
                         }
                     }
                 }
+                // Hoisted nested functions must re-capture after bindings init.
+                self.flush_closure_snapshots();
                 Ok(())
             }
             Statement::ReturnStatement(value) => {
+                // Capture current local values before leaving the frame.
+                self.flush_closure_snapshots();
                 if let Some(expr) = value {
                     self.generate_expression(expr)?;
                 } else {
@@ -334,8 +372,10 @@ impl CodeGenerator {
                         self.locals.push(name.clone());
                     }
                 }
-                let mut deferred_snapshots: Vec<(u16, Box<Vec<u16>>)> = Vec::new();
+                let saved_pending = std::mem::take(&mut self.pending_closure_snapshots);
+                let mut deferred_snapshots: Vec<(u16, Vec<u16>)> = Vec::new();
                 self.compile_hoisted_functions(stmts, &mut deferred_snapshots)?;
+                self.pending_closure_snapshots = deferred_snapshots;
                 for (i, stmt) in stmts.iter().enumerate() {
                     if matches!(&stmt.inner, Statement::FunctionDeclaration { .. }) {
                         continue;
@@ -344,9 +384,8 @@ impl CodeGenerator {
                     self.record_line_from_span(&stmt.span);
                     self.generate_statement(&stmt.inner, is_last)?;
                 }
-                for (local_slot, capture_slots) in deferred_snapshots {
-                    self.emit(Instruction::SnapshotClosure(local_slot, capture_slots));
-                }
+                self.flush_closure_snapshots();
+                self.pending_closure_snapshots = saved_pending;
                 let locals_added = self.locals.len() - prev_locals_count;
                 for _ in 0..locals_added {
                     self.locals.pop();
@@ -396,47 +435,33 @@ impl CodeGenerator {
         }
     }
 
-    fn generate_statement_in_branch(&mut self, stmt: &Statement) -> Result<()> {
+    fn generate_statement_in_branch(&mut self, stmt: &Statement, leave_value: bool) -> Result<()> {
         match stmt {
             Statement::BlockStatement(stmts) => {
                 self.scope_depth += 1;
                 let prev_locals_count = self.locals.len();
                 self.emit(Instruction::BlockEnter);
                 self.pre_register_declarations(stmts);
-                let mut deferred_snapshots: Vec<(u16, Box<Vec<u16>>)> = Vec::new();
+                let saved_pending = std::mem::take(&mut self.pending_closure_snapshots);
+                let mut deferred_snapshots: Vec<(u16, Vec<u16>)> = Vec::new();
                 self.compile_hoisted_functions(stmts, &mut deferred_snapshots)?;
-                for stmt in stmts.iter() {
-                    if matches!(&stmt.inner, Statement::FunctionDeclaration { .. }) {
-                        continue;
-                    }
-                    if !matches!(
-                        &stmt.inner,
-                        Statement::VariableDeclaration { .. } | Statement::ClassDeclaration { .. }
-                    ) {
-                        continue;
-                    }
+                self.pending_closure_snapshots = deferred_snapshots;
+                // Source order for all non-function statements (including var
+                // initializers — only bindings are hoisted, not initializers).
+                // Snapshots flush after var decls / before returns via
+                // pending_closure_snapshots (not before initializers).
+                let body: Vec<_> = stmts
+                    .iter()
+                    .filter(|s| !matches!(&s.inner, Statement::FunctionDeclaration { .. }))
+                    .collect();
+                let last_idx = body.len().saturating_sub(1);
+                for (i, stmt) in body.iter().enumerate() {
                     self.record_line_from_span(&stmt.span);
-                    self.generate_statement(&stmt.inner, false)?;
-                }
-                for (local_slot, capture_slots) in deferred_snapshots {
-                    self.emit(Instruction::SnapshotClosure(local_slot, capture_slots));
-                }
-                for (i, stmt) in stmts.iter().enumerate() {
-                    if matches!(&stmt.inner, Statement::FunctionDeclaration { .. }) {
-                        continue;
-                    }
-                    if matches!(
-                        &stmt.inner,
-                        Statement::VariableDeclaration { .. } | Statement::ClassDeclaration { .. }
-                    ) {
-                        continue;
-                    }
-                    let is_last = stmts[i + 1..]
-                        .iter()
-                        .all(|s| matches!(&s.inner, Statement::FunctionDeclaration { .. }));
-                    self.record_line_from_span(&stmt.span);
+                    let is_last = leave_value && i == last_idx;
                     self.generate_statement(&stmt.inner, is_last)?;
                 }
+                self.flush_closure_snapshots();
+                self.pending_closure_snapshots = saved_pending;
                 let locals_added = self.locals.len() - prev_locals_count;
                 for _ in 0..locals_added {
                     self.locals.pop();
@@ -445,7 +470,7 @@ impl CodeGenerator {
                 self.scope_depth -= 1;
                 Ok(())
             }
-            _ => self.generate_statement(stmt, true),
+            _ => self.generate_statement(stmt, leave_value),
         }
     }
 
@@ -513,8 +538,7 @@ impl CodeGenerator {
                         self.generate_destructuring_pattern(&element.value)?;
                     } else {
                         self.emit(Instruction::Dup);
-                        let key_idx =
-                            self.add_constant(Value::from_string(element.key.clone()));
+                        let key_idx = self.add_constant(Value::from_string(element.key.clone()));
                         self.emit(Instruction::LoadConst(key_idx));
                         self.emit(Instruction::GetProperty);
                         if let Some(default_expr) = &element.default_value {
@@ -590,8 +614,7 @@ impl CodeGenerator {
                             self.generate_expression(key_expr)?;
                         }
                     } else {
-                        let key_idx =
-                            self.add_constant(Value::from_string(prop.key.clone()));
+                        let key_idx = self.add_constant(Value::from_string(prop.key.clone()));
                         self.emit(Instruction::LoadConst(key_idx));
                     }
                     self.emit(Instruction::GetProperty);

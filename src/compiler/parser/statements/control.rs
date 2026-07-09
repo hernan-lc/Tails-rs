@@ -89,7 +89,7 @@ impl<'a> Parser<'a> {
             };
             self.expect(&Token::Semicolon)?;
             let update = if self.peek().token != Token::RightParen {
-                Some(self.parse_expression()?.inner)
+                Some(self.parse_expression_with_comma()?.inner)
             } else {
                 None
             };
@@ -132,18 +132,39 @@ impl<'a> Parser<'a> {
                 return Err(Error::ParseError("Expected assignment in for-loop".into()));
             }
             let mut declarations = Vec::new();
-            let decl_id = id;
+            // First declarator (already parsed id / optional type)
             let init_val = if self.peek().token == Token::Assign {
                 self.advance();
-                Some(self.parse_expression()?.inner)
+                // No comma here — `var i = 0, j = 1` uses comma between declarators.
+                Some(self.parse_assignment()?.inner)
             } else {
                 None
             };
             declarations.push(VariableDeclarator {
-                id: decl_id,
+                id,
                 type_annotation: None,
                 init: init_val,
             });
+            // Additional declarators: `var i = 0, j = 0`
+            while self.peek().token == Token::Comma {
+                self.advance();
+                let next_id = self.parse_binding_pattern()?;
+                if self.peek().token == Token::Colon {
+                    self.advance();
+                    self.parse_type_annotation()?;
+                }
+                let next_init = if self.peek().token == Token::Assign {
+                    self.advance();
+                    Some(self.parse_assignment()?.inner)
+                } else {
+                    None
+                };
+                declarations.push(VariableDeclarator {
+                    id: next_id,
+                    type_annotation: None,
+                    init: next_init,
+                });
+            }
             let init = Some(Box::new(ForInit::Variable(Box::new(
                 self.spanned(Statement::VariableDeclaration { kind, declarations }),
             ))));
@@ -155,7 +176,8 @@ impl<'a> Parser<'a> {
             };
             self.expect(&Token::Semicolon)?;
             let update = if self.peek().token != Token::RightParen {
-                Some(self.parse_expression()?.inner)
+                // Comma operator: `i++, j += 2`
+                Some(self.parse_expression_with_comma()?.inner)
             } else {
                 None
             };
@@ -187,7 +209,7 @@ impl<'a> Parser<'a> {
             ));
         }
 
-        let init_expr = self.parse_expression()?.inner;
+        let init_expr = self.parse_expression_with_comma()?.inner;
         let init = Some(Box::new(ForInit::Expression(Box::new(init_expr))));
         self.expect(&Token::Semicolon)?;
         let condition = if self.peek().token != Token::Semicolon {
@@ -197,7 +219,7 @@ impl<'a> Parser<'a> {
         };
         self.expect(&Token::Semicolon)?;
         let update = if self.peek().token != Token::RightParen {
-            Some(self.parse_expression()?.inner)
+            Some(self.parse_expression_with_comma()?.inner)
         } else {
             None
         };

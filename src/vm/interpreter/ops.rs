@@ -142,6 +142,27 @@ impl Interpreter {
                 let r = self.to_number(&right)? as u32;
                 self.stack.push(Value::Integer(l >> r));
             }
+            Instruction::UnsignedShiftRight => {
+                let (left, right) = self.pop_binary()?;
+                // ES: ToUint32(left) >>> (ToUint32(right) & 31)
+                let l = {
+                    let n = self.to_number(&left)?;
+                    if n.is_finite() {
+                        n.trunc().rem_euclid(4294967296.0) as u32
+                    } else {
+                        0
+                    }
+                };
+                let r = {
+                    let n = self.to_number(&right)?;
+                    if n.is_finite() {
+                        (n.trunc().rem_euclid(4294967296.0) as u32) & 31
+                    } else {
+                        0
+                    }
+                };
+                self.stack.push(Value::Float((l >> r) as f64));
+            }
             Instruction::Void => {
                 self.stack_pop()?;
                 self.stack.push(Value::Undefined);
@@ -300,9 +321,10 @@ impl Interpreter {
     pub(crate) fn exec_property_ops(&mut self, instruction: &Instruction) -> Result<bool> {
         match instruction {
             Instruction::NewObject => {
-                let heap_idx = self
-                    .gc
-                    .allocate(&mut self.heap, HeapValue::Object(JsObject::new()));
+                let heap_idx = self.gc.allocate(
+                    &mut self.heap,
+                    HeapValue::Object(JsObject::with_prototype(self.object_proto_idx)),
+                );
                 self.stack.push(Value::Object(heap_idx));
             }
             Instruction::SetProperty => {
@@ -337,13 +359,10 @@ impl Interpreter {
                                         &[target, key.clone(), value, object.clone()],
                                     );
                                     trap_result?;
-                                } else {
-                                    if let Value::Object(target_obj_idx) = &target {
-                                        if let HeapValue::Object(obj) =
-                                            &mut self.heap[*target_obj_idx]
-                                        {
-                                            obj.properties.insert(resolved_key, value);
-                                        }
+                                } else if let Value::Object(target_obj_idx) = &target {
+                                    if let HeapValue::Object(obj) = &mut self.heap[*target_obj_idx]
+                                    {
+                                        obj.properties.insert(resolved_key, value);
                                     }
                                 }
                             }
@@ -404,9 +423,15 @@ impl Interpreter {
                                 f.properties.insert(resolved_key, value);
                             }
                         }
+                        Value::NativeFunction(_) => {
+                            // Error.prepareStackTrace / Error.stackTraceLimit, etc.
+                            self.set_property(&object, &key, value)?;
+                        }
                         _ => {}
                     }
                 }
+                // Leave the receiver on the stack (object-literal construction).
+                // Member assignment expressions Dup the RHS and Pop this.
                 self.stack.push(object);
             }
             Instruction::GetProperty => {

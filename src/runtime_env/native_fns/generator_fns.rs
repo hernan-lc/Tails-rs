@@ -74,6 +74,7 @@ pub(super) fn native_generator_next(
                 } else {
                     interp.exception_handlers.clone()
                 },
+                arguments: None,
             });
 
             let result = interp.execute_from(&module, resume_pc);

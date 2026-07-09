@@ -18,12 +18,26 @@ pub(super) fn native_http_create_server(
 ) -> Result<Value> {
     let handler = args.first().cloned().unwrap_or(Value::Undefined);
 
+    // EventEmitter state so express's `server.once('error', done)` works.
+    let listeners_idx = interp
+        .gc
+        .allocate(&mut interp.heap, HeapValue::Object(JsObject::new()));
+
     let props = props! {
         "__handler" => handler,
         "__closed" => Value::Boolean(false),
         "__port" => Value::Integer(0),
+        "_listeners" => Value::Object(listeners_idx),
         "listen" => Value::NativeFunction(c::HTTP_SERVER_LISTEN),
         "close" => Value::NativeFunction(c::HTTP_SERVER_CLOSE),
+        // Minimal EventEmitter surface used by express/Node http.Server
+        "on" => Value::NativeFunction(c::EVENT_EMITTER_ON),
+        "addListener" => Value::NativeFunction(c::EVENT_EMITTER_ON),
+        "once" => Value::NativeFunction(c::EVENT_EMITTER_ONCE),
+        "emit" => Value::NativeFunction(c::EVENT_EMITTER_EMIT),
+        "off" => Value::NativeFunction(c::EVENT_EMITTER_OFF),
+        "removeListener" => Value::NativeFunction(c::EVENT_EMITTER_OFF),
+        "removeAllListeners" => Value::NativeFunction(c::EVENT_EMITTER_REMOVE_ALL_LISTENERS),
     };
 
     let idx = interp.heap.len();

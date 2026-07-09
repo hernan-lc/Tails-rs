@@ -10,6 +10,68 @@ use super::reflect_fns::native_reflect_get_own_property_descriptor;
 
 use crate::well_known as wk;
 
+/// Object.getOwnPropertyNames(obj) — all own string keys (incl. non-enumerable).
+pub(super) fn native_object_get_own_property_names(
+    interp: &mut Interpreter,
+    _this: &Value,
+    args: &[Value],
+) -> Result<Value> {
+    let obj_val = args.first().cloned().unwrap_or(Value::Undefined);
+    let keys: Vec<Value> = match &obj_val {
+        Value::Object(obj_idx) => {
+            if let crate::vm::interpreter::HeapValue::Object(obj) = &interp.heap[*obj_idx] {
+                obj.properties
+                    .keys()
+                    .filter(|k| is_user_visible_key(k))
+                    .map(|k| Value::from_string(k.to_string()))
+                    .collect()
+            } else {
+                Vec::new()
+            }
+        }
+        Value::Array(arr_idx) => {
+            if let crate::vm::interpreter::HeapValue::Array(arr) = &interp.heap[*arr_idx] {
+                let mut keys = Vec::with_capacity(arr.elements.len() + 1);
+                for i in 0..arr.elements.len() {
+                    keys.push(Value::from_string(i.to_string()));
+                }
+                keys.push(Value::from_string(wk::LENGTH.to_string()));
+                keys
+            } else {
+                Vec::new()
+            }
+        }
+        Value::Function(idx) => {
+            if let crate::vm::interpreter::HeapValue::Function(f) = &interp.heap[*idx] {
+                f.properties
+                    .keys()
+                    .filter(|k| is_user_visible_key(k))
+                    .map(|k| Value::from_string(k.to_string()))
+                    .collect()
+            } else {
+                Vec::new()
+            }
+        }
+        _ => Vec::new(),
+    };
+    let heap_idx = interp.heap.len();
+    interp.heap.push(crate::vm::interpreter::HeapValue::Array(
+        crate::vm::interpreter::JsArray { elements: keys },
+    ));
+    Ok(Value::Array(heap_idx))
+}
+
+/// Object.hasOwn(obj, prop)
+pub(super) fn native_object_has_own(
+    interp: &mut Interpreter,
+    _this: &Value,
+    args: &[Value],
+) -> Result<Value> {
+    let obj = args.first().cloned().unwrap_or(Value::Undefined);
+    let prop = args.get(1).cloned().unwrap_or(Value::Undefined);
+    native_object_has_own_property(interp, &obj, &[prop])
+}
+
 pub(super) fn native_object_keys(
     interp: &mut Interpreter,
     _this: &Value,
@@ -665,6 +727,52 @@ pub(super) fn native_object_seal(
         }
     }
     Ok(target)
+}
+
+/// Object.getOwnPropertySymbols(obj) — returns symbol keys (minimal: empty array).
+pub(super) fn native_object_get_own_property_symbols(
+    interp: &mut Interpreter,
+    _this: &Value,
+    _args: &[Value],
+) -> Result<Value> {
+    let arr_idx = interp.gc.allocate(
+        &mut interp.heap,
+        crate::vm::interpreter::HeapValue::Array(crate::vm::interpreter::JsArray {
+            elements: Vec::new(),
+        }),
+    );
+    Ok(Value::Array(arr_idx))
+}
+
+/// Object.prototype.toString — returns `[object Type]` (ES).
+pub(super) fn native_object_to_string(
+    interp: &mut Interpreter,
+    this: &Value,
+    _args: &[Value],
+) -> Result<Value> {
+    let tag = match this {
+        Value::Undefined => "Undefined",
+        Value::Null => "Null",
+        Value::Boolean(_) => "Boolean",
+        Value::Integer(_) | Value::Float(_) => "Number",
+        Value::String(_) | Value::Cons(_) => "String",
+        Value::BigInt(_) => "BigInt",
+        Value::Symbol(_) => "Symbol",
+        Value::Function(_) | Value::NativeFunction(_) => "Function",
+        Value::Array(_) => "Array",
+        Value::Date(_) => "Date",
+        Value::RegExp(_) => "RegExp",
+        Value::Map(_) => "Map",
+        Value::Set(_) => "Set",
+        Value::WeakMap(_) => "WeakMap",
+        Value::WeakSet(_) => "WeakSet",
+        Value::Promise(_) => "Promise",
+        Value::TypedArray(_) => "Object",
+        Value::Buffer(_) => "Uint8Array",
+        _ => "Object",
+    };
+    let _ = interp;
+    Ok(Value::from_string(format!("[object {}]", tag)))
 }
 
 pub(super) fn native_object_has_own_property(

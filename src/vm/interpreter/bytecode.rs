@@ -53,7 +53,23 @@ impl Interpreter {
                         if idx >= self.stack.len() {
                             self.stack.resize(idx + 1, Value::Undefined);
                         }
-                        self.stack[idx] = value;
+                        self.stack[idx] = value.clone();
+                        if let Some(frame) = self.call_stack.last() {
+                            let slot_usize = *slot as usize;
+                            if slot_usize < frame.closure_var_count {
+                                if let Some(heap_idx) = frame.func_heap_idx {
+                                    if let HeapValue::Function(f) = &self.heap[heap_idx] {
+                                        let mut closure = f.closure.borrow_mut();
+                                        if slot_usize < closure.len() {
+                                            closure[slot_usize] = value.clone();
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        if let Value::Function(heap_idx) = value {
+                            self.resnapshot_function_closure(heap_idx, base, *slot);
+                        }
                     } else {
                         return Err(self.err_at_location(Error::RuntimeError(
                             super::ERR_STACK_UNDERFLOW.into(),
@@ -65,19 +81,36 @@ impl Interpreter {
                 Instruction::IncLocal(slot, delta) => {
                     if let Some(frame) = self.call_stack.last() {
                         let idx = frame.base_pointer + *slot as usize;
+                        let slot_usize = *slot as usize;
+                        let publish = slot_usize < frame.closure_var_count;
+                        let heap_idx = frame.func_heap_idx;
                         if idx < self.stack.len() {
-                            match &self.stack[idx] {
+                            let updated = match &self.stack[idx] {
                                 Value::Integer(n) => {
-                                    self.stack[idx] = Value::Integer(n + delta);
-                                    pc += 1;
-                                    continue;
+                                    let v = Value::Integer(n + delta);
+                                    self.stack[idx] = v.clone();
+                                    Some(v)
                                 }
                                 Value::Float(n) => {
-                                    self.stack[idx] = Value::Float(n + *delta as f64);
-                                    pc += 1;
-                                    continue;
+                                    let v = Value::Float(n + *delta as f64);
+                                    self.stack[idx] = v.clone();
+                                    Some(v)
                                 }
-                                _ => {}
+                                _ => None,
+                            };
+                            if let Some(v) = updated {
+                                if publish {
+                                    if let Some(heap_idx) = heap_idx {
+                                        if let HeapValue::Function(f) = &self.heap[heap_idx] {
+                                            let mut closure = f.closure.borrow_mut();
+                                            if slot_usize < closure.len() {
+                                                closure[slot_usize] = v;
+                                            }
+                                        }
+                                    }
+                                }
+                                pc += 1;
+                                continue;
                             }
                         }
                     }
@@ -255,15 +288,25 @@ impl Interpreter {
                             .as_ref()
                             .and_then(|mg| mg.borrow().get(name.as_str()).cloned())
                     });
+                    // Non-arrow functions expose the ES `arguments` object.
+                    let val = val.or_else(|| {
+                        if name == "arguments" {
+                            self.call_stack.last().and_then(|f| f.arguments.clone())
+                        } else {
+                            None
+                        }
+                    });
                     match val {
                         Some(v) => {
                             self.stack.push(v);
                         }
                         None => {
-                            return Err(self.err_at_location(Error::ReferenceError(format!(
-                                "{} is not defined",
-                                name
-                            ))));
+                            // Convert undeclared free-var access into a catchable
+                            // JS ReferenceError so `try { localStorage } catch {}`
+                            // works (required by packages like `debug`).
+                            if self.throw_reference_error(&mut pc, name.as_str())? {
+                                continue;
+                            }
                         }
                     }
                     pc += 1;
@@ -462,25 +505,45 @@ impl Interpreter {
                     }
                 }
                 Instruction::Call(argc) => {
-                    if self.exec_call(argc, module, &mut pc)? {
-                        continue;
+                    // Native/JS call errors (e.g. require missing module) must
+                    // be catchable by try/catch — convert host Err → JS throw.
+                    match self.exec_call(argc, module, &mut pc) {
+                        Ok(true) => continue,
+                        Ok(false) => {}
+                        Err(e) => {
+                            if self.throw_from_host_error(&mut pc, e)? {
+                                continue;
+                            }
+                        }
                     }
                 }
-                Instruction::CallMethod(argc) => {
-                    if self.exec_call_method(argc, &mut pc)? {
-                        continue;
+                Instruction::CallMethod(argc) => match self.exec_call_method(argc, &mut pc) {
+                    Ok(true) => continue,
+                    Ok(false) => {}
+                    Err(e) => {
+                        if self.throw_from_host_error(&mut pc, e)? {
+                            continue;
+                        }
                     }
-                }
-                Instruction::Construct(argc) => {
-                    if self.exec_construct(argc, module, &mut pc)? {
-                        continue;
+                },
+                Instruction::Construct(argc) => match self.exec_construct(argc, module, &mut pc) {
+                    Ok(true) => continue,
+                    Ok(false) => {}
+                    Err(e) => {
+                        if self.throw_from_host_error(&mut pc, e)? {
+                            continue;
+                        }
                     }
-                }
-                Instruction::ConstructApply => {
-                    if self.exec_construct_apply(module, &mut pc)? {
-                        continue;
+                },
+                Instruction::ConstructApply => match self.exec_construct_apply(module, &mut pc) {
+                    Ok(true) => continue,
+                    Ok(false) => {}
+                    Err(e) => {
+                        if self.throw_from_host_error(&mut pc, e)? {
+                            continue;
+                        }
                     }
-                }
+                },
                 Instruction::MakeClass(_)
                 | Instruction::SuperConstruct(_)
                 | Instruction::SuperGet => {
@@ -711,10 +774,20 @@ impl Interpreter {
                             let object = self.stack.pop().ok_or_else(|| {
                                 Error::RuntimeError(super::ERR_STACK_UNDERFLOW.into())
                             })?;
-                            let result = self.get_property(&object, &key)?;
-                            self.stack.push(result);
-                            pc += 1;
-                            continue;
+                            match self.get_property(&object, &key) {
+                                Ok(result) => {
+                                    self.stack.push(result);
+                                    pc += 1;
+                                    continue;
+                                }
+                                Err(e) => {
+                                    // null/undefined property reads must be catchable
+                                    // (e.g. get-intrinsic's `null.error` probe).
+                                    if self.throw_from_host_error(&mut pc, e)? {
+                                        continue;
+                                    }
+                                }
+                            }
                         }
                         Instruction::SetProperty => {
                             let value = self.stack.pop().ok_or_else(|| {
@@ -728,6 +801,10 @@ impl Interpreter {
                             })?;
                             // Inline the fast path for Object properties, but
                             // only when no accessors (getters/setters) exist.
+                            // Leaves the *object* on the stack (object-literal
+                            // construction relies on this). Assignment
+                            // expressions that need the RHS value Dup it
+                            // before SetProperty and Pop afterward.
                             if let Value::Object(obj_idx) = &object {
                                 if let Value::String(key_str) = &key {
                                     if let HeapValue::Object(obj) = &mut self.heap[*obj_idx] {

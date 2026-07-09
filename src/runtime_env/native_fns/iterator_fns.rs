@@ -22,6 +22,28 @@ pub(super) fn native_array_iterator(
         _ => Vec::new(),
     };
 
+    make_array_style_iterator(interp, arr_data)
+}
+
+/// String.prototype[Symbol.iterator]() — yields each code unit / char as a string.
+pub(super) fn native_string_iterator(
+    interp: &mut Interpreter,
+    this: &Value,
+    _args: &[Value],
+) -> Result<Value> {
+    let s = match this {
+        Value::String(s) => s.to_string(),
+        Value::Cons(c) => c.flatten(),
+        _ => String::new(),
+    };
+    let chars: Vec<Value> = s
+        .chars()
+        .map(|ch| Value::from_string(ch.to_string()))
+        .collect();
+    make_array_style_iterator(interp, chars)
+}
+
+fn make_array_style_iterator(interp: &mut Interpreter, arr_data: Vec<Value>) -> Result<Value> {
     let data_idx = interp.gc.allocate(
         &mut interp.heap,
         HeapValue::Array(JsArray { elements: arr_data }),

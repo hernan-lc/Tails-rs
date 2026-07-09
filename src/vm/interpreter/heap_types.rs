@@ -397,6 +397,10 @@ pub struct JsFunction {
     pub source_line: Option<usize>,
     pub is_arrow: bool,
     pub captured_this: Option<Value>,
+    /// Parent-frame local slots snapshotted into `closure`. Retained so
+    /// StoreLocal can re-snapshot after self-referential assignment
+    /// (`var f = function(){ return f }`) once the binding holds the function.
+    pub capture_slots: Vec<u16>,
 }
 
 #[derive(Debug, Clone)]
@@ -506,6 +510,30 @@ fn has_advanced_features(pattern: &str) -> bool {
 /// element of the class (a position where the Rust engines treat it as a
 /// literal), e.g. `[abc\]]` -> `[][abc\\]`.
 fn normalize_js_regex(pattern: &str) -> String {
+    // Lone UTF-16 surrogates (U+D800–U+DFFF) are not valid Unicode scalar
+    // values and cannot appear in Rust regexes / UTF-8 strings. Packages like
+    // `encodeurl` still use them to detect ill-formed UTF-16; rewrite those
+    // ranges to a never-matching class so the rest of the pattern compiles.
+    let pattern = pattern
+        .replace(r"\x{D800}-\x{DBFF}", r"\x{10FFFF}")
+        .replace(r"\x{DC00}-\x{DFFF}", r"\x{10FFFF}")
+        .replace(r"\x{D800}", r"\x{10FFFF}")
+        .replace(r"\x{DBFF}", r"\x{10FFFF}")
+        .replace(r"\x{DC00}", r"\x{10FFFF}")
+        .replace(r"\x{DFFF}", r"\x{10FFFF}");
+    // Also handle raw-char form if the lexer expanded escapes.
+    let pattern = {
+        let mut s = String::new();
+        for ch in pattern.chars() {
+            let cp = ch as u32;
+            if (0xD800..=0xDFFF).contains(&cp) {
+                // skip lone surrogates
+            } else {
+                s.push(ch);
+            }
+        }
+        s
+    };
     let bytes = pattern.as_bytes();
     let len = bytes.len();
     let mut out = String::with_capacity(len);
@@ -530,6 +558,34 @@ fn normalize_js_regex(pattern: &str) -> String {
                 j += 2; // skip the '\' and ']'
                 continue;
             }
+            // Preserve multi-char escapes produced by the lexer (`\x{HHHH}`)
+            // and common two-char hex escapes (`\xHH`).
+            if next == b'x' {
+                out.push('\\');
+                out.push('x');
+                j += 2;
+                if j < len && bytes[j] == b'{' {
+                    out.push('{');
+                    j += 1;
+                    while j < len && bytes[j] != b'}' {
+                        out.push(bytes[j] as char);
+                        j += 1;
+                    }
+                    if j < len && bytes[j] == b'}' {
+                        out.push('}');
+                        j += 1;
+                    }
+                    continue;
+                }
+                // `\xHH`
+                for _ in 0..2 {
+                    if j < len && bytes[j].is_ascii_hexdigit() {
+                        out.push(bytes[j] as char);
+                        j += 1;
+                    }
+                }
+                continue;
+            }
             out.push('\\');
             out.push(next as char);
             j += 2;
@@ -548,9 +604,6 @@ fn normalize_js_regex(pattern: &str) -> String {
 
 impl JsRegExp {
     pub fn new(pattern: &str, flags: &str) -> Result<Self, String> {
-        //eprintln!("[DBG regex pattern = {:?}]", pattern);
-        let normalized = normalize_js_regex(pattern);
-        let mut regex_flags = String::new();
         let global = flags.contains('g');
         let ignore_case = flags.contains('i');
         let multiline = flags.contains('m');
@@ -558,23 +611,48 @@ impl JsRegExp {
         let unicode = flags.contains('u');
         let sticky = flags.contains('y');
 
-        if ignore_case {
-            regex_flags.push_str("(?i)");
-        }
-        if multiline {
-            regex_flags.push_str("(?m)");
-        }
-        if dot_all {
-            regex_flags.push_str("(?s)");
-        }
-        regex_flags.push_str(&normalized);
+        let build = |body: &str| -> Result<JsCompiledRegex, String> {
+            let mut regex_flags = String::new();
+            if ignore_case {
+                regex_flags.push_str("(?i)");
+            }
+            if multiline {
+                regex_flags.push_str("(?m)");
+            }
+            if dot_all {
+                regex_flags.push_str("(?s)");
+            }
+            regex_flags.push_str(body);
+            if has_advanced_features(body) {
+                fancy_regex::Regex::new(&regex_flags)
+                    .map(JsCompiledRegex::Advanced)
+                    .map_err(|e| e.to_string())
+            } else {
+                regex::Regex::new(&regex_flags)
+                    .map(JsCompiledRegex::Simple)
+                    .map_err(|e| e.to_string())
+            }
+        };
 
-        let compiled = if has_advanced_features(&normalized) {
-            JsCompiledRegex::Advanced(
-                fancy_regex::Regex::new(&regex_flags).map_err(|e| e.to_string())?,
-            )
-        } else {
-            JsCompiledRegex::Simple(regex::Regex::new(&regex_flags).map_err(|e| e.to_string())?)
+        let normalized = normalize_js_regex(pattern);
+        let compiled = match build(&normalized) {
+            Ok(c) => c,
+            Err(e) => {
+                // get-intrinsic's lodash `rePropName` uses a backreference inside
+                // a negative lookahead, which fancy_regex cannot compile. Fall
+                // back to a simpler path-splitter that still works for
+                // `%Foo.bar.baz%` / `Foo.prototype.method` names.
+                if has_advanced_features(&normalized) {
+                    // Split `%Foo.bar.baz%` into Foo, bar, baz. Keep one capture
+                    // group so String.replace callbacks that expect
+                    // (match, group1, offset, string) still see group1 as
+                    // undefined for plain segments (get-intrinsic/lodash).
+                    let fallback = normalize_js_regex(r#"[^%.[\]]+|\[([^\]]*)\]"#);
+                    build(&fallback).map_err(|_| e)?
+                } else {
+                    return Err(e);
+                }
+            }
         };
 
         Ok(JsRegExp {

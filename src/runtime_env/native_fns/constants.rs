@@ -504,6 +504,42 @@ pub const OBJECT_FROM_ENTRIES: usize = 475;
 // String.prototype.trimStart / trimEnd (476-477)
 pub const STRING_TRIM_START: usize = 476;
 pub const STRING_TRIM_END: usize = 477;
+// tty.isatty (478)
+pub const TTY_ISATTY: usize = 478;
+// util.deprecate (479)
+pub const UTIL_DEPRECATE: usize = 479;
+// Error.captureStackTrace (480)
+pub const ERROR_CAPTURE_STACK_TRACE: usize = 480;
+// CallSite methods (481-489)
+pub const CALLSITE_GET_FILE_NAME: usize = 481;
+pub const CALLSITE_GET_LINE_NUMBER: usize = 482;
+pub const CALLSITE_GET_COLUMN_NUMBER: usize = 483;
+pub const CALLSITE_IS_EVAL: usize = 484;
+pub const CALLSITE_GET_FUNCTION_NAME: usize = 485;
+pub const CALLSITE_GET_METHOD_NAME: usize = 486;
+pub const CALLSITE_GET_TYPE_NAME: usize = 487;
+pub const CALLSITE_GET_THIS: usize = 488;
+pub const CALLSITE_TO_STRING: usize = 489;
+// Object.prototype.toString / Function.prototype.toString (490-491)
+pub const OBJECT_TO_STRING: usize = 490;
+pub const FUNCTION_TO_STRING: usize = 491;
+pub const OBJECT_GET_OWN_PROPERTY_SYMBOLS: usize = 492;
+pub const DECODE_URI: usize = 493;
+pub const DECODE_URI_COMPONENT: usize = 494;
+pub const ENCODE_URI: usize = 495;
+pub const ENCODE_URI_COMPONENT: usize = 496;
+pub const EVAL: usize = 497;
+pub const STRING_ITERATOR: usize = 498;
+pub const GET_INTRINSIC: usize = 499;
+pub const TEXT_ENCODER_CONSTRUCTOR: usize = 500;
+pub const TEXT_DECODER_CONSTRUCTOR: usize = 501;
+pub const TEXT_ENCODER_ENCODE: usize = 502;
+pub const TEXT_DECODER_DECODE: usize = 503;
+pub const UTIL_INHERITS: usize = 504;
+pub const OBJECT_GET_OWN_PROPERTY_NAMES: usize = 505;
+pub const OBJECT_HAS_OWN: usize = 506;
+pub const DEBUG_NOOP: usize = 507;
+pub const DEBUG_LOGGER_NOOP: usize = 508;
 
 #[cfg(test)]
 mod tests {

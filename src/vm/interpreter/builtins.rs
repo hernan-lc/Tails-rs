@@ -62,6 +62,28 @@ impl Interpreter {
             .insert("isNaN".into(), Value::NativeFunction(c::IS_NAN));
         self.globals
             .insert("isFinite".into(), Value::NativeFunction(c::IS_FINITE));
+        self.globals
+            .insert("decodeURI".into(), Value::NativeFunction(c::DECODE_URI));
+        self.globals.insert(
+            "decodeURIComponent".into(),
+            Value::NativeFunction(c::DECODE_URI_COMPONENT),
+        );
+        self.globals
+            .insert("encodeURI".into(), Value::NativeFunction(c::ENCODE_URI));
+        self.globals.insert(
+            "encodeURIComponent".into(),
+            Value::NativeFunction(c::ENCODE_URI_COMPONENT),
+        );
+        self.globals
+            .insert("eval".into(), Value::NativeFunction(c::EVAL));
+        self.globals.insert(
+            "TextEncoder".into(),
+            Value::NativeFunction(c::TEXT_ENCODER_CONSTRUCTOR),
+        );
+        self.globals.insert(
+            "TextDecoder".into(),
+            Value::NativeFunction(c::TEXT_DECODER_CONSTRUCTOR),
+        );
 
         // Timer stubs
         self.globals
@@ -126,6 +148,7 @@ impl Interpreter {
         // Object
         let object_proto_props = props! {
             "hasOwnProperty" => Value::NativeFunction(c::OBJECT_HAS_OWN_PROPERTY),
+            wk::TO_STRING => Value::NativeFunction(c::OBJECT_TO_STRING),
         };
         let object_proto_idx = self.gc.allocate(
             &mut self.heap,
@@ -135,6 +158,7 @@ impl Interpreter {
                 extensible: true,
             }),
         );
+        self.object_proto_idx = Some(object_proto_idx);
 
         let object_props = props! {
             "keys" => Value::NativeFunction(c::OBJECT_KEYS),
@@ -146,6 +170,9 @@ impl Interpreter {
             "defineProperties" => Value::NativeFunction(c::OBJECT_DEFINE_PROPERTIES),
             "getOwnPropertyDescriptor" => Value::NativeFunction(c::OBJECT_GET_OWN_PROPERTY_DESCRIPTOR),
             "getOwnPropertyDescriptors" => Value::NativeFunction(c::OBJECT_GET_OWN_PROPERTY_DESCRIPTORS),
+            "getOwnPropertyNames" => Value::NativeFunction(c::OBJECT_GET_OWN_PROPERTY_NAMES),
+            "getOwnPropertySymbols" => Value::NativeFunction(c::OBJECT_GET_OWN_PROPERTY_SYMBOLS),
+            "hasOwn" => Value::NativeFunction(c::OBJECT_HAS_OWN),
             "fromEntries" => Value::NativeFunction(c::OBJECT_FROM_ENTRIES),
             "freeze" => Value::NativeFunction(c::OBJECT_FREEZE),
             "is" => Value::NativeFunction(c::OBJECT_IS),
@@ -203,11 +230,41 @@ impl Interpreter {
         self.globals
             .insert(wk::REFLECT.into(), Value::Object(reflect_obj_idx));
 
+        // Symbol.prototype
+        let symbol_proto_idx = self.gc.allocate(
+            &mut self.heap,
+            HeapValue::Object(JsObject {
+                properties: props! {
+                    wk::TO_STRING => Value::NativeFunction(c::OBJECT_TO_STRING),
+                    wk::VALUE_OF => Value::NativeFunction(c::NUMBER_VALUE_OF),
+                },
+                prototype: self.object_proto_idx,
+                extensible: true,
+            }),
+        );
+        self.symbol_proto_idx = Some(symbol_proto_idx);
+
         // Symbol - registered as NativeFunction(c::SYMBOL_CONSTRUCTOR) with well-known symbols accessible via GetProperty
         self.globals.insert(
             wk::SYMBOL.into(),
             Value::NativeFunction(c::SYMBOL_CONSTRUCTOR),
         );
+
+        // Function.prototype (call/apply/bind/toString) — object-inspect, util, etc.
+        let function_proto_idx = self.gc.allocate(
+            &mut self.heap,
+            HeapValue::Object(JsObject {
+                properties: props! {
+                    "call" => Value::NativeFunction(c::FUNCTION_CALL),
+                    "apply" => Value::NativeFunction(c::FUNCTION_APPLY),
+                    "bind" => Value::NativeFunction(c::FUNCTION_BIND),
+                    wk::TO_STRING => Value::NativeFunction(c::FUNCTION_TO_STRING),
+                },
+                prototype: self.object_proto_idx,
+                extensible: true,
+            }),
+        );
+        self.function_proto_idx = Some(function_proto_idx);
 
         // Function constructor (for dynamic code generation, e.g. new Function(...args, body))
         self.globals.insert(
@@ -231,11 +288,58 @@ impl Interpreter {
         self.globals
             .insert(wk::JSON.into(), Value::Object(json_obj_idx));
 
+        // Array.prototype
+        let array_proto_idx = self.gc.allocate(
+            &mut self.heap,
+            HeapValue::Object(JsObject {
+                properties: props! {
+                    "push" => Value::NativeFunction(c::ARRAY_PUSH),
+                    "pop" => Value::NativeFunction(c::ARRAY_POP),
+                    "shift" => Value::NativeFunction(c::ARRAY_SHIFT),
+                    "unshift" => Value::NativeFunction(c::ARRAY_UNSHIFT),
+                    "slice" => Value::NativeFunction(c::ARRAY_SLICE),
+                    "splice" => Value::NativeFunction(c::ARRAY_SPLICE),
+                    "concat" => Value::NativeFunction(c::ARRAY_CONCAT),
+                    "join" => Value::NativeFunction(c::ARRAY_JOIN),
+                    "indexOf" => Value::NativeFunction(c::ARRAY_INDEX_OF),
+                    "includes" => Value::NativeFunction(c::ARRAY_INCLUDES),
+                    "map" => Value::NativeFunction(c::ARRAY_MAP),
+                    "filter" => Value::NativeFunction(c::ARRAY_FILTER),
+                    "reduce" => Value::NativeFunction(c::ARRAY_REDUCE),
+                    "forEach" => Value::NativeFunction(c::ARRAY_FOR_EACH),
+                    "some" => Value::NativeFunction(c::ARRAY_SOME),
+                    "every" => Value::NativeFunction(c::ARRAY_EVERY),
+                    "find" => Value::NativeFunction(c::ARRAY_FIND),
+                    "findIndex" => Value::NativeFunction(c::ARRAY_FIND_INDEX),
+                    "reverse" => Value::NativeFunction(c::ARRAY_REVERSE),
+                    "sort" => Value::NativeFunction(c::ARRAY_SORT),
+                    "flat" => Value::NativeFunction(c::ARRAY_FLAT),
+                },
+                prototype: self.object_proto_idx,
+                extensible: true,
+            }),
+        );
+        self.array_proto_idx = Some(array_proto_idx);
+
         // Array
         self.globals.insert(
             wk::ARRAY.into(),
             Value::NativeFunction(c::ARRAY_CONSTRUCTOR),
         );
+
+        // BigInt.prototype (object-inspect does BigInt.prototype.valueOf)
+        let bigint_proto_idx = self.gc.allocate(
+            &mut self.heap,
+            HeapValue::Object(JsObject {
+                properties: props! {
+                    wk::TO_STRING => Value::NativeFunction(c::NUMBER_TO_STRING),
+                    wk::VALUE_OF => Value::NativeFunction(c::NUMBER_VALUE_OF),
+                },
+                prototype: self.object_proto_idx,
+                extensible: true,
+            }),
+        );
+        self.bigint_proto_idx = Some(bigint_proto_idx);
 
         // BigInt
         self.globals.insert(
@@ -415,6 +519,64 @@ impl Interpreter {
         self.globals
             .insert(wk::MATH.into(), Value::Object(math_obj_idx));
 
+        // Number / String / Boolean prototypes (object-inspect reads
+        // `Boolean.prototype.valueOf` at module load).
+        let number_proto_idx = self.gc.allocate(
+            &mut self.heap,
+            HeapValue::Object(JsObject {
+                properties: props! {
+                    wk::TO_STRING => Value::NativeFunction(c::NUMBER_TO_STRING),
+                    wk::VALUE_OF => Value::NativeFunction(c::NUMBER_VALUE_OF),
+                    "toFixed" => Value::NativeFunction(c::NUMBER_TO_FIXED),
+                },
+                prototype: self.object_proto_idx,
+                extensible: true,
+            }),
+        );
+        self.number_proto_idx = Some(number_proto_idx);
+
+        let string_proto_idx = self.gc.allocate(
+            &mut self.heap,
+            HeapValue::Object(JsObject {
+                properties: props! {
+                    wk::TO_STRING => Value::NativeFunction(c::NUMBER_TO_STRING),
+                    wk::VALUE_OF => Value::NativeFunction(c::NUMBER_VALUE_OF),
+                    "charAt" => Value::NativeFunction(c::STRING_CHAR_AT),
+                    "charCodeAt" => Value::NativeFunction(c::STRING_CHAR_CODE_AT),
+                    "slice" => Value::NativeFunction(c::STRING_SLICE),
+                    "substring" => Value::NativeFunction(c::STRING_SUBSTRING),
+                    "indexOf" => Value::NativeFunction(c::STRING_INDEX_OF),
+                    "includes" => Value::NativeFunction(c::STRING_INCLUDES),
+                    "replace" => Value::NativeFunction(c::STRING_REPLACE),
+                    "split" => Value::NativeFunction(c::STRING_SPLIT),
+                    "trim" => Value::NativeFunction(c::STRING_TRIM),
+                    "toLowerCase" => Value::NativeFunction(c::STRING_TO_LOWER_CASE),
+                    "toUpperCase" => Value::NativeFunction(c::STRING_TO_UPPER_CASE),
+                    "startsWith" => Value::NativeFunction(c::STRING_STARTS_WITH),
+                    "endsWith" => Value::NativeFunction(c::STRING_ENDS_WITH),
+                    "repeat" => Value::NativeFunction(c::STRING_REPEAT),
+                    "match" => Value::NativeFunction(c::STRING_MATCH),
+                    "search" => Value::NativeFunction(c::STRING_SEARCH),
+                },
+                prototype: self.object_proto_idx,
+                extensible: true,
+            }),
+        );
+        self.string_proto_idx = Some(string_proto_idx);
+
+        let boolean_proto_idx = self.gc.allocate(
+            &mut self.heap,
+            HeapValue::Object(JsObject {
+                properties: props! {
+                    wk::TO_STRING => Value::NativeFunction(c::BOOLEAN_TO_STRING),
+                    wk::VALUE_OF => Value::NativeFunction(c::BOOLEAN_VALUE_OF),
+                },
+                prototype: self.object_proto_idx,
+                extensible: true,
+            }),
+        );
+        self.boolean_proto_idx = Some(boolean_proto_idx);
+
         // Number constructor (callable as Number(), with static methods via property lookup)
         self.globals.insert(
             wk::NUMBER.into(),
@@ -468,21 +630,21 @@ impl Interpreter {
             Value::NativeFunction(c::PROMISE_CONSTRUCTOR),
         );
 
-        // Error constructor
-        let error_proto_idx = self
-            .gc
-            .allocate(&mut self.heap, HeapValue::Object(JsObject::new()));
-        let error_ctor_props = props! {
-            wk::PROTOTYPE => Value::Object(error_proto_idx),
+        // Error constructor + prototype. Prototype must be reachable via
+        // `Error.prototype` for Node packages that use `Object.create(Error.prototype)`.
+        let error_proto_props = props! {
+            wk::NAME => Value::string(wk::ERROR),
+            wk::MESSAGE => Value::string(""),
         };
-        self.gc.allocate(
+        let error_proto_idx = self.gc.allocate(
             &mut self.heap,
             HeapValue::Object(JsObject {
-                properties: error_ctor_props,
+                properties: error_proto_props,
                 prototype: None,
                 extensible: true,
             }),
         );
+        self.error_proto_idx = Some(error_proto_idx);
         self.globals.insert(
             wk::ERROR.into(),
             Value::NativeFunction(c::ERROR_CONSTRUCTOR),
@@ -514,6 +676,17 @@ impl Interpreter {
             wk::RANGE_ERROR,
             error_proto_idx,
             c::RANGE_ERROR_CONSTRUCTOR,
+        );
+
+        // EvalError / URIError — no dedicated natives yet; alias to Error so
+        // packages like es-errors can `module.exports = EvalError`.
+        self.globals.insert(
+            wk::EVAL_ERROR.into(),
+            Value::NativeFunction(c::ERROR_CONSTRUCTOR),
+        );
+        self.globals.insert(
+            wk::URI_ERROR.into(),
+            Value::NativeFunction(c::ERROR_CONSTRUCTOR),
         );
 
         // TypedArray constructors
@@ -551,7 +724,9 @@ impl Interpreter {
                 }),
             );
 
-            // Create constructor
+            // Constructor object holds statics (from/of/prototype). The global
+            // binding remains a NativeFunction so `new Uint8Array(...)` works;
+            // static property access is handled in property_access.rs.
             let ctor_props = props! {
                 wk::PROTOTYPE => Value::Object(proto_idx),
                 "BYTES_PER_ELEMENT" => Value::Integer(bytes_per_element),
@@ -567,7 +742,7 @@ impl Interpreter {
                 }),
             );
             self.globals
-                .insert((*name).into(), Value::NativeFunction(*ctor_idx));
+                .insert(name.to_string(), Value::NativeFunction(*ctor_idx));
         }
 
         // Map
@@ -757,27 +932,36 @@ impl Interpreter {
         // without an import.
         {
             use super::native_loader::create_buffer_module;
-            let buffer_props = create_buffer_module(&mut self.heap, &mut self.gc);
-            // Capture the prototype index before moving `buffer_props`
-            // into the heap, so subsequent `Value::Buffer(_)` property
-            // lookups (`b.toString(...)`, `b.length`, etc.) can find
-            // their methods. Without this, `buffer_proto_idx` would
-            // only be set when the module is imported explicitly, and
-            // bare `Buffer.from(x).toString("utf8")` would crash with
-            // "undefined is not a function".
-            if let Some(Value::Object(proto_idx)) = buffer_props.get(wk::PROTOTYPE) {
+            let buffer_mod = create_buffer_module(&mut self.heap, &mut self.gc);
+            // Capture the prototype index before moving props into the heap.
+            if let Some(Value::Object(proto_idx)) = buffer_mod.get(wk::PROTOTYPE) {
                 self.buffer_proto_idx = Some(*proto_idx);
             }
-            let buffer_idx = self.gc.allocate(
-                &mut self.heap,
-                HeapValue::Object(JsObject {
-                    properties: buffer_props,
-                    prototype: None,
-                    extensible: true,
-                }),
-            );
-            self.globals
-                .insert("Buffer".into(), Value::Object(buffer_idx));
+            // Global `Buffer` is the constructor (Node: require('buffer').Buffer).
+            let buffer_ctor = buffer_mod
+                .get("Buffer")
+                .cloned()
+                .unwrap_or(Value::Undefined);
+            if let Value::Object(idx) = buffer_ctor {
+                // Give Buffer Object.prototype so `.hasOwnProperty` works.
+                if let HeapValue::Object(obj) = &mut self.heap[idx] {
+                    if obj.prototype.is_none() {
+                        obj.prototype = self.object_proto_idx;
+                    }
+                }
+                self.globals.insert("Buffer".into(), Value::Object(idx));
+            } else {
+                let buffer_idx = self.gc.allocate(
+                    &mut self.heap,
+                    HeapValue::Object(JsObject {
+                        properties: buffer_mod,
+                        prototype: self.object_proto_idx,
+                        extensible: true,
+                    }),
+                );
+                self.globals
+                    .insert("Buffer".into(), Value::Object(buffer_idx));
+            }
         }
 
         // -------------------------------------------------------------------

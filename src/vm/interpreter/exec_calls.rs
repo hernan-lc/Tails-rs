@@ -162,6 +162,18 @@ impl Interpreter {
                                 self.throw_stack_overflow(pc)?;
                                 return Ok(true);
                             }
+                            // Build `arguments` array for non-arrow functions.
+                            let arguments_val = if !is_arrow {
+                                let arr_idx = self.gc.allocate(
+                                    &mut self.heap,
+                                    HeapValue::Array(JsArray {
+                                        elements: args.clone(),
+                                    }),
+                                );
+                                Some(Value::Array(arr_idx))
+                            } else {
+                                None
+                            };
                             self.call_stack.push(CallFrame {
                                 return_address,
                                 base_pointer,
@@ -178,6 +190,7 @@ impl Interpreter {
                                 } else {
                                     self.exception_handlers.clone()
                                 },
+                                arguments: arguments_val,
                             });
                             for closure_var in closure_vars.borrow().iter().cloned() {
                                 self.stack.push(closure_var);
@@ -335,6 +348,17 @@ impl Interpreter {
                                 self.throw_stack_overflow(pc)?;
                                 return Ok(true);
                             }
+                            let arguments_val = if !is_arrow {
+                                let arr_idx = self.gc.allocate(
+                                    &mut self.heap,
+                                    HeapValue::Array(JsArray {
+                                        elements: args.clone(),
+                                    }),
+                                );
+                                Some(Value::Array(arr_idx))
+                            } else {
+                                None
+                            };
                             self.call_stack.push(CallFrame {
                                 return_address,
                                 base_pointer,
@@ -351,6 +375,7 @@ impl Interpreter {
                                 } else {
                                     self.exception_handlers.clone()
                                 },
+                                arguments: arguments_val,
                             });
                             for closure_var in closure_vars.borrow().iter().cloned() {
                                 self.stack.push(closure_var);
@@ -495,6 +520,7 @@ impl Interpreter {
                                             exception_handlers_snapshot: self
                                                 .exception_handlers
                                                 .clone(),
+                                            arguments: None,
                                         });
                                         for arg in args {
                                             self.stack.push(arg);
@@ -568,6 +594,7 @@ impl Interpreter {
                                     source_line: self.current_source_line(*pc),
                                     source_col: self.current_source_col(*pc),
                                     exception_handlers_snapshot: self.exception_handlers.clone(),
+                                    arguments: None,
                                 });
                                 for closure_var in closure_vars.borrow().iter().cloned() {
                                     self.stack.push(closure_var);

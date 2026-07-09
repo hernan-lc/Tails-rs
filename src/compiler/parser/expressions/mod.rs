@@ -64,6 +64,9 @@ impl<'a> Parser<'a> {
             Token::XorAssign => Some(CompoundAssignmentOp::XorAssign),
             Token::BitAndAssign => Some(CompoundAssignmentOp::BitAndAssign),
             Token::BitOrAssign => Some(CompoundAssignmentOp::BitOrAssign),
+            Token::ShiftLeftAssign => Some(CompoundAssignmentOp::ShiftLeftAssign),
+            Token::ShiftRightAssign => Some(CompoundAssignmentOp::ShiftRightAssign),
+            Token::UnsignedShiftRightAssign => Some(CompoundAssignmentOp::UnsignedShiftRightAssign),
             Token::NullishCoalescingAssign => Some(CompoundAssignmentOp::NullishCoalescingAssign),
             _ => None,
         };
@@ -205,6 +208,7 @@ impl<'a> Parser<'a> {
             let op = match self.peek().token {
                 Token::ShiftLeft => Some(BinaryOperator::ShiftLeft),
                 Token::ShiftRight => Some(BinaryOperator::ShiftRight),
+                Token::UnsignedShiftRight => Some(BinaryOperator::UnsignedShiftRight),
                 _ => None,
             };
             if let Some(op) = op {
