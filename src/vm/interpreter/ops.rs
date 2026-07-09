@@ -4,19 +4,19 @@ use crate::errors::{Error, Result};
 use crate::objects::Value;
 use crate::well_known as wk;
 
-const PROXY_SET_TRAP: &str = "set";
-const PROXY_DELETE_TRAP: &str = "deleteProperty";
-const SETTER_PREFIX: &str = "__setter_";
-const GETTER_PREFIX: &str = "__getter_";
-const METHOD_PREFIX: &str = "__method_";
-const TYPE_UNDEFINED: &str = wk::UNDEFINED;
-const TYPE_OBJECT: &str = "object";
-const TYPE_BOOLEAN: &str = "boolean";
-const TYPE_NUMBER: &str = "number";
-const TYPE_STRING: &str = "string";
-const TYPE_BIGINT: &str = "bigint";
-const TYPE_SYMBOL: &str = "symbol";
-const TYPE_FUNCTION: &str = "function";
+const PROXY_SET_TRAP: &str = wk::TRAP_SET;
+const PROXY_DELETE_TRAP: &str = wk::TRAP_DELETE_PROPERTY;
+const SETTER_PREFIX: &str = wk::SETTER_PREFIX;
+const GETTER_PREFIX: &str = wk::GETTER_PREFIX;
+const METHOD_PREFIX: &str = wk::METHOD_PREFIX;
+const TYPE_UNDEFINED: &str = wk::TYPEOF_UNDEFINED;
+const TYPE_OBJECT: &str = wk::TYPEOF_OBJECT;
+const TYPE_BOOLEAN: &str = wk::TYPEOF_BOOLEAN;
+const TYPE_NUMBER: &str = wk::TYPEOF_NUMBER;
+const TYPE_STRING: &str = wk::TYPEOF_STRING;
+const TYPE_BIGINT: &str = wk::TYPEOF_BIGINT;
+const TYPE_SYMBOL: &str = wk::TYPEOF_SYMBOL;
+const TYPE_FUNCTION: &str = wk::TYPEOF_FUNCTION;
 
 /// Own enumerable string keys, including accessor properties (getters/setters).
 /// Internal storage prefixes are not returned as keys; instead the logical
@@ -255,25 +255,13 @@ impl Interpreter {
                 let result = self.in_check_mut(&left, &right)?;
                 self.stack.push(result);
             }
-            // Map/Set fast-path bytecodes (argc==2 avoids temporary Vec)
+            // Map/Set fast-path bytecodes — shared helpers in collection_ops.rs
             Instruction::MapSet(argc) => {
                 if *argc == 2 {
                     let value = self.stack_pop()?;
                     let key = self.stack_pop()?;
                     let object = self.stack_pop()?;
-                    match object {
-                        Value::Map(map_idx) => {
-                            if let HeapValue::Map(map) = &mut self.heap[map_idx] {
-                                map.set(key, value);
-                            }
-                            self.stack.push(Value::Map(map_idx));
-                        }
-                        other => {
-                            let method = self.get_property(&other, &Value::string("set"))?;
-                            let result = self.call_value(&method, &other, &[key, value])?;
-                            self.stack.push(result);
-                        }
-                    }
+                    self.exec_map_set(object, key, value)?;
                 } else {
                     let mut args = Vec::with_capacity(usize::from(*argc));
                     for _ in 0..*argc {
@@ -281,158 +269,28 @@ impl Interpreter {
                     }
                     args.reverse();
                     let object = self.stack_pop()?;
-                    match object {
-                        Value::Map(map_idx) => {
-                            let key = args.first().cloned().unwrap_or(Value::Undefined);
-                            let value = args.get(1).cloned().unwrap_or(Value::Undefined);
-                            if let HeapValue::Map(map) = &mut self.heap[map_idx] {
-                                map.set(key, value);
-                            }
-                            self.stack.push(Value::Map(map_idx));
-                        }
-                        other => {
-                            let method = self.get_property(&other, &Value::string("set"))?;
-                            let result = self.call_value(&method, &other, &args)?;
-                            self.stack.push(result);
-                        }
-                    }
+                    self.exec_map_set_args(object, &args)?;
                 }
             }
             Instruction::MapGet => {
                 let key = self.stack_pop()?;
                 let object = self.stack_pop()?;
-                match &object {
-                    Value::Map(map_idx) => {
-                        let result = if let HeapValue::Map(map) = &self.heap[*map_idx] {
-                            map.get(&key).cloned().unwrap_or(Value::Undefined)
-                        } else {
-                            Value::Undefined
-                        };
-                        self.stack.push(result);
-                    }
-                    _ => {
-                        let method = self.get_property(&object, &Value::string("get"))?;
-                        let result = self.call_value(&method, &object, &[key])?;
-                        self.stack.push(result);
-                    }
-                }
+                self.exec_map_get(object, key)?;
             }
-            Instruction::MapHas => {
+            Instruction::MapHas | Instruction::SetHas => {
                 let key = self.stack_pop()?;
                 let object = self.stack_pop()?;
-                match &object {
-                    Value::Map(map_idx) => {
-                        let result = if let HeapValue::Map(map) = &self.heap[*map_idx] {
-                            Value::Boolean(map.has(&key))
-                        } else {
-                            Value::Boolean(false)
-                        };
-                        self.stack.push(result);
-                    }
-                    Value::Set(set_idx) => {
-                        let result = if let HeapValue::Set(set) = &self.heap[*set_idx] {
-                            Value::Boolean(set.has(&key))
-                        } else {
-                            Value::Boolean(false)
-                        };
-                        self.stack.push(result);
-                    }
-                    _ => {
-                        let method = self.get_property(&object, &Value::string("has"))?;
-                        let result = self.call_value(&method, &object, &[key])?;
-                        self.stack.push(result);
-                    }
-                }
+                self.exec_collection_has(object, key)?;
             }
-            Instruction::MapDelete => {
+            Instruction::MapDelete | Instruction::SetDelete => {
                 let key = self.stack_pop()?;
                 let object = self.stack_pop()?;
-                match &object {
-                    Value::Map(map_idx) => {
-                        let result = if let HeapValue::Map(map) = &mut self.heap[*map_idx] {
-                            Value::Boolean(map.delete(&key))
-                        } else {
-                            Value::Boolean(false)
-                        };
-                        self.stack.push(result);
-                    }
-                    Value::Set(set_idx) => {
-                        let result = if let HeapValue::Set(set) = &mut self.heap[*set_idx] {
-                            Value::Boolean(set.delete(&key))
-                        } else {
-                            Value::Boolean(false)
-                        };
-                        self.stack.push(result);
-                    }
-                    _ => {
-                        let method = self.get_property(&object, &Value::string("delete"))?;
-                        let result = self.call_value(&method, &object, &[key])?;
-                        self.stack.push(result);
-                    }
-                }
+                self.exec_collection_delete(object, key)?;
             }
             Instruction::SetAdd => {
                 let value = self.stack_pop()?;
                 let object = self.stack_pop()?;
-                match &object {
-                    Value::Set(set_idx) => {
-                        if let HeapValue::Set(set) = &mut self.heap[*set_idx] {
-                            set.add(value);
-                        }
-                        self.stack.push(object);
-                    }
-                    _ => {
-                        let method = self.get_property(&object, &Value::string("add"))?;
-                        let result = self.call_value(&method, &object, &[value])?;
-                        self.stack.push(result);
-                    }
-                }
-            }
-            Instruction::SetHas => {
-                let value = self.stack_pop()?;
-                let object = self.stack_pop()?;
-                match &object {
-                    Value::Set(set_idx) => {
-                        let result = if let HeapValue::Set(set) = &self.heap[*set_idx] {
-                            Value::Boolean(set.has(&value))
-                        } else {
-                            Value::Boolean(false)
-                        };
-                        self.stack.push(result);
-                    }
-                    Value::Map(map_idx) => {
-                        let result = if let HeapValue::Map(map) = &self.heap[*map_idx] {
-                            Value::Boolean(map.has(&value))
-                        } else {
-                            Value::Boolean(false)
-                        };
-                        self.stack.push(result);
-                    }
-                    _ => {
-                        let method = self.get_property(&object, &Value::string("has"))?;
-                        let result = self.call_value(&method, &object, &[value])?;
-                        self.stack.push(result);
-                    }
-                }
-            }
-            Instruction::SetDelete => {
-                let value = self.stack_pop()?;
-                let object = self.stack_pop()?;
-                match &object {
-                    Value::Set(set_idx) => {
-                        let result = if let HeapValue::Set(set) = &mut self.heap[*set_idx] {
-                            Value::Boolean(set.delete(&value))
-                        } else {
-                            Value::Boolean(false)
-                        };
-                        self.stack.push(result);
-                    }
-                    _ => {
-                        let method = self.get_property(&object, &Value::string("delete"))?;
-                        let result = self.call_value(&method, &object, &[value])?;
-                        self.stack.push(result);
-                    }
-                }
+                self.exec_set_add(object, value)?;
             }
             _ => return Ok(false),
         }

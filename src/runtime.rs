@@ -3,14 +3,11 @@ use crate::compiler::{CompiledModule, Compiler};
 use crate::errors::Result;
 use crate::objects::Value;
 use crate::vm::{EventSource, Interpreter};
+use crate::well_known as wk;
 use rustc_hash::FxHashMap;
 use std::hash::{Hash, Hasher};
 use std::path::Path;
 use std::rc::Rc;
-
-/// Cap on cached eval compilations (source → bytecode). Oldest entries are
-/// dropped when exceeded — simple FIFO by re-insert order.
-const EVAL_CACHE_MAX: usize = 128;
 
 pub struct RuntimeConfig {
     pub enable_type_checking: bool,
@@ -23,7 +20,7 @@ impl Default for RuntimeConfig {
         Self {
             enable_type_checking: false,
             max_heap_size: 0,
-            max_call_stack_depth: 10_000,
+            max_call_stack_depth: wk::DEFAULT_MAX_CALL_STACK_DEPTH,
         }
     }
 }
@@ -80,7 +77,7 @@ impl TailsRuntime {
             } else {
                 let compiler = Compiler::new(false);
                 let module = Rc::new(compiler.compile(source)?);
-                if self.eval_cache.len() >= EVAL_CACHE_MAX {
+                if self.eval_cache.len() >= wk::EVAL_CACHE_MAX {
                     if let Some(old) = self.eval_cache_order.first().copied() {
                         self.eval_cache.remove(&old);
                         self.eval_cache_order.remove(0);

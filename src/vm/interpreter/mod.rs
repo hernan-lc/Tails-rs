@@ -3,6 +3,7 @@ mod bytecode;
 mod call_frame;
 mod calls;
 mod class_ops;
+mod collection_ops;
 mod control_flow;
 mod error_format;
 mod exception_handling;

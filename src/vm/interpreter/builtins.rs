@@ -178,12 +178,12 @@ impl Interpreter {
 
         // Reflect
         let reflect_props = props! {
-            "get" => Value::NativeFunction(c::REFLECT_GET),
-            "set" => Value::NativeFunction(c::REFLECT_SET),
-            "has" => Value::NativeFunction(c::REFLECT_HAS),
-            "deleteProperty" => Value::NativeFunction(c::REFLECT_DELETE_PROPERTY),
-            "apply" => Value::NativeFunction(c::REFLECT_APPLY),
-            "construct" => Value::NativeFunction(c::REFLECT_CONSTRUCT),
+            wk::GET => Value::NativeFunction(c::REFLECT_GET),
+            wk::SET_PROP => Value::NativeFunction(c::REFLECT_SET),
+            wk::HAS => Value::NativeFunction(c::REFLECT_HAS),
+            wk::TRAP_DELETE_PROPERTY => Value::NativeFunction(c::REFLECT_DELETE_PROPERTY),
+            wk::TRAP_APPLY => Value::NativeFunction(c::REFLECT_APPLY),
+            wk::TRAP_CONSTRUCT => Value::NativeFunction(c::REFLECT_CONSTRUCT),
             "ownKeys" => Value::NativeFunction(c::REFLECT_OWN_KEYS),
             "getOwnPropertyDescriptor" => Value::NativeFunction(c::REFLECT_GET_OWN_PROPERTY_DESCRIPTOR),
             "defineProperty" => Value::NativeFunction(c::REFLECT_DEFINE_PROPERTY),
@@ -537,8 +537,8 @@ impl Interpreter {
             let proto_props = props! {
                 "BYTES_PER_ELEMENT" => Value::Integer(bytes_per_element),
                 wk::LENGTH => Value::NativeFunction(c::TYPED_ARRAY_LENGTH),
-                "get" => Value::NativeFunction(c::TYPED_ARRAY_GET),
-                "set" => Value::NativeFunction(c::TYPED_ARRAY_SET),
+                wk::GET => Value::NativeFunction(c::TYPED_ARRAY_GET),
+                wk::SET_PROP => Value::NativeFunction(c::TYPED_ARRAY_SET),
                 "subarray" => Value::NativeFunction(c::TYPED_ARRAY_SUBARRAY),
                 "slice" => Value::NativeFunction(c::TYPED_ARRAY_SLICE),
             };
@@ -572,16 +572,16 @@ impl Interpreter {
 
         // Map
         let map_proto_props = props! {
-            "get" => Value::NativeFunction(c::MAP_GET),
-            "set" => Value::NativeFunction(c::MAP_SET),
-            "has" => Value::NativeFunction(c::MAP_HAS),
-            "delete" => Value::NativeFunction(c::MAP_DELETE),
-            "clear" => Value::NativeFunction(c::MAP_CLEAR),
-            "size" => Value::NativeFunction(c::MAP_SIZE),
-            "forEach" => Value::NativeFunction(c::MAP_FOR_EACH),
-            "keys" => Value::NativeFunction(c::MAP_KEYS),
-            "values" => Value::NativeFunction(c::MAP_VALUES),
-            "entries" => Value::NativeFunction(c::MAP_ENTRIES),
+            wk::GET => Value::NativeFunction(c::MAP_GET),
+            wk::SET_PROP => Value::NativeFunction(c::MAP_SET),
+            wk::HAS => Value::NativeFunction(c::MAP_HAS),
+            wk::DELETE => Value::NativeFunction(c::MAP_DELETE),
+            wk::CLEAR => Value::NativeFunction(c::MAP_CLEAR),
+            wk::SIZE => Value::NativeFunction(c::MAP_SIZE),
+            wk::FOR_EACH => Value::NativeFunction(c::MAP_FOR_EACH),
+            wk::KEYS => Value::NativeFunction(c::MAP_KEYS),
+            wk::VALUES => Value::NativeFunction(c::MAP_VALUES),
+            wk::ENTRIES => Value::NativeFunction(c::MAP_ENTRIES),
         };
         let map_proto_idx = self.gc.allocate(
             &mut self.heap,
@@ -608,15 +608,15 @@ impl Interpreter {
 
         // Set
         let set_proto_props = props! {
-            "add" => Value::NativeFunction(c::SET_ADD),
-            "has" => Value::NativeFunction(c::SET_HAS),
-            "delete" => Value::NativeFunction(c::SET_DELETE),
-            "clear" => Value::NativeFunction(c::SET_CLEAR),
-            "size" => Value::NativeFunction(c::SET_SIZE),
-            "forEach" => Value::NativeFunction(c::SET_FOR_EACH),
-            "values" => Value::NativeFunction(c::SET_VALUES),
-            "keys" => Value::NativeFunction(c::SET_KEYS),
-            "entries" => Value::NativeFunction(c::SET_ENTRIES),
+            wk::ADD => Value::NativeFunction(c::SET_ADD),
+            wk::HAS => Value::NativeFunction(c::SET_HAS),
+            wk::DELETE => Value::NativeFunction(c::SET_DELETE),
+            wk::CLEAR => Value::NativeFunction(c::SET_CLEAR),
+            wk::SIZE => Value::NativeFunction(c::SET_SIZE),
+            wk::FOR_EACH => Value::NativeFunction(c::SET_FOR_EACH),
+            wk::VALUES => Value::NativeFunction(c::SET_VALUES),
+            wk::KEYS => Value::NativeFunction(c::SET_KEYS),
+            wk::ENTRIES => Value::NativeFunction(c::SET_ENTRIES),
         };
         let set_proto_idx = self.gc.allocate(
             &mut self.heap,
@@ -643,10 +643,10 @@ impl Interpreter {
 
         // WeakMap
         let weakmap_proto_props = props! {
-            "get" => Value::NativeFunction(c::WEAKMAP_GET),
-            "set" => Value::NativeFunction(c::WEAKMAP_SET),
-            "has" => Value::NativeFunction(c::WEAKMAP_HAS),
-            "delete" => Value::NativeFunction(c::WEAKMAP_DELETE),
+            wk::GET => Value::NativeFunction(c::WEAKMAP_GET),
+            wk::SET_PROP => Value::NativeFunction(c::WEAKMAP_SET),
+            wk::HAS => Value::NativeFunction(c::WEAKMAP_HAS),
+            wk::DELETE => Value::NativeFunction(c::WEAKMAP_DELETE),
         };
         let weakmap_proto_idx = self.gc.allocate(
             &mut self.heap,
@@ -675,9 +675,9 @@ impl Interpreter {
 
         // WeakSet
         let weakset_proto_props = props! {
-            "add" => Value::NativeFunction(c::WEAKSET_ADD),
-            "has" => Value::NativeFunction(c::WEAKSET_HAS),
-            "delete" => Value::NativeFunction(c::WEAKSET_DELETE),
+            wk::ADD => Value::NativeFunction(c::WEAKSET_ADD),
+            wk::HAS => Value::NativeFunction(c::WEAKSET_HAS),
+            wk::DELETE => Value::NativeFunction(c::WEAKSET_DELETE),
         };
         let weakset_proto_idx = self.gc.allocate(
             &mut self.heap,
@@ -706,8 +706,8 @@ impl Interpreter {
 
         // Generator
         let generator_proto_props = props! {
-            "next" => Value::NativeFunction(c::GENERATOR_NEXT),
-            "return" => Value::NativeFunction(c::GENERATOR_RETURN),
+            wk::NEXT => Value::NativeFunction(c::GENERATOR_NEXT),
+            wk::RETURN => Value::NativeFunction(c::GENERATOR_RETURN),
             "throw" => Value::NativeFunction(c::GENERATOR_THROW),
             wk::SYMBOL_ITERATOR => Value::NativeFunction(c::GENERATOR_SYMBOL_ITERATOR),
         };

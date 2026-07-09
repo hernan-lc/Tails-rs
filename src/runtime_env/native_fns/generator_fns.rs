@@ -130,8 +130,8 @@ pub(super) fn native_generator_next(
                     // Phase 8.5: Use inline PropertyStorage for the small
                     // 2-property result object, avoiding FxHashMap allocation.
                     let mut props = crate::vm::interpreter::PropertyStorage::new();
-                    props.insert("value".to_string(), yield_value);
-                    props.insert("done".to_string(), Value::Boolean(false));
+                    props.insert(crate::well_known::VALUE.to_string(), yield_value);
+                    props.insert(crate::well_known::DONE.to_string(), Value::Boolean(false));
                     let obj_idx = interp.gc.allocate(
                         &mut interp.heap,
                         crate::vm::interpreter::HeapValue::Object(
@@ -146,8 +146,8 @@ pub(super) fn native_generator_next(
                 }
                 _ => {
                     let mut props = crate::vm::interpreter::PropertyStorage::new();
-                    props.insert("value".to_string(), Value::Undefined);
-                    props.insert("done".to_string(), Value::Boolean(true));
+                    props.insert(crate::well_known::VALUE.to_string(), Value::Undefined);
+                    props.insert(crate::well_known::DONE.to_string(), Value::Boolean(true));
                     let obj_idx = interp.gc.allocate(
                         &mut interp.heap,
                         crate::vm::interpreter::HeapValue::Object(

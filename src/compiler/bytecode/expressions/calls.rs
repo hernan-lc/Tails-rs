@@ -39,7 +39,8 @@ impl CodeGenerator {
             if !computed && !has_spread {
                 if let Expression::Identifier(name) = property.as_ref() {
                     match name.as_str() {
-                        "set" if args.len() == 2 => {
+                        // Well-known collection methods → specialized opcodes
+                        s if s == crate::well_known::SET_PROP && args.len() == 2 => {
                             self.generate_expression(object)?;
                             for arg in args {
                                 self.generate_expression(arg)?;
@@ -47,7 +48,7 @@ impl CodeGenerator {
                             self.emit(Instruction::MapSet(args.len() as u16));
                             return Ok(());
                         }
-                        "get" if args.len() == 1 => {
+                        s if s == crate::well_known::GET && args.len() == 1 => {
                             self.generate_expression(object)?;
                             for arg in args {
                                 self.generate_expression(arg)?;
@@ -55,7 +56,7 @@ impl CodeGenerator {
                             self.emit(Instruction::MapGet);
                             return Ok(());
                         }
-                        "has" if args.len() == 1 => {
+                        s if s == crate::well_known::HAS && args.len() == 1 => {
                             self.generate_expression(object)?;
                             for arg in args {
                                 self.generate_expression(arg)?;
@@ -63,7 +64,7 @@ impl CodeGenerator {
                             self.emit(Instruction::MapHas);
                             return Ok(());
                         }
-                        "delete" if args.len() == 1 => {
+                        s if s == crate::well_known::DELETE && args.len() == 1 => {
                             self.generate_expression(object)?;
                             for arg in args {
                                 self.generate_expression(arg)?;
@@ -71,7 +72,7 @@ impl CodeGenerator {
                             self.emit(Instruction::MapDelete);
                             return Ok(());
                         }
-                        "add" if args.len() == 1 => {
+                        s if s == crate::well_known::ADD && args.len() == 1 => {
                             self.generate_expression(object)?;
                             for arg in args {
                                 self.generate_expression(arg)?;

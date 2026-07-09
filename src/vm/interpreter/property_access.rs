@@ -421,7 +421,7 @@ impl Interpreter {
                 if let HeapValue::Proxy(proxy) = &self.heap[*proxy_idx] {
                     let handler = proxy.handler.clone();
                     let target = proxy.target.clone();
-                    let trap = self.get_property(&handler, &Value::from_string("get".to_string()));
+                    let trap = self.get_property(&handler, &Value::string(wk::GET));
                     match &trap {
                         Ok(Value::Function(_)) | Ok(Value::NativeFunction(_)) => {
                             let trap_val = trap.unwrap();
@@ -487,22 +487,22 @@ impl Interpreter {
                     None => return Ok(Value::Undefined),
                 };
                 match key_str.as_str() {
-                    "size" => {
+                    s if s == wk::SIZE => {
                         if let Value::Map(map_idx) = this {
                             if let HeapValue::Map(map) = &self.heap[*map_idx] {
                                 return Ok(Value::Float(map.size() as f64));
                             }
                         }
                     }
-                    "get" => return Ok(Value::NativeFunction(c::MAP_GET)),
-                    "set" => return Ok(Value::NativeFunction(c::MAP_SET)),
-                    "has" => return Ok(Value::NativeFunction(c::MAP_HAS)),
-                    "delete" => return Ok(Value::NativeFunction(c::MAP_DELETE)),
-                    "clear" => return Ok(Value::NativeFunction(c::MAP_CLEAR)),
-                    "forEach" => return Ok(Value::NativeFunction(c::MAP_FOR_EACH)),
-                    "keys" => return Ok(Value::NativeFunction(c::MAP_KEYS)),
-                    "values" => return Ok(Value::NativeFunction(c::MAP_VALUES)),
-                    "entries" => return Ok(Value::NativeFunction(c::MAP_ENTRIES)),
+                    s if s == wk::GET => return Ok(Value::NativeFunction(c::MAP_GET)),
+                    s if s == wk::SET_PROP => return Ok(Value::NativeFunction(c::MAP_SET)),
+                    s if s == wk::HAS => return Ok(Value::NativeFunction(c::MAP_HAS)),
+                    s if s == wk::DELETE => return Ok(Value::NativeFunction(c::MAP_DELETE)),
+                    s if s == wk::CLEAR => return Ok(Value::NativeFunction(c::MAP_CLEAR)),
+                    s if s == wk::FOR_EACH => return Ok(Value::NativeFunction(c::MAP_FOR_EACH)),
+                    s if s == wk::KEYS => return Ok(Value::NativeFunction(c::MAP_KEYS)),
+                    s if s == wk::VALUES => return Ok(Value::NativeFunction(c::MAP_VALUES)),
+                    s if s == wk::ENTRIES => return Ok(Value::NativeFunction(c::MAP_ENTRIES)),
                     _ => {}
                 }
             }
@@ -512,21 +512,21 @@ impl Interpreter {
                     None => return Ok(Value::Undefined),
                 };
                 match key_str.as_str() {
-                    "size" => {
+                    s if s == wk::SIZE => {
                         if let Value::Set(set_idx) = this {
                             if let HeapValue::Set(set) = &self.heap[*set_idx] {
                                 return Ok(Value::Float(set.size() as f64));
                             }
                         }
                     }
-                    "add" => return Ok(Value::NativeFunction(c::SET_ADD)),
-                    "has" => return Ok(Value::NativeFunction(c::SET_HAS)),
-                    "delete" => return Ok(Value::NativeFunction(c::SET_DELETE)),
-                    "clear" => return Ok(Value::NativeFunction(c::SET_CLEAR)),
-                    "forEach" => return Ok(Value::NativeFunction(c::SET_FOR_EACH)),
-                    "values" => return Ok(Value::NativeFunction(c::SET_VALUES)),
-                    "keys" => return Ok(Value::NativeFunction(c::SET_KEYS)),
-                    "entries" => return Ok(Value::NativeFunction(c::SET_ENTRIES)),
+                    s if s == wk::ADD => return Ok(Value::NativeFunction(c::SET_ADD)),
+                    s if s == wk::HAS => return Ok(Value::NativeFunction(c::SET_HAS)),
+                    s if s == wk::DELETE => return Ok(Value::NativeFunction(c::SET_DELETE)),
+                    s if s == wk::CLEAR => return Ok(Value::NativeFunction(c::SET_CLEAR)),
+                    s if s == wk::FOR_EACH => return Ok(Value::NativeFunction(c::SET_FOR_EACH)),
+                    s if s == wk::VALUES => return Ok(Value::NativeFunction(c::SET_VALUES)),
+                    s if s == wk::KEYS => return Ok(Value::NativeFunction(c::SET_KEYS)),
+                    s if s == wk::ENTRIES => return Ok(Value::NativeFunction(c::SET_ENTRIES)),
                     _ => {}
                 }
             }
@@ -536,10 +536,10 @@ impl Interpreter {
                     None => return Ok(Value::Undefined),
                 };
                 match key_str.as_str() {
-                    "get" => return Ok(Value::NativeFunction(c::WEAKMAP_GET)),
-                    "set" => return Ok(Value::NativeFunction(c::WEAKMAP_SET)),
-                    "has" => return Ok(Value::NativeFunction(c::WEAKMAP_HAS)),
-                    "delete" => return Ok(Value::NativeFunction(c::WEAKMAP_DELETE)),
+                    s if s == wk::GET => return Ok(Value::NativeFunction(c::WEAKMAP_GET)),
+                    s if s == wk::SET_PROP => return Ok(Value::NativeFunction(c::WEAKMAP_SET)),
+                    s if s == wk::HAS => return Ok(Value::NativeFunction(c::WEAKMAP_HAS)),
+                    s if s == wk::DELETE => return Ok(Value::NativeFunction(c::WEAKMAP_DELETE)),
                     _ => {}
                 }
             }
@@ -549,9 +549,9 @@ impl Interpreter {
                     None => return Ok(Value::Undefined),
                 };
                 match key_str.as_str() {
-                    "add" => return Ok(Value::NativeFunction(c::WEAKSET_ADD)),
-                    "has" => return Ok(Value::NativeFunction(c::WEAKSET_HAS)),
-                    "delete" => return Ok(Value::NativeFunction(c::WEAKSET_DELETE)),
+                    s if s == wk::ADD => return Ok(Value::NativeFunction(c::WEAKSET_ADD)),
+                    s if s == wk::HAS => return Ok(Value::NativeFunction(c::WEAKSET_HAS)),
+                    s if s == wk::DELETE => return Ok(Value::NativeFunction(c::WEAKSET_DELETE)),
                     _ => {}
                 }
             }
@@ -570,7 +570,7 @@ impl Interpreter {
                             }
                         }
                     }
-                    "byteLength" => {
+                    s if s == wk::BYTE_LENGTH => {
                         if let Value::TypedArray(ta_idx) = this {
                             if let HeapValue::TypedArray(ta) = &self.heap[*ta_idx] {
                                 return Ok(Value::Float(ta.byte_length as f64));
@@ -867,7 +867,7 @@ impl Interpreter {
                 if let HeapValue::Proxy(proxy) = &self.heap[*proxy_idx] {
                     let handler = proxy.handler.clone();
                     let target = proxy.target.clone();
-                    let trap = self.get_property(&handler, &Value::from_string("has".to_string()));
+                    let trap = self.get_property(&handler, &Value::string(wk::HAS));
                     if let Ok(Value::Function(_)) | Ok(Value::NativeFunction(_)) = &trap {
                         let trap_result = self.call_value(&trap?, &handler, &[target, key.clone()]);
                         if let Ok(v) = trap_result {

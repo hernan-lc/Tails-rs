@@ -269,33 +269,9 @@ impl Interpreter {
             }
         }
 
-        let next_fn = self.get_property(&iterator, &Value::from_string("next".to_string()))?;
-        let next_result = self.call_value(&next_fn, &iterator, &[])?;
-        // OPTIMIZATION (Phase 6C): for generator results, extract `done` and
-        // `value` directly from the JsObject properties without re-doing
-        // get_property (which would allocate 2 more strings "done" and
-        // "value" and walk the prototype chain). The native generator
-        // implementation always returns an Object with these two keys.
-        if let Value::Object(obj_idx) = &next_result {
-            if let HeapValue::Object(obj) = &self.heap[*obj_idx] {
-                if let Some(done_val) = obj.properties.get("done") {
-                    if matches!(done_val, Value::Boolean(true)) {
-                        return Ok(ControlFlowOutcome::Jump(target));
-                    }
-                    if let Some(value) = obj.properties.get("value") {
-                        self.stack.push(value.clone());
-                        return Ok(ControlFlowOutcome::Next);
-                    }
-                }
-            }
-        }
-        // Slow path: fall back to the original property-access logic for
-        // custom iterators that don't follow the generator protocol.
-        let done = self.get_property(&next_result, &Value::from_string("done".to_string()))?;
-        match done {
-            Value::Boolean(true) => Ok(ControlFlowOutcome::Jump(target)),
-            _ => {
-                let value = self.get_property(&next_result, &Value::from_string("value".to_string()))?;
+        match self.iterator_next_value(&iterator)? {
+            None => Ok(ControlFlowOutcome::Jump(target)),
+            Some(value) => {
                 self.stack.push(value);
                 Ok(ControlFlowOutcome::Next)
             }
@@ -315,14 +291,9 @@ impl Interpreter {
                 index = iter.index;
                 data_val = iter.data.clone();
             } else {
-                let next_fn = self.get_property(&iterator, &Value::from_string("next".to_string()))?;
-                let next_result = self.call_value(&next_fn, &iterator, &[])?;
-                let done = self.get_property(&next_result, &Value::from_string("done".to_string()))?;
-                match done {
-                    Value::Boolean(true) => return Ok(ControlFlowOutcome::Jump(target)),
-                    _ => {
-                        let value =
-                            self.get_property(&next_result, &Value::from_string("value".to_string()))?;
+                match self.iterator_next_value(&iterator)? {
+                    None => return Ok(ControlFlowOutcome::Jump(target)),
+                    Some(value) => {
                         let awaited_value = Self::resolve_value_promise(&self.heap, &value);
                         self.stack.push(awaited_value);
                         return Ok(ControlFlowOutcome::Next);
@@ -362,13 +333,9 @@ impl Interpreter {
             }
         }
 
-        let next_fn = self.get_property(&iterator, &Value::from_string("next".to_string()))?;
-        let next_result = self.call_value(&next_fn, &iterator, &[])?;
-        let done = self.get_property(&next_result, &Value::from_string("done".to_string()))?;
-        match done {
-            Value::Boolean(true) => Ok(ControlFlowOutcome::Jump(target)),
-            _ => {
-                let value = self.get_property(&next_result, &Value::from_string("value".to_string()))?;
+        match self.iterator_next_value(&iterator)? {
+            None => Ok(ControlFlowOutcome::Jump(target)),
+            Some(value) => {
                 let awaited_value = Self::resolve_value_promise(&self.heap, &value);
                 self.stack.push(awaited_value);
                 Ok(ControlFlowOutcome::Next)
@@ -377,7 +344,9 @@ impl Interpreter {
     }
 
     pub(crate) fn exec_iterator_close(&mut self, iterator: Value) -> Result<()> {
-        if let Ok(return_fn) = self.get_property(&iterator, &Value::from_string("return".to_string())) {
+        if let Ok(return_fn) =
+            self.get_property(&iterator, &Value::string(crate::well_known::RETURN))
+        {
             if matches!(return_fn, Value::Function(_) | Value::NativeFunction(_)) {
                 let _ = self.call_value(&return_fn, &iterator, &[]);
             }

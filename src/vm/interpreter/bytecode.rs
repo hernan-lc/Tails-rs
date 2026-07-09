@@ -284,8 +284,7 @@ impl Interpreter {
                     pc += 1;
                     continue;
                 }
-                // Phase 8.4: Inline MapSet/MapGet. Fast path for the common
-                // 2-arg form pops value/key/map without a temporary args Vec.
+                // Phase 8.4: MapSet/MapGet — shared with ops.rs via collection_ops.
                 Instruction::MapSet(argc) => {
                     if *argc == 2 {
                         let value = self.stack.pop().ok_or_else(|| {
@@ -297,18 +296,7 @@ impl Interpreter {
                         let object = self.stack.pop().ok_or_else(|| {
                             Error::RuntimeError(super::ERR_STACK_UNDERFLOW.into())
                         })?;
-                        if let Value::Map(map_idx) = object {
-                            if let HeapValue::Map(map) = &mut self.heap[map_idx] {
-                                map.set(key, value);
-                            }
-                            self.stack.push(Value::Map(map_idx));
-                        } else {
-                            let method =
-                                self.get_property(&object, &Value::string("set"))?;
-                            let result =
-                                self.call_value(&method, &object, &[key, value])?;
-                            self.stack.push(result);
-                        }
+                        self.exec_map_set(object, key, value)?;
                     } else {
                         let mut args = Vec::with_capacity(usize::from(*argc));
                         for _ in 0..*argc {
@@ -320,19 +308,7 @@ impl Interpreter {
                         let object = self.stack.pop().ok_or_else(|| {
                             Error::RuntimeError(super::ERR_STACK_UNDERFLOW.into())
                         })?;
-                        if let Value::Map(map_idx) = object {
-                            let key = args.first().cloned().unwrap_or(Value::Undefined);
-                            let value = args.get(1).cloned().unwrap_or(Value::Undefined);
-                            if let HeapValue::Map(map) = &mut self.heap[map_idx] {
-                                map.set(key, value);
-                            }
-                            self.stack.push(Value::Map(map_idx));
-                        } else {
-                            let method =
-                                self.get_property(&object, &Value::string("set"))?;
-                            let result = self.call_value(&method, &object, &args)?;
-                            self.stack.push(result);
-                        }
+                        self.exec_map_set_args(object, &args)?;
                     }
                     pc += 1;
                     continue;
@@ -344,18 +320,7 @@ impl Interpreter {
                     let object = self.stack.pop().ok_or_else(|| {
                         Error::RuntimeError(super::ERR_STACK_UNDERFLOW.into())
                     })?;
-                    if let Value::Map(map_idx) = object {
-                        let result = if let HeapValue::Map(map) = &self.heap[map_idx] {
-                            map.get(&key).cloned().unwrap_or(Value::Undefined)
-                        } else {
-                            Value::Undefined
-                        };
-                        self.stack.push(result);
-                    } else {
-                        let method = self.get_property(&object, &Value::string("get"))?;
-                        let result = self.call_value(&method, &object, &[key])?;
-                        self.stack.push(result);
-                    }
+                    self.exec_map_get(object, key)?;
                     pc += 1;
                     continue;
                 }

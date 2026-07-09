@@ -25,7 +25,9 @@ impl AsyncRuntime {
         Self {
             // Pre-size so the first burst of promise resolutions does not
             // reallocate the queue buffer.
-            microtask_queue: VecDeque::with_capacity(64),
+            microtask_queue: VecDeque::with_capacity(
+                crate::well_known::MICROTASK_QUEUE_INITIAL_CAP,
+            ),
             macrotask_queue: VecDeque::new(),
             next_timer_id: 1,
         }
@@ -107,7 +109,7 @@ impl AsyncRuntime {
         }
         std::mem::replace(
             &mut self.microtask_queue,
-            VecDeque::with_capacity(32),
+            VecDeque::with_capacity(crate::well_known::MICROTASK_QUEUE_INITIAL_CAP / 2),
         )
     }
 
