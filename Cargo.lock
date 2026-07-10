@@ -1949,6 +1949,7 @@ dependencies = [
 name = "tails-abi"
 version = "0.1.0"
 dependencies = [
+ "libc",
  "libloading",
  "once_cell",
  "serde",

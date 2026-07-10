@@ -103,6 +103,9 @@ fn discover_imports(script_path: &Path) -> Vec<PathBuf> {
 }
 
 fn run_script(script_path: &Path) -> Result<()> {
+    // Ensure the shared handle registry symbols are preserved and exported.
+    let _ = tails_abi::tails_abi_get_shared_registry();
+
     // So Ctrl+C / SIGTERM stop the event loop cleanly (normal exit code)
     // instead of an uncaught signal that shells report as "terminated by SIGTERM".
     tails::runtime_env::native_fns::process_fns::install_signal_handlers();

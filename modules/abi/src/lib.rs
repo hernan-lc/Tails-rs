@@ -182,32 +182,91 @@ pub fn free_string(val: NativeValue) {
 // Handle Registry — zero-copy passing of complex values (objects/arrays)
 // ============================================================================
 
-static HANDLE_COUNTER: AtomicU64 = AtomicU64::new(1);
+type RegistryType = Mutex<HashMap<u64, simd_json::OwnedValue>>;
 
-pub static HANDLE_REGISTRY: Lazy<Mutex<HashMap<u64, simd_json::OwnedValue>>> =
-    Lazy::new(|| Mutex::new(HashMap::new()));
+static LOCAL_REGISTRY: Lazy<RegistryType> = Lazy::new(|| Mutex::new(HashMap::new()));
+
+static mut SHARED_REGISTRY: *const RegistryType = std::ptr::null();
+
+static LOCAL_HANDLE_COUNTER: AtomicU64 = AtomicU64::new(1);
+
+static mut SHARED_COUNTER_PTR: *const AtomicU64 = std::ptr::null();
+
+#[no_mangle]
+pub extern "C" fn tails_abi_get_shared_registry() -> *const std::ffi::c_void {
+    unsafe {
+        if SHARED_REGISTRY.is_null() {
+            SHARED_REGISTRY = &*LOCAL_REGISTRY as *const RegistryType;
+        }
+        SHARED_REGISTRY as *const std::ffi::c_void
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn tails_abi_set_shared_registry(ptr: *const std::ffi::c_void) {
+    unsafe {
+        SHARED_REGISTRY = ptr as *const RegistryType;
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn tails_abi_get_shared_counter_ptr() -> *const std::ffi::c_void {
+    &LOCAL_HANDLE_COUNTER as *const AtomicU64 as *const std::ffi::c_void
+}
+
+#[no_mangle]
+pub extern "C" fn tails_abi_set_shared_counter(ptr: *const std::ffi::c_void) {
+    unsafe {
+        SHARED_COUNTER_PTR = ptr as *const AtomicU64;
+    }
+}
+
+pub fn tails_abi_get_next_handle_id() -> u64 {
+    unsafe {
+        if !SHARED_COUNTER_PTR.is_null() {
+            (*SHARED_COUNTER_PTR).fetch_add(1, Ordering::Relaxed)
+        } else {
+            LOCAL_HANDLE_COUNTER.fetch_add(1, Ordering::Relaxed)
+        }
+    }
+}
+
+pub(crate) fn resolve_shared_registry() -> &'static RegistryType {
+    unsafe {
+        if !SHARED_REGISTRY.is_null() {
+            &*SHARED_REGISTRY
+        } else {
+            SHARED_REGISTRY = &*LOCAL_REGISTRY as *const RegistryType;
+            &*SHARED_REGISTRY
+        }
+    }
+}
 
 pub fn store_handle(value: simd_json::OwnedValue) -> NativeValue {
-    let id = HANDLE_COUNTER.fetch_add(1, Ordering::Relaxed);
-    HANDLE_REGISTRY.lock().unwrap().insert(id, value);
+    let id = tails_abi_get_next_handle_id();
+    let tag = match &value {
+        simd_json::OwnedValue::Array(_) => TAG_ARRAY,
+        _ => TAG_OBJECT,
+    };
+    resolve_shared_registry().lock().unwrap().insert(id, value);
     NativeValue {
-        tag: TAG_OBJECT,
+        tag,
         data: id,
     }
 }
 
 pub fn get_handle(id: u64) -> Option<simd_json::OwnedValue> {
-    HANDLE_REGISTRY.lock().unwrap().get(&id).cloned()
+    resolve_shared_registry().lock().unwrap().get(&id).cloned()
 }
 
 pub fn take_handle(id: u64) -> Option<simd_json::OwnedValue> {
-    HANDLE_REGISTRY.lock().unwrap().remove(&id)
+    resolve_shared_registry().lock().unwrap().remove(&id)
 }
 
 pub fn peek_handle(
     id: u64,
 ) -> Option<std::sync::MutexGuard<'static, HashMap<u64, simd_json::OwnedValue>>> {
-    let guard = HANDLE_REGISTRY.lock().unwrap();
+    let guard = resolve_shared_registry().lock().unwrap();
     if guard.contains_key(&id) {
         Some(guard)
     } else {
@@ -216,7 +275,7 @@ pub fn peek_handle(
 }
 
 pub fn free_handle(id: u64) {
-    HANDLE_REGISTRY.lock().unwrap().remove(&id);
+    resolve_shared_registry().lock().unwrap().remove(&id);
 }
 
 pub fn object_new() -> NativeValue {

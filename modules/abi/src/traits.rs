@@ -193,25 +193,75 @@ impl<T: FromNativeValue> FromNativeValue for Option<T> {
 
 impl<T: ToNativeValue> ToNativeValue for Vec<T> {
     fn to_native_value(&self) -> Result<NativeValue, String> {
-        Ok(crate::array_new())
+        let mut arr = Vec::with_capacity(self.len());
+        for item in self {
+            let nv = item.to_native_value()?;
+            let ov = OwnedValue::from_native_value(nv)?;
+            arr.push(ov);
+        }
+        let sv = OwnedValue::Array(Box::new(arr));
+        Ok(crate::store_handle(sv))
     }
 }
 
 impl<T: FromNativeValue> FromNativeValue for Vec<T> {
-    fn from_native_value(_val: NativeValue) -> Result<Self, String> {
-        Ok(Vec::new())
+    fn from_native_value(val: NativeValue) -> Result<Self, String> {
+        match val.tag {
+            crate::TAG_ARRAY | crate::TAG_OBJECT => {
+                if val.data != 0 {
+                    if let Some(simd_json::OwnedValue::Array(arr)) = crate::get_handle(val.data) {
+                        let mut res = Vec::with_capacity(arr.len());
+                        for item in arr.iter() {
+                            let nv = item.to_native_value()?;
+                            res.push(T::from_native_value(nv)?);
+                        }
+                        Ok(res)
+                    } else {
+                        Ok(Vec::new())
+                    }
+                } else {
+                    Ok(Vec::new())
+                }
+            }
+            _ => Ok(Vec::new()),
+        }
     }
 }
 
 impl<T: ToNativeValue> ToNativeValue for HashMap<String, T> {
     fn to_native_value(&self) -> Result<NativeValue, String> {
-        Ok(crate::object_new())
+        let mut obj = simd_json::value::owned::Object::new();
+        for (k, v) in self {
+            let nv = v.to_native_value()?;
+            let ov = OwnedValue::from_native_value(nv)?;
+            obj.insert(k.clone(), ov);
+        }
+        let sv = OwnedValue::Object(Box::new(obj));
+        Ok(crate::store_handle(sv))
     }
 }
 
 impl<T: FromNativeValue> FromNativeValue for HashMap<String, T> {
-    fn from_native_value(_val: NativeValue) -> Result<Self, String> {
-        Ok(HashMap::new())
+    fn from_native_value(val: NativeValue) -> Result<Self, String> {
+        match val.tag {
+            crate::TAG_OBJECT | crate::TAG_ARRAY => {
+                if val.data != 0 {
+                    if let Some(simd_json::OwnedValue::Object(obj)) = crate::get_handle(val.data) {
+                        let mut res = HashMap::with_capacity(obj.len());
+                        for (k, v) in obj.iter() {
+                            let nv = v.to_native_value()?;
+                            res.insert(k.clone(), T::from_native_value(nv)?);
+                        }
+                        Ok(res)
+                    } else {
+                        Ok(HashMap::new())
+                    }
+                } else {
+                    Ok(HashMap::new())
+                }
+            }
+            _ => Ok(HashMap::new()),
+        }
     }
 }
 
@@ -299,15 +349,19 @@ impl FromNativeValue for OwnedValue {
                             eprintln!(
                                 "[abi-debug] handle {} not found, registry size={}",
                                 val.data,
-                                crate::HANDLE_REGISTRY.lock().unwrap().len()
+                                crate::resolve_shared_registry().lock().unwrap().len()
                             );
                             Ok(OwnedValue::Static(simd_json::StaticNode::Null))
                         }
                     }
                 } else {
-                    Ok(OwnedValue::Object(Box::new(
-                        simd_json::value::owned::Object::new(),
-                    )))
+                    if val.tag == crate::TAG_ARRAY {
+                        Ok(OwnedValue::Array(Box::new(Vec::new())))
+                    } else {
+                        Ok(OwnedValue::Object(Box::new(
+                            simd_json::value::owned::Object::new(),
+                        )))
+                    }
                 }
             }
             _ => Ok(OwnedValue::Static(simd_json::StaticNode::Null)),

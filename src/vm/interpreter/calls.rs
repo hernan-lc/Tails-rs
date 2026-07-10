@@ -312,8 +312,8 @@ impl Interpreter {
                         let s = tails_abi::get_string(result);
                         Ok(Value::from_string(s))
                     }
-                    5 => {
-                        // Native object - create NativeObject value with the ID
+                    5 | 6 => {
+                        // Native object or array - create NativeObject value with the ID
                         let obj_id = result.data as u32;
 
                         // Look up class methods from the registry

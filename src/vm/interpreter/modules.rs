@@ -13,6 +13,20 @@ use crate::well_known as wk;
 impl Interpreter {
     fn load_native_library(&mut self, lib_path: &Path) -> Option<FxHashMap<String, Value>> {
         let library = SafeLibrary::new(lib_path).ok()?;
+
+        // Dynamically initialize shared registry and shared counter pointer inside the loaded library
+        type SetSharedFn = extern "C" fn(*const std::ffi::c_void);
+        unsafe {
+            if let Ok(f) = library.get_function::<SetSharedFn>("tails_abi_set_shared_registry") {
+                let host_ptr = tails_abi::tails_abi_get_shared_registry();
+                f(host_ptr);
+            }
+            if let Ok(f) = library.get_function::<SetSharedFn>("tails_abi_set_shared_counter") {
+                let host_counter_ptr = tails_abi::tails_abi_get_shared_counter_ptr();
+                f(host_counter_ptr);
+            }
+        }
+
         let mut props = FxHashMap::default();
 
         type InitFn = fn() -> *mut tails_abi::ModuleHandle;
@@ -746,7 +760,11 @@ impl Interpreter {
                 let val = if let Some(v) = exports.get("default") {
                     v.clone()
                 } else if !exports.is_empty() {
-                    self.build_module_object_from_exports(&exports)
+                    let prev_path = self.current_module_path.take();
+                    self.current_module_path = Some(module_path.clone());
+                    let module_obj = self.build_module_object_from_exports(&exports);
+                    self.current_module_path = prev_path;
+                    module_obj
                 } else {
                     Value::Undefined
                 };
@@ -793,10 +811,13 @@ impl Interpreter {
                     .get(&module_path)
                     .cloned()
                     .unwrap_or_default();
+                let prev_path = self.current_module_path.take();
+                self.current_module_path = Some(module_path.clone());
                 let val = exports
                     .get("default")
                     .cloned()
                     .unwrap_or_else(|| self.build_module_object_from_exports(&exports));
+                self.current_module_path = prev_path;
                 self.set_global(local_name, val);
                 Ok(Value::Undefined)
             }
