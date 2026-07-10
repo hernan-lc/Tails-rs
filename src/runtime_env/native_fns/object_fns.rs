@@ -204,12 +204,11 @@ pub(super) fn native_object_values(
             }
         }
         Value::Function(idx) => {
-            let keys =
-                if let crate::vm::interpreter::HeapValue::Function(f) = &interp.heap[*idx] {
-                    collect_own_enumerable_keys(&f.properties)
-                } else {
-                    Vec::new()
-                };
+            let keys = if let crate::vm::interpreter::HeapValue::Function(f) = &interp.heap[*idx] {
+                collect_own_enumerable_keys(&f.properties)
+            } else {
+                Vec::new()
+            };
             let mut vals = Vec::with_capacity(keys.len());
             for k in keys {
                 let v = interp
@@ -263,12 +262,11 @@ pub(super) fn native_object_entries(
             }
         }
         Value::Function(idx) => {
-            let keys =
-                if let crate::vm::interpreter::HeapValue::Function(f) = &interp.heap[*idx] {
-                    collect_own_enumerable_keys(&f.properties)
-                } else {
-                    Vec::new()
-                };
+            let keys = if let crate::vm::interpreter::HeapValue::Function(f) = &interp.heap[*idx] {
+                collect_own_enumerable_keys(&f.properties)
+            } else {
+                Vec::new()
+            };
             let mut pairs = Vec::with_capacity(keys.len());
             for k in keys {
                 let v = interp
@@ -312,16 +310,10 @@ pub(super) fn native_object_assign(
     for src in &args[1..] {
         let cloned: Vec<(String, Value)> = match src {
             Value::Object(src_idx) => {
-                if let crate::vm::interpreter::HeapValue::Object(src_obj) = &interp.heap[*src_idx]
-                {
+                if let crate::vm::interpreter::HeapValue::Object(src_obj) = &interp.heap[*src_idx] {
                     collect_own_enumerable_keys(&src_obj.properties)
                         .into_iter()
-                        .filter_map(|k| {
-                            src_obj
-                                .properties
-                                .get(&k)
-                                .map(|v| (k, v.clone()))
-                        })
+                        .filter_map(|k| src_obj.properties.get(&k).map(|v| (k, v.clone())))
                         .collect()
                 } else {
                     Vec::new()

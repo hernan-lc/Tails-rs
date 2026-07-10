@@ -179,14 +179,8 @@ fn pretty_format_inner(
                     (Vec::new(), false)
                 };
 
-            let body = format_props_block(
-                interp,
-                &props,
-                depth,
-                use_colors,
-                include_quotes,
-                ancestors,
-            );
+            let body =
+                format_props_block(interp, &props, depth, use_colors, include_quotes, ancestors);
             let result = if is_null_proto && body != "{}" {
                 format!("[Object: null prototype] {}", body)
             } else if is_null_proto {
@@ -206,13 +200,12 @@ fn pretty_format_inner(
                     "[Circular]".to_string()
                 };
             }
-            let elems = if let crate::vm::interpreter::HeapValue::Array(arr) =
-                &interp.heap[*arr_idx]
-            {
-                arr.elements.clone()
-            } else {
-                Vec::new()
-            };
+            let elems =
+                if let crate::vm::interpreter::HeapValue::Array(arr) = &interp.heap[*arr_idx] {
+                    arr.elements.clone()
+                } else {
+                    Vec::new()
+                };
             let result = if elems.is_empty() {
                 "[]".to_string()
             } else {

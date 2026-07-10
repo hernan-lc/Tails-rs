@@ -105,6 +105,9 @@ mod http_fns {
         native_http_res_write_head,
         native_http_res_write,
         native_http_res_end,
+        native_http_res_set_header,
+        native_http_res_get_header,
+        native_http_res_remove_header,
     );
 }
 #[cfg(feature = "net")]
@@ -195,6 +198,7 @@ pub mod process_fns {
         native_process_uptime,
         native_process_memory_usage,
         native_process_on,
+        native_tty_isatty,
     );
 
     #[inline]

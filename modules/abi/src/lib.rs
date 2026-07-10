@@ -249,10 +249,7 @@ pub fn store_handle(value: simd_json::OwnedValue) -> NativeValue {
         _ => TAG_OBJECT,
     };
     resolve_shared_registry().lock().unwrap().insert(id, value);
-    NativeValue {
-        tag,
-        data: id,
-    }
+    NativeValue { tag, data: id }
 }
 
 pub fn get_handle(id: u64) -> Option<simd_json::OwnedValue> {

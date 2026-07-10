@@ -58,9 +58,7 @@ impl CodeGenerator {
                 rest_param,
             } => {
                 // Prefer explicit name; fall back to ES name inference from binding.
-                let inferred = name
-                    .clone()
-                    .or_else(|| self.inferred_function_name.take());
+                let inferred = name.clone().or_else(|| self.inferred_function_name.take());
                 self.generate_function_expression(
                     inferred,
                     params,
