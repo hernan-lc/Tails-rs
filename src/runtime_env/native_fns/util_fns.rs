@@ -266,11 +266,7 @@ fn inspect_value(interp: &Interpreter, value: &Value, depth: usize, indent: usiz
                             && *k != "__[[Prototype]]__"
                             && *k != "constructor"
                     })
-                    .filter_map(|k| {
-                        f.properties
-                            .get(k)
-                            .map(|v| (k.to_string(), v.clone()))
-                    })
+                    .filter_map(|k| f.properties.get(k).map(|v| (k.to_string(), v.clone())))
                     .collect();
                 if items_src.is_empty() {
                     tag

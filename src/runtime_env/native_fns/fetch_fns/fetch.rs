@@ -95,11 +95,13 @@ pub(crate) fn native_fetch(
 
     // Register a source the event loop polls; it resolves the promise once the
     // worker's result arrives.
-    interp.pending_event_sources.push(Box::new(FetchEventSource {
-        rx,
-        promise_idx,
-        done: false,
-    }));
+    interp
+        .pending_event_sources
+        .push(Box::new(FetchEventSource {
+            rx,
+            promise_idx,
+            done: false,
+        }));
 
     Ok(Value::Promise(promise_idx))
 }
@@ -246,9 +248,7 @@ fn do_fetch_blocking(
         req = req.body(body_str);
     }
 
-    let response = req
-        .send()
-        .map_err(|e| format!("fetch failed: {}", e))?;
+    let response = req.send().map_err(|e| format!("fetch failed: {}", e))?;
 
     let status = response.status().as_u16();
     let status_text = response
@@ -303,7 +303,9 @@ impl EventSource for FetchEventSource {
                     &raw.headers_raw,
                 ) {
                     Ok(response_value) => interp.resolve_promise(self.promise_idx, response_value),
-                    Err(e) => interp.reject_promise(self.promise_idx, Value::from_string(e.to_string())),
+                    Err(e) => {
+                        interp.reject_promise(self.promise_idx, Value::from_string(e.to_string()))
+                    }
                 }
                 self.done = true;
             }
@@ -319,7 +321,9 @@ impl EventSource for FetchEventSource {
                 if !self.done {
                     interp.reject_promise(
                         self.promise_idx,
-                        Value::from_string("fetch failed: worker thread terminated unexpectedly".to_string()),
+                        Value::from_string(
+                            "fetch failed: worker thread terminated unexpectedly".to_string(),
+                        ),
                     );
                     self.done = true;
                 }

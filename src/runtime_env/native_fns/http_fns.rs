@@ -483,9 +483,7 @@ fn handle_one_request(
 
     // --- invoke handler(req, res) ---
     let handler_ret = if !matches!(handler, Value::Undefined) {
-        Some(
-            interp.call_value(&handler, &Value::Undefined, &[req_val, res_val])?,
-        )
+        Some(interp.call_value(&handler, &Value::Undefined, &[req_val, res_val])?)
     } else {
         None
     };
@@ -519,7 +517,7 @@ fn handle_one_request(
 fn write_response_from_res(
     interp: &mut Interpreter,
     res_idx: usize,
-    mut stream: &mut std::net::TcpStream,
+    stream: &mut std::net::TcpStream,
 ) -> Result<()> {
     let (status, headers, body) = if let HeapValue::Object(obj) = &interp.heap[res_idx] {
         let st = obj
@@ -567,7 +565,7 @@ fn write_response_from_res(
     };
 
     tails_http::write_response(
-        &mut stream,
+        stream,
         status,
         tails_http::status_text(status),
         &headers,

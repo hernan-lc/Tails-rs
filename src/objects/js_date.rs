@@ -335,7 +335,11 @@ impl JsDate {
         if !self.is_valid() {
             return "Invalid Date".to_string();
         }
-        format!("{} {}", self.to_locale_date_string(), self.to_locale_time_string())
+        format!(
+            "{} {}",
+            self.to_locale_date_string(),
+            self.to_locale_time_string()
+        )
     }
 }
 

@@ -278,8 +278,7 @@ impl TailsRuntime {
                 .async_runtime
                 .next_timer_delay_ms()
                 .unwrap_or(50)
-                .min(50)
-                .max(1);
+                .clamp(1, 50);
             std::thread::sleep(std::time::Duration::from_millis(sleep_ms));
         }
 

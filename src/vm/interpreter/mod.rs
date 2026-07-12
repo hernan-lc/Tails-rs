@@ -306,8 +306,7 @@ impl Interpreter {
             {
                 use std::io::Write;
                 if crate::runtime_env::native_fns::process_fns::exit_requested() {
-                    let code =
-                        crate::runtime_env::native_fns::process_fns::take_exit_code();
+                    let code = crate::runtime_env::native_fns::process_fns::take_exit_code();
                     let _ = std::io::stdout().flush();
                     let _ = std::io::stderr().flush();
                     std::process::exit(code);
@@ -322,9 +321,7 @@ impl Interpreter {
             // timer (e.g. `setInterval`) would keep this loop alive forever and
             // `run_event_loop` would never run, so the server would never accept
             // connections and in-process `fetch` would never resolve.
-            if !any_resumed
-                && self.suspended_frames.is_empty()
-                && self.async_runtime.is_idle()
+            if !any_resumed && self.suspended_frames.is_empty() && self.async_runtime.is_idle()
                 || !self.pending_event_sources.is_empty()
             {
                 break;
@@ -336,8 +333,7 @@ impl Interpreter {
                 .async_runtime
                 .next_timer_delay_ms()
                 .unwrap_or(200)
-                .min(50)
-                .max(1);
+                .clamp(1, 50);
             std::thread::sleep(std::time::Duration::from_millis(sleep_ms));
         }
 
