@@ -415,6 +415,22 @@ impl Interpreter {
         }
         let source_code = std::fs::read_to_string(&module_path)
             .map_err(|e| Error::RuntimeError(format!("Cannot read module '{}': {}", source, e)))?;
+        // ESM `import` of a CommonJS module (e.g. `import x from '../index.js'`
+        // inside an ESM file, where index.js is CJS) must run through the
+        // `require` path so that `module.exports` is captured into the registry.
+        // The ESM loader below only captures `export` statements and would
+        // otherwise expose nothing, breaking `cjsModule.configure` style reads.
+        if Self::is_cjs_source(&module_path, &source_code) {
+            // Pass the original (relative) specifier so `require` resolves it
+            // against the importing module's directory, rather than the already
+            // joined path which `require`'s resolution mishandles.
+            crate::runtime_env::native_fns::require_fns::native_require(
+                self,
+                &Value::Undefined,
+                &[Value::from_string(source.to_string())],
+            )?;
+            return Ok(Some(module_path));
+        }
         let mut tokens = crate::compiler::lexer::tokenize(&source_code)?;
         let ast = crate::compiler::parser::parse(&mut tokens)?;
         let compiled = crate::compiler::bytecode::generate(&ast)?;
@@ -692,6 +708,52 @@ impl Interpreter {
             extensible: true,
         }));
         Value::Object(heap_idx)
+    }
+
+    /// Decide whether a `.js` file is CommonJS rather than ESM. A module is
+    /// ESM when it contains `import`/`export` statements (or the package
+    /// declares `"type": "module"`). Otherwise—when it relies on
+    /// `module.exports`/`require`—it must be loaded through the CJS `require`
+    /// path so its exports are captured into the registry.
+    fn is_cjs_source(path: &str, source: &str) -> bool {
+        // `.cjs` is always CommonJS; `.mjs` is always ESM.
+        if path.ends_with(".cjs") {
+            return true;
+        }
+        if path.ends_with(".mjs") {
+            return false;
+        }
+        // Respect package.json `"type": "module"` for `.js` files.
+        let mut dir = std::path::Path::new(path);
+        for _ in 0..6 {
+            dir = match dir.parent() {
+                Some(d) => d,
+                None => break,
+            };
+            let pkg = dir.join("package.json");
+            if let Ok(text) = std::fs::read_to_string(&pkg) {
+                if let Ok(json) = serde_json::from_str::<serde_json::Value>(&text) {
+                    if let Some(t) = json.get("type").and_then(|v| v.as_str()) {
+                        return t != "module";
+                    }
+                }
+                break;
+            }
+        }
+        // Heuristic: presence of top-level `import`/`export` statements marks ESM.
+        // Scan only a prefix to stay cheap; this catches the common cases.
+        let mut saw_export = false;
+        let mut saw_import = false;
+        for line in source.lines().take(200) {
+            let trimmed = line.trim_start();
+            if trimmed.starts_with("export ") || trimmed.starts_with("export{") {
+                saw_export = true;
+            }
+            if trimmed.starts_with("import ") {
+                saw_import = true;
+            }
+        }
+        !(saw_export || saw_import)
     }
 
     pub(crate) fn build_error_promise(&mut self, message: String) -> Value {

@@ -9,7 +9,7 @@ use rustc_hash::FxHashMap;
 /// Resolves the module path, checks the cache, reads the source,
 /// compiles it, executes it with module/exports/require injected,
 /// and returns module.exports.
-pub(super) fn native_require(
+pub(crate) fn native_require(
     interp: &mut Interpreter,
     _this: &Value,
     args: &[Value],

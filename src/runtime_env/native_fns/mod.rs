@@ -219,7 +219,7 @@ mod proxy_fns;
 mod querystring_fns;
 mod reflect_fns;
 mod regexp_fns;
-mod require_fns;
+pub(crate) mod require_fns;
 mod stream_fns;
 mod string_fns;
 mod symbol_fns;
