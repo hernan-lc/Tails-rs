@@ -111,12 +111,23 @@ impl<'a> Parser<'a> {
                             body,
                             is_static,
                             is_async,
+                            computed: None,
                         });
                     }
                 } else {
                     self.advance();
-                    let name = match self.advance().token {
-                        Token::Identifier(name) => name,
+                    let (name, computed) = match self.advance().token {
+                        Token::Identifier(name) => (name, None),
+                        Token::String(name) => (name, None),
+                        Token::Number(n) => (n.to_string(), None),
+                        t if token_keyword_string(&t).is_some() => {
+                            (token_keyword_string(&t).unwrap(), None)
+                        }
+                        Token::LeftBracket => {
+                            let key_expr = self.parse_expression()?.inner;
+                            self.expect(&Token::RightBracket)?;
+                            ("".to_string(), Some(key_expr))
+                        }
                         t => {
                             return Err(Error::ParseError(format!(
                                 "Expected property name after 'get', got {:?}",
@@ -140,6 +151,7 @@ impl<'a> Parser<'a> {
                         return_type,
                         body,
                         is_static,
+                        computed,
                     });
                 }
             } else if self.peek().token == Token::Set && !is_async {
@@ -172,12 +184,23 @@ impl<'a> Parser<'a> {
                             body,
                             is_static,
                             is_async,
+                            computed: None,
                         });
                     }
                 } else {
                     self.advance();
-                    let name = match self.advance().token {
-                        Token::Identifier(name) => name,
+                    let (name, computed) = match self.advance().token {
+                        Token::Identifier(name) => (name, None),
+                        Token::String(name) => (name, None),
+                        Token::Number(n) => (n.to_string(), None),
+                        t if token_keyword_string(&t).is_some() => {
+                            (token_keyword_string(&t).unwrap(), None)
+                        }
+                        Token::LeftBracket => {
+                            let key_expr = self.parse_expression()?.inner;
+                            self.expect(&Token::RightBracket)?;
+                            ("".to_string(), Some(key_expr))
+                        }
                         t => {
                             return Err(Error::ParseError(format!(
                                 "Expected property name after 'set', got {:?}",
@@ -218,13 +241,25 @@ impl<'a> Parser<'a> {
                         param_type,
                         body,
                         is_static,
+                        computed,
                     });
                 }
             } else {
-                let name = match self.advance().token {
-                    Token::Identifier(name) => name,
-                    Token::String(name) => name,
-                    Token::Number(n) => n.to_string(),
+                let (name, computed) = match self.advance().token {
+                    Token::Identifier(name) => (name, None),
+                    Token::String(name) => (name, None),
+                    Token::Number(n) => (n.to_string(), None),
+                    // Contextual/keyword member names (e.g. `static from (...) {}`,
+                    // `delete () {}`). Any keyword whose textual form is a valid
+                    // property name is accepted here.
+                    t if token_keyword_string(&t).is_some() => {
+                        (token_keyword_string(&t).unwrap(), None)
+                    }
+                    Token::LeftBracket => {
+                        let key_expr = self.parse_expression()?.inner;
+                        self.expect(&Token::RightBracket)?;
+                        ("".to_string(), Some(key_expr))
+                    }
                     t => {
                         return Err(Error::ParseError(format!(
                             "Expected method name, got {:?}",
@@ -269,6 +304,7 @@ impl<'a> Parser<'a> {
                             body,
                             is_static,
                             is_async,
+                            computed,
                         });
                     }
                 } else {
@@ -286,6 +322,7 @@ impl<'a> Parser<'a> {
                         name,
                         is_static,
                         init,
+                        computed,
                     });
                     if self.peek().token == Token::Semicolon {
                         self.advance();

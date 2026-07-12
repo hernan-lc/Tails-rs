@@ -445,6 +445,7 @@ fn collect_identifiers_expr(expr: &Expression, out: &mut Vec<String>) {
         Expression::TypeAssertion { expression, .. } => {
             collect_identifiers_expr(expression, out);
         }
+        Expression::MetaProperty { .. } => {}
         _ => {}
     }
 }

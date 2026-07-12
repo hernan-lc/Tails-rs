@@ -163,6 +163,22 @@ impl<'a> Parser<'a> {
 
     pub(crate) fn parse_new_expression(&mut self) -> Result<SpannedNode<Expression>> {
         self.expect(&Token::New)?;
+        if self.peek().token == Token::Dot {
+            self.advance();
+            if let Token::Identifier(name) = &self.peek().token {
+                if name == "target" {
+                    self.advance();
+                    return Ok(self.spanned(Expression::MetaProperty {
+                        meta: "new".to_string(),
+                        property: "target".to_string(),
+                    }));
+                }
+            }
+            return Err(Error::ParseError(format!(
+                "Unexpected member after 'new', got {:?}",
+                self.peek().token
+            )));
+        }
         let callee = self.parse_new_target()?;
         if self.peek().token == Token::Less {
             self.advance();

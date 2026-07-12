@@ -138,6 +138,7 @@ pub(super) fn native_reflect_construct(
                 func_heap_idx: Some(*func_idx),
                 this_value: Some(this_val.clone()),
                 is_construct: true,
+                new_target: args.get(2).cloned().or(Some(target.clone())),
                 source_name: None,
                 generator_heap_idx: None,
                 source_line: None,

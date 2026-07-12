@@ -233,6 +233,7 @@ impl TypeChecker {
                 self.check_expression(expression)?;
                 self.resolve_annotation(type_annotation)
             }
+            Expression::MetaProperty { .. } => Ok(Type::Any),
             Expression::ConditionalExpression {
                 test,
                 consequent,

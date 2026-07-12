@@ -197,11 +197,16 @@ pub enum ClassMember {
         body: Vec<SpannedNode<Statement>>,
         is_static: bool,
         is_async: bool,
+        /// Computed member name (e.g. `[Symbol.iterator]() {}`). `None` for
+        /// ordinary string/number/identifier names.
+        computed: Option<Expression>,
     },
     Property {
         name: String,
         is_static: bool,
         init: Option<Expression>,
+        /// Computed member name (e.g. `[key] = value`). `None` for ordinary names.
+        computed: Option<Expression>,
     },
     Constructor {
         params: Vec<ConstructorParam>,
@@ -212,6 +217,8 @@ pub enum ClassMember {
         return_type: Option<TypeAnnotation>,
         body: Vec<SpannedNode<Statement>>,
         is_static: bool,
+        /// Computed member name (e.g. `get [Symbol.iterator]() {}`).
+        computed: Option<Expression>,
     },
     Setter {
         name: String,
@@ -219,6 +226,8 @@ pub enum ClassMember {
         param_type: Option<TypeAnnotation>,
         body: Vec<SpannedNode<Statement>>,
         is_static: bool,
+        /// Computed member name (e.g. `set [Symbol.iterator](v) {}`).
+        computed: Option<Expression>,
     },
 }
 
@@ -401,6 +410,10 @@ pub enum Expression {
     TypeAssertion {
         expression: Box<Expression>,
         type_annotation: TypeAnnotation,
+    },
+    MetaProperty {
+        meta: String,
+        property: String,
     },
 }
 

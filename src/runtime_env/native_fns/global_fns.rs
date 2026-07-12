@@ -1,8 +1,12 @@
 use crate::errors::Result;
 use crate::objects::Value;
-use crate::vm::interpreter::Interpreter;
+use crate::props;
+use crate::vm::interpreter::{HeapValue, Interpreter, JsFunction, JsObject, PropertyStorage};
+use std::cell::RefCell;
+use std::rc::Rc;
 
 use super::helpers::{to_f64, to_i64, to_string_value};
+
 
 pub(super) fn native_parse_int(
     _interp: &mut Interpreter,
@@ -342,4 +346,90 @@ pub(super) fn native_eval(
     let compiler = crate::compiler::Compiler::new(false);
     let compiled = compiler.compile(&source)?;
     interp.execute(&compiled)
+}
+
+/// `diagnostics_channel.channel(name)` — returns a channel object. Since the
+/// runtime has no subscribers, `hasSubscribers` is `false` and `publish` is a
+/// no-op, which is all fastify requires for its initialization channel.
+pub(super) fn native_diagnostics_channel_channel(
+    interp: &mut Interpreter,
+    _this: &Value,
+    _args: &[Value],
+) -> Result<Value> {
+    Ok(make_channel_object(interp))
+}
+
+/// `diagnostics_channel.tracingChannel(name)` — returns the standard set of
+/// tracing sub-channels (`start`, `end`, `asyncStart`, `asyncEnd`, `error`),
+/// each a no-op channel object.
+pub(super) fn native_diagnostics_channel_tracing_channel(
+    interp: &mut Interpreter,
+    _this: &Value,
+    _args: &[Value],
+) -> Result<Value> {
+    let start = make_channel_object(interp);
+    let end = make_channel_object(interp);
+    let async_start = make_channel_object(interp);
+    let async_end = make_channel_object(interp);
+    let error = make_channel_object(interp);
+    let channel_idx = interp.gc.allocate(
+        &mut interp.heap,
+        HeapValue::Object(JsObject {
+            properties: props! {
+                "start" => start,
+                "end" => end,
+                "asyncStart" => async_start,
+                "asyncEnd" => async_end,
+                "error" => error,
+            },
+            prototype: None,
+            extensible: true,
+        }),
+    );
+    Ok(Value::Object(channel_idx))
+}
+
+/// Build a no-op channel object: `publish` is a function that does nothing,
+/// `hasSubscribers` is `false`, and `subscribe`/`unsubscribe` are no-ops.
+fn make_channel_object(interp: &mut Interpreter) -> Value {
+    let publish_idx = interp.gc.allocate(
+        &mut interp.heap,
+        HeapValue::Function(JsFunction {
+            name: Some("publish".to_string()),
+            params: vec!["message".to_string()],
+            rest_param: None,
+            bytecode_index: usize::MAX,
+            local_count: 0,
+            closure: Rc::new(RefCell::new(Vec::new())),
+            prototype: None,
+            super_class: None,
+            properties: PropertyStorage::new(),
+            owner_module: interp.current_module.clone(),
+            module_scope: None,
+            is_generator: false,
+            source_file: interp.current_module_path.clone(),
+            source_line: None,
+            is_arrow: false,
+            captured_this: None,
+            capture_slots: Vec::new(),
+        }),
+    );
+    let channel_idx = interp.gc.allocate(
+        &mut interp.heap,
+        HeapValue::Object(JsObject {
+            properties: props! {
+                "publish" => Value::Function(publish_idx),
+                "hasSubscribers" => Value::Boolean(false),
+                "subscribe" => Value::NativeFunction(
+                    crate::runtime_env::native_fns::constants::DEBUG_LOGGER_NOOP,
+                ),
+                "unsubscribe" => Value::NativeFunction(
+                    crate::runtime_env::native_fns::constants::DEBUG_LOGGER_NOOP,
+                ),
+            },
+            prototype: None,
+            extensible: true,
+        }),
+    );
+    Value::Object(channel_idx)
 }

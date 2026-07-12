@@ -10,6 +10,9 @@ pub(crate) struct CallFrame {
     pub(crate) func_heap_idx: Option<usize>,
     pub(crate) this_value: Option<Value>,
     pub(crate) is_construct: bool,
+    /// Constructor used with `new`, exposed as `new.target`. `None` (→ undefined)
+    /// for ordinary calls.
+    pub(crate) new_target: Option<Value>,
     pub(crate) source_name: Option<String>,
     pub(crate) generator_heap_idx: Option<usize>,
     pub(crate) source_line: Option<usize>,

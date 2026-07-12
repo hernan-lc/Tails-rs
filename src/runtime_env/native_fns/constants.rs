@@ -549,6 +549,10 @@ pub const ITERATOR_NEXT: usize = 512;
 pub const DATE_TO_LOCALE_TIME_STRING: usize = 513;
 pub const DATE_TO_LOCALE_DATE_STRING: usize = 514;
 pub const DATE_TO_LOCALE_STRING: usize = 515;
+// diagnostics_channel.channel (516)
+pub const DIAGNOSTICS_CHANNEL_CHANNEL: usize = 516;
+// diagnostics_channel.tracingChannel (517)
+pub const DIAGNOSTICS_CHANNEL_TRACING_CHANNEL: usize = 517;
 
 #[cfg(test)]
 mod tests {

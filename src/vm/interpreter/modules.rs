@@ -277,7 +277,7 @@ impl Interpreter {
                     let base_path = std::path::Path::new(base);
                     let parent = base_path.parent().unwrap_or(std::path::Path::new("."));
 
-                    if let Some(resolved) = self.resolve_from_node_modules(source, parent) {
+                    if let Some(resolved) = self.resolve_from_node_modules(source, parent, false) {
                         std::path::PathBuf::from(resolved)
                     } else {
                         // Fall back to ./dist/
@@ -431,6 +431,17 @@ impl Interpreter {
     }
 
     pub(crate) fn resolve_module_path(&self, source: &str) -> Result<String> {
+        self.resolve_module_path_with_context(source, false)
+    }
+
+    /// Like `resolve_module_path`, but lets the caller indicate a CJS `require`
+    /// context so the package `exports` resolution can prefer the `require`
+    /// condition over `import` (Node resolves `require()` against `require`).
+    pub(crate) fn resolve_module_path_with_context(
+        &self,
+        source: &str,
+        is_require: bool,
+    ) -> Result<String> {
         let base = self.current_module_path.as_deref().unwrap_or(".");
         let base_path = std::path::Path::new(base);
         let parent = base_path.parent().unwrap_or(std::path::Path::new("."));
@@ -473,7 +484,7 @@ impl Interpreter {
 
         // node_modules resolution for bare specifiers (no ./ or ../)
         if is_bare {
-            if let Some(resolved) = self.resolve_from_node_modules(source, parent) {
+            if let Some(resolved) = self.resolve_from_node_modules(source, parent, is_require) {
                 return Ok(resolved);
             }
         }
@@ -489,6 +500,7 @@ impl Interpreter {
         &self,
         specifier: &str,
         start_dir: &std::path::Path,
+        is_require: bool,
     ) -> Option<String> {
         // Parse scoped package names: @scope/pkg/subpath -> (@scope/pkg, subpath)
         let (pkg_name, subpath) = if specifier.starts_with('@') {
@@ -508,7 +520,7 @@ impl Interpreter {
         while let Some(dir) = current {
             let pkg_dir = dir.join("node_modules").join(&pkg_name);
             if pkg_dir.is_dir() {
-                return self.resolve_package_entry(&pkg_dir, subpath);
+                return self.resolve_package_entry(&pkg_dir, subpath, is_require);
             }
             current = dir.parent();
         }
@@ -516,7 +528,12 @@ impl Interpreter {
     }
 
     /// Resolve a package's entry point from its package.json
-    fn resolve_package_entry(&self, pkg_dir: &std::path::Path, subpath: &str) -> Option<String> {
+    fn resolve_package_entry(
+        &self,
+        pkg_dir: &std::path::Path,
+        subpath: &str,
+        is_require: bool,
+    ) -> Option<String> {
         // If there's a subpath, resolve that directly
         if !subpath.is_empty() {
             let sub = pkg_dir.join(subpath);
@@ -531,7 +548,7 @@ impl Interpreter {
         // Priority: exports > module > main > index.js
         // Try exports["."]["import"] > exports["."]["default"] > exports["."]
         if let Some(exports) = pkg.get("exports") {
-            if let Some(resolved) = self.resolve_exports_field(exports, pkg_dir) {
+            if let Some(resolved) = self.resolve_exports_field(exports, pkg_dir, is_require) {
                 return Some(resolved);
             }
         }
@@ -561,28 +578,30 @@ impl Interpreter {
         &self,
         exports: &serde_json::Value,
         pkg_dir: &std::path::Path,
+        is_require: bool,
     ) -> Option<String> {
         match exports {
             // "exports": "./index.js"
             serde_json::Value::String(s) => {
                 let path = pkg_dir.join(s);
-                return self.resolve_with_fallbacks(&path);
+                let normalized: std::path::PathBuf = path.components().collect();
+                return self.resolve_with_fallbacks(&normalized);
             }
             // "exports": { ".": "...", "./sub": "..." }
             serde_json::Value::Object(map) => {
                 // Look for "." entry (the main entry)
                 if let Some(dot_entry) = map.get(".") {
-                    return self.resolve_condition(dot_entry, pkg_dir);
+                    return self.resolve_condition(dot_entry, pkg_dir, is_require);
                 }
                 // If no "." key, maybe it's a condition map directly (e.g. {"import":"...", "default":"..."})
                 // Try "import" then "default"
                 if let Some(import_val) = map.get("import") {
-                    if let Some(r) = self.resolve_condition(import_val, pkg_dir) {
+                    if let Some(r) = self.resolve_condition(import_val, pkg_dir, is_require) {
                         return Some(r);
                     }
                 }
                 if let Some(default_val) = map.get("default") {
-                    if let Some(r) = self.resolve_condition(default_val, pkg_dir) {
+                    if let Some(r) = self.resolve_condition(default_val, pkg_dir, is_require) {
                         return Some(r);
                     }
                 }
@@ -597,17 +616,25 @@ impl Interpreter {
         &self,
         value: &serde_json::Value,
         pkg_dir: &std::path::Path,
+        is_require: bool,
     ) -> Option<String> {
         match value {
             serde_json::Value::String(s) => {
                 let path = pkg_dir.join(s);
-                self.resolve_with_fallbacks(&path)
+                let normalized: std::path::PathBuf = path.components().collect();
+                self.resolve_with_fallbacks(&normalized)
             }
             serde_json::Value::Object(map) => {
-                // Nested conditions: try "import" > "default" > "require" > "node"
-                for condition in &["import", "default", "require", "node"] {
+                // For a CJS `require()`, prefer the `require` condition; for ESM
+                // `import`, prefer `import`. `default`/`node` are fallbacks.
+                let conditions: &[&str] = if is_require {
+                    &["require", "node", "import", "default"]
+                } else {
+                    &["import", "default", "require", "node"]
+                };
+                for condition in conditions {
                     if let Some(val) = map.get(*condition) {
-                        if let Some(r) = self.resolve_condition(val, pkg_dir) {
+                        if let Some(r) = self.resolve_condition(val, pkg_dir, is_require) {
                             return Some(r);
                         }
                     }

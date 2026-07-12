@@ -414,6 +414,22 @@ fn test_reflect_construct_with_new_target() {
 }
 
 #[test]
+fn test_new_target_meta_property() {
+    let mut runtime = TailsRuntime::default();
+    let result = runtime.eval(
+        r#"
+        function F() {
+            this.kind = (new.target === F) ? "ctor" : "plain";
+        }
+        const a = new F();          // new.target === F
+        const b = F.call({});       // new.target is undefined
+        a.kind + "|" + (b === undefined);
+    "#,
+    );
+    assert_eq!(result.unwrap(), tails::objects::Value::from_string("ctor|true".to_string()));
+}
+
+#[test]
 fn test_proxy_handler_get_method() {
     let mut runtime = TailsRuntime::default();
     let result = runtime.eval(

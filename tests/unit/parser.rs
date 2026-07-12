@@ -21,6 +21,31 @@ fn test_number_literal() {
 }
 
 #[test]
+fn test_new_target_meta_property() {
+    let mut tokens = tokenize("new.target").unwrap();
+    let ast = parse(&mut tokens).unwrap();
+
+    match ast {
+        AstNode::Program(stmts) => {
+            assert_eq!(stmts.len(), 1);
+            match &stmts[0].inner {
+                Statement::Expression(expr) => {
+                    assert!(matches!(
+                        expr,
+                        Expression::MetaProperty {
+                            meta,
+                            property
+                        } if meta == "new" && property == "target"
+                    ));
+                }
+                _ => panic!("Expected expression statement"),
+            }
+        }
+        _ => panic!("Expected program"),
+    }
+}
+
+#[test]
 fn test_string_literal() {
     let mut tokens = tokenize(r#""hello""#).unwrap();
     let ast = parse(&mut tokens).unwrap();

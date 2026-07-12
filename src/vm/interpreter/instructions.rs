@@ -311,6 +311,14 @@ impl Interpreter {
                     .unwrap_or(Value::Undefined);
                 self.stack.push(this);
             }
+            Instruction::GetNewTarget => {
+                let nt = self
+                    .call_stack
+                    .last()
+                    .and_then(|f| f.new_target.clone())
+                    .unwrap_or(Value::Undefined);
+                self.stack.push(nt);
+            }
             Instruction::BlockEnter => {
                 let is_generator = self
                     .call_stack

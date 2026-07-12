@@ -144,6 +144,7 @@ impl CodeGenerator {
                 self.generate_expression(expression)?;
                 Ok(())
             }
+            Expression::MetaProperty { .. } => Ok(self.emit(Instruction::GetNewTarget)),
         }
     }
 
@@ -490,6 +491,7 @@ impl CodeGenerator {
         let constructor_func_idx = self.compile_class_constructor(body)?;
 
         let mut methods = Vec::new();
+        let mut computed_members: Vec<(u32, bool, ClassMethodKind, Expression)> = Vec::new();
         for member in body {
             match member {
                 ClassMember::Method {
@@ -497,37 +499,58 @@ impl CodeGenerator {
                     params,
                     body: mbody,
                     is_static,
+                    computed,
                     ..
                 } => {
                     let func_idx =
                         self.compile_function(Some(mname.clone()), params, mbody, false)?;
-                    methods.push(ClassMethodInfo {
-                        name: mname.clone(),
-                        func_idx,
-                        is_static: *is_static,
-                        kind: ClassMethodKind::Method,
-                    });
+                    if let Some(key) = computed {
+                        computed_members.push((
+                            func_idx,
+                            *is_static,
+                            ClassMethodKind::Method,
+                            key.clone(),
+                        ));
+                    } else {
+                        methods.push(ClassMethodInfo {
+                            name: mname.clone(),
+                            func_idx,
+                            is_static: *is_static,
+                            kind: ClassMethodKind::Method,
+                        });
+                    }
                 }
                 ClassMember::Getter {
                     name: mname,
                     body: mbody,
                     is_static,
+                    computed,
                     ..
                 } => {
                     let func_idx =
                         self.compile_function(Some(format!("get_{}", mname)), &[], mbody, false)?;
-                    methods.push(ClassMethodInfo {
-                        name: mname.clone(),
-                        func_idx,
-                        is_static: *is_static,
-                        kind: ClassMethodKind::Getter,
-                    });
+                    if let Some(key) = computed {
+                        computed_members.push((
+                            func_idx,
+                            *is_static,
+                            ClassMethodKind::Getter,
+                            key.clone(),
+                        ));
+                    } else {
+                        methods.push(ClassMethodInfo {
+                            name: mname.clone(),
+                            func_idx,
+                            is_static: *is_static,
+                            kind: ClassMethodKind::Getter,
+                        });
+                    }
                 }
                 ClassMember::Setter {
                     name: mname,
                     param,
                     body: mbody,
                     is_static,
+                    computed,
                     ..
                 } => {
                     let func_idx = self.compile_function(
@@ -536,12 +559,21 @@ impl CodeGenerator {
                         mbody,
                         false,
                     )?;
-                    methods.push(ClassMethodInfo {
-                        name: mname.clone(),
-                        func_idx,
-                        is_static: *is_static,
-                        kind: ClassMethodKind::Setter,
-                    });
+                    if let Some(key) = computed {
+                        computed_members.push((
+                            func_idx,
+                            *is_static,
+                            ClassMethodKind::Setter,
+                            key.clone(),
+                        ));
+                    } else {
+                        methods.push(ClassMethodInfo {
+                            name: mname.clone(),
+                            func_idx,
+                            is_static: *is_static,
+                            kind: ClassMethodKind::Setter,
+                        });
+                    }
                 }
                 ClassMember::Constructor { .. } | ClassMember::Property { .. } => {}
             }
@@ -567,6 +599,7 @@ impl CodeGenerator {
         }
 
         self.emit(Instruction::MakeClass(class_info_idx));
+        self.emit_computed_class_members(&computed_members)?;
         Ok(())
     }
 

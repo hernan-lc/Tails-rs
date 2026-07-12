@@ -66,7 +66,7 @@ pub(super) fn native_require(
     }
 
     // 1. Resolve the module path (fallback to native modules for bare names)
-    let module_path = match interp.resolve_module_path(bare_specifier) {
+    let module_path = match interp.resolve_module_path_with_context(bare_specifier, true) {
         Ok(p) => p,
         Err(_) => {
             // Try as a native module (e.g., "path", "fs", "process", "tty")

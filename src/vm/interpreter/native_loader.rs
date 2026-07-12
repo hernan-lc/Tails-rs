@@ -74,6 +74,9 @@ pub fn discover_module(name: &str, registry: &mut NativeModuleRegistry) {
         "child_process" => registry.register("child_process", create_child_process_module),
         wk::MOD_URL => registry.register(wk::MOD_URL, create_url_module),
         wk::MOD_UTIL => registry.register(wk::MOD_UTIL, create_util_module),
+        "diagnostics_channel" => {
+            registry.register("diagnostics_channel", create_diagnostics_channel_module)
+        }
         wk::MOD_TIMERS => registry.register(wk::MOD_TIMERS, create_timers_module),
         wk::MOD_QUERYSTRING => registry.register(wk::MOD_QUERYSTRING, create_querystring_module),
         wk::MOD_STREAM => registry.register(wk::MOD_STREAM, create_stream_module),
@@ -86,6 +89,10 @@ pub fn discover_module(name: &str, registry: &mut NativeModuleRegistry) {
         wk::MOD_DNS => registry.register(wk::MOD_DNS, create_dns_module),
         #[cfg(feature = "http")]
         wk::MOD_HTTP => registry.register(wk::MOD_HTTP, create_http_module),
+        #[cfg(feature = "http")]
+        "https" => registry.register("https", create_http_module),
+        #[cfg(feature = "http")]
+        "http2" => registry.register("http2", create_http_module),
         #[cfg(feature = "net")]
         wk::MOD_NET => registry.register(wk::MOD_NET, create_net_module),
         _ => {}
@@ -463,6 +470,17 @@ pub fn create_util_module(
         "callbackify" => Value::NativeFunction(c::UTIL_CALLBACKIFY),
         "deprecate" => Value::NativeFunction(c::UTIL_DEPRECATE),
         "inherits" => Value::NativeFunction(c::UTIL_INHERITS),
+        "debuglog" => Value::NativeFunction(c::DEBUG_LOGGER_NOOP),
+    }
+}
+
+pub fn create_diagnostics_channel_module(
+    _heap: &mut Vec<HeapValue>,
+    _gc: &mut GarbageCollector,
+) -> PropertyStorage {
+    props! {
+        "channel" => Value::NativeFunction(c::DIAGNOSTICS_CHANNEL_CHANNEL),
+        "tracingChannel" => Value::NativeFunction(c::DIAGNOSTICS_CHANNEL_TRACING_CHANNEL),
     }
 }
 

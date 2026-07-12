@@ -1,6 +1,7 @@
-use super::{ClassInfo, ClassMethodInfo, ClassMethodKind, Instruction};
-use crate::compiler::parser::{BinaryOperator, ClassMember, Expression, SpannedNode, Statement};
+use super::{ClassInfo, ClassMethodInfo, ClassMethodKind, Expression, Instruction};
+use crate::compiler::parser::{BinaryOperator, ClassMember, SpannedNode, Statement};
 use crate::errors::Result;
+use crate::objects::Value;
 
 use super::CodeGenerator;
 
@@ -19,6 +20,7 @@ impl CodeGenerator {
                 let constructor_func_idx = self.compile_class_constructor(body)?;
 
                 let mut methods = Vec::new();
+                let mut computed_members: Vec<(u32, bool, ClassMethodKind, Expression)> = Vec::new();
                 for member in body {
                     match member {
                         ClassMember::Method {
@@ -26,21 +28,36 @@ impl CodeGenerator {
                             params,
                             body: mbody,
                             is_static,
+                            computed,
                             ..
                         } => {
-                            let func_idx =
-                                self.compile_function(Some(mname.clone()), params, mbody, false)?;
-                            methods.push(ClassMethodInfo {
-                                name: mname.clone(),
-                                func_idx,
-                                is_static: *is_static,
-                                kind: ClassMethodKind::Method,
-                            });
+                            let func_idx = self.compile_function(
+                                Some(mname.clone()),
+                                params,
+                                mbody,
+                                false,
+                            )?;
+                            if let Some(key) = computed {
+                                computed_members.push((
+                                    func_idx,
+                                    *is_static,
+                                    ClassMethodKind::Method,
+                                    key.clone(),
+                                ));
+                            } else {
+                                methods.push(ClassMethodInfo {
+                                    name: mname.clone(),
+                                    func_idx,
+                                    is_static: *is_static,
+                                    kind: ClassMethodKind::Method,
+                                });
+                            }
                         }
                         ClassMember::Getter {
                             name: mname,
                             body: mbody,
                             is_static,
+                            computed,
                             ..
                         } => {
                             let func_idx = self.compile_function(
@@ -49,18 +66,28 @@ impl CodeGenerator {
                                 mbody,
                                 false,
                             )?;
-                            methods.push(ClassMethodInfo {
-                                name: mname.clone(),
-                                func_idx,
-                                is_static: *is_static,
-                                kind: ClassMethodKind::Getter,
-                            });
+                            if let Some(key) = computed {
+                                computed_members.push((
+                                    func_idx,
+                                    *is_static,
+                                    ClassMethodKind::Getter,
+                                    key.clone(),
+                                ));
+                            } else {
+                                methods.push(ClassMethodInfo {
+                                    name: mname.clone(),
+                                    func_idx,
+                                    is_static: *is_static,
+                                    kind: ClassMethodKind::Getter,
+                                });
+                            }
                         }
                         ClassMember::Setter {
                             name: mname,
                             param,
                             body: mbody,
                             is_static,
+                            computed,
                             ..
                         } => {
                             let func_idx = self.compile_function(
@@ -69,12 +96,21 @@ impl CodeGenerator {
                                 mbody,
                                 false,
                             )?;
-                            methods.push(ClassMethodInfo {
-                                name: mname.clone(),
-                                func_idx,
-                                is_static: *is_static,
-                                kind: ClassMethodKind::Setter,
-                            });
+                            if let Some(key) = computed {
+                                computed_members.push((
+                                    func_idx,
+                                    *is_static,
+                                    ClassMethodKind::Setter,
+                                    key.clone(),
+                                ));
+                            } else {
+                                methods.push(ClassMethodInfo {
+                                    name: mname.clone(),
+                                    func_idx,
+                                    is_static: *is_static,
+                                    kind: ClassMethodKind::Setter,
+                                });
+                            }
                         }
                         ClassMember::Constructor { .. } | ClassMember::Property { .. } => {}
                     }
@@ -100,6 +136,7 @@ impl CodeGenerator {
                 }
 
                 self.emit(Instruction::MakeClass(class_info_idx));
+                self.emit_computed_class_members(&computed_members)?;
 
                 if self.scope_depth == 0 {
                     self.emit(Instruction::StoreGlobal(class_name));
@@ -116,6 +153,32 @@ impl CodeGenerator {
             }
             _ => Ok(false),
         }
+    }
+
+    /// Emit setup for computed class members (`[expr](){}`, `[expr] = v`,
+    /// `get [expr](){}`, `set [expr](v){}`). The class value must be on top of
+    /// the stack when this is called; it leaves the class value on the stack.
+    /// For instance members the function is installed on the prototype; for
+    /// static members it is installed directly on the class (constructor).
+    pub(super) fn emit_computed_class_members(
+        &mut self,
+        computed: &[(u32, bool, ClassMethodKind, Expression)],
+    ) -> Result<()> {
+        for (func_idx, is_static, _kind, key) in computed {
+            self.emit(Instruction::Dup);
+            if *is_static {
+                // class value is the target; key goes directly on it.
+            } else {
+                let proto_idx = self.add_constant(Value::from_string("prototype".to_string()));
+                self.emit(Instruction::LoadConst(proto_idx));
+                self.emit(Instruction::GetProperty);
+            }
+            self.generate_expression(key)?;
+            self.emit(Instruction::MakeFunction(*func_idx));
+            self.emit(Instruction::SetProperty);
+            self.emit(Instruction::Pop);
+        }
+        Ok(())
     }
 
     pub(super) fn compile_class_constructor(

@@ -198,6 +198,7 @@ impl Interpreter {
             func_heap_idx: None,
             this_value: None,
             is_construct: false,
+            new_target: None,
             source_name: self.current_module_path.clone(),
             generator_heap_idx: None,
             source_line: None,

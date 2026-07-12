@@ -255,6 +255,9 @@ impl<'a> Parser<'a> {
             self.advance();
             let property = match self.advance().token {
                 Token::Identifier(name) => Expression::Identifier(name),
+                t if token_keyword_string(&t).is_some() => {
+                    Expression::Identifier(token_keyword_string(&t).unwrap())
+                }
                 t => {
                     return Err(Error::ParseError(format!(
                         "Expected property name after 'super', got {:?}",

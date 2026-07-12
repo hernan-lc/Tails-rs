@@ -175,6 +175,9 @@ pub enum Instruction {
     /// `new Ctor(...args)` with a pre-built arguments array.
     /// Stack: `[argsArray, ctor]` (ctor on top).
     ConstructApply,
+    /// Push `new.target` (the constructor invoked with `new`, or undefined
+    /// for an ordinary call) onto the stack.
+    GetNewTarget,
     LoadThis,
     Dup,
     Rot3Right,

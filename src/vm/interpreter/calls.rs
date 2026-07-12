@@ -137,6 +137,7 @@ impl Interpreter {
                             func_heap_idx: Some(*func_idx),
                             this_value: Some(this_for_frame),
                             is_construct: false,
+                            new_target: None,
                             source_name: source_file.or_else(|| self.current_module_path.clone()),
                             generator_heap_idx: None,
                             source_line,

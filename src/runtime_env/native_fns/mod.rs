@@ -890,6 +890,8 @@ pub static NATIVE_TABLE: &[NativeFn] = &[
     date_fns::native_date_to_locale_time_string,
     date_fns::native_date_to_locale_date_string,
     date_fns::native_date_to_locale_string,
+    global_fns::native_diagnostics_channel_channel,
+    global_fns::native_diagnostics_channel_tracing_channel,
 ];
 
 #[cfg(test)]
