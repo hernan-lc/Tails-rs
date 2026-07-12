@@ -103,6 +103,9 @@ mod http_fns {
         native_http_server_close,
         native_http_req_on,
         native_http_res_write_head,
+        native_http_res_set_header,
+        native_http_res_get_header,
+        native_http_res_remove_header,
         native_http_res_write,
         native_http_res_end,
     );
@@ -195,6 +198,7 @@ pub mod process_fns {
         native_process_uptime,
         native_process_memory_usage,
         native_process_on,
+        native_tty_isatty,
     );
 
     #[inline]
@@ -889,4 +893,6 @@ pub static NATIVE_TABLE: &[NativeFn] = &[
 ];
 
 #[cfg(test)]
+const _: () = assert!(!NATIVE_TABLE.is_empty(), "NATIVE_TABLE must not be empty");
+
 const _: () = assert!(!NATIVE_TABLE.is_empty(), "NATIVE_TABLE must not be empty");
