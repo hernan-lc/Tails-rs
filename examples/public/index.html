@@ -2,17 +2,34 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Node.js Native HTTP Server</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>User Management Client</title>
     <style>
-        body { font-family: sans-serif; margin: 40px; background: #f4f4f9; color: #333; }
-        max-width { max-width: 600px; margin: 0 auto; }
-        code { background: #eee; padding: 2px 6px; border-radius: 4px; }
+        body { font-family: sans-serif; background: #f4f4f9; padding: 40px; }
+        .container { max-width: 500px; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        form { display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px; }
+        input, button { padding: 8px; font-size: 14px; }
+        button { background: #007bff; color: white; border: none; cursor: pointer; font-weight: bold; }
+        button:hover { background: #0056b3; }
+        ul { padding-left: 20px; }
+        li { margin-bottom: 5px; }
     </style>
 </head>
 <body>
-    <div class="max-width">
-        <h1>Hello from a Native HTTP Server!</h1>
-        <p>This static HTML file is being read from the disk and served using Node's <code>fs/promises</code> module.</p>
+
+    <div class="container">
+        <h2>Add New User</h2>
+        <form id="user-form">
+            <input type="text" id="user-name" placeholder="Name" required>
+            <input type="text" id="user-role" placeholder="Role (e.g. Admin, Developer)" required>
+            <button type="submit">Create User</button>
+        </form>
+
+        <h2>Current Users</h2>
+        <ul id="users-list">
+            </ul>
     </div>
+
+    <script src="app.js"></script>
 </body>
 </html>
