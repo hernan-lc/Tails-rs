@@ -54,6 +54,13 @@ impl CodeGenerator {
                 self.patch_jump(skip_right, self.instructions.len());
                 self.patch_jump(done, self.instructions.len());
             }
+            BinaryOperator::Comma => {
+                // Evaluate left, discard it, then evaluate and keep right.
+                // JS: (a, b) yields b.
+                self.generate_expression(left)?;
+                self.emit(Instruction::Pop);
+                self.generate_expression(right)?;
+            }
             _ => {
                 self.generate_expression(left)?;
                 self.generate_expression(right)?;

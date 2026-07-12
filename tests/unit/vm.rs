@@ -339,3 +339,39 @@ fn test_complex_control_flow() {
         .unwrap();
     assert_eq!(result, tails::Value::Float(-5.0));
 }
+
+#[test]
+fn test_comma_operator_yields_right() {
+    let mut runtime = TailsRuntime::default();
+    let result = runtime.eval("(1, 2)").unwrap();
+    assert_eq!(result, tails::Value::Float(2.0));
+}
+
+#[test]
+fn test_comma_in_call_callee() {
+    // TS/CJS `(0, foo)(...)` idiom — paren must accept comma expr.
+    let mut runtime = TailsRuntime::default();
+    let result = runtime
+        .eval(
+            r#"
+        function fn(a, b) { return a + ":" + b; }
+        (0, fn)(22, "==");
+    "#,
+        )
+        .unwrap();
+    assert_eq!(result, tails::Value::string("22:=="));
+}
+
+#[test]
+fn test_call_args_preserve_order() {
+    let mut runtime = TailsRuntime::default();
+    let result = runtime
+        .eval(
+            r#"
+        function f(a, b) { return a + ":" + b; }
+        f(22, "==");
+    "#,
+        )
+        .unwrap();
+    assert_eq!(result, tails::Value::string("22:=="));
+}

@@ -50,7 +50,7 @@ impl<'a> Parser<'a> {
                 }
             }
         }
-        let expr = self.parse_expression()?;
+        let expr = self.parse_expression_with_comma()?;
         self.expect(&Token::RightParen)?;
         if self.peek().token == Token::Arrow {
             let params = match &expr.inner {

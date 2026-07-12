@@ -1,4 +1,5 @@
-import * as z from 'zod'
+//import * as z from './modules/zod-ts/zod.ts'
+import * as z from './modules/zod-ts/zod.ts'
 
 // Primitives with chained refinements (these call Object.getOwnPropertyDescriptors via mergeDefs)
 const stringSchema = z.string().min(2).max(20).email()

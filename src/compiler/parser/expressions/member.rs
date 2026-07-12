@@ -98,6 +98,8 @@ impl<'a> Parser<'a> {
             loop {
                 if self.peek().token == Token::Ellipsis {
                     self.advance();
+                    // Args are AssignmentExpressions (ES): comma separates args,
+                    // it is not the comma operator. Use `(a, b)` for comma-expr args.
                     let argument = Box::new(self.parse_assignment()?.inner);
                     args.push(Expression::SpreadElement { argument });
                 } else {

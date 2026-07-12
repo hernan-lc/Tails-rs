@@ -168,6 +168,9 @@ impl CodeGenerator {
             BinaryOperator::In => self.emit(Instruction::In),
             BinaryOperator::NullishCoalescing => self.emit(Instruction::NullishCoalescing),
             BinaryOperator::Comma => {
+                // Evaluate left, discard it, then evaluate and keep right
+                // (js semantics: a,b yields b). Order emitted by caller is
+                // left,right,op, so pop left here and keep right on stack.
                 self.emit(Instruction::Pop);
             }
         }

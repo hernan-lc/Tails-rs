@@ -98,3 +98,25 @@ fn test_function_bind() {
     assert!(r.is_ok());
     assert_eq!(r.unwrap(), Value::Float(10.0));
 }
+
+#[test]
+fn comma_operator_and_call_arg_order() {
+    let mut rt = TailsRuntime::default();
+    let r = rt.eval(
+        r#"
+    function fixedBase64(bodyLength, padding) {
+      return `^[A-Za-z0-9+/]{${bodyLength}}${padding}$`;
+    }
+    [
+      (1, 2),
+      (0, fixedBase64)(22, "=="),
+      fixedBase64(22, "=="),
+    ].join("|");
+    "#,
+    );
+    assert!(r.is_ok());
+    assert_eq!(
+        r.unwrap(),
+        Value::string("2|^[A-Za-z0-9+/]{22}==$|^[A-Za-z0-9+/]{22}==$")
+    );
+}
