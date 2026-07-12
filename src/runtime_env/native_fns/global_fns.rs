@@ -1,6 +1,7 @@
 use crate::errors::Result;
 use crate::objects::Value;
 use crate::props;
+use crate::runtime_env::native_fns::constants as c;
 use crate::vm::interpreter::{HeapValue, Interpreter, JsFunction, JsObject, PropertyStorage};
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -387,6 +388,60 @@ pub(super) fn native_diagnostics_channel_tracing_channel(
         }),
     );
     Ok(Value::Object(channel_idx))
+}
+
+/// `AsyncResource` constructor (node:async_hooks). fastify only uses it as
+/// `new AsyncResource(name, obj).bind(fn)` to bind a callback; we return an
+/// object whose `bind` simply returns the passed function unchanged, which is
+/// all the runtime needs for content-type-parser's callback handling.
+pub(super) fn native_async_resource_constructor(
+    interp: &mut Interpreter,
+    _this: &Value,
+    _args: &[Value],
+) -> Result<Value> {
+    let obj_idx = interp.gc.allocate(
+        &mut interp.heap,
+        HeapValue::Object(JsObject {
+            properties: props! {
+                "bind" => Value::NativeFunction(c::ASYNC_HOOKS_BIND),
+                "runInAsyncScope" => Value::NativeFunction(c::ASYNC_HOOKS_BIND),
+            },
+            prototype: None,
+            extensible: true,
+        }),
+    );
+    Ok(Value::Object(obj_idx))
+}
+
+/// `AsyncResource#bind(fn)` — returns `fn` unchanged (no async-context wrapping).
+pub(super) fn native_async_resource_bind(
+    _interp: &mut Interpreter,
+    _this: &Value,
+    args: &[Value],
+) -> Result<Value> {
+    Ok(args.first().cloned().unwrap_or(Value::Undefined))
+}
+
+/// `safe-regex2` shim — always reports a regex as safe (see require_fns.rs).
+pub(super) fn native_safe_regex_true(
+    _interp: &mut Interpreter,
+    _this: &Value,
+    _args: &[Value],
+) -> Result<Value> {
+    Ok(Value::Boolean(true))
+}
+/// fastify uses it only for high-resolution timestamps; a monotonic
+/// wall-clock reading (seconds since Unix epoch) is sufficient.
+pub(super) fn native_perf_hooks_now(
+    _interp: &mut Interpreter,
+    _this: &Value,
+    _args: &[Value],
+) -> Result<Value> {
+    let secs = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs_f64())
+        .unwrap_or(0.0);
+    Ok(Value::Float(secs * 1000.0))
 }
 
 /// Build a no-op channel object: `publish` is a function that does nothing,

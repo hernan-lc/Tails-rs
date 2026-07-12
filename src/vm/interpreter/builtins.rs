@@ -50,6 +50,9 @@ impl Interpreter {
             .allocate(&mut self.heap, HeapValue::Object(JsObject::new()));
         self.globals
             .insert(wk::GLOBAL_THIS.into(), Value::Object(global_this_idx));
+        // Node's `global` alias for `globalThis`.
+        self.globals
+            .insert("global".into(), Value::Object(global_this_idx));
         self.globals
             .insert("-Infinity".into(), Value::Float(f64::NEG_INFINITY));
 
@@ -707,31 +710,38 @@ impl Interpreter {
             ("BigUint64Array", 311),
         ];
 
-        for (name, ctor_idx) in typed_array_constructors.iter() {
-            // Create prototype
-            let bytes_per_element = TypedArray::element_size(&parse_typed_array_type(name)) as i64;
-            let proto_props = props! {
-                "BYTES_PER_ELEMENT" => Value::Integer(bytes_per_element),
-                wk::LENGTH => Value::NativeFunction(c::TYPED_ARRAY_LENGTH),
-                wk::GET => Value::NativeFunction(c::TYPED_ARRAY_GET),
-                wk::SET_PROP => Value::NativeFunction(c::TYPED_ARRAY_SET),
-                "subarray" => Value::NativeFunction(c::TYPED_ARRAY_SUBARRAY),
-                "slice" => Value::NativeFunction(c::TYPED_ARRAY_SLICE),
-            };
-            let proto_idx = self.gc.allocate(
-                &mut self.heap,
-                HeapValue::Object(JsObject {
-                    properties: proto_props,
-                    prototype: None,
-                    extensible: true,
-                }),
-            );
+        // Shared `%TypedArray%` prototype — every typed-array instance chains
+        // to this. It carries the instance methods and `[Symbol.toStringTag]`
+        // as a getter (read by `safe-stable-stringify`'s
+        // `typedArrayPrototypeGetSymbolToStringTag`).
+        let tag_key = format!("__getter___sym_{}", crate::objects::SYMBOL_TO_STRING_TAG);
+        let typed_array_proto_props = props! {
+            "BYTES_PER_ELEMENT" => Value::Integer(0),
+            wk::LENGTH => Value::NativeFunction(c::TYPED_ARRAY_LENGTH),
+            wk::GET => Value::NativeFunction(c::TYPED_ARRAY_GET),
+            wk::SET_PROP => Value::NativeFunction(c::TYPED_ARRAY_SET),
+            "subarray" => Value::NativeFunction(c::TYPED_ARRAY_SUBARRAY),
+            "slice" => Value::NativeFunction(c::TYPED_ARRAY_SLICE),
+            "buffer" => Value::NativeFunction(c::TYPED_ARRAY_BUFFER),
+            tag_key => Value::NativeFunction(c::TYPED_ARRAY_TO_STRING_TAG),
+        };
+        let typed_array_proto_idx = self.gc.allocate(
+            &mut self.heap,
+            HeapValue::Object(JsObject {
+                properties: typed_array_proto_props,
+                prototype: self.object_proto_idx,
+                extensible: true,
+            }),
+        );
+        self.typed_array_proto_idx = Some(typed_array_proto_idx);
 
+        for (name, ctor_idx) in typed_array_constructors.iter() {
+            let bytes_per_element = TypedArray::element_size(&parse_typed_array_type(name)) as i64;
             // Constructor object holds statics (from/of/prototype). The global
             // binding remains a NativeFunction so `new Uint8Array(...)` works;
             // static property access is handled in property_access.rs.
             let ctor_props = props! {
-                wk::PROTOTYPE => Value::Object(proto_idx),
+                wk::PROTOTYPE => Value::Object(typed_array_proto_idx),
                 "BYTES_PER_ELEMENT" => Value::Integer(bytes_per_element),
                 "from" => Value::NativeFunction(c::TYPED_ARRAY_FROM),
                 "of" => Value::NativeFunction(c::TYPED_ARRAY_OF),

@@ -10,6 +10,63 @@ fn tokenize_template_literal(
     let mut parts = Vec::new();
     let mut text_buf = String::new();
 
+    // Scan a template interpolation `${ ... }`, tracking brace depth while
+    // skipping string/regex literals so a `}` inside a nested quote (e.g.
+    // `'(\\d{1,'}` in a regex builder) doesn't prematurely close the
+    // expression. Returns the inner source (without the outer `${`/`}`).
+    fn scan_template_expression(
+        chars: &mut std::iter::Peekable<std::str::CharIndices>,
+    ) -> Result<String> {
+        let mut depth = 1u32;
+        let mut expr_src = String::new();
+        loop {
+            match chars.next() {
+                Some((_, '{')) => {
+                    depth += 1;
+                    expr_src.push('{');
+                }
+                Some((_, '}')) => {
+                    depth -= 1;
+                    if depth == 0 {
+                        break;
+                    }
+                    expr_src.push('}');
+                }
+                // String literals: their contents (including braces) must not
+                // affect the brace-depth count for the outer expression.
+                Some((_, c @ ('"' | '\''))) => {
+                    let quote = c;
+                    expr_src.push(quote);
+                    loop {
+                        match chars.next() {
+                            Some((_, '\\')) => {
+                                if let Some((_, e)) = chars.next() {
+                                    expr_src.push('\\');
+                                    expr_src.push(e);
+                                }
+                            }
+                            Some((_, c2)) if c2 == quote => {
+                                expr_src.push(c2);
+                                break;
+                            }
+                            Some((_, c2)) => expr_src.push(c2),
+                            None => {
+                                return Err(Error::ParseError(
+                                    "Unterminated string in template expression".into(),
+                                ))
+                            }
+                        }
+                    }
+                }
+                Some((_, c)) => expr_src.push(c),
+                None => {
+                    return Err(Error::ParseError("Unterminated template expression".into()))
+                }
+            }
+        }
+        Ok(expr_src)
+    }
+
     loop {
         match chars.next() {
             Some((_, '`')) => {
@@ -26,29 +83,7 @@ fn tokenize_template_literal(
                         parts.push(TemplatePart::Text(text_buf.clone()));
                         text_buf.clear();
                     }
-                    let mut depth = 1u32;
-                    let mut expr_src = String::new();
-                    loop {
-                        match chars.next() {
-                            Some((_, '{')) => {
-                                depth += 1;
-                                expr_src.push('{');
-                            }
-                            Some((_, '}')) => {
-                                depth -= 1;
-                                if depth == 0 {
-                                    break;
-                                }
-                                expr_src.push('}');
-                            }
-                            Some((_, c)) => expr_src.push(c),
-                            None => {
-                                return Err(Error::ParseError(
-                                    "Unterminated template expression".into(),
-                                ))
-                            }
-                        }
-                    }
+                    let expr_src = scan_template_expression(chars)?;
                     let inner_tokens = tokenize(&expr_src)?;
                     // Keep the trailing Eof: the parser's `advance` relies on a
                     // final non-repeatable token to terminate loops. Removing

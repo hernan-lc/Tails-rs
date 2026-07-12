@@ -248,6 +248,11 @@ pub const PROCESS_HRTIME_BIGINT: usize = 244;
 pub const PROCESS_NEXT_TICK: usize = 245;
 pub const BUFFER_CONSTRUCTOR: usize = 246;
 pub const BUFFER_ALLOC: usize = 247;
+pub const BUFFER_ALLOC_UNSAFE: usize = 280;
+pub const BUFFER_ALLOC_UNSAFE_SLOW: usize = 281;
+pub const MODULE_CREATE_REQUIRE: usize = 282;
+pub const TYPED_ARRAY_TO_STRING_TAG: usize = 283;
+pub const TYPED_ARRAY_BUFFER: usize = 284;
 pub const BUFFER_FROM: usize = 248;
 pub const BUFFER_CONCAT: usize = 249;
 pub const BUFFER_IS_BUFFER: usize = 250;
@@ -553,6 +558,14 @@ pub const DATE_TO_LOCALE_STRING: usize = 515;
 pub const DIAGNOSTICS_CHANNEL_CHANNEL: usize = 516;
 // diagnostics_channel.tracingChannel (517)
 pub const DIAGNOSTICS_CHANNEL_TRACING_CHANNEL: usize = 517;
+// perf_hooks.performance.now (518)
+pub const PERF_HOOKS_NOW: usize = 518;
+// async_hooks.AsyncResource (519)
+pub const ASYNC_HOOKS_ASYNC_RESOURCE: usize = 519;
+// async_hooks.AsyncResource#bind (520)
+pub const ASYNC_HOOKS_BIND: usize = 520;
+// safe-regex2 shim (always-safe) (521)
+pub const SAFE_REGEX_TRUE: usize = 521;
 
 #[cfg(test)]
 mod tests {

@@ -520,7 +520,15 @@ fn normalize_js_regex(pattern: &str) -> String {
         .replace(r"\x{D800}", r"\x{10FFFF}")
         .replace(r"\x{DBFF}", r"\x{10FFFF}")
         .replace(r"\x{DC00}", r"\x{10FFFF}")
-        .replace(r"\x{DFFF}", r"\x{10FFFF}");
+        .replace(r"\x{DFFF}", r"\x{10FFFF}")
+        // Lowercase hex forms (e.g. fast-json-stringify's `\x{d800}-\x{dfff}`).
+        .replace(r"\x{d800}-\x{dbff}", r"\x{10FFFF}")
+        .replace(r"\x{dc00}-\x{dfff}", r"\x{10FFFF}")
+        .replace(r"\x{d800}-\x{dfff}", r"\x{10FFFF}")
+        .replace(r"\x{d800}", r"\x{10FFFF}")
+        .replace(r"\x{dbff}", r"\x{10FFFF}")
+        .replace(r"\x{dc00}", r"\x{10FFFF}")
+        .replace(r"\x{dfff}", r"\x{10FFFF}");
     // Also handle raw-char form if the lexer expanded escapes.
     let pattern = {
         let mut s = String::new();

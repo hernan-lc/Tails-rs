@@ -77,6 +77,12 @@ pub fn discover_module(name: &str, registry: &mut NativeModuleRegistry) {
         "diagnostics_channel" => {
             registry.register("diagnostics_channel", create_diagnostics_channel_module)
         }
+        wk::MOD_PERF_HOOKS => registry.register(wk::MOD_PERF_HOOKS, create_perf_hooks_module),
+        wk::MOD_ASYNC_HOOKS => registry.register(wk::MOD_ASYNC_HOOKS, create_async_hooks_module),
+        wk::MOD_WORKER_THREADS => {
+            registry.register(wk::MOD_WORKER_THREADS, create_worker_threads_module)
+        }
+        "module" => registry.register("module", create_module_module),
         wk::MOD_TIMERS => registry.register(wk::MOD_TIMERS, create_timers_module),
         wk::MOD_QUERYSTRING => registry.register(wk::MOD_QUERYSTRING, create_querystring_module),
         wk::MOD_STREAM => registry.register(wk::MOD_STREAM, create_stream_module),
@@ -192,8 +198,51 @@ pub fn create_process_module(
             }
             .into(),),
         "pid" => Value::Integer(std::process::id() as i64),
-        "hrtime" => Value::NativeFunction(c::PROCESS_HRTIME),
-        "hrtime.bigint" => Value::NativeFunction(c::PROCESS_HRTIME_BIGINT),
+        "versions" => {
+            let versions_props = props! {
+                "node" => Value::from_string(env!("CARGO_PKG_VERSION").to_string()),
+            };
+            let versions_idx = gc.allocate(
+                heap,
+                HeapValue::Object(JsObject {
+                    properties: versions_props,
+                    prototype: None,
+                    extensible: true,
+                }),
+            );
+            Value::Object(versions_idx)
+        },
+        "hrtime" => {
+            // `process.hrtime` is callable; Node also exposes
+            // `process.hrtime.bigint()` (pino uses it). Make it a Function so it
+            // is callable, and attach `bigint` as a readable property.
+            let hrtime_idx = heap.len();
+            heap.push(HeapValue::Function(crate::vm::interpreter::JsFunction {
+                name: Some("hrtime".to_string()),
+                params: vec!["time".to_string()],
+                rest_param: None,
+                bytecode_index: usize::MAX,
+                local_count: 0,
+                closure: std::rc::Rc::new(std::cell::RefCell::new(Vec::new())),
+                prototype: None,
+                super_class: None,
+                properties: PropertyStorage::new(),
+                owner_module: None,
+                module_scope: None,
+                is_generator: false,
+                source_file: None,
+                source_line: None,
+                is_arrow: false,
+                captured_this: None,
+                capture_slots: Vec::new(),
+            }));
+            if let HeapValue::Function(hrtime_fn) = &mut heap[hrtime_idx] {
+                hrtime_fn
+                    .properties
+                    .insert("bigint".to_string(), Value::NativeFunction(c::PROCESS_HRTIME_BIGINT));
+            }
+            Value::Function(hrtime_idx)
+        },
         "nextTick" => Value::NativeFunction(c::PROCESS_NEXT_TICK),
         // API completeness additions (v0.5.0+).
         "kill" => Value::NativeFunction(c::PROCESS_KILL),
@@ -306,6 +355,8 @@ pub fn create_buffer_module(
     let buffer_ctor_props = props! {
         "alloc" => Value::NativeFunction(c::BUFFER_ALLOC),
         "from" => Value::NativeFunction(c::BUFFER_FROM),
+        "allocUnsafe" => Value::NativeFunction(c::BUFFER_ALLOC_UNSAFE),
+        "allocUnsafeSlow" => Value::NativeFunction(c::BUFFER_ALLOC_UNSAFE_SLOW),
         "concat" => Value::NativeFunction(c::BUFFER_CONCAT),
         "isBuffer" => Value::NativeFunction(c::BUFFER_IS_BUFFER),
         "isEncoding" => Value::NativeFunction(c::BUFFER_IS_ENCODING),
@@ -333,9 +384,28 @@ pub fn create_buffer_module(
     // safer-buffer does `var Buffer = require('buffer').Buffer`.
     props! {
         "Buffer" => Value::Object(buffer_ctor_idx),
+        // `buffer.constants` — Node exposes MAX_STRING_LENGTH, MAX_LENGTH, etc.
+        "constants" => {
+            let constants_props = props! {
+                "MAX_STRING_LENGTH" => Value::Integer(i32::MAX as i64),
+                "MAX_LENGTH" => Value::Integer(i32::MAX as i64),
+                "MAX_SAFE_INTEGER" => Value::Float((i32::MAX as f64) + 1.0),
+            };
+            let constants_idx = gc.allocate(
+                heap,
+                HeapValue::Object(JsObject {
+                    properties: constants_props,
+                    prototype: None,
+                    extensible: true,
+                }),
+            );
+            Value::Object(constants_idx)
+        },
         // Also re-export statics at top level for callers that treat the
         // module as the constructor (legacy / our global Buffer).
         "alloc" => Value::NativeFunction(c::BUFFER_ALLOC),
+        "allocUnsafe" => Value::NativeFunction(c::BUFFER_ALLOC_UNSAFE),
+        "allocUnsafeSlow" => Value::NativeFunction(c::BUFFER_ALLOC_UNSAFE_SLOW),
         "from" => Value::NativeFunction(c::BUFFER_FROM),
         "concat" => Value::NativeFunction(c::BUFFER_CONCAT),
         "isBuffer" => Value::NativeFunction(c::BUFFER_IS_BUFFER),
@@ -481,6 +551,58 @@ pub fn create_diagnostics_channel_module(
     props! {
         "channel" => Value::NativeFunction(c::DIAGNOSTICS_CHANNEL_CHANNEL),
         "tracingChannel" => Value::NativeFunction(c::DIAGNOSTICS_CHANNEL_TRACING_CHANNEL),
+    }
+}
+
+pub fn create_perf_hooks_module(
+    heap: &mut Vec<HeapValue>,
+    _gc: &mut GarbageCollector,
+) -> PropertyStorage {
+    // `performance.now()` — the only member fastify (logger-factory) uses.
+    let performance_props = props! {
+        "now" => Value::NativeFunction(c::PERF_HOOKS_NOW),
+        "timeOrigin" => Value::Float(0.0),
+    };
+    let performance_idx = heap.len();
+    heap.push(HeapValue::Object(JsObject {
+        properties: performance_props,
+        prototype: None,
+        extensible: true,
+    }));
+    props! {
+        "performance" => Value::Object(performance_idx),
+    }
+}
+
+pub fn create_async_hooks_module(
+    _heap: &mut Vec<HeapValue>,
+    _gc: &mut GarbageCollector,
+) -> PropertyStorage {
+    props! {
+        "AsyncResource" => Value::NativeFunction(c::ASYNC_HOOKS_ASYNC_RESOURCE),
+    }
+}
+
+pub fn create_worker_threads_module(
+    _heap: &mut Vec<HeapValue>,
+    _gc: &mut GarbageCollector,
+) -> PropertyStorage {
+    // Minimal stub: pino only reads `isMainThread`.
+    props! {
+        "isMainThread" => Value::Boolean(true),
+        "parentPort" => Value::Null,
+        "workerData" => Value::Null,
+        "threadId" => Value::Integer(0),
+    }
+}
+
+pub fn create_module_module(
+    _heap: &mut Vec<HeapValue>,
+    _gc: &mut GarbageCollector,
+) -> PropertyStorage {
+    // `createRequire` — pino/lib/transport uses it to build a require fn.
+    props! {
+        "createRequire" => Value::NativeFunction(c::MODULE_CREATE_REQUIRE),
     }
 }
 

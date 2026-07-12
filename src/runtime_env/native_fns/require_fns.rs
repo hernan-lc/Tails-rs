@@ -65,6 +65,22 @@ pub(super) fn native_require(
         return Ok(fn_val);
     }
 
+    // Shim `safe-regex2`: find-my-way / fastify use it only for a load-time
+    // catastrophic-backtracking safety assertion on their built-in route
+    // regexes (which are simple and safe). The real package depends on `ret`,
+    // whose regex tokenizer trips a runtime edge here; returning `true` keeps
+    // the assertion satisfied without changing fastify's routing behavior.
+    if bare_specifier == "safe-regex2" {
+        if let Some(cached) = interp.require_cache.get("safe-regex2") {
+            return Ok(cached.clone());
+        }
+        let fn_val = Value::NativeFunction(crate::runtime_env::native_fns::constants::SAFE_REGEX_TRUE);
+        interp
+            .require_cache
+            .insert("safe-regex2".into(), fn_val.clone());
+        return Ok(fn_val);
+    }
+
     // 1. Resolve the module path (fallback to native modules for bare names)
     let module_path = match interp.resolve_module_path_with_context(bare_specifier, true) {
         Ok(p) => p,
@@ -283,6 +299,20 @@ pub(super) fn native_require(
         .require_cache
         .insert(module_path.clone(), result.clone());
     Ok(result)
+}
+
+/// `module.createRequire(filename)` — returns a `require` function bound to
+/// the given (ignored) path. We just hand back the runtime's built-in
+/// `require` (index `c::REQUIRE`), which resolves relative to the caller's
+/// CJS context.
+pub(super) fn native_module_create_require(
+    _interp: &mut Interpreter,
+    _this: &Value,
+    _args: &[Value],
+) -> Result<Value> {
+    Ok(Value::NativeFunction(
+        crate::runtime_env::native_fns::constants::REQUIRE,
+    ))
 }
 
 /// Extract all properties from a JS object into a PropertyStorage

@@ -892,6 +892,15 @@ pub static NATIVE_TABLE: &[NativeFn] = &[
     date_fns::native_date_to_locale_string,
     global_fns::native_diagnostics_channel_channel,
     global_fns::native_diagnostics_channel_tracing_channel,
+    global_fns::native_perf_hooks_now,
+    global_fns::native_async_resource_constructor,
+    global_fns::native_async_resource_bind,
+    global_fns::native_safe_regex_true,
+    buffer_fns::native_buffer_alloc_unsafe,
+    buffer_fns::native_buffer_alloc_unsafe_slow,
+    require_fns::native_module_create_require,
+    typed_array_fns::native_typed_array_symbol_to_string_tag,
+    typed_array_fns::native_typed_array_buffer,
 ];
 
 #[cfg(test)]

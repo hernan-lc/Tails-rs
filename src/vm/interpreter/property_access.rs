@@ -231,7 +231,17 @@ impl Interpreter {
                                     .cloned()
                                     .unwrap_or(Value::Undefined));
                             }
-                            return self.get_array_method(key_str);
+                            let method = self.get_array_method(key_str)?;
+                            if !matches!(method, Value::Undefined) {
+                                return Ok(method);
+                            }
+                            // Fall back to the Array.prototype → Object.prototype
+                            // chain (e.g. `hasOwnProperty`, `toString`).
+                            return self.get_from_prototype_chain(
+                                self.array_proto_idx,
+                                key,
+                                object,
+                            );
                         }
                         Value::Cons(c) => {
                             let s = c.flatten();
@@ -802,6 +812,47 @@ impl Interpreter {
                 }
             }
             _ => {}
+        }
+        Ok(Value::Undefined)
+    }
+
+    /// Resolve `key` by walking the prototype chain starting at `proto_idx`.
+    /// Used by array/primitive property lookups to inherit Object.prototype
+    /// members (e.g. `hasOwnProperty`, `toString`) that live on the shared
+    /// prototype rather than the value's own property map.
+    pub(super) fn get_from_prototype_chain(
+        &self,
+        proto_idx: Option<usize>,
+        key: &Value,
+        _this: &Value,
+    ) -> Result<Value> {
+        let mut current = match proto_idx {
+            Some(idx) => Value::Object(idx),
+            None => return Ok(Value::Undefined),
+        };
+        // Guard against prototype loops.
+        for _ in 0..64 {
+            match &current {
+                Value::Object(idx) => {
+                    if let HeapValue::Object(obj) = &self.heap[*idx] {
+                        let ks = match key_to_str(key) {
+                            Some(s) => s,
+                            None => return Ok(Value::Undefined),
+                        };
+                        if let Some(val) = obj.properties.get(&ks) {
+                            return Ok(val.clone());
+                        }
+                        if let Some(next) = obj.prototype {
+                            current = Value::Object(next);
+                        } else {
+                            return Ok(Value::Undefined);
+                        }
+                    } else {
+                        return Ok(Value::Undefined);
+                    }
+                }
+                _ => return Ok(Value::Undefined),
+            }
         }
         Ok(Value::Undefined)
     }

@@ -16,7 +16,12 @@ impl<'a> Parser<'a> {
         // failure or non-`=>` follow, rewind and parse as a parenthesized expr.
         if matches!(
             self.peek().token,
-            Token::Identifier(_) | Token::Ellipsis | Token::LeftBracket | Token::LeftBrace
+            Token::Identifier(_)
+                | Token::Get
+                | Token::Set
+                | Token::Ellipsis
+                | Token::LeftBracket
+                | Token::LeftBrace
         ) {
             let saved = self.pos;
             let arrow_result = (|| -> Result<SpannedNode<Expression>> {
@@ -65,7 +70,18 @@ impl<'a> Parser<'a> {
                 Expression::ObjectLiteral { properties } => {
                     properties.iter().map(|p| p.key.clone()).collect()
                 }
-                _ => return Err(Error::ParseError("Invalid arrow function parameter".into())),
+                _ => {
+                    let ctx: Vec<String> = (self.pos.saturating_sub(8)..=self.pos.min(self.tokens.len()-1))
+                        .map(|i| format!("{:?}", self.tokens[i].token))
+                        .collect();
+                    return Err(Error::ParseError(format!(
+                        "Invalid arrow function parameter (got token {:?} at {}:{}) ctx=[{}]",
+                        self.peek().token,
+                        self.tokens[self.pos].span.line,
+                        self.tokens[self.pos].span.col,
+                        ctx.join(" ")
+                    ).into()))
+                }
             };
             self.advance();
             return self.parse_arrow_body(params, None, vec![], None, None, false, vec![]);
@@ -339,7 +355,19 @@ impl<'a> Parser<'a> {
                     self.advance();
                     let key_expr = self.parse_expression()?.inner;
                     self.expect(&Token::RightBracket)?;
-                    if self.peek().token == Token::LeftParen
+                    // Computed key may be a getter/setter (`get [Symbol.x] () {}`).
+                    let accessor = if matches!(self.peek().token, Token::Get | Token::Set) {
+                        let kw = self.advance().token;
+                        if let Token::Get = kw {
+                            Some(true)
+                        } else {
+                            Some(false)
+                        }
+                    } else {
+                        None
+                    };
+                    if accessor.is_some()
+                        || self.peek().token == Token::LeftParen
                         || self.peek().token == Token::Async
                         || self.peek().token == Token::Star
                     {
@@ -366,6 +394,11 @@ impl<'a> Parser<'a> {
                         self.expect(&Token::LeftBrace)?;
                         let body = self.parse_block_body()?;
                         self.expect(&Token::RightBrace)?;
+                        let (is_getter, is_setter) = match accessor {
+                            Some(true) => (true, false),
+                            Some(false) => (false, true),
+                            None => (false, false),
+                        };
                         properties.push(ObjectProperty {
                             key: String::new(),
                             value: Expression::FunctionExpression {
@@ -383,8 +416,8 @@ impl<'a> Parser<'a> {
                             shorthand: false,
                             computed: true,
                             computed_key: Some(key_expr),
-                            is_getter: false,
-                            is_setter: false,
+                            is_getter,
+                            is_setter,
                         });
                     } else {
                         self.expect(&Token::Colon)?;
@@ -518,6 +551,46 @@ impl<'a> Parser<'a> {
                                 shorthand: false,
                                 computed: false,
                                 computed_key: None,
+                                is_getter,
+                                is_setter: !is_getter,
+                            });
+                        } else if (key == "get" || key == "set")
+                            && self.peek().token == Token::LeftBracket
+                        {
+                            // Computed accessor: `get [Symbol.x] () { ... }`.
+                            self.advance();
+                            let key_expr = self.parse_expression()?.inner;
+                            self.expect(&Token::RightBracket)?;
+                            self.expect(&Token::LeftParen)?;
+                            self.expect(&Token::RightParen)?;
+                            let return_type = if self.peek().token == Token::Colon {
+                                self.advance();
+                                Some(self.parse_type_annotation()?)
+                            } else {
+                                None
+                            };
+                            self.expect(&Token::LeftBrace)?;
+                            let body = self.parse_block_body()?;
+                            self.expect(&Token::RightBrace)?;
+                            let is_getter = key == "get";
+                            let accessor_fn = Expression::FunctionExpression {
+                                name: None,
+                                params: vec![],
+                                param_patterns: vec![],
+                                param_types: Some(vec![]),
+                                defaults: vec![],
+                                rest_param: None,
+                                return_type,
+                                body,
+                                is_async: false,
+                                is_generator: false,
+                            };
+                            properties.push(ObjectProperty {
+                                key: String::new(),
+                                value: accessor_fn,
+                                shorthand: false,
+                                computed: true,
+                                computed_key: Some(key_expr),
                                 is_getter,
                                 is_setter: !is_getter,
                             });

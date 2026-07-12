@@ -580,6 +580,65 @@ pub(super) fn native_typed_array_subarray(
     Ok(Value::TypedArray(heap_idx))
 }
 
+/// `%TypedArray%.prototype[Symbol.toStringTag]` getter. Returns the
+/// constructor name (e.g. `"Int8Array"`) for the receiver so code like
+/// `safe-stable-stringify`'s `typedArrayPrototypeGetSymbolToStringTag.call(value)`
+/// works.
+pub(super) fn native_typed_array_symbol_to_string_tag(
+    interp: &mut Interpreter,
+    this: &Value,
+    _args: &[Value],
+) -> Result<Value> {
+    let idx = match this {
+        Value::TypedArray(idx) => *idx,
+        _ => return Err(Error::TypeError("Not a TypedArray".into())),
+    };
+    let arr = get_typed_array(interp, idx)?;
+    let name = match arr.kind {
+        TypedArrayType::Int8Array => "Int8Array",
+        TypedArrayType::Uint8Array => "Uint8Array",
+        TypedArrayType::Uint8ClampedArray => "Uint8ClampedArray",
+        TypedArrayType::Int16Array => "Int16Array",
+        TypedArrayType::Uint16Array => "Uint16Array",
+        TypedArrayType::Int32Array => "Int32Array",
+        TypedArrayType::Uint32Array => "Uint32Array",
+        TypedArrayType::Float32Array => "Float32Array",
+        TypedArrayType::Float64Array => "Float64Array",
+        TypedArrayType::BigInt64Array => "BigInt64Array",
+        TypedArrayType::BigUint64Array => "BigUint64Array",
+    };
+    Ok(Value::from_string(name.to_string()))
+}
+
+/// `TypedArray.prototype.buffer` getter — returns the underlying ArrayBuffer
+/// (a Buffer/Array slice) for the receiver typed array.
+pub(super) fn native_typed_array_buffer(
+    interp: &mut Interpreter,
+    this: &Value,
+    _args: &[Value],
+) -> Result<Value> {
+    let idx = match this {
+        Value::TypedArray(idx) => *idx,
+        _ => return Err(Error::TypeError("Not a TypedArray".into())),
+    };
+    let arr = get_typed_array(interp, idx)?;
+    // Expose the raw byte buffer as a shared-ish Array of bytes. Node's
+    // `buffer` is an ArrayBuffer; we surface it as a plain Array (the actual
+    // byte Vec is owned by the TypedArray heap cell, so we copy).
+    let bytes: Vec<Value> = arr
+        .buffer
+        .iter()
+        .map(|b| Value::Integer(*b as i64))
+        .collect();
+    let arr_idx = interp.heap.len();
+    interp
+        .heap
+        .push(crate::vm::interpreter::HeapValue::Array(
+            crate::vm::interpreter::JsArray { elements: bytes },
+        ));
+    Ok(Value::Array(arr_idx))
+}
+
 pub(super) fn native_typed_array_slice(
     interp: &mut Interpreter,
     this: &Value,

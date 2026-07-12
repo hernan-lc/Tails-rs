@@ -8,6 +8,11 @@ use crate::well_known as wk;
 impl Interpreter {
     fn handle_make_class(&mut self, class_info_idx: &u32, module: &CompiledModule) -> Result<()> {
         let class_info = module.class_infos[*class_info_idx as usize].clone();
+        // Capture the module scope so class methods/constructor resolve free
+        // variables (e.g. top-level function declarations) against the module
+        // that *defines* the class, even when the class is instantiated from a
+        // different module (see exec_make_function's module_scope handling).
+        let class_scope = self.module_globals_rc();
         let super_val = if class_info.superclass.is_some() {
             self.stack
                 .pop()
@@ -56,7 +61,7 @@ impl Interpreter {
                     super_class: Some(super_val.clone()),
                     properties: PropertyStorage::new(),
                     owner_module: owner,
-                    module_scope: None,
+                    module_scope: Some(class_scope.clone()),
                     is_generator: false,
                     source_file: src_file,
                     source_line: src_line,
@@ -81,7 +86,7 @@ impl Interpreter {
                     super_class: Some(super_val.clone()),
                     properties: PropertyStorage::new(),
                     owner_module: None,
-                    module_scope: None,
+                    module_scope: Some(class_scope.clone()),
                     is_generator: false,
                     source_file: src_file,
                     source_line: src_line,
@@ -117,7 +122,7 @@ impl Interpreter {
                     super_class: None,
                     properties: PropertyStorage::new(),
                     owner_module: owner,
-                    module_scope: None,
+                    module_scope: Some(class_scope.clone()),
                     is_generator: false,
                     source_file: src_file,
                     source_line: src_line,

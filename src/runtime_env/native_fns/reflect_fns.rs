@@ -226,6 +226,7 @@ pub(super) fn native_reflect_get_own_property_descriptor(
     let target = args.first().cloned().unwrap_or(Value::Undefined);
     let property = match args.get(1) {
         Some(Value::String(s)) => s.to_string(),
+        Some(Value::Symbol(id)) => format!("__sym_{}", id),
         _ => return Ok(Value::Undefined),
     };
 
@@ -507,6 +508,12 @@ pub(super) fn native_reflect_get_prototype_of(
                 if let Some(proto_idx) = interp.function_proto_idx {
                     return Ok(Value::Object(proto_idx));
                 }
+            }
+            Ok(Value::Null)
+        }
+        Value::TypedArray(_) => {
+            if let Some(proto_idx) = interp.typed_array_proto_idx {
+                return Ok(Value::Object(proto_idx));
             }
             Ok(Value::Null)
         }

@@ -82,6 +82,32 @@ pub(super) fn native_buffer_alloc(
     Ok(Value::Buffer(buf_idx))
 }
 
+// `Buffer.allocUnsafe(size)` / `Buffer.allocUnsafeSlow(size)` — like
+// `alloc` but the contents are not initialised. For safety we still
+// zero-fill (Node warns the memory is uninitialised; we don't expose
+// random heap bytes).
+pub(super) fn native_buffer_alloc_unsafe(
+    interp: &mut Interpreter,
+    _this: &Value,
+    args: &[Value],
+) -> Result<Value> {
+    let size = args.first().map(|v| to_i64(v) as usize).unwrap_or(0);
+    let buf_idx = interp.heap.len();
+    interp.heap.push(HeapValue::Buffer(vec![0u8; size]));
+    Ok(Value::Buffer(buf_idx))
+}
+
+pub(super) fn native_buffer_alloc_unsafe_slow(
+    interp: &mut Interpreter,
+    _this: &Value,
+    args: &[Value],
+) -> Result<Value> {
+    let size = args.first().map(|v| to_i64(v) as usize).unwrap_or(0);
+    let buf_idx = interp.heap.len();
+    interp.heap.push(HeapValue::Buffer(vec![0u8; size]));
+    Ok(Value::Buffer(buf_idx))
+}
+
 pub(super) fn native_buffer_from(
     interp: &mut Interpreter,
     _this: &Value,

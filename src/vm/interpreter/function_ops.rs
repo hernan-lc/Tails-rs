@@ -36,7 +36,7 @@ impl Interpreter {
         }
     }
 
-    fn module_globals_rc(&mut self) -> std::rc::Rc<std::cell::RefCell<FxHashMap<String, Value>>> {
+    pub(crate) fn module_globals_rc(&mut self) -> std::rc::Rc<std::cell::RefCell<FxHashMap<String, Value>>> {
         self.module_globals_rc
             .get_or_insert_with(|| {
                 if let Some(ref mg) = self.module_globals {

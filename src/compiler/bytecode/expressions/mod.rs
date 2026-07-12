@@ -698,6 +698,17 @@ impl CodeGenerator {
                     if let Some(key_expr) = &prop.computed_key {
                         self.generate_expression(key_expr)?;
                     }
+                    let actual_key = if prop.is_getter {
+                        format!("__getter_{}", prop.key)
+                    } else if prop.is_setter {
+                        format!("__setter_{}", prop.key)
+                    } else {
+                        prop.key.clone()
+                    };
+                    if !actual_key.is_empty() {
+                        let key_idx = self.add_constant(Value::from_string(actual_key));
+                        self.emit(Instruction::LoadConst(key_idx));
+                    }
                 } else {
                     let actual_key = if prop.is_getter {
                         format!("__getter_{}", prop.key)

@@ -134,6 +134,9 @@ pub const MOD_ZLIB: &str = "zlib";
 pub const MOD_TLS: &str = "tls";
 pub const MOD_TIMERS: &str = "timers";
 pub const MOD_ASSERT: &str = "assert";
+pub const MOD_PERF_HOOKS: &str = "perf_hooks";
+pub const MOD_ASYNC_HOOKS: &str = "async_hooks";
+pub const MOD_WORKER_THREADS: &str = "worker_threads";
 
 // ---------------------------------------------------------------------------
 // F. `typeof` result tags
