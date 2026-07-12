@@ -211,21 +211,43 @@ impl CodeGenerator {
 
         // Remap all jump targets to account for removed instructions.
         for instr in &mut optimized {
-            let target = match instr {
+            // `TryJump` carries two jump targets (catch_pc, finally_pc); every
+            // other variant carries at most one. IteratorNext / AsyncIteratorNext
+            // are real forward jumps (the iterator's "done" target) and MUST be
+            // remapped, otherwise a peephole deletion that shifts code earlier
+            // leaves them pointing into the middle of a later statement (e.g.
+            // the call right after a `for...of` loop — the Zod `normalized`
+            // clobbering bug).
+            match instr {
                 Instruction::Jump(t)
                 | Instruction::JumpIf(t)
                 | Instruction::JumpIfNot(t)
                 | Instruction::JumpIfUndefined(t)
-                | Instruction::JumpIfNotUndefined(t) => Some(t),
-                _ => None,
-            };
-            if let Some(t) = target {
-                let old = *t as usize;
-                if old < old_to_new.len() {
-                    if let Some(Some(new)) = old_to_new.get(old) {
-                        *t = *new as u32;
+                | Instruction::JumpIfNotUndefined(t)
+                | Instruction::IteratorNext(t)
+                | Instruction::AsyncIteratorNext(t) => {
+                    let old = *t as usize;
+                    if old < old_to_new.len() {
+                        if let Some(Some(new)) = old_to_new.get(old) {
+                            *t = *new as u32;
+                        }
                     }
                 }
+                Instruction::TryJump(c, f) => {
+                    let old_c = *c as usize;
+                    if old_c < old_to_new.len() {
+                        if let Some(Some(new)) = old_to_new.get(old_c) {
+                            *c = *new as u32;
+                        }
+                    }
+                    let old_f = *f as usize;
+                    if old_f < old_to_new.len() {
+                        if let Some(Some(new)) = old_to_new.get(old_f) {
+                            *f = *new as u32;
+                        }
+                    }
+                }
+                _ => {}
             }
         }
 

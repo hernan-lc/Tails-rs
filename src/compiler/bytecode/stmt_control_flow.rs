@@ -549,6 +549,15 @@ impl CodeGenerator {
                 // local frame and clobber bindings declared before the loop
                 // (Zod generateFastpass: `const ids` became undefined after
                 // `for (const key of normalized.keys)`).
+                //
+                // NOTE: the original symptom (an earlier binding read back as
+                // `undefined` after the loop) was actually caused by the
+                // peephole optimizer deleting the discarded bare expression
+                // statement (`doc;`) before the loop and then failing to remap
+                // `IteratorNext`'s "done" jump target — landing it inside the
+                // statement that follows the loop. That is fixed in
+                // `peephole_optimize` (mod.rs), which now remaps IteratorNext /
+                // AsyncIteratorNext / TryJump targets.
                 self.locals.truncate(prev_locals_count);
                 self.scope_depth -= 1;
                 Ok(true)
