@@ -468,6 +468,10 @@ pub fn create_timers_module(
     _gc: &mut GarbageCollector,
 ) -> PropertyStorage {
     props! {
+        "setTimeout" => Value::NativeFunction(c::SET_TIMEOUT),
+        "clearTimeout" => Value::NativeFunction(c::CLEAR_TIMEOUT),
+        "setInterval" => Value::NativeFunction(c::SET_INTERVAL),
+        "clearInterval" => Value::NativeFunction(c::CLEAR_INTERVAL),
         "setImmediate" => Value::NativeFunction(c::SET_IMMEDIATE),
         "clearImmediate" => Value::NativeFunction(c::CLEAR_IMMEDIATE),
     }
