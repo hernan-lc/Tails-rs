@@ -710,11 +710,24 @@ impl Interpreter {
             ("BigUint64Array", 311),
         ];
 
-        // Shared `%TypedArray%` prototype — every typed-array instance chains
-        // to this. It carries the instance methods and `[Symbol.toStringTag]`
-        // as a getter (read by `safe-stable-stringify`'s
-        // `typedArrayPrototypeGetSymbolToStringTag`).
-        let tag_key = format!("__getter___sym_{}", crate::objects::SYMBOL_TO_STRING_TAG);
+        // Base `%TypedArray.prototype%` — chained to from each typed-array's
+        // prototype. Carries `[Symbol.toStringTag]` as a getter (read by
+        // `safe-stable-stringify`'s `typedArrayPrototypeGetSymbolToStringTag`,
+        // which does `Object.getPrototypeOf(Object.getPrototypeOf(instance))`).
+        let typed_array_base_proto_props = props! {
+            "__getter___sym_2" => Value::NativeFunction(c::TYPED_ARRAY_TO_STRING_TAG),
+        };
+        let typed_array_base_proto_idx = self.gc.allocate(
+            &mut self.heap,
+            HeapValue::Object(JsObject {
+                properties: typed_array_base_proto_props,
+                prototype: self.object_proto_idx,
+                extensible: true,
+            }),
+        );
+
+        // Shared instance-method prototype (`TypedArray.prototype`), chained
+        // to the base proto. Every typed-array instance's [[Prototype]] is this.
         let typed_array_proto_props = props! {
             "BYTES_PER_ELEMENT" => Value::Integer(0),
             wk::LENGTH => Value::NativeFunction(c::TYPED_ARRAY_LENGTH),
@@ -723,13 +736,12 @@ impl Interpreter {
             "subarray" => Value::NativeFunction(c::TYPED_ARRAY_SUBARRAY),
             "slice" => Value::NativeFunction(c::TYPED_ARRAY_SLICE),
             "buffer" => Value::NativeFunction(c::TYPED_ARRAY_BUFFER),
-            tag_key => Value::NativeFunction(c::TYPED_ARRAY_TO_STRING_TAG),
         };
         let typed_array_proto_idx = self.gc.allocate(
             &mut self.heap,
             HeapValue::Object(JsObject {
                 properties: typed_array_proto_props,
-                prototype: self.object_proto_idx,
+                prototype: Some(typed_array_base_proto_idx),
                 extensible: true,
             }),
         );

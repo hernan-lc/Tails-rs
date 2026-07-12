@@ -786,8 +786,12 @@ impl Interpreter {
                     "set" => return Ok(Value::NativeFunction(c::TYPED_ARRAY_SET)),
                     "subarray" => return Ok(Value::NativeFunction(c::TYPED_ARRAY_SUBARRAY)),
                     "slice" => return Ok(Value::NativeFunction(c::TYPED_ARRAY_SLICE)),
+                    "buffer" => return Ok(Value::NativeFunction(c::TYPED_ARRAY_BUFFER)),
                     _ => {}
                 }
+                // Fall back to the TypedArray.prototype chain
+                // (e.g. `[Symbol.toStringTag]` getter, BYTES_PER_ELEMENT).
+                return self.get_from_prototype_chain(self.typed_array_proto_idx, key, this);
             }
             Value::Generator(_gen_idx) => {
                 if let Some(proto_idx) = self.generator_proto_idx {

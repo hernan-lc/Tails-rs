@@ -345,6 +345,14 @@ pub(super) fn native_reflect_get_own_property_descriptor(
                 }
             }
         }
+        Value::TypedArray(_ta_idx) => {
+            // TypedArray instances have no own property map; their members
+            // live on the shared TypedArray.prototype. Delegate to it.
+            if let Some(proto_idx) = interp.typed_array_proto_idx {
+                let proto_val = Value::Object(proto_idx);
+                return native_reflect_get_own_property_descriptor(interp, _this, &[proto_val, args.get(1).cloned().unwrap_or(Value::Undefined)]);
+            }
+        }
         Value::Array(arr_idx) => {
             if let crate::vm::interpreter::HeapValue::Array(arr) = &interp.heap[*arr_idx] {
                 if property.as_str() == wk::LENGTH {
