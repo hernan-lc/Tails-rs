@@ -296,9 +296,37 @@ impl Interpreter {
                 let _ = self.call_value(&task.callback, &Value::Undefined, &[]);
             }
 
+            // Honor a Ctrl+C / SIGTERM / `process.exit` request even while this
+            // inner async loop is the one driving timers. Otherwise the
+            // cooperative exit flag set by the signal handler is only checked in
+            // `TailsRuntime::run_event_loop`, which is never reached for scripts
+            // that keep pending timers (setInterval / setTimeout) — so the
+            // process would ignore Ctrl+C until the timers finished.
+            #[cfg(feature = "process")]
+            {
+                use std::io::Write;
+                if crate::runtime_env::native_fns::process_fns::exit_requested() {
+                    let code =
+                        crate::runtime_env::native_fns::process_fns::take_exit_code();
+                    let _ = std::io::stdout().flush();
+                    let _ = std::io::stderr().flush();
+                    std::process::exit(code);
+                }
+            }
+
             if !any_resumed && self.suspended_frames.is_empty() && self.async_runtime.is_idle() {
                 break;
             }
+
+            // Don't busy-spin while waiting for the next timer: sleep until it is
+            // due (capped) so we wake promptly for due timers and for signals.
+            let sleep_ms = self
+                .async_runtime
+                .next_timer_delay_ms()
+                .unwrap_or(200)
+                .min(50)
+                .max(1);
+            std::thread::sleep(std::time::Duration::from_millis(sleep_ms));
         }
 
         if result.is_ok() {

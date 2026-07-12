@@ -1,45 +1,115 @@
 import http from "http";
-import { setInterval, setTimeout } from "timers";
+import fs from "fs/promises";
+import path from "path";
+import { fileURLToPath } from "url";
 
-// Define the port the server will listen on
 const PORT = 3000;
 
-// Create the HTTP server
-const server = http.createServer((req, res) => {
-  // Get the request method and URL path
-  const { method, url } = req;
+// Replicate __dirname functionality in ES Modules
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
-  console.log(`[${new Date().toISOString()}] ${method} ${url}`);
+// Mock Database Memory Store
+const usersDb = [
+  { id: 1, name: "Alice", role: "Admin" },
+  { id: 2, name: "Bob", role: "Developer" }
+];
 
-  // Route 1: Home Page
-  if (url === "/" && method === "GET") {
-    res.writeHead(200, { "Content-Type": "text/html" });
-    res.end("<h1>Welcome to my Node.js HTTP Server!</h1><p>Try visiting <a href='/api/user'>/api/user</a></p>");
-  }
+// Helper function to handle JSON responses cleanly
+const sendJSON = (res, statusCode, data) => {
+  res.writeHead(statusCode, { "Content-Type": "application/json" });
+  res.end(JSON.stringify(data));
+};
 
-  // Route 2: JSON API Endpoint
-  else if (url === "/api/user" && method === "GET") {
-    const userData = {
-      id: 1,
-      name: "Alex Dev",
-      role: "Full Stack Engineer",
-      status: "Coding"
-    };
+// Main Server Request Listener
+const server = http.createServer(async (req, res) => {
+  // Parse the URL and extract query string params (e.g., /api/users?role=Admin)
+  const parsedUrl = new URL(req.url, `http://${req.headers.host}`);
+  const pathname = parsedUrl.pathname;
+  const method = req.method;
 
-    res.writeHead(200, { "Content-Type": "application/json" });
-    res.end(JSON.stringify(userData));
-  }
+  console.log(`[${new Date().toLocaleTimeString()}] ${method} ${pathname}`);
 
-  // Route 3: Catch-all for 404 Not Found
-  else {
-    res.writeHead(404, { "Content-Type": "text/plain" });
-    res.end("404 Not Found - The page you are looking for does not exist.");
+  try {
+    // ---------------------------------------------------------
+    // ROUTE 1: GET / -> Serve Static HTML File
+    // ---------------------------------------------------------
+    if (pathname === "/" && method === "GET") {
+      const filePath = path.join(__dirname, "examples", "public", "index.html");
+      const htmlContent = await fs.readFile(filePath, "utf-8");
+
+      res.writeHead(200, { "Content-Type": "text/html" });
+      res.end(htmlContent);
+    }
+
+    // ---------------------------------------------------------
+    // ROUTE 2: GET /api/users -> Supports filtering via Query Parameters
+    // ---------------------------------------------------------
+    else if (pathname === "/api/users" && method === "GET") {
+      const roleFilter = parsedUrl.searchParams.get("role");
+
+      if (roleFilter) {
+        const filteredUsers = usersDb.filter(
+          u => u.role.toLowerCase() === roleFilter.toLowerCase()
+        );
+        return sendJSON(res, 200, filteredUsers);
+      }
+
+      sendJSON(res, 200, usersDb);
+    }
+
+    // ---------------------------------------------------------
+    // ROUTE 3: POST /api/users -> Parse JSON Request Body & Add User
+    // ---------------------------------------------------------
+    else if (pathname === "/api/users" && method === "POST") {
+      let body = "";
+
+      // Listen for data chunks incoming in the stream
+      req.on("data", chunk => {
+        body += chunk.toString();
+      });
+
+      // Once the full stream payload is received
+      req.on("end", () => {
+        try {
+          const payload = JSON.parse(body);
+
+          // Simple Validation
+          if (!payload.name || !payload.role) {
+            return sendJSON(res, 400, { error: "Missing 'name' or 'role' fields" });
+          }
+
+          const newUser = {
+            id: usersDb.length + 1,
+            name: payload.name,
+            role: payload.role
+          };
+
+          usersDb.push(newUser);
+          sendJSON(res, 201, { message: "User created successfully", user: newUser });
+        } catch (parseError) {
+          sendJSON(res, 400, { error: "Invalid JSON payload format" });
+        }
+      });
+    }
+
+    // ---------------------------------------------------------
+    // ROUTE 4: Catch-all 404 Not Found
+    // ---------------------------------------------------------
+    else {
+      sendJSON(res, 404, { error: `Route ${method} ${pathname} not found.` });
+    }
+
+  } catch (globalError) {
+    // Top-level catch block to prevent the server from crashing on unhandled errors (e.g., file missing)
+    console.error("Server Error:", globalError);
+    sendJSON(res, 500, { error: "Internal Server Error" });
   }
 });
 
-// Start the server
+// Start the server instance
 server.listen(PORT, () => {
-  console.log(`🚀 Server is running and listening on http://localhost:${PORT}`);
+  console.log(`HTTP Server live on port ${PORT}`);
 });
 setInterval(() => {
   console.log("tick");
@@ -47,4 +117,4 @@ setInterval(() => {
 setTimeout(() => {
   console.log("exiting");
   process.exit();
-}, 10000);
+}, 15000);
