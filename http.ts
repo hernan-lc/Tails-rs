@@ -114,7 +114,11 @@ server.listen(PORT, () => {
 setInterval(() => {
   console.log("tick");
 }, 5000);
-setTimeout(() => {
-  console.log("exiting");
-  process.exit();
-}, 15000);
+fetch("http://localhost:3000/")
+  .then((res) => res.text())
+  .then((body) => console.log(body))
+  .catch((err) => console.error(err));
+// setTimeout(() => {
+//   console.log("exiting");
+//   process.exit();
+// }, 15000);

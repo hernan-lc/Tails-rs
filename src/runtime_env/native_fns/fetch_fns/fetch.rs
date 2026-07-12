@@ -1,11 +1,15 @@
-use crate::errors::{Error, Result};
+use crate::errors::Result;
 use crate::objects::js_promise::JsPromise;
 use crate::objects::Value;
 use crate::runtime_env::native_fns::helpers::to_string_value;
 use crate::vm::interpreter::{HeapValue, Interpreter};
+use crate::vm::EventSource;
 
 use super::headers::parse_headers;
 use super::response::build_response;
+
+use std::sync::mpsc;
+use std::thread;
 
 pub(crate) fn native_fetch(
     interp: &mut Interpreter,
@@ -68,23 +72,36 @@ pub(crate) fn native_fetch(
         (url, method, headers_map, body)
     };
 
-    let result = execute_fetch(interp, &url, &method, &headers_map, body.as_deref());
+    // Create a *pending* promise. We resolve it later (without blocking the
+    // interpreter thread) once the background worker delivers the response.
+    let promise_idx = interp.heap.len();
+    interp.heap.push(HeapValue::Promise(JsPromise::new()));
 
-    match result {
-        Ok(response_value) => {
-            let promise = JsPromise::fulfilled(response_value);
-            let promise_idx = interp.heap.len();
-            interp.heap.push(HeapValue::Promise(promise));
-            Ok(Value::Promise(promise_idx))
-        }
-        Err(e) => {
-            let err_msg = Value::from_string(e.to_string());
-            let promise = JsPromise::rejected(err_msg);
-            let promise_idx = interp.heap.len();
-            interp.heap.push(HeapValue::Promise(promise));
-            Ok(Value::Promise(promise_idx))
-        }
-    }
+    // The blocking HTTP I/O runs on a dedicated worker thread so the main
+    // thread stays free to run the event loop — serving HTTP requests, firing
+    // timers, draining microtasks, … . This is what makes `await fetch(...)`
+    // cooperative instead of deadlocking against an in-process server.
+    let (tx, rx) = mpsc::channel();
+    let worker_url = url.clone();
+    let worker_method = method.clone();
+    let worker_headers = headers_map.clone();
+    let worker_body = body.clone();
+    let _ = thread::Builder::new()
+        .name("tails-fetch".to_string())
+        .spawn(move || {
+            let result = do_fetch_blocking(worker_url, worker_method, worker_headers, worker_body);
+            let _ = tx.send(result);
+        });
+
+    // Register a source the event loop polls; it resolves the promise once the
+    // worker's result arrives.
+    interp.pending_event_sources.push(Box::new(FetchEventSource {
+        rx,
+        promise_idx,
+        done: false,
+    }));
+
+    Ok(Value::Promise(promise_idx))
 }
 
 fn parse_fetch_args(
@@ -183,40 +200,55 @@ fn parse_headers_to_map(raw: &str) -> std::collections::HashMap<String, String> 
     parse_headers(raw).into_iter().collect()
 }
 
-fn execute_fetch(
-    interp: &mut Interpreter,
-    url: &str,
-    method: &str,
-    headers: &std::collections::HashMap<String, String>,
-    body: Option<&str>,
-) -> Result<Value> {
+/// Raw, interpreter-independent result of a completed (blocking) HTTP request.
+///
+/// Produced on the worker thread and shipped to the main thread via a channel;
+/// the [`FetchEventSource`] turns it into the JS `Response` value.
+struct RawFetchResult {
+    status: u16,
+    status_text: String,
+    headers_raw: String,
+    body: String,
+}
+
+/// Performs the actual network I/O on a background thread.
+///
+/// Kept free of any interpreter/heap references so it is safe to run off the
+/// main thread. Errors are returned as plain strings (matching the previous
+/// `fetch failed: …` message shape) and later surface as a rejected promise.
+fn do_fetch_blocking(
+    url: String,
+    method: String,
+    headers: std::collections::HashMap<String, String>,
+    body: Option<String>,
+) -> std::result::Result<RawFetchResult, String> {
     let client = reqwest::blocking::Client::builder()
         .timeout(std::time::Duration::from_secs(30))
         .redirect(reqwest::redirect::Policy::limited(10))
         .build()
-        .map_err(|e| Error::RuntimeError(format!("Failed to create HTTP client: {}", e)))?;
+        .map_err(|e| format!("Failed to create HTTP client: {}", e))?;
 
     let mut req = match method.to_uppercase().as_str() {
-        "POST" => client.post(url),
-        "PUT" => client.put(url),
-        "DELETE" => client.delete(url),
-        "PATCH" => client.patch(url),
-        "HEAD" => client.head(url),
-        "OPTIONS" => client.request(reqwest::Method::OPTIONS, url),
-        _ => client.get(url),
+        "POST" => client.post(&url),
+        "PUT" => client.put(&url),
+        "DELETE" => client.delete(&url),
+        "PATCH" => client.patch(&url),
+        "HEAD" => client.head(&url),
+        "OPTIONS" => client.request(reqwest::Method::OPTIONS, &url),
+        _ => client.get(&url),
     };
 
-    for (key, value) in headers {
+    for (key, value) in &headers {
         req = req.header(key.as_str(), value.as_str());
     }
 
     if let Some(body_str) = body {
-        req = req.body(body_str.to_string());
+        req = req.body(body_str);
     }
 
     let response = req
         .send()
-        .map_err(|e| Error::RuntimeError(format!("fetch failed: {}", e)))?;
+        .map_err(|e| format!("fetch failed: {}", e))?;
 
     let status = response.status().as_u16();
     let status_text = response
@@ -235,5 +267,64 @@ fn execute_fetch(
 
     let body_text = response.text().unwrap_or_default();
 
-    build_response(interp, body_text, status, &status_text, &headers_raw)
+    Ok(RawFetchResult {
+        status,
+        status_text,
+        headers_raw,
+        body: body_text,
+    })
+}
+
+/// Drives an in-flight `fetch` request without blocking the interpreter thread.
+///
+/// The blocking network I/O runs on a worker thread (see [`do_fetch_blocking`]);
+/// this source is polled by the event loop and, once the worker delivers its
+/// result, resolves the associated promise — enqueuing the `.then`/`.catch`
+/// continuations as microtasks for [`crate::vm::interpreter::Interpreter::drain_microtasks`].
+struct FetchEventSource {
+    rx: mpsc::Receiver<std::result::Result<RawFetchResult, String>>,
+    promise_idx: usize,
+    done: bool,
+}
+
+impl EventSource for FetchEventSource {
+    fn is_active(&self) -> bool {
+        !self.done
+    }
+
+    fn poll(&mut self, interp: &mut Interpreter) -> Result<()> {
+        match self.rx.try_recv() {
+            Ok(Ok(raw)) => {
+                match build_response(
+                    interp,
+                    raw.body,
+                    raw.status,
+                    &raw.status_text,
+                    &raw.headers_raw,
+                ) {
+                    Ok(response_value) => interp.resolve_promise(self.promise_idx, response_value),
+                    Err(e) => interp.reject_promise(self.promise_idx, Value::from_string(e.to_string())),
+                }
+                self.done = true;
+            }
+            Ok(Err(msg)) => {
+                interp.reject_promise(self.promise_idx, Value::from_string(msg));
+                self.done = true;
+            }
+            Err(mpsc::TryRecvError::Empty) => {
+                // Worker hasn't finished yet — remain pending and try again next tick.
+            }
+            Err(mpsc::TryRecvError::Disconnected) => {
+                // The worker ended without sending a result (e.g. panicked).
+                if !self.done {
+                    interp.reject_promise(
+                        self.promise_idx,
+                        Value::from_string("fetch failed: worker thread terminated unexpectedly".to_string()),
+                    );
+                    self.done = true;
+                }
+            }
+        }
+        Ok(())
+    }
 }

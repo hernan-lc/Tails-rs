@@ -19,6 +19,12 @@ pub struct JsPromise {
 pub struct PromiseHandler {
     pub callback: usize,
     pub resolve: bool,
+    /// The promise returned by the `.then`/`.catch`/`.finally` call that
+    /// registered this handler. Its settlement is driven by this handler's
+    /// result (or, when the handler doesn't match the settlement type, by
+    /// pass-through of the original outcome) so promise chains actually
+    /// propagate values instead of leaving the next promise forever pending.
+    pub chained_promise: usize,
 }
 
 impl JsPromise {
@@ -87,24 +93,27 @@ impl JsPromise {
         }
     }
 
-    pub fn then(&mut self, callback: usize) {
+    pub fn then(&mut self, callback: usize, chained_promise: usize) {
         self.then_handlers.push(PromiseHandler {
             callback,
             resolve: true,
+            chained_promise,
         });
     }
 
-    pub fn catch(&mut self, callback: usize) {
+    pub fn catch(&mut self, callback: usize, chained_promise: usize) {
         self.catch_handlers.push(PromiseHandler {
             callback,
             resolve: false,
+            chained_promise,
         });
     }
 
-    pub fn finally(&mut self, callback: usize) {
+    pub fn finally(&mut self, callback: usize, chained_promise: usize) {
         self.finally_handlers.push(PromiseHandler {
             callback,
             resolve: true,
+            chained_promise,
         });
     }
 

@@ -2,9 +2,16 @@ use crate::objects::Value;
 use std::collections::VecDeque;
 use std::time::Instant;
 
+/// Sentinel `chained_promise` value meaning "not part of a promise chain":
+/// the microtask's result is intentionally dropped after it runs.
+pub const NO_CHAIN: usize = usize::MAX;
+
 pub struct Microtask {
     pub callback: Value,
     pub arg: Value,
+    /// When this microtask is a promise-chain continuation, the promise to
+    /// settle with the handler's return value. [`NO_CHAIN`] otherwise.
+    pub chained_promise: usize,
 }
 
 pub struct Macrotask {
@@ -38,12 +45,33 @@ impl AsyncRuntime {
         self.microtask_queue.push_back(Microtask {
             callback,
             arg: Value::Undefined,
+            chained_promise: NO_CHAIN,
         });
     }
 
     #[inline]
     pub fn enqueue_microtask_with_arg(&mut self, callback: Value, arg: Value) {
-        self.microtask_queue.push_back(Microtask { callback, arg });
+        self.microtask_queue.push_back(Microtask {
+            callback,
+            arg,
+            chained_promise: NO_CHAIN,
+        });
+    }
+
+    /// Enqueue a microtask that is a promise-chain continuation: after
+    /// `callback` runs, its result (or thrown error) settles `chained_promise`.
+    #[inline]
+    pub fn enqueue_microtask_chained(
+        &mut self,
+        callback: Value,
+        arg: Value,
+        chained_promise: usize,
+    ) {
+        self.microtask_queue.push_back(Microtask {
+            callback,
+            arg,
+            chained_promise,
+        });
     }
 
     #[inline]

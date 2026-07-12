@@ -70,6 +70,7 @@ pub(super) fn native_promise_then(
                     .push(crate::objects::js_promise::PromiseHandler {
                         callback: cb_idx,
                         resolve: true,
+                        chained_promise: new_promise_idx,
                     });
             }
         }
@@ -123,6 +124,7 @@ pub(super) fn native_promise_catch(
                     .push(crate::objects::js_promise::PromiseHandler {
                         callback: cb_idx,
                         resolve: false,
+                        chained_promise: new_promise_idx,
                     });
             }
         }
@@ -156,10 +158,13 @@ pub(super) fn native_promise_finally(
         };
 
     match state_snapshot {
-        crate::objects::js_promise::PromiseState::Fulfilled(value)
-        | crate::objects::js_promise::PromiseState::Rejected(value) => {
+        crate::objects::js_promise::PromiseState::Fulfilled(value) => {
             let _ = interp.call_value(&callback, &Value::Undefined, &[])?;
             interp.resolve_promise(new_promise_idx, value);
+        }
+        crate::objects::js_promise::PromiseState::Rejected(reason) => {
+            let _ = interp.call_value(&callback, &Value::Undefined, &[])?;
+            interp.reject_promise(new_promise_idx, reason);
         }
         crate::objects::js_promise::PromiseState::Pending => {
             if let crate::vm::interpreter::HeapValue::Promise(promise) =
@@ -174,6 +179,7 @@ pub(super) fn native_promise_finally(
                     .push(crate::objects::js_promise::PromiseHandler {
                         callback: cb_idx,
                         resolve: true,
+                        chained_promise: new_promise_idx,
                     });
             }
         }
