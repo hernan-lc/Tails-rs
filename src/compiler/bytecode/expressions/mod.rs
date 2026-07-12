@@ -3,7 +3,14 @@ mod literals;
 mod operators;
 
 use super::*;
+use crate::compiler::parser::BindingPattern;
 use crate::errors::Result;
+
+struct FunctionParams<'a> {
+    params: &'a [String],
+    defaults: &'a [Option<Expression>],
+    param_patterns: &'a [Option<BindingPattern>],
+}
 
 impl CodeGenerator {
     pub(crate) fn generate_expression(&mut self, expr: &Expression) -> Result<()> {
@@ -61,12 +68,14 @@ impl CodeGenerator {
                 let inferred = name.clone().or_else(|| self.inferred_function_name.take());
                 self.generate_function_expression(
                     inferred,
-                    params,
                     body,
                     *is_generator,
                     rest_param.as_deref(),
-                    defaults,
-                    param_patterns,
+                    &FunctionParams {
+                        params,
+                        defaults,
+                        param_patterns,
+                    },
                 )
             }
             Expression::ArrowFunction {
@@ -250,13 +259,16 @@ impl CodeGenerator {
     fn generate_function_expression(
         &mut self,
         name: Option<String>,
-        params: &[String],
         body: &[SpannedNode<Statement>],
         is_generator: bool,
         rest_param: Option<&str>,
-        defaults: &[Option<Expression>],
-        param_patterns: &[Option<crate::compiler::parser::BindingPattern>],
+        fp: &FunctionParams<'_>,
     ) -> Result<()> {
+        let FunctionParams {
+            params,
+            defaults,
+            param_patterns,
+        } = *fp;
         let func_idx = self.functions.len() as u32;
         let mut all_params = params.to_vec();
         if let Some(rp) = rest_param {

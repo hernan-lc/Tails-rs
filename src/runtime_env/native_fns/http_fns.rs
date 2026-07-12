@@ -241,7 +241,7 @@ pub(super) fn native_http_res_set_header(
         .unwrap_or_default();
     if let HeapValue::Object(h) = &mut interp.heap[h_idx] {
         h.properties
-            .insert(header_key(&name).into(), Value::from_string(value));
+            .insert(header_key(&name), Value::from_string(value));
     }
     Ok(Value::Undefined)
 }
