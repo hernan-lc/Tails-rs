@@ -55,18 +55,27 @@ pub fn expand_module(item: ItemMod, options: ModuleOptions) -> TokenStream {
 
                     // Detect whether this function has `#[tails_function]`. If
                     // so, rewrite the attribute to inject `module = "<name>"`
-                    // so the function-level macro generates module-scoped
-                    // symbol names and avoids collisions when multiple native
-                    // modules are linked into the same binary.
+                    // (and preserve any explicit `js_name`) so the
+                    // function-level macro generates module-scoped symbol names
+                    // and avoids collisions when multiple native modules are
+                    // linked into the same binary.
                     let mut new_func = func.clone();
                     let mut has_tails_function = false;
                     for attr in new_func.attrs.iter_mut() {
                         if attr.path().is_ident("tails_function") {
                             has_tails_function = true;
-                            // Replace the attribute with one that includes
-                            // `module = "<name>"`.
-                            let new_attr_tokens = quote! {
-                                #[tails_function(module = #module_name)]
+                            // Preserve an explicit `js_name` so aliases (e.g.
+                            // camelCase `readFile` for snake_case `read_file`)
+                            // are registered under the intended JS name.
+                            let existing_js_name = extract_js_name(std::slice::from_ref(attr));
+                            let new_attr_tokens = if let Some(js) = existing_js_name {
+                                quote! {
+                                    #[tails_function(module = #module_name, js_name = #js)]
+                                }
+                            } else {
+                                quote! {
+                                    #[tails_function(module = #module_name)]
+                                }
                             };
                             *attr = syn::parse_quote!(#new_attr_tokens);
                         }
@@ -145,7 +154,7 @@ pub fn expand_module(item: ItemMod, options: ModuleOptions) -> TokenStream {
 
 fn extract_js_name(attrs: &[syn::Attribute]) -> Option<String> {
     for attr in attrs {
-        if attr.path().is_ident("tails") {
+        if attr.path().is_ident("tails") || attr.path().is_ident("tails_function") {
             if let Meta::List(list) = &attr.meta {
                 let mut js_name = None;
                 let _ = list.parse_nested_meta(|meta| {

@@ -182,7 +182,13 @@ impl Interpreter {
                     };
                     // Live binding for module namespaces: if tagged with
                     // __module_path, read from the registry so circular
-                    // dependency imports see exports defined so far.
+                    // dependency imports see exports defined so far. Fall back
+                    // to the object's own properties when the registry entry is
+                    // missing or doesn't contain the key — otherwise objects
+                    // that merely carry a `__module_path` tag (e.g. the default
+                    // export of a native module, which is built via
+                    // build_module_object_from_exports) would lose all their
+                    // own properties.
                     if key_str != "__module_path" {
                         if let Some(Value::String(module_path)) =
                             obj.properties.get("__module_path")
@@ -191,7 +197,6 @@ impl Interpreter {
                                 if let Some(val) = exports.get(&key_str) {
                                     return Ok(val.clone());
                                 }
-                                return Ok(Value::Undefined);
                             }
                         }
                     }

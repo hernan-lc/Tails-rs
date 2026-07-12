@@ -314,7 +314,19 @@ impl Interpreter {
                 }
             }
 
-            if !any_resumed && self.suspended_frames.is_empty() && self.async_runtime.is_idle() {
+            // Hand control back to `TailsRuntime::run_event_loop` as soon as any
+            // long-lived I/O event source (HTTP server, fetch, TCP, …) has been
+            // registered. This inner loop can drive timers and resume pending
+            // promises, but it has no way to poll those sources — only the
+            // runtime's event loop can. Without this, a script with an infinite
+            // timer (e.g. `setInterval`) would keep this loop alive forever and
+            // `run_event_loop` would never run, so the server would never accept
+            // connections and in-process `fetch` would never resolve.
+            if !any_resumed
+                && self.suspended_frames.is_empty()
+                && self.async_runtime.is_idle()
+                || !self.pending_event_sources.is_empty()
+            {
                 break;
             }
 
@@ -406,6 +418,17 @@ impl Interpreter {
         stack_snapshot.extend(self.stack.iter().cloned());
         let mut call_stack_snapshot = Vec::with_capacity(self.call_stack.len());
         call_stack_snapshot.extend(self.call_stack.iter().cloned());
+
+        // Suspended `await` frames hold live references (locals, `this`,
+        // closures, …) in their snapshots. If these are not marked as roots
+        // the objects they reference can be collected and their heap slots
+        // reused, leaving dangling references when the frame resumes. Fold
+        // every suspended frame's snapshot into the root set.
+        for frame in &self.suspended_frames {
+            stack_snapshot.extend(frame.stack_snapshot.iter().cloned());
+            call_stack_snapshot.extend(frame.call_stack_snapshot.iter().cloned());
+        }
+
         let freed = self.gc.collect(
             &mut self.heap,
             &globals_snapshot,

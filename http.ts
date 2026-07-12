@@ -62,35 +62,28 @@ const server = http.createServer(async (req, res) => {
     // ROUTE 3: POST /api/users -> Parse JSON Request Body & Add User
     // ---------------------------------------------------------
     else if (pathname === "/api/users" && method === "POST") {
-      let body = "";
+      // This runtime buffers the full request body on `req.body` before the
+      // handler runs, so we read it directly instead of streaming via
+      // `req.on("data")`. The body is a string here (no Buffer wrapper).
+      try {
+        const payload = JSON.parse(req.body || "{}");
 
-      // Listen for data chunks incoming in the stream
-      req.on("data", chunk => {
-        body += chunk.toString();
-      });
-
-      // Once the full stream payload is received
-      req.on("end", () => {
-        try {
-          const payload = JSON.parse(body);
-
-          // Simple Validation
-          if (!payload.name || !payload.role) {
-            return sendJSON(res, 400, { error: "Missing 'name' or 'role' fields" });
-          }
-
-          const newUser = {
-            id: usersDb.length + 1,
-            name: payload.name,
-            role: payload.role
-          };
-
-          usersDb.push(newUser);
-          sendJSON(res, 201, { message: "User created successfully", user: newUser });
-        } catch (parseError) {
-          sendJSON(res, 400, { error: "Invalid JSON payload format" });
+        // Simple Validation
+        if (!payload.name || !payload.role) {
+          return sendJSON(res, 400, { error: "Missing 'name' or 'role' fields" });
         }
-      });
+
+        const newUser = {
+          id: usersDb.length + 1,
+          name: payload.name,
+          role: payload.role
+        };
+
+        usersDb.push(newUser);
+        sendJSON(res, 201, { message: "User created successfully", user: newUser });
+      } catch (parseError) {
+        sendJSON(res, 400, { error: "Invalid JSON payload format" });
+      }
     }
 
     // ---------------------------------------------------------
@@ -118,7 +111,7 @@ fetch("http://localhost:3000/")
   .then((res) => res.text())
   .then((body) => console.log(body))
   .catch((err) => console.error(err));
-// setTimeout(() => {
-//   console.log("exiting");
-//   process.exit();
-// }, 15000);
+setTimeout(() => {
+  console.log("exiting");
+  process.exit();
+}, 15000);

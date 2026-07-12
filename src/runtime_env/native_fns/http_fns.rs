@@ -390,7 +390,7 @@ impl crate::vm::EventSource for HttpEventSource {
             Ok((mut stream, _)) => {
                 match tails_http::read_request(&mut stream) {
                     Ok(req) => {
-                        handle_one_request(interp, self.server_idx, req, &mut stream)?;
+                        handle_one_request(interp, self.server_idx, req, stream)?;
                         self.handled += 1;
                     }
                     Err(_) => { /* ignore malformed requests */ }
@@ -415,7 +415,7 @@ fn handle_one_request(
     interp: &mut Interpreter,
     server_idx: usize,
     req: tails_http::HttpRequest,
-    stream: &mut std::net::TcpStream,
+    mut stream: std::net::TcpStream,
 ) -> Result<()> {
     // Retrieve the handler (clone first to release the immutable borrow).
     let handler = if let HeapValue::Object(obj) = &interp.heap[server_idx] {
@@ -482,11 +482,45 @@ fn handle_one_request(
     let res_val = Value::Object(res_idx);
 
     // --- invoke handler(req, res) ---
-    if !matches!(handler, Value::Undefined) {
-        let _ = interp.call_value(&handler, &Value::Undefined, &[req_val, res_val]);
+    let handler_ret = if !matches!(handler, Value::Undefined) {
+        Some(
+            interp.call_value(&handler, &Value::Undefined, &[req_val, res_val])?,
+        )
+    } else {
+        None
+    };
+
+    // Async handlers (`async (req, res) => { ... await ...; res.end(...) }`)
+    // return a Promise. The response must NOT be written until that promise
+    // settles — otherwise we'd send an empty body before `await fs.readFile`
+    // resolves. We therefore hand the still-open connection to a dedicated
+    // event source that flushes the response once the handler calls
+    // `res.end` (or the promise settles), while the event loop keeps driving
+    // timers, I/O, and the promise chain to completion.
+    if let Some(Value::Promise(pidx)) = handler_ret {
+        interp.pending_event_sources.push(Box::new(PendingResponse {
+            stream,
+            res_idx,
+            server_idx,
+            handler_promise: Some(pidx),
+            done: false,
+        }));
+        return Ok(());
     }
 
-    // --- read the response out of `res` (no allocation between call & read) ---
+    // Synchronous handler (or a handler that already ended the response):
+    // write the response now.
+    write_response_from_res(interp, res_idx, &mut stream)
+}
+
+/// Read the status/headers/body accumulated on the `res` object and write the
+/// HTTP response to `stream`. Shared by synchronous handlers and the
+/// [`PendingResponse`] event source used for async handlers.
+fn write_response_from_res(
+    interp: &mut Interpreter,
+    res_idx: usize,
+    mut stream: &mut std::net::TcpStream,
+) -> Result<()> {
     let (status, headers, body) = if let HeapValue::Object(obj) = &interp.heap[res_idx] {
         let st = obj
             .properties
@@ -533,7 +567,7 @@ fn handle_one_request(
     };
 
     tails_http::write_response(
-        stream,
+        &mut stream,
         status,
         tails_http::status_text(status),
         &headers,
@@ -541,4 +575,61 @@ fn handle_one_request(
     )
     .map_err(|e| Error::RuntimeError(format!("http write_response failed: {}", e)))?;
     Ok(())
+}
+
+/// Event source that owns the TCP connection for an in-flight async request
+/// handler. The `run_event_loop` polls it each tick; once the handler's
+/// `res.end` flags the response as ended (or the handler promise settles) it
+/// writes the response and retires itself.
+struct PendingResponse {
+    stream: std::net::TcpStream,
+    res_idx: usize,
+    server_idx: usize,
+    handler_promise: Option<usize>,
+    done: bool,
+}
+
+impl crate::vm::EventSource for PendingResponse {
+    fn is_active(&self) -> bool {
+        !self.done
+    }
+
+    fn poll(&mut self, interp: &mut Interpreter) -> Result<()> {
+        // Stop if the server was closed from JS.
+        let closed = match interp.heap.get(self.server_idx) {
+            Some(HeapValue::Object(obj)) => {
+                matches!(obj.properties.get("__closed"), Some(Value::Boolean(true)))
+            }
+            _ => true,
+        };
+        if closed {
+            self.done = true;
+            return Ok(());
+        }
+
+        // Flush once the handler has ended the response, or once its promise
+        // has settled (so a handler that forgets to call `res.end` can't hang
+        // the connection forever).
+        let ended = match interp.heap.get(self.res_idx) {
+            Some(HeapValue::Object(obj)) => {
+                matches!(obj.properties.get("__ended"), Some(Value::Boolean(true)))
+            }
+            _ => true,
+        };
+        let settled = match self.handler_promise {
+            Some(pidx) => matches!(
+                interp.heap.get(pidx),
+                Some(HeapValue::Promise(p)) if matches!(p.state,
+                    crate::objects::js_promise::PromiseState::Fulfilled(_)
+                        | crate::objects::js_promise::PromiseState::Rejected(_))
+            ),
+            None => false,
+        };
+
+        if ended || settled {
+            let _ = write_response_from_res(interp, self.res_idx, &mut self.stream);
+            self.done = true;
+        }
+        Ok(())
+    }
 }

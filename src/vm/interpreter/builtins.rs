@@ -439,6 +439,9 @@ impl Interpreter {
             "toUTCString" => Value::NativeFunction(c::DATE_TO_UTC_STRING),
             "toDateString" => Value::NativeFunction(c::DATE_TO_DATE_STRING),
             "toTimeString" => Value::NativeFunction(c::DATE_TO_TIME_STRING),
+            "toLocaleTimeString" => Value::NativeFunction(c::DATE_TO_LOCALE_TIME_STRING),
+            "toLocaleDateString" => Value::NativeFunction(c::DATE_TO_LOCALE_DATE_STRING),
+            "toLocaleString" => Value::NativeFunction(c::DATE_TO_LOCALE_STRING),
             "toJSON" => Value::NativeFunction(c::DATE_TO_JSON),
             wk::VALUE_OF => Value::NativeFunction(c::DATE_VALUE_OF),
         };

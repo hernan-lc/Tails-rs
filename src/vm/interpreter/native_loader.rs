@@ -115,12 +115,15 @@ pub fn create_fs_promises_module(
     _gc: &mut GarbageCollector,
 ) -> PropertyStorage {
     props! {
+        "readFile" => Value::NativeFunction(c::FS_READ_FILE),
         "readdir" => Value::NativeFunction(c::FS_READDIR),
         "read_file" => Value::NativeFunction(c::FS_READ_FILE),
+        "writeFile" => Value::NativeFunction(c::FS_WRITE_FILE),
         "write_file" => Value::NativeFunction(c::FS_WRITE_FILE),
         "stat" => Value::NativeFunction(c::FS_STAT),
         "mkdir" => Value::NativeFunction(c::FS_MKDIR),
         "unlink" => Value::NativeFunction(c::FS_UNLINK),
+        "copyFile" => Value::NativeFunction(c::FS_COPY_FILE),
         "copy_file" => Value::NativeFunction(c::FS_COPY_FILE),
         "rename" => Value::NativeFunction(c::FS_RENAME),
     }

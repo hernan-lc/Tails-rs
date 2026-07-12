@@ -310,6 +310,33 @@ impl JsDate {
         let s = self.get_utc_seconds() as u32;
         format!("{:02}:{:02}:{:02} GMT+0000", h, min, s)
     }
+
+    // Locale string representations. The runtime treats local time as UTC
+    // (see `get_timezone_offset`), so these mirror the UTC-based formatting.
+    pub fn to_locale_time_string(&self) -> String {
+        if !self.is_valid() {
+            return "Invalid Date".to_string();
+        }
+        let h = self.get_utc_hours() as u32;
+        let min = self.get_utc_minutes() as u32;
+        let s = self.get_utc_seconds() as u32;
+        format!("{:02}:{:02}:{:02}", h, min, s)
+    }
+
+    pub fn to_locale_date_string(&self) -> String {
+        if !self.is_valid() {
+            return "Invalid Date".to_string();
+        }
+        let (y, m, d) = js_date_calendar::date_from_millis(self.utc_ms);
+        format!("{:04}-{:02}-{:02}", y, m, d)
+    }
+
+    pub fn to_locale_string(&self) -> String {
+        if !self.is_valid() {
+            return "Invalid Date".to_string();
+        }
+        format!("{} {}", self.to_locale_date_string(), self.to_locale_time_string())
+    }
 }
 
 impl std::fmt::Display for JsDate {

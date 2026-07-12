@@ -152,4 +152,44 @@ mod fs_promises_native {
     pub fn exists(path: String) -> String {
         __tails_ok(JsonValue::Bool(tails_fs::exists(&path)))
     }
+
+    // ------------------------------------------------------------------------
+    // Node.js camelCase aliases. The canonical exports are snake_case
+    // (e.g. `read_file`), but Node's `fs/promises` uses camelCase
+    // (`readFile`). These thin wrappers keep Tail-style call sites working
+    // while letting Node/bun-style code run unmodified.
+    // ------------------------------------------------------------------------
+
+    /// Node-style `fs.promises.readFile(path)`.
+    #[tails_function(js_name = "readFile")]
+    pub fn read_file_camel(path: String) -> String {
+        read_file(path)
+    }
+
+    /// Node-style `fs.promises.writeFile(path, content)`.
+    #[tails_function(js_name = "writeFile")]
+    pub fn write_file_camel(path: String, content: String) -> String {
+        write_file(path, content)
+    }
+
+    /// Node-style `fs.promises.copyFile(src, dest)`.
+    #[tails_function(js_name = "copyFile")]
+    pub fn copy_file_camel(src: String, dest: String) -> String {
+        copy_file(src, dest)
+    }
+
+    /// Node-style `fs.promises.appendFile(path, content)`.
+    #[tails_function(js_name = "appendFile")]
+    pub fn append_file_camel(path: String, content: String) -> String {
+        append_file(path, content)
+    }
+
+    /// Node-style `fs.promises.rm(path, recursive)`.
+    #[tails_function(js_name = "rm")]
+    pub fn rm_camel(path: String, recursive: bool) -> String {
+        match tails_fs::rm(&path, recursive) {
+            Ok(()) => __tails_ok(JsonValue::Null),
+            Err(e) => __tails_err(format!("EACCES: permission denied, rm '{}': {}", path, e)),
+        }
+    }
 }

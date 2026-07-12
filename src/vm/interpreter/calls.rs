@@ -207,8 +207,9 @@ impl Interpreter {
                 }
             }
             _ => Err(self.err_at_location(Error::TypeError(format!(
-                "{} is not a function",
-                self.value_to_string(callee)
+                "{} is not a function\n{}",
+                self.value_to_string(callee),
+                self.call_stack_backtrace()
             )))),
         }
     }

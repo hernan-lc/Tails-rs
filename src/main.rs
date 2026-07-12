@@ -128,7 +128,10 @@ fn run_script(script_path: &Path) -> Result<()> {
             if runtime.has_pending_work() {
                 eprintln!("[tails] Event loop running (Ctrl+C to exit).");
                 if let Err(e) = runtime.run_event_loop() {
-                    eprintln!("[tails] Event loop error: {}", e);
+                    let bt = runtime
+                        .get_interpreter_backtrace()
+                        .unwrap_or_default();
+                    eprintln!("[tails] Event loop error: {}{}", e, bt);
                 }
             }
         }

@@ -882,6 +882,10 @@ pub static NATIVE_TABLE: &[NativeFn] = &[
     http_fns::native_http_res_remove_header,
     // Iterator.prototype.next (512)
     iterator_fns::native_iterator_next,
+    // Date locale methods (513-515)
+    date_fns::native_date_to_locale_time_string,
+    date_fns::native_date_to_locale_date_string,
+    date_fns::native_date_to_locale_string,
 ];
 
 #[cfg(test)]

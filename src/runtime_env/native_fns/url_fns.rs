@@ -18,8 +18,23 @@ pub(super) fn native_url_constructor(
         .map(|v| to_string_value(interp, v))
         .unwrap_or_default();
 
-    let parsed =
-        url::Url::parse(&url_str).map_err(|e| Error::TypeError(format!("Invalid URL: {}", e)))?;
+    // `new URL(url, base)` resolves `url` against `base` when `url` is
+    // relative (matching Node.js / the WHATWG URL spec). When `url` is
+    // absolute the base is ignored. Without this, relative URLs such as "/"
+    // always fail to parse.
+    let base_str = args
+        .get(1)
+        .map(|v| to_string_value(interp, v))
+        .unwrap_or_default();
+    let parsed = if base_str.is_empty() {
+        url::Url::parse(&url_str)
+    } else {
+        match url::Url::parse(&base_str) {
+            Ok(base) => url::Url::options().base_url(Some(&base)).parse(&url_str),
+            Err(_) => url::Url::parse(&url_str),
+        }
+    }
+    .map_err(|e| Error::TypeError(format!("Invalid URL: {}", e)))?;
 
     let query_str = parsed.query().unwrap_or("").to_string();
 

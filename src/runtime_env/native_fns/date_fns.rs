@@ -363,6 +363,9 @@ date_to_string_fn!(native_date_to_utc_string, to_utc_string);
 date_to_string_fn!(native_date_to_date_string, to_date_string);
 date_to_string_fn!(native_date_to_time_string, to_time_string);
 date_to_string_fn!(native_date_to_json, to_iso_string);
+date_to_string_fn!(native_date_to_locale_time_string, to_locale_time_string);
+date_to_string_fn!(native_date_to_locale_date_string, to_locale_date_string);
+date_to_string_fn!(native_date_to_locale_string, to_locale_string);
 
 pub(super) fn native_date_value_of(
     interp: &mut Interpreter,

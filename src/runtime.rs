@@ -203,6 +203,17 @@ impl TailsRuntime {
             || !self.interpreter.async_runtime.is_idle()
     }
 
+    /// Return the interpreter's current JS call-stack backtrace as a string
+    /// (used for diagnostics when the event loop surfaces an error).
+    pub fn get_interpreter_backtrace(&self) -> Option<String> {
+        let bt = self.interpreter.call_stack_backtrace();
+        if bt.is_empty() {
+            None
+        } else {
+            Some(format!("\n{}", bt))
+        }
+    }
+
     /// Run the event loop until all registered event sources are idle and
     /// there are no more pending timers or microtasks.
     ///

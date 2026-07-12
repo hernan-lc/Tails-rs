@@ -546,6 +546,9 @@ pub const OBJECT_HAS_OWN: usize = 506;
 pub const DEBUG_NOOP: usize = 507;
 pub const DEBUG_LOGGER_NOOP: usize = 508;
 pub const ITERATOR_NEXT: usize = 512;
+pub const DATE_TO_LOCALE_TIME_STRING: usize = 513;
+pub const DATE_TO_LOCALE_DATE_STRING: usize = 514;
+pub const DATE_TO_LOCALE_STRING: usize = 515;
 
 #[cfg(test)]
 mod tests {
