@@ -26,7 +26,7 @@ impl Default for RuntimeConfig {
 }
 
 pub struct TailsRuntime {
-    interpreter: Interpreter,
+    pub interpreter: Interpreter,
     config: RuntimeConfig,
     /// Long-lived event sources registered by native modules (http, net, …).
     /// Polled by [`run_event_loop`] after the top-level script finishes.

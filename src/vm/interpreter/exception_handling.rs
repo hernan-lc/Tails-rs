@@ -157,6 +157,17 @@ impl Interpreter {
         }));
         let error_value = Value::Object(obj_idx);
         self.pending_exception = Some(error_value);
+
+        // Dispatch to the nearest handler, unwinding the call stack as needed.
+        // If no handler exists in the current exception_handlers set, walk the
+        // call stack to restore saved exception handler snapshots (handlers
+        // are cleared on function entry in exec_calls.rs and saved in each
+        // CallFrame's exception_handlers_snapshot).
+        self.dispatch_exception(pc, error_name, message)
+    }
+
+    /// Find a catch/finally handler and transfer control to it.
+    fn dispatch_exception(&mut self, pc: &mut usize, error_name: &str, message: &str) -> Result<bool> {
         while let Some(handler) = self.exception_handlers.last().cloned() {
             self.exception_handlers.pop();
             if handler.catch_pc != 0 {
@@ -188,6 +199,18 @@ impl Interpreter {
                 }
                 *pc = handler.finally_pc as usize;
                 return Ok(true);
+            }
+        }
+        // No handler in the current exception_handlers set. Walk the call
+        // stack to find a frame whose snapshot contains a handler, unwind to
+        // that frame, and restore its handlers so the error can be caught.
+        while let Some(frame) = self.call_stack.pop() {
+            if !frame.exception_handlers_snapshot.is_empty() {
+                self.exception_handlers = frame.exception_handlers_snapshot;
+                self.stack.truncate(frame.base_pointer);
+                // Re-attempt dispatch with the restored handlers so the
+                // catch/finally block executes in the correct scope.
+                return self.dispatch_exception(pc, error_name, message);
             }
         }
         // No JS handler — surface as a host-level error of the matching kind.
