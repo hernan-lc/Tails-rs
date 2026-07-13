@@ -386,7 +386,7 @@ pub const CHILD_PROCESS_EXEC_SYNC: usize = 377;
 pub const CHILD_PROCESS_EXEC: usize = 378;
 pub const CHILD_PROCESS_SPAWN: usize = 379;
 pub const OBJECT_HAS_OWN_PROPERTY: usize = 380;
-pub const OBJECT_CREATE: usize = 463;
+pub const OBJECT_CREATE: usize = 464;
 pub const REQUIRE: usize = 381;
 pub const URL_FILE_URL_TO_PATH: usize = 382;
 pub const NUMBER_TO_FIXED: usize = 383;
@@ -411,9 +411,9 @@ pub const HTTP_RES_WRITE: usize = 400;
 pub const HTTP_RES_END: usize = 401;
 // HTTP ServerResponse header accessors (used by Express via the
 // http.ServerResponse.prototype chain: setHeader/getHeader/removeHeader)
-pub const HTTP_RES_SET_HEADER: usize = 509;
-pub const HTTP_RES_GET_HEADER: usize = 510;
-pub const HTTP_RES_REMOVE_HEADER: usize = 511;
+pub const HTTP_RES_SET_HEADER: usize = 510;
+pub const HTTP_RES_GET_HEADER: usize = 511;
+pub const HTTP_RES_REMOVE_HEADER: usize = 512;
 // Net (TCP client) (402-405)
 pub const NET_CREATE_CONNECTION: usize = 402;
 pub const NET_SOCKET_WRITE: usize = 403;
@@ -445,155 +445,155 @@ pub const EVENT_EMITTER_PREPEND_ONCE_LISTENER: usize = 422;
 pub const SET_IMMEDIATE: usize = 423;
 pub const CLEAR_IMMEDIATE: usize = 424;
 // querystring module (425-428)
-pub const QUERYSTRING_PARSE: usize = 425;
-pub const QUERYSTRING_STRINGIFY: usize = 426;
-pub const QUERYSTRING_ENCODE: usize = 427;
-pub const QUERYSTRING_DECODE: usize = 428;
+pub const QUERYSTRING_PARSE: usize = 426;
+pub const QUERYSTRING_STRINGIFY: usize = 427;
+pub const QUERYSTRING_ENCODE: usize = 428;
+pub const QUERYSTRING_DECODE: usize = 429;
 // stream module (429-442)
-pub const STREAM_READABLE_READ: usize = 429;
-pub const STREAM_READABLE_PIPE: usize = 430;
-pub const STREAM_READABLE_UNPIPE: usize = 431;
-pub const STREAM_READABLE_PUSH: usize = 432;
-pub const STREAM_READABLE_DESTROY: usize = 433;
-pub const STREAM_WRITABLE_WRITE: usize = 434;
-pub const STREAM_WRITABLE_END: usize = 435;
-pub const STREAM_WRITABLE_DESTROY: usize = 436;
-pub const STREAM_WRITABLE_CORK: usize = 437;
-pub const STREAM_WRITABLE_UNCORK: usize = 438;
-pub const STREAM_CONSTRUCTOR: usize = 439;
-pub const STREAM_PASSTHROUGH_CONSTRUCTOR: usize = 440;
-pub const STREAM_PIPELINE: usize = 441;
-pub const STREAM_FINISHED: usize = 442;
+pub const STREAM_READABLE_READ: usize = 430;
+pub const STREAM_READABLE_PIPE: usize = 431;
+pub const STREAM_READABLE_UNPIPE: usize = 432;
+pub const STREAM_READABLE_PUSH: usize = 433;
+pub const STREAM_READABLE_DESTROY: usize = 434;
+pub const STREAM_WRITABLE_WRITE: usize = 435;
+pub const STREAM_WRITABLE_END: usize = 436;
+pub const STREAM_WRITABLE_DESTROY: usize = 437;
+pub const STREAM_WRITABLE_CORK: usize = 438;
+pub const STREAM_WRITABLE_UNCORK: usize = 439;
+pub const STREAM_CONSTRUCTOR: usize = 440;
+pub const STREAM_PASSTHROUGH_CONSTRUCTOR: usize = 441;
+pub const STREAM_PIPELINE: usize = 442;
+pub const STREAM_FINISHED: usize = 443;
 // zlib module (443-452)
-pub const ZLIB_GZIP_SYNC: usize = 443;
-pub const ZLIB_GUNZIP_SYNC: usize = 444;
-pub const ZLIB_DEFLATE_SYNC: usize = 445;
-pub const ZLIB_INFLATE_SYNC: usize = 446;
-pub const ZLIB_DEFLATE_RAW_SYNC: usize = 447;
-pub const ZLIB_INFLATE_RAW_SYNC: usize = 448;
-pub const ZLIB_GZIP: usize = 449;
-pub const ZLIB_GUNZIP: usize = 450;
-pub const ZLIB_DEFLATE: usize = 451;
-pub const ZLIB_INFLATE: usize = 452;
+pub const ZLIB_GZIP_SYNC: usize = 444;
+pub const ZLIB_GUNZIP_SYNC: usize = 445;
+pub const ZLIB_DEFLATE_SYNC: usize = 446;
+pub const ZLIB_INFLATE_SYNC: usize = 447;
+pub const ZLIB_DEFLATE_RAW_SYNC: usize = 448;
+pub const ZLIB_INFLATE_RAW_SYNC: usize = 449;
+pub const ZLIB_GZIP: usize = 450;
+pub const ZLIB_GUNZIP: usize = 451;
+pub const ZLIB_DEFLATE: usize = 452;
+pub const ZLIB_INFLATE: usize = 453;
 // tls module (453-457)
-pub const TLS_CONNECT: usize = 453;
-pub const TLS_CREATE_SECURE_CONTEXT: usize = 454;
-pub const TLS_SOCKET_WRITE: usize = 455;
-pub const TLS_SOCKET_END: usize = 456;
-pub const TLS_CREATE_SERVER: usize = 457;
+pub const TLS_CONNECT: usize = 454;
+pub const TLS_CREATE_SECURE_CONTEXT: usize = 455;
+pub const TLS_SOCKET_WRITE: usize = 456;
+pub const TLS_SOCKET_END: usize = 457;
+pub const TLS_CREATE_SERVER: usize = 458;
 // dns module (458-462)
-pub const DNS_RESOLVE: usize = 458;
-pub const DNS_LOOKUP: usize = 459;
-pub const DNS_RESOLVE4: usize = 460;
-pub const DNS_RESOLVE6: usize = 461;
-pub const DNS_RESOLVE_MX: usize = 462;
+pub const DNS_RESOLVE: usize = 459;
+pub const DNS_LOOKUP: usize = 460;
+pub const DNS_RESOLVE4: usize = 461;
+pub const DNS_RESOLVE6: usize = 462;
+pub const DNS_RESOLVE_MX: usize = 463;
 // Array constructor (464)
-pub const ARRAY_CONSTRUCTOR: usize = 464;
+pub const ARRAY_CONSTRUCTOR: usize = 465;
 // String constructor (465)
-pub const STRING_CONSTRUCTOR: usize = 465;
+pub const STRING_CONSTRUCTOR: usize = 466;
 // Number constructor (466)
-pub const NUMBER_CONSTRUCTOR: usize = 466;
+pub const NUMBER_CONSTRUCTOR: usize = 467;
 // Boolean constructor (467)
-pub const BOOLEAN_CONSTRUCTOR: usize = 467;
+pub const BOOLEAN_CONSTRUCTOR: usize = 468;
 // Array.prototype.at (468)
-pub const ARRAY_AT: usize = 468;
+pub const ARRAY_AT: usize = 469;
 // Math.trunc (469)
-pub const MATH_TRUNC: usize = 469;
+pub const MATH_TRUNC: usize = 470;
 // Math.sign (470)
-pub const MATH_SIGN: usize = 470;
+pub const MATH_SIGN: usize = 471;
 // Math.hypot (471)
-pub const MATH_HYPOT: usize = 471;
+pub const MATH_HYPOT: usize = 472;
 // Function constructor (472)
-pub const FUNCTION_CONSTRUCTOR: usize = 472;
+pub const FUNCTION_CONSTRUCTOR: usize = 473;
 // Object.getOwnPropertyDescriptors (473)
-pub const OBJECT_GET_OWN_PROPERTY_DESCRIPTORS: usize = 473;
+pub const OBJECT_GET_OWN_PROPERTY_DESCRIPTORS: usize = 474;
 // Object.defineProperties (474)
-pub const OBJECT_DEFINE_PROPERTIES: usize = 474;
+pub const OBJECT_DEFINE_PROPERTIES: usize = 475;
 // Object.fromEntries (475)
-pub const OBJECT_FROM_ENTRIES: usize = 475;
+pub const OBJECT_FROM_ENTRIES: usize = 476;
 // String.prototype.trimStart / trimEnd (476-477)
-pub const STRING_TRIM_START: usize = 476;
-pub const STRING_TRIM_END: usize = 477;
+pub const STRING_TRIM_START: usize = 477;
+pub const STRING_TRIM_END: usize = 478;
 // tty.isatty (478)
-pub const TTY_ISATTY: usize = 478;
+pub const TTY_ISATTY: usize = 479;
 // util.deprecate (479)
-pub const UTIL_DEPRECATE: usize = 479;
+pub const UTIL_DEPRECATE: usize = 480;
 // Error.captureStackTrace (480)
-pub const ERROR_CAPTURE_STACK_TRACE: usize = 480;
+pub const ERROR_CAPTURE_STACK_TRACE: usize = 481;
 // CallSite methods (481-489)
-pub const CALLSITE_GET_FILE_NAME: usize = 481;
-pub const CALLSITE_GET_LINE_NUMBER: usize = 482;
-pub const CALLSITE_GET_COLUMN_NUMBER: usize = 483;
-pub const CALLSITE_IS_EVAL: usize = 484;
-pub const CALLSITE_GET_FUNCTION_NAME: usize = 485;
-pub const CALLSITE_GET_METHOD_NAME: usize = 486;
-pub const CALLSITE_GET_TYPE_NAME: usize = 487;
-pub const CALLSITE_GET_THIS: usize = 488;
-pub const CALLSITE_TO_STRING: usize = 489;
+pub const CALLSITE_GET_FILE_NAME: usize = 482;
+pub const CALLSITE_GET_LINE_NUMBER: usize = 483;
+pub const CALLSITE_GET_COLUMN_NUMBER: usize = 484;
+pub const CALLSITE_IS_EVAL: usize = 485;
+pub const CALLSITE_GET_FUNCTION_NAME: usize = 486;
+pub const CALLSITE_GET_METHOD_NAME: usize = 487;
+pub const CALLSITE_GET_TYPE_NAME: usize = 488;
+pub const CALLSITE_GET_THIS: usize = 489;
+pub const CALLSITE_TO_STRING: usize = 490;
 // Object.prototype.toString / Function.prototype.toString (490-491)
-pub const OBJECT_TO_STRING: usize = 490;
-pub const FUNCTION_TO_STRING: usize = 491;
-pub const OBJECT_GET_OWN_PROPERTY_SYMBOLS: usize = 492;
-pub const DECODE_URI: usize = 493;
-pub const DECODE_URI_COMPONENT: usize = 494;
-pub const ENCODE_URI: usize = 495;
-pub const ENCODE_URI_COMPONENT: usize = 496;
-pub const EVAL: usize = 497;
-pub const STRING_ITERATOR: usize = 498;
-pub const GET_INTRINSIC: usize = 499;
-pub const TEXT_ENCODER_CONSTRUCTOR: usize = 500;
-pub const TEXT_DECODER_CONSTRUCTOR: usize = 501;
-pub const TEXT_ENCODER_ENCODE: usize = 502;
-pub const TEXT_DECODER_DECODE: usize = 503;
-pub const UTIL_INHERITS: usize = 504;
-pub const OBJECT_GET_OWN_PROPERTY_NAMES: usize = 505;
-pub const OBJECT_HAS_OWN: usize = 506;
-pub const DEBUG_NOOP: usize = 507;
-pub const DEBUG_LOGGER_NOOP: usize = 508;
-pub const ITERATOR_NEXT: usize = 512;
-pub const DATE_TO_LOCALE_TIME_STRING: usize = 513;
-pub const DATE_TO_LOCALE_DATE_STRING: usize = 514;
-pub const DATE_TO_LOCALE_STRING: usize = 515;
+pub const OBJECT_TO_STRING: usize = 491;
+pub const FUNCTION_TO_STRING: usize = 492;
+pub const OBJECT_GET_OWN_PROPERTY_SYMBOLS: usize = 493;
+pub const DECODE_URI: usize = 494;
+pub const DECODE_URI_COMPONENT: usize = 495;
+pub const ENCODE_URI: usize = 496;
+pub const ENCODE_URI_COMPONENT: usize = 497;
+pub const EVAL: usize = 498;
+pub const STRING_ITERATOR: usize = 499;
+pub const GET_INTRINSIC: usize = 500;
+pub const TEXT_ENCODER_CONSTRUCTOR: usize = 501;
+pub const TEXT_DECODER_CONSTRUCTOR: usize = 502;
+pub const TEXT_ENCODER_ENCODE: usize = 503;
+pub const TEXT_DECODER_DECODE: usize = 504;
+pub const UTIL_INHERITS: usize = 505;
+pub const OBJECT_GET_OWN_PROPERTY_NAMES: usize = 506;
+pub const OBJECT_HAS_OWN: usize = 507;
+pub const DEBUG_NOOP: usize = 508;
+pub const DEBUG_LOGGER_NOOP: usize = 509;
+pub const ITERATOR_NEXT: usize = 513;
+pub const DATE_TO_LOCALE_TIME_STRING: usize = 514;
+pub const DATE_TO_LOCALE_DATE_STRING: usize = 515;
+pub const DATE_TO_LOCALE_STRING: usize = 516;
 // diagnostics_channel.channel (516)
-pub const DIAGNOSTICS_CHANNEL_CHANNEL: usize = 516;
+pub const DIAGNOSTICS_CHANNEL_CHANNEL: usize = 517;
 // diagnostics_channel.tracingChannel (517)
-pub const DIAGNOSTICS_CHANNEL_TRACING_CHANNEL: usize = 517;
+pub const DIAGNOSTICS_CHANNEL_TRACING_CHANNEL: usize = 518;
 // perf_hooks.performance.now (518)
-pub const PERF_HOOKS_NOW: usize = 518;
+pub const PERF_HOOKS_NOW: usize = 519;
 // async_hooks.AsyncResource (519)
-pub const ASYNC_HOOKS_ASYNC_RESOURCE: usize = 519;
+pub const ASYNC_HOOKS_ASYNC_RESOURCE: usize = 520;
 // async_hooks.AsyncResource#bind (520)
-pub const ASYNC_HOOKS_BIND: usize = 520;
+pub const ASYNC_HOOKS_BIND: usize = 521;
 // safe-regex2 shim (always-safe) (521)
-pub const SAFE_REGEX_TRUE: usize = 521;
+pub const SAFE_REGEX_TRUE: usize = 522;
 
 // WeakRef (522-523)
-pub const WEAK_REF_CONSTRUCTOR: usize = 527;
-pub const WEAK_REF_DEREF: usize = 528;
+pub const WEAK_REF_CONSTRUCTOR: usize = 528;
+pub const WEAK_REF_DEREF: usize = 529;
 // FinalizationRegistry (524-525)
-pub const FINALIZATION_REGISTRY_CONSTRUCTOR: usize = 529;
-pub const FINALIZATION_REGISTRY_REGISTER: usize = 530;
+pub const FINALIZATION_REGISTRY_CONSTRUCTOR: usize = 530;
+pub const FINALIZATION_REGISTRY_REGISTER: usize = 531;
 // ArrayBuffer (531-533)
-pub const ARRAY_BUFFER_CONSTRUCTOR: usize = 531;
-pub const ARRAY_BUFFER_BYTE_LENGTH: usize = 532;
-pub const ARRAY_BUFFER_IS_VIEW: usize = 533;
-pub const ASSERT_DEEP_EQUAL: usize = 534;
-pub const ASSERT_IF_ERROR: usize = 535;
-pub const ASSERT_FAIL: usize = 536;
-pub const ASSERT_THROWS: usize = 537;
-pub const ASSERT_DOES_NOT_THROW: usize = 538;
-pub const ASSERT_REJECTS: usize = 539;
-pub const ASSERT_MATCH: usize = 540;
-pub const ASSERT_NOT_STRICT_EQUAL: usize = 541;
-pub const ASSERT_NOT_EQUAL: usize = 542;
-pub const ASSERT_DOES_NOT_REJECT: usize = 543;
-pub const ASSERT_NOT_DEEP_STRICT_EQUAL: usize = 544;
-pub const ASSERT_NOT_DEEP_EQUAL: usize = 545;
-pub const ASSERT_NOT_MATCH: usize = 546;
-pub const HTTP_SERVER_SET_TIMEOUT: usize = 547;
+pub const ARRAY_BUFFER_CONSTRUCTOR: usize = 532;
+pub const ARRAY_BUFFER_BYTE_LENGTH: usize = 533;
+pub const ARRAY_BUFFER_IS_VIEW: usize = 534;
+pub const ASSERT_DEEP_EQUAL: usize = 535;
+pub const ASSERT_IF_ERROR: usize = 536;
+pub const ASSERT_FAIL: usize = 537;
+pub const ASSERT_THROWS: usize = 538;
+pub const ASSERT_DOES_NOT_THROW: usize = 539;
+pub const ASSERT_REJECTS: usize = 540;
+pub const ASSERT_MATCH: usize = 541;
+pub const ASSERT_NOT_STRICT_EQUAL: usize = 542;
+pub const ASSERT_NOT_EQUAL: usize = 543;
+pub const ASSERT_DOES_NOT_REJECT: usize = 544;
+pub const ASSERT_NOT_DEEP_STRICT_EQUAL: usize = 545;
+pub const ASSERT_NOT_DEEP_EQUAL: usize = 546;
+pub const ASSERT_NOT_MATCH: usize = 547;
+pub const HTTP_SERVER_SET_TIMEOUT: usize = 548;
 
 // queueMicrotask (548)
-pub const QUEUE_MICROTASK: usize = 548;
+pub const QUEUE_MICROTASK: usize = 425;
 
 #[cfg(test)]
 mod tests {

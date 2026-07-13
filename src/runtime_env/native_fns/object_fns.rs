@@ -649,8 +649,6 @@ pub(super) fn native_object_get_own_property_descriptors(
             extensible: true,
         },
     ));
-    // Debug: log the result
-    eprintln!("[DEBUG] Object.getOwnPropertyDescriptors returning Object({})", result_idx);
     Ok(Value::Object(result_idx))
 }
 
