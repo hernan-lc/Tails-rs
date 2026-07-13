@@ -155,6 +155,9 @@ fn collect_identifiers_pattern(pat: &BindingPattern, out: &mut Vec<String>) {
                 if let Some(expr) = &elem.default_value {
                     collect_identifiers_expr(expr, out);
                 }
+                if let Some(expr) = &elem.computed_key {
+                    collect_identifiers_expr(expr, out);
+                }
             }
         }
     }

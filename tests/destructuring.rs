@@ -113,3 +113,50 @@ fn test_nested_destructuring() {
         .unwrap();
     assert_eq!(result.to_string(), "3");
 }
+
+#[test]
+fn test_computed_property_destructuring() {
+    let mut runtime = TailsRuntime::default();
+    let result = runtime
+        .eval(
+            r#"
+        const obj = { foo: 42, bar: 99 };
+        const key = "foo";
+        const { [key]: val } = obj;
+        val;
+    "#,
+        )
+        .unwrap();
+    assert_eq!(result.to_string(), "42");
+}
+
+#[test]
+fn test_computed_property_destructuring_with_rest() {
+    let mut runtime = TailsRuntime::default();
+    let result = runtime
+        .eval(
+            r#"
+        const obj = { foo: 1, bar: 2, baz: 3 };
+        const type = "foo";
+        const { [type]: oneOfs, ...rest } = obj;
+        oneOfs + rest.bar + rest.baz;
+    "#,
+        )
+        .unwrap();
+    assert_eq!(result.to_string(), "6");
+}
+
+#[test]
+fn test_computed_property_destructuring_string_literal() {
+    let mut runtime = TailsRuntime::default();
+    let result = runtime
+        .eval(
+            r#"
+        const obj = { abc: 100, xyz: 200 };
+        const { ["abc"]: a, ["xyz"]: b } = obj;
+        a + b;
+    "#,
+        )
+        .unwrap();
+    assert_eq!(result.to_string(), "300");
+}

@@ -167,13 +167,31 @@ impl<'a> Parser<'a> {
                         shorthand: true,
                         default_value: None,
                         is_rest: true,
+                        computed_key: None,
                     });
                     break;
                 }
-                let key_expr = self.token_to_property_name()?;
-                let key = match key_expr {
-                    Expression::Identifier(name) => name,
-                    _ => return Err(Error::ParseError("Expected property name".into())),
+                // Computed property key: `[expr]: value`
+                // A computed key always requires a colon and an explicit value
+                // binding (no shorthand form exists for computed keys).
+                let computed_key = if self.peek().token == Token::LeftBracket {
+                    self.advance();
+                    let key_expr = self.parse_expression()?.inner;
+                    self.expect(&Token::RightBracket)?;
+                    Some(key_expr)
+                } else {
+                    None
+                };
+                let key = if computed_key.is_some() {
+                    // The key is the computed expression itself; there is no
+                    // separate property-name token. Expect `:` immediately.
+                    String::new()
+                } else {
+                    let key_expr = self.token_to_property_name()?;
+                    match key_expr {
+                        Expression::Identifier(name) => name,
+                        _ => return Err(Error::ParseError("Expected property name".into())),
+                    }
                 };
                 if self.peek().token == Token::Colon {
                     self.advance();
@@ -190,6 +208,7 @@ impl<'a> Parser<'a> {
                         shorthand: false,
                         default_value: default,
                         is_rest: false,
+                        computed_key,
                     });
                 } else if self.peek().token == Token::Assign {
                     self.advance();
@@ -200,6 +219,7 @@ impl<'a> Parser<'a> {
                         shorthand: true,
                         default_value: Some(default_value),
                         is_rest: false,
+                        computed_key,
                     });
                 } else {
                     elements.push(ObjectBindingElement {
@@ -208,6 +228,7 @@ impl<'a> Parser<'a> {
                         shorthand: true,
                         default_value: None,
                         is_rest: false,
+                        computed_key,
                     });
                 }
                 if self.peek().token == Token::Comma {

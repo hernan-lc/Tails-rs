@@ -586,9 +586,11 @@ impl CodeGenerator {
                 self.emit(Instruction::Pop);
             }
             BindingPattern::Object(elements) => {
+                // Collect statically-known keys to exclude from `...rest`.
+                // Computed keys (`[expr]`) cannot be statically excluded.
                 let excluded_keys: Vec<String> = elements
                     .iter()
-                    .filter(|e| !e.is_rest)
+                    .filter(|e| !e.is_rest && e.computed_key.is_none())
                     .map(|e| e.key.clone())
                     .collect();
                 for element in elements {
@@ -598,8 +600,14 @@ impl CodeGenerator {
                         self.generate_destructuring_pattern(&element.value)?;
                     } else {
                         self.emit(Instruction::Dup);
-                        let key_idx = self.add_constant(Value::from_string(element.key.clone()));
-                        self.emit(Instruction::LoadConst(key_idx));
+                        if let Some(computed) = &element.computed_key {
+                            // Computed key: evaluate the expression to get the
+                            // property name at runtime.
+                            self.generate_expression(computed)?;
+                        } else {
+                            let key_idx = self.add_constant(Value::from_string(element.key.clone()));
+                            self.emit(Instruction::LoadConst(key_idx));
+                        }
                         self.emit(Instruction::GetProperty);
                         if let Some(default_expr) = &element.default_value {
                             let skip_default = self.instructions.len();

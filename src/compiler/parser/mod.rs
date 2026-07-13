@@ -281,6 +281,10 @@ pub struct ObjectBindingElement {
     pub default_value: Option<Expression>,
     /// `...rest` element — `key`/`value` name the rest binding.
     pub is_rest: bool,
+    /// Computed key expression for `const { [expr]: value } = obj`.
+    /// When `Some`, `key` is empty and the property is looked up by evaluating
+    /// this expression at runtime.
+    pub computed_key: Option<Expression>,
 }
 
 #[derive(Debug, Clone)]
