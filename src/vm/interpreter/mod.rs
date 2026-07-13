@@ -103,6 +103,11 @@ pub struct Interpreter {
     pub(crate) error_proto_idx: Option<usize>,
     /// `Object.prototype` heap index (for module exports / plain objects).
     pub(crate) object_proto_idx: Option<usize>,
+    /// When a CJS module does `module.exports = fn` (a function carrying
+    /// properties like `.configure`), the ESM `import x from 'cjs'` must
+    /// resolve to that function directly. We stash it here so
+    /// `exec_import_default` can return it for CJS modules loaded via ESM.
+    pub(crate) cjs_default_exports: HashMap<String, Value>,
     pub(crate) boolean_proto_idx: Option<usize>,
     pub(crate) number_proto_idx: Option<usize>,
     pub(crate) string_proto_idx: Option<usize>,
@@ -162,6 +167,7 @@ impl Interpreter {
             generator_proto_idx: None,
             error_proto_idx: None,
             object_proto_idx: None,
+            cjs_default_exports: HashMap::new(),
             boolean_proto_idx: None,
             number_proto_idx: None,
             string_proto_idx: None,

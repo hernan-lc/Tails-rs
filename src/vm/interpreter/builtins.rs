@@ -176,6 +176,7 @@ impl Interpreter {
             "getOwnPropertyNames" => Value::NativeFunction(c::OBJECT_GET_OWN_PROPERTY_NAMES),
             "getOwnPropertySymbols" => Value::NativeFunction(c::OBJECT_GET_OWN_PROPERTY_SYMBOLS),
             "hasOwn" => Value::NativeFunction(c::OBJECT_HAS_OWN),
+            "hasOwnProperty" => Value::NativeFunction(c::OBJECT_HAS_OWN_PROPERTY),
             "fromEntries" => Value::NativeFunction(c::OBJECT_FROM_ENTRIES),
             "freeze" => Value::NativeFunction(c::OBJECT_FREEZE),
             "is" => Value::NativeFunction(c::OBJECT_IS),
@@ -903,6 +904,34 @@ impl Interpreter {
             "WeakSet".into(),
             Value::NativeFunction(c::WEAKSET_CONSTRUCTOR),
         );
+
+        // WeakRef / FinalizationRegistry — Node globals used by
+        // on-exit-leak-free (pulled in by pino/sonic-boom). We expose
+        // them as constructors; the shim holds the target by reference and
+        // `.deref()` always returns it (no GC-based clearing).
+        self.globals.insert(
+            "WeakRef".into(),
+            Value::NativeFunction(c::WEAK_REF_CONSTRUCTOR),
+        );
+        self.globals.insert(
+            "FinalizationRegistry".into(),
+            Value::NativeFunction(c::FINALIZATION_REGISTRY_CONSTRUCTOR),
+        );
+
+        // ArrayBuffer — needed by packages that do `o instanceof ArrayBuffer`
+        // (e.g. rfdc used by fastify). Backed by HeapValue::Buffer.
+        self.globals.insert(
+            "ArrayBuffer".into(),
+            Value::NativeFunction(c::ARRAY_BUFFER_CONSTRUCTOR),
+        );
+        // Static helpers used by ArrayBuffer consumers.
+        if let Some(Value::NativeFunction(_)) = self.globals.get("ArrayBuffer") {
+            self.set_property_str(
+                &Value::NativeFunction(c::ARRAY_BUFFER_CONSTRUCTOR),
+                "isView",
+                Value::NativeFunction(c::ARRAY_BUFFER_IS_VIEW),
+            );
+        }
 
         // Generator
         let generator_proto_props = props! {

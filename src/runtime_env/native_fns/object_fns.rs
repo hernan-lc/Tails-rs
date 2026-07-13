@@ -311,8 +311,15 @@ pub(super) fn native_object_assign(
         let cloned: Vec<(String, Value)> = match src {
             Value::Object(src_idx) => {
                 if let crate::vm::interpreter::HeapValue::Object(src_obj) = &interp.heap[*src_idx] {
-                    collect_own_enumerable_keys(&src_obj.properties)
-                        .into_iter()
+                    // Object.assign copies own enumerable string AND symbol
+                    // keys (unlike Object.keys/values/entries which skip symbols).
+                    let mut keys = collect_own_enumerable_keys(&src_obj.properties);
+                    for k in src_obj.properties.keys() {
+                        if k.starts_with("__sym_") && !keys.iter().any(|x| x == k) {
+                            keys.push(k.to_string());
+                        }
+                    }
+                    keys.into_iter()
                         .filter_map(|k| src_obj.properties.get(&k).map(|v| (k, v.clone())))
                         .collect()
                 } else {
@@ -321,8 +328,13 @@ pub(super) fn native_object_assign(
             }
             Value::Function(src_idx) => {
                 if let crate::vm::interpreter::HeapValue::Function(f) = &interp.heap[*src_idx] {
-                    collect_own_enumerable_keys(&f.properties)
-                        .into_iter()
+                    let mut keys = collect_own_enumerable_keys(&f.properties);
+                    for k in f.properties.keys() {
+                        if k.starts_with("__sym_") && !keys.iter().any(|x| x == k) {
+                            keys.push(k.to_string());
+                        }
+                    }
+                    keys.into_iter()
                         .filter_map(|k| f.properties.get(&k).map(|v| (k, v.clone())))
                         .collect()
                 } else {

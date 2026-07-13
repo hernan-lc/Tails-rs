@@ -274,33 +274,78 @@ pub fn create_process_module(
     );
     props.insert("argv".into(), Value::Array(argv_idx));
 
-    // process.stdout — Node exposes `.fd` (1) used by `tty.isatty(process.stdout.fd)`.
-    let stdout_props = props! {
-        "write" => Value::NativeFunction(c::PROCESS_STDOUT_WRITE),
-        "fd" => Value::Integer(1),
-        "isTTY" => Value::Boolean(atty_stdout()),
-    };
+    // process.stdout / sterr are stream-like: they expose `write`, `.fd`, and
+    // `isTTY`. To satisfy code that reads
+    // `process.stdout.constructor.prototype.write` (pino's `hasBeenTampered`),
+    // give them a prototype carrying `write` and a `constructor` whose own
+    // `.prototype` is that same prototype.
+    let stdout_proto_idx = gc.allocate(
+        heap,
+        HeapValue::Object(JsObject {
+            properties: props! {
+                "write" => Value::NativeFunction(c::PROCESS_STDOUT_WRITE),
+                "end" => Value::NativeFunction(c::PROCESS_STDOUT_WRITE),
+            },
+            prototype: None,
+            extensible: true,
+        }),
+    );
+    let stdout_ctor_idx = gc.allocate(
+        heap,
+        HeapValue::Object(JsObject {
+            properties: props! {
+                wk::PROTOTYPE => Value::Object(stdout_proto_idx),
+            },
+            prototype: None,
+            extensible: true,
+        }),
+    );
     let stdout_idx = gc.allocate(
         heap,
         HeapValue::Object(JsObject {
-            properties: stdout_props,
-            prototype: None,
+            properties: props! {
+                "fd" => Value::Integer(1),
+                "isTTY" => Value::Boolean(atty_stdout()),
+                "write" => Value::NativeFunction(c::PROCESS_STDOUT_WRITE),
+                "constructor" => Value::Object(stdout_ctor_idx),
+            },
+            prototype: Some(stdout_proto_idx),
             extensible: true,
         }),
     );
     props.insert("stdout".into(), Value::Object(stdout_idx));
 
-    // process.stderr — `.fd` is 2 (Node convention).
-    let stderr_props = props! {
-        "write" => Value::NativeFunction(c::PROCESS_STDOUT_WRITE),
-        "fd" => Value::Integer(2),
-        "isTTY" => Value::Boolean(atty_stderr()),
-    };
+    let stderr_proto_idx = gc.allocate(
+        heap,
+        HeapValue::Object(JsObject {
+            properties: props! {
+                "write" => Value::NativeFunction(c::PROCESS_STDOUT_WRITE),
+                "end" => Value::NativeFunction(c::PROCESS_STDOUT_WRITE),
+            },
+            prototype: None,
+            extensible: true,
+        }),
+    );
+    let stderr_ctor_idx = gc.allocate(
+        heap,
+        HeapValue::Object(JsObject {
+            properties: props! {
+                wk::PROTOTYPE => Value::Object(stderr_proto_idx),
+            },
+            prototype: None,
+            extensible: true,
+        }),
+    );
     let stderr_idx = gc.allocate(
         heap,
         HeapValue::Object(JsObject {
-            properties: stderr_props,
-            prototype: None,
+            properties: props! {
+                "fd" => Value::Integer(2),
+                "isTTY" => Value::Boolean(atty_stderr()),
+                "write" => Value::NativeFunction(c::PROCESS_STDOUT_WRITE),
+                "constructor" => Value::Object(stderr_ctor_idx),
+            },
+            prototype: Some(stderr_proto_idx),
             extensible: true,
         }),
     );

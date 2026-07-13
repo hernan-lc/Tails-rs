@@ -261,10 +261,28 @@ pub(crate) fn native_require(
 
     // 14. Store exports in registry
     let export_props = extract_object_properties(interp, &final_exports);
-    let export_map: FxHashMap<String, Value> = export_props
+    let mut export_map: FxHashMap<String, Value> = export_props
         .iter()
         .map(|(k, v)| (k.to_string(), v.clone()))
         .collect();
+    // If module.exports was reassigned to a non-object (e.g. a function
+    // carrying properties like `stringify.configure`), ESM `import x from
+    // 'cjs'` should resolve to that function directly. Stash it as the CJS
+    // default so the ESM loader can return it, and also surface its own
+    // properties (e.g. `configure`) as named exports after the function's
+    // own props are read.
+    if !matches!(final_exports, Value::Object(_)) {
+        interp
+            .cjs_default_exports
+            .insert(module_path.clone(), final_exports.clone());
+    } else {
+        // Surface function/object property exports so `import { configure }`
+        // and `cjsModule.configure` both resolve.
+        let own_props = extract_object_properties(interp, &final_exports);
+        for (k, v) in own_props.iter() {
+            export_map.entry(k.to_string()).or_insert_with(|| v.clone());
+        }
+    }
     interp
         .module_registry
         .insert(module_path.clone(), export_map.clone());

@@ -567,6 +567,17 @@ pub const ASYNC_HOOKS_BIND: usize = 520;
 // safe-regex2 shim (always-safe) (521)
 pub const SAFE_REGEX_TRUE: usize = 521;
 
+// WeakRef (522-523)
+pub const WEAK_REF_CONSTRUCTOR: usize = 527;
+pub const WEAK_REF_DEREF: usize = 528;
+// FinalizationRegistry (524-525)
+pub const FINALIZATION_REGISTRY_CONSTRUCTOR: usize = 529;
+pub const FINALIZATION_REGISTRY_REGISTER: usize = 530;
+// ArrayBuffer (531-533)
+pub const ARRAY_BUFFER_CONSTRUCTOR: usize = 531;
+pub const ARRAY_BUFFER_BYTE_LENGTH: usize = 532;
+pub const ARRAY_BUFFER_IS_VIEW: usize = 533;
+
 #[cfg(test)]
 mod tests {
     use super::*;

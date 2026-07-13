@@ -901,9 +901,14 @@ pub static NATIVE_TABLE: &[NativeFn] = &[
     require_fns::native_module_create_require,
     typed_array_fns::native_typed_array_symbol_to_string_tag,
     typed_array_fns::native_typed_array_buffer,
+    crate::runtime_env::weak_refs::native_weak_ref_constructor,
+    crate::runtime_env::weak_refs::native_weak_ref_deref,
+    crate::runtime_env::weak_refs::native_finalization_registry_constructor,
+    crate::runtime_env::weak_refs::native_finalization_registry_register,
+    buffer_fns::native_array_buffer_constructor,
+    buffer_fns::native_array_buffer_byte_length,
+    buffer_fns::native_array_buffer_is_view,
 ];
 
 #[cfg(test)]
-const _: () = assert!(!NATIVE_TABLE.is_empty(), "NATIVE_TABLE must not be empty");
-
 const _: () = assert!(!NATIVE_TABLE.is_empty(), "NATIVE_TABLE must not be empty");

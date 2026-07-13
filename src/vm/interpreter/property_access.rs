@@ -122,6 +122,19 @@ impl Interpreter {
                 if let HeapValue::Function(f) = &mut self.heap[*func_idx] {
                     f.properties.remove(&format!("__getter_{}", key_str));
                     f.properties.remove(&format!("__setter_{}", key_str));
+                    // Keep `f.prototype` in sync with the `prototype` property
+                    // so that `util.inherits`/classical inheritance (which sets
+                    // `ctor.prototype` via set_property) is reflected when the
+                    // prototype is later read back. Otherwise `get_property`
+                    // would lazily fabricate a fresh empty prototype and break
+                    // the chain (`this.on` undefined inside subclasses).
+                    if key_str == wk::PROTOTYPE {
+                        if let Value::Object(pidx) = value {
+                            f.prototype = Some(pidx);
+                        } else if matches!(value, Value::Null) {
+                            f.prototype = None;
+                        }
+                    }
                     f.properties.insert(key_str.to_string(), value);
                 }
             }
@@ -175,6 +188,23 @@ impl Interpreter {
                 ))));
             }
             Value::Object(obj_idx) => {
+                // `constructor` resolves through the prototype chain to a native
+                // constructor when the prototype is a built-in proto (streams,
+                // errors, buffers, typed arrays, arrays, dates, regexps,
+                // generators). This mirrors Node's behavior where
+                // `stream.constructor.prototype.write` is the native method.
+                let obj_proto = if let HeapValue::Object(obj) = &self.heap[*obj_idx] {
+                    obj.prototype
+                } else {
+                    None
+                };
+                if let Value::String(ks) = key {
+                    if **ks == *wk::CONSTRUCTOR {
+                        if let Some(ctor) = self.constructor_for_proto_chain(obj_proto) {
+                            return Ok(ctor);
+                        }
+                    }
+                }
                 if let HeapValue::Object(obj) = &mut self.heap[*obj_idx] {
                     let key_str = match key_to_str(key) {
                         Some(s) => s,
@@ -294,7 +324,14 @@ impl Interpreter {
                     return Ok(val);
                 }
                 if key_str == wk::PROTOTYPE {
+                    // Prefer a `prototype` set via set_property (used by
+                    // `util.inherits`/classical inheritance) over the lazily
+                    // allocated `f.prototype` field, so the chain that was
+                    // actually installed is the one returned.
                     if let HeapValue::Function(f) = &self.heap[*func_idx] {
+                        if let Some(val) = f.properties.get(&key_str) {
+                            return Ok(val.clone());
+                        }
                         if let Some(proto_idx) = f.prototype {
                             return Ok(Value::Object(proto_idx));
                         }
@@ -820,6 +857,32 @@ impl Interpreter {
         Ok(Value::Undefined)
     }
 
+    /// Walk the prototype chain starting at `proto_idx` and return the first
+    /// constructor NativeFunction found, so `instance.constructor` resolves for
+    /// built-in objects whose prototype is a native proto.
+    fn constructor_for_proto_chain(
+        &self,
+        proto_idx: Option<usize>,
+    ) -> Option<Value> {
+        let mut current = proto_idx?;
+        for _ in 0..64 {
+            if let Some(ctor) = self.constructor_for_proto(current) {
+                return Some(ctor);
+            }
+            match &self.heap[current] {
+                HeapValue::Object(obj) => {
+                    if let Some(next) = obj.prototype {
+                        current = next;
+                    } else {
+                        return None;
+                    }
+                }
+                _ => return None,
+            }
+        }
+        None
+    }
+
     /// Resolve `key` by walking the prototype chain starting at `proto_idx`.
     /// Used by array/primitive property lookups to inherit Object.prototype
     /// members (e.g. `hasOwnProperty`, `toString`) that live on the shared
@@ -834,6 +897,15 @@ impl Interpreter {
             Some(idx) => Value::Object(idx),
             None => return Ok(Value::Undefined),
         };
+        // `constructor` resolves to the first native constructor found while
+        // walking the prototype chain (e.g. TypedArray/stream instances).
+        if let Some(ks) = key_to_str(key) {
+            if ks == wk::CONSTRUCTOR {
+                if let Some(ctor) = self.constructor_for_proto_chain(proto_idx) {
+                    return Ok(ctor);
+                }
+            }
+        }
         // Guard against prototype loops.
         for _ in 0..64 {
             match &current {

@@ -393,6 +393,63 @@ impl Interpreter {
         None
     }
 
+    /// Map a native prototype heap index to its constructor NativeFunction,
+    /// so that `instance.constructor` resolves the same way Node does for
+    /// built-in objects (streams, errors, buffers, typed arrays, etc.).
+    pub(crate) fn constructor_for_proto(&self, proto_idx: usize) -> Option<Value> {
+        // Error subtypes share their constructor when no dedicated proto exists.
+        if let Some(idx) = self.error_proto_idx {
+            if idx == proto_idx {
+                return Some(Value::NativeFunction(c::ERROR_CONSTRUCTOR));
+            }
+        }
+        if let Some(idx) = self.date_proto_idx {
+            if idx == proto_idx {
+                return Some(Value::NativeFunction(c::DATE_CONSTRUCTOR));
+            }
+        }
+        if let Some(idx) = self.regexp_proto_idx {
+            if idx == proto_idx {
+                return Some(Value::NativeFunction(c::REGEXP_CONSTRUCTOR));
+            }
+        }
+        if let Some(idx) = self.buffer_proto_idx {
+            if idx == proto_idx {
+                return Some(Value::NativeFunction(c::BUFFER_CONSTRUCTOR));
+            }
+        }
+        if let Some(idx) = self.typed_array_proto_idx {
+            if idx == proto_idx {
+                return Some(Value::NativeFunction(c::INT8_ARRAY_CONSTRUCTOR));
+            }
+        }
+        if let Some(idx) = self.array_proto_idx {
+            if idx == proto_idx {
+                return Some(Value::NativeFunction(c::ARRAY_CONSTRUCTOR));
+            }
+        }
+        // Stream prototypes live in the stream module's registry.
+        if let Some(stream_props) = self.module_registry.get(wk::MOD_STREAM) {
+            for (ctor_name, prop) in [
+                ("Readable", stream_props.get("readablePrototype")),
+                ("Writable", stream_props.get("writablePrototype")),
+                ("Transform", stream_props.get("transformPrototype")),
+            ] {
+                if let Some(Value::Object(p)) = prop {
+                    if *p == proto_idx {
+                        let ctor = match ctor_name {
+                            "Readable" | "Writable" => c::STREAM_CONSTRUCTOR,
+                            "Transform" => c::STREAM_PASSTHROUGH_CONSTRUCTOR,
+                            _ => c::STREAM_CONSTRUCTOR,
+                        };
+                        return Some(Value::NativeFunction(ctor));
+                    }
+                }
+            }
+        }
+        None
+    }
+
     fn find_class_name_for_native(&self, native_idx: usize) -> Option<String> {
         for props in self.module_registry.values() {
             for (func_name, value) in props {

@@ -605,6 +605,21 @@ impl Interpreter {
             }
             // "exports": { ".": "...", "./sub": "..." }
             serde_json::Value::Object(map) => {
+                // Direct condition map at the top level
+                // (e.g. { "require": "./index.js", "import": "./esm/wrapper.js" })
+                // — resolve using require/import ordering instead of only
+                // looking for a "." sub-key.
+                let is_top_level_condition = !map.contains_key(".")
+                    && map.keys().any(|k| {
+                        matches!(k.as_str(), "require" | "import" | "node" | "default" | "types")
+                    });
+                if is_top_level_condition {
+                    return self.resolve_condition(
+                        &serde_json::Value::Object(map.clone()),
+                        pkg_dir,
+                        is_require,
+                    );
+                }
                 // Look for "." entry (the main entry)
                 if let Some(dot_entry) = map.get(".") {
                     return self.resolve_condition(dot_entry, pkg_dir, is_require);
@@ -832,7 +847,13 @@ impl Interpreter {
                     .get(&module_path)
                     .cloned()
                     .unwrap_or_default();
-                let val = if let Some(v) = exports.get("default") {
+                let val = if let Some(v) = self.cjs_default_exports.get(&module_path) {
+                    // CJS module that did `module.exports = fn` — ESM
+                    // `import x from 'cjs'` resolves to that function directly
+                    // (its properties like `.configure` are surfaced as named
+                    // exports by native_require).
+                    v.clone()
+                } else if let Some(v) = exports.get("default") {
                     v.clone()
                 } else if !exports.is_empty() {
                     self.build_module_object_from_exports(&exports)

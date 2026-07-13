@@ -873,3 +873,50 @@ fn encode_utf8_codepoint(out: &mut Vec<u8>, cp: u32) {
         out.push(0x80 | (cp & 0x3F) as u8);
     }
 }
+
+/// `ArrayBuffer(length)` — minimal global so packages that do
+/// `o instanceof ArrayBuffer` (e.g. rfdc) don't throw "ArrayBuffer is not
+/// defined". The buffer is backed by a `HeapValue::Buffer` (Vec<u8>),
+/// matching the runtime's buffer representation, with a `byteLength` getter.
+pub(super) fn native_array_buffer_constructor(
+    interp: &mut Interpreter,
+    _this: &Value,
+    args: &[Value],
+) -> Result<Value> {
+    use crate::runtime_env::native_fns::constants as c;
+    let len = match args.first() {
+        Some(Value::Integer(n)) => *n as usize,
+        Some(Value::Float(n)) => *n as usize,
+        _ => 0,
+    };
+    let buf = vec![0u8; len];
+    let buf_idx = interp.gc.allocate(&mut interp.heap, HeapValue::Buffer(buf));
+    let _ = c::ARRAY_BUFFER_BYTE_LENGTH;
+    Ok(Value::Buffer(buf_idx))
+}
+
+/// `ArrayBuffer.prototype.byteLength` getter.
+pub(super) fn native_array_buffer_byte_length(
+    interp: &mut Interpreter,
+    this: &Value,
+    _args: &[Value],
+) -> Result<Value> {
+    if let Value::Buffer(idx) = this {
+        if let HeapValue::Buffer(buf) = &interp.heap[*idx] {
+            return Ok(Value::Integer(buf.len() as i64));
+        }
+    }
+    Ok(Value::Integer(0))
+}
+
+/// `ArrayBuffer.isView(value)` — returns true if `value` is a TypedArray or
+/// DataView (which wrap an ArrayBuffer). Backed by HeapValue::Buffer here.
+pub(super) fn native_array_buffer_is_view(
+    interp: &mut Interpreter,
+    _this: &Value,
+    args: &[Value],
+) -> Result<Value> {
+    let is_view = matches!(args.first(), Some(Value::TypedArray(_)));
+    let _ = interp;
+    Ok(Value::Boolean(is_view))
+}
