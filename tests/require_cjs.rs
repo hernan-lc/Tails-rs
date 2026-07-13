@@ -21,6 +21,15 @@ fn eval_fixture(runtime: &mut TailsRuntime, name: &str) -> tails::Value {
     runtime.eval_module(&source, &base).unwrap()
 }
 
+// ── Cross-module `new` of a CJS-exported class ───────────────────────────────
+
+#[test]
+fn test_require_cross_module_new_class() {
+    let mut runtime = TailsRuntime::default();
+    let result = eval_fixture(&mut runtime, "main_cross_new.ts");
+    assert_eq!(result, tails::Value::Float(1.0));
+}
+
 // ── CJS named exports (exports.x = ...) ─────────────────────────────────────
 
 #[test]

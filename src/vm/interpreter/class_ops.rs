@@ -212,20 +212,34 @@ impl Interpreter {
                     Value::Function(func_idx) => {
                         if let HeapValue::Function(f) = &self.heap[func_idx] {
                             let f_clone = f.clone();
-                            let proto_val = self.get_property(
-                                &super_class,
-                                &Value::from_string(wk::PROTOTYPE.to_string()),
-                            )?;
-                            let proto_idx = if let Value::Object(pi) = proto_val {
-                                Some(pi)
-                            } else {
-                                None
+                            let super_module: Option<std::rc::Rc<CompiledModule>> = f_clone
+                                .owner_module
+                                .clone()
+                                .or_else(|| self.current_module.clone());
+                            let cross_module = match super_module.as_ref() {
+                                Some(m) => !std::ptr::eq(m.as_ref(), module),
+                                None => false,
                             };
-                            let new_obj_heap_idx = self.gc.allocate(
-                                &mut self.heap,
-                                HeapValue::Object(JsObject::with_prototype(proto_idx)),
-                            );
-                            let _constructed = Value::Object(new_obj_heap_idx);
+                            if cross_module {
+                                if let Some(ref ctor_mod) = super_module {
+                                    let result = self.construct_function_nested(
+                                        func_idx,
+                                        &f_clone.closure,
+                                        f_clone.bytecode_index,
+                                        f_clone.local_count,
+                                        f_clone.module_scope.clone(),
+                                        f_clone.source_file.clone(),
+                                        ctor_mod,
+                                        this_val.clone(),
+                                        Value::Function(func_idx),
+                                        args,
+                                        *pc,
+                                    )?;
+                                    self.stack.push(result);
+                                    *pc += 1;
+                                    return Ok(true);
+                                }
+                            }
                             let return_address = *pc + 1;
                             let base_pointer = self.stack.len();
                             let closure_count = f_clone.closure.borrow().len();

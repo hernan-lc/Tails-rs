@@ -185,8 +185,8 @@ pub struct ConstructorParam {
     pub type_annotation: Option<TypeAnnotation>,
     pub access_modifiers: Vec<AccessModifier>,
     pub default: Option<Expression>,
+    pub pattern: Option<BindingPattern>,
 }
-
 #[derive(Debug, Clone)]
 pub enum ClassMember {
     Method {
@@ -790,11 +790,6 @@ impl<'a> Parser<'a> {
                             self.advance();
                             (name, None)
                         } else {
-                            eprintln!(
-                                "[DEBUG param] failing token={:?} prev={:?}",
-                                self.peek().token,
-                                self.tokens.get(self.pos.wrapping_sub(1)).map(|t| &t.token)
-                            );
                             return Err(Error::ParseError(format!(
                                 "Expected parameter name, got {:?}",
                                 self.peek().token
@@ -868,17 +863,26 @@ impl<'a> Parser<'a> {
                 if self.peek().token == Token::Ellipsis {
                     self.advance();
                 }
-                let param = match self.advance().token {
-                    Token::Identifier(name) => name,
-                    token => match token_keyword_string(&token) {
-                        Some(name) => name,
-                        None => {
-                            return Err(Error::ParseError(format!(
-                                "Expected parameter name, got {:?}",
-                                token
-                            )))
-                        }
-                    },
+                let (param, pattern) = match self.peek().token.clone() {
+                    Token::LeftBracket | Token::LeftBrace => {
+                        let pattern = self.parse_binding_pattern()?;
+                        (format!("__destr_{}", params.len()), Some(pattern))
+                    }
+                    _ => {
+                        let param = match self.advance().token {
+                            Token::Identifier(name) => name,
+                            token => match token_keyword_string(&token) {
+                                Some(name) => name,
+                                None => {
+                                    return Err(Error::ParseError(format!(
+                                        "Expected parameter name, got {:?}",
+                                        token
+                                    )))
+                                }
+                            },
+                        };
+                        (param, None)
+                    }
                 };
                 let type_annotation = if self.peek().token == Token::Colon {
                     self.advance();
@@ -905,6 +909,7 @@ impl<'a> Parser<'a> {
                     type_annotation,
                     access_modifiers,
                     default,
+                    pattern,
                 });
                 if self.peek().token == Token::Comma {
                     self.advance();

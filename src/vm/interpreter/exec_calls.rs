@@ -477,7 +477,7 @@ impl Interpreter {
         &mut self,
         constructor: Value,
         args: Vec<Value>,
-        _module: &CompiledModule,
+        module: &CompiledModule,
         pc: &mut usize,
     ) -> Result<bool> {
         match &constructor {
@@ -501,6 +501,36 @@ impl Interpreter {
                                 if let HeapValue::Function(super_f) = &self.heap[*super_func_idx] {
                                     if super_f.bytecode_index != usize::MAX {
                                         let super_f_clone = super_f.clone();
+                                        let super_owner = super_f_clone.owner_module.clone();
+                                        let super_scope = super_f_clone.module_scope.clone();
+                                        let super_source = super_f_clone.source_file.clone();
+                                        let super_module: Option<std::rc::Rc<CompiledModule>> =
+                                            super_owner.or_else(|| self.current_module.clone());
+                                        let cross_module = match super_module.as_ref() {
+                                            Some(m) => !std::ptr::eq(m.as_ref(), module),
+                                            None => false,
+                                        };
+                                        if cross_module {
+                                            if let Some(ref ctor_mod) = super_module {
+                                                let result = self
+                                                    .construct_function_nested(
+                                                        *super_func_idx,
+                                                        &super_f_clone.closure,
+                                                        super_f_clone.bytecode_index,
+                                                        super_f_clone.local_count,
+                                                        super_scope,
+                                                        super_source,
+                                                        ctor_mod,
+                                                        this_val.clone(),
+                                                        constructor.clone(),
+                                                        args,
+                                                        *pc,
+                                                    )?;
+                                                self.stack.push(result);
+                                                *pc += 1;
+                                                return Ok(true);
+                                            }
+                                        }
                                         let return_address = *pc + 1;
                                         let base_pointer = self.stack.len();
                                         if self.call_stack.len() >= self.max_call_stack_depth {
@@ -561,69 +591,99 @@ impl Interpreter {
                     } else {
                         let func_info = {
                             if let HeapValue::Function(f) = &self.heap[*func_idx] {
-                                Some((f.closure.clone(), f.bytecode_index, f.local_count))
+                                Some((
+                                    f.closure.clone(),
+                                    f.bytecode_index,
+                                    f.local_count,
+                                    f.owner_module.clone(),
+                                    f.module_scope.clone(),
+                                    f.source_file.clone(),
+                                ))
                             } else {
                                 None
                             }
                         };
-                        if let Some((closure_vars, bytecode_index, local_count)) = func_info {
-                            let same_module = if let HeapValue::Function(f) = &self.heap[*func_idx]
-                            {
-                                match (&f.owner_module, &self.current_module) {
-                                    (Some(om), Some(cm)) => Rc::ptr_eq(om, cm),
-                                    (None, None) => true,
-                                    _ => false,
-                                }
-                            } else {
-                                false
+                        if let Some((
+                            closure_vars,
+                            bytecode_index,
+                            local_count,
+                            owner_module,
+                            module_scope,
+                            source_file,
+                        )) = func_info
+                        {
+                            // Cross-module `new`: execute constructor bytecode in
+                            // a nested execute_from on the defining module. Same-
+                            // module keeps the pc-jump fast path.
+                            let func_module: Option<std::rc::Rc<CompiledModule>> =
+                                owner_module.or_else(|| self.current_module.clone());
+                            let cross_module = match func_module.as_ref() {
+                                Some(m) => !std::ptr::eq(m.as_ref(), module),
+                                None => false,
                             };
-                            if same_module {
-                                let return_address = *pc + 1;
-                                let base_pointer = self.stack.len();
-                                let closure_count = closure_vars.borrow().len();
-                                if self.call_stack.len() >= self.max_call_stack_depth {
-                                    self.throw_stack_overflow(pc)?;
+                            if cross_module {
+                                if let Some(ref ctor_mod) = func_module {
+                                    let result = self.construct_function_nested(
+                                        *func_idx,
+                                        &closure_vars,
+                                        bytecode_index,
+                                        local_count,
+                                        module_scope,
+                                        source_file,
+                                        ctor_mod,
+                                        this_val.clone(),
+                                        constructor.clone(),
+                                        args,
+                                        *pc,
+                                    )?;
+                                    self.stack.push(result);
+                                    *pc += 1;
                                     return Ok(true);
                                 }
-                                self.call_stack.push(CallFrame {
-                                    return_address,
-                                    base_pointer,
-                                    closure_var_count: closure_count,
-                                    func_heap_idx: Some(*func_idx),
-                                    this_value: Some(this_val.clone()),
-                                    is_construct: true,
-                                    new_target: Some(constructor.clone()),
-                                    source_name: self.current_module_path.clone(),
-                                    generator_heap_idx: None,
-                                    source_line: self.current_source_line(*pc),
-                                    source_col: self.current_source_col(*pc),
-                                    exception_handlers_snapshot: self.exception_handlers.clone(),
-                                    arguments: None,
-                                });
-                                for closure_var in closure_vars.borrow().iter().cloned() {
-                                    self.stack.push(closure_var);
-                                }
-                                for arg in args {
-                                    self.stack.push(arg);
-                                }
-                                self.reserve_frame_locals(base_pointer, local_count);
-                                *pc = bytecode_index;
+                            }
+                            if let Some(ref mod_ref) = func_module {
+                                self.current_module = Some(mod_ref.clone());
+                            }
+                            if let Some(ref scope) = module_scope {
+                                self.module_globals = Some(scope.clone());
+                                self.module_globals_rc = Some(scope.clone());
+                            }
+                            if source_file.is_some() {
+                                self.current_module_path = source_file;
+                            }
+                            let return_address = *pc + 1;
+                            let base_pointer = self.stack.len();
+                            let closure_count = closure_vars.borrow().len();
+                            if self.call_stack.len() >= self.max_call_stack_depth {
+                                self.throw_stack_overflow(pc)?;
                                 return Ok(true);
                             }
-                        }
-                        let result = self.call_value(&constructor, &this_val, &args)?;
-                        match result {
-                            Value::Object(_)
-                            | Value::Array(_)
-                            | Value::Function(_)
-                            | Value::Promise(_)
-                            | Value::Proxy(_) => {
-                                self.stack.push(result);
+                            self.call_stack.push(CallFrame {
+                                return_address,
+                                base_pointer,
+                                closure_var_count: closure_count,
+                                func_heap_idx: Some(*func_idx),
+                                this_value: Some(this_val.clone()),
+                                is_construct: true,
+                                new_target: Some(constructor.clone()),
+                                source_name: self.current_module_path.clone(),
+                                generator_heap_idx: None,
+                                source_line: self.current_source_line(*pc),
+                                source_col: self.current_source_col(*pc),
+                                exception_handlers_snapshot: self.exception_handlers.clone(),
+                                arguments: None,
+                            });
+                            for closure_var in closure_vars.borrow().iter().cloned() {
+                                self.stack.push(closure_var);
                             }
-                            _ => {
-                                self.stack.push(this_val);
+                            for arg in args {
+                                self.stack.push(arg);
                             }
+                            self.reserve_frame_locals(base_pointer, local_count);
+                            *pc = bytecode_index;
+                            return Ok(true);
                         }
+                        self.stack.push(this_val);
                     }
                 }
             }

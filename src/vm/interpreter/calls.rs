@@ -215,6 +215,86 @@ impl Interpreter {
         }
     }
 
+    /// Nested construct for constructors whose bytecode lives in another module.
+    /// Mirrors `call_value`'s save/restore and construct return rules.
+    #[allow(clippy::too_many_arguments)]
+    pub(crate) fn construct_function_nested(
+        &mut self,
+        func_idx: usize,
+        closure: &Rc<RefCell<Vec<Value>>>,
+        bytecode_index: usize,
+        local_count: usize,
+        module_scope: Option<Rc<RefCell<FxHashMap<String, Value>>>>,
+        source_file: Option<String>,
+        ctor_module: &Rc<CompiledModule>,
+        this_val: Value,
+        new_target: Value,
+        args: Vec<Value>,
+        call_site_pc: usize,
+    ) -> Result<Value> {
+        let return_address = ctor_module.instructions.len();
+        let base_pointer = self.stack.len();
+        let closure_count = closure.borrow().len();
+
+        let saved_mg = self.module_globals.take();
+        let saved_mg_rc = self.module_globals_rc.take();
+        if let Some(ref scope) = module_scope {
+            self.module_globals = Some(scope.clone());
+            self.module_globals_rc = Some(scope.clone());
+        }
+
+        let saved_module = self.current_module.clone();
+        let saved_path = self.current_module_path.clone();
+        let saved_exception_handlers = if self.exception_handlers.is_empty() {
+            Vec::new()
+        } else {
+            self.exception_handlers.clone()
+        };
+        let exception_handlers_snapshot = saved_exception_handlers.clone();
+        self.current_module = Some(ctor_module.clone());
+        if source_file.is_some() {
+            self.current_module_path = source_file.clone();
+        }
+
+        if self.call_stack.len() >= self.max_call_stack_depth {
+            let msg = "Maximum call stack size exceeded".to_string();
+            return Err(crate::errors::Error::RuntimeError(msg));
+        }
+
+        self.call_stack.push(CallFrame {
+            return_address,
+            base_pointer,
+            closure_var_count: closure_count,
+            func_heap_idx: Some(func_idx),
+            this_value: Some(this_val.clone()),
+            is_construct: true,
+            new_target: Some(new_target),
+            source_name: source_file.or_else(|| self.current_module_path.clone()),
+            generator_heap_idx: None,
+            source_line: self.current_source_line(call_site_pc),
+            source_col: self.current_source_col(call_site_pc),
+            exception_handlers_snapshot,
+            arguments: None,
+        });
+
+        for closure_var in closure.borrow().iter().cloned() {
+            self.stack.push(closure_var);
+        }
+        for arg in args {
+            self.stack.push(arg);
+        }
+        self.reserve_frame_locals(base_pointer, local_count);
+
+        let result = self.execute_from(ctor_module, bytecode_index);
+
+        self.current_module = saved_module;
+        self.current_module_path = saved_path;
+        self.module_globals = saved_mg;
+        self.module_globals_rc = saved_mg_rc;
+        self.exception_handlers = saved_exception_handlers;
+        result
+    }
+
     pub(crate) fn call_native(
         &mut self,
         idx: usize,

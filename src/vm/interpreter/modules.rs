@@ -470,7 +470,12 @@ impl Interpreter {
 
         // For bare specifiers (e.g. "valibot"), skip local file checks and go straight to node_modules
         if !is_bare {
-            let resolved = if source.starts_with("./") || source.starts_with("../") {
+            // Include bare "." / ".." (common for package root re-exports)
+            let resolved = if source == "."
+                || source == ".."
+                || source.starts_with("./")
+                || source.starts_with("../")
+            {
                 parent.join(source)
             } else {
                 std::path::PathBuf::from(source)

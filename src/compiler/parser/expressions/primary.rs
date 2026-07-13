@@ -14,15 +14,15 @@ impl<'a> Parser<'a> {
         }
         // Speculatively parse as arrow params (including destructuring). On any
         // failure or non-`=>` follow, rewind and parse as a parenthesized expr.
-        if matches!(
+        // Contextual keywords (`from`, `as`, `of`, …) are valid param names.
+        let can_start_arrow_param = matches!(
             self.peek().token,
             Token::Identifier(_)
-                | Token::Get
-                | Token::Set
                 | Token::Ellipsis
                 | Token::LeftBracket
                 | Token::LeftBrace
-        ) {
+        ) || token_keyword_string(&self.peek().token).is_some();
+        if can_start_arrow_param {
             let saved = self.pos;
             let arrow_result = (|| -> Result<SpannedNode<Expression>> {
                 let (params, param_types, defaults, rest_param, param_patterns) =
