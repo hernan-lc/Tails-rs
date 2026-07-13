@@ -288,12 +288,7 @@ impl Interpreter {
                             .as_ref()
                             .and_then(|mg| mg.borrow().get(name.as_str()).cloned())
                     });
-                    if name == "Request" {
-                        eprintln!("DBG LoadGlobal Request at line {:?}, val={:?}", self.current_source_line(self.current_pc), val.as_ref().map(|v| std::mem::discriminant(v)));
-                    }
-                    if name == "diagnostics" {
-                        eprintln!("DBG LoadGlobal diagnostics at line {:?}, val={:?}", self.current_source_line(self.current_pc), val.as_ref().map(|v| std::mem::discriminant(v)));
-                    }
+
                     // Non-arrow functions expose the ES `arguments` object.
                     let val = val.or_else(|| {
                         if name == "arguments" {

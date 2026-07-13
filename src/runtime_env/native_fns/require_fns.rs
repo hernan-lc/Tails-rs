@@ -218,12 +218,24 @@ pub(crate) fn native_require(
     let exports_obj = interp.new_object();
     interp.set_property_str(&module_obj, "exports", exports_obj.clone());
 
-    // 7. Save current state
+    // 7. Save current state. We save/restore only the CJS injection globals
+    // (module, exports, require, __filename, __dirname) so nested requires
+    // don't clobber them. Other globals (like parent's `const X = ...`)
+    // are left untouched so they persist across requires.
     let saved_module = interp.current_module.take();
     let saved_path = interp.current_module_path.take();
     let prev_exports = std::mem::take(&mut interp.module_exports);
     let saved_module_globals = interp.module_globals.take();
     let saved_module_globals_rc = interp.module_globals_rc.take();
+    let saved_cjs_globals = {
+        let mut g = FxHashMap::default();
+        for key in &["module", "exports", "require", "__filename", "__dirname"] {
+            if let Some(v) = interp.globals.get(*key) {
+                g.insert(key.to_string(), v.clone());
+            }
+        }
+        g
+    };
 
     // 9. Set module path and pre-register (for circular deps)
     interp.current_module_path = Some(module_path.clone());
@@ -311,9 +323,12 @@ pub(crate) fn native_require(
     interp.current_module = saved_module;
     let exec_exports = std::mem::replace(&mut interp.module_exports, prev_exports);
 
-    // Note: we intentionally do NOT restore globals to their pre-require state.
-    // In Tails-rs, module-level `const X = require(...)` must persist for nested
-    // functions to access via LoadGlobal. We only restore module_globals.
+    // Restore only the CJS injection globals so nested requires don't clobber
+    // the parent's module/exports bindings. Other globals (parent's top-level
+    // `const X = require(...)` assignments) are left untouched.
+    for (key, value) in &saved_cjs_globals {
+        interp.globals.insert(key.clone(), value.clone());
+    }
     interp.module_globals = saved_module_globals;
     interp.module_globals_rc = saved_module_globals_rc;
 

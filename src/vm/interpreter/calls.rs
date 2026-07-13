@@ -301,15 +301,8 @@ impl Interpreter {
         this: &Value,
         args: &[Value],
     ) -> Result<Value> {
-        if idx == 516 {
-            eprintln!("DBG call_native idx=516 (diagnostics.channel), table_len={}", NATIVE_TABLE.len());
-        }
         if idx < NATIVE_TABLE.len() {
-            let result = NATIVE_TABLE[idx](self, this, args);
-            if idx == 516 {
-                eprintln!("DBG call_native idx=516 result: {:?}", result.as_ref().map(|v| std::mem::discriminant(v)));
-            }
-            result
+            NATIVE_TABLE[idx](self, this, args)
         } else {
             // Check for dynamic native functions (from loaded .so/.dylib modules)
             let dynamic_idx = idx - NATIVE_TABLE.len();
