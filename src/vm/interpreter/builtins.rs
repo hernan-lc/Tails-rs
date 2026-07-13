@@ -924,14 +924,6 @@ impl Interpreter {
             "ArrayBuffer".into(),
             Value::NativeFunction(c::ARRAY_BUFFER_CONSTRUCTOR),
         );
-        // Static helpers used by ArrayBuffer consumers.
-        if let Some(Value::NativeFunction(_)) = self.globals.get("ArrayBuffer") {
-            self.set_property_str(
-                &Value::NativeFunction(c::ARRAY_BUFFER_CONSTRUCTOR),
-                "isView",
-                Value::NativeFunction(c::ARRAY_BUFFER_IS_VIEW),
-            );
-        }
 
         // Generator
         let generator_proto_props = props! {

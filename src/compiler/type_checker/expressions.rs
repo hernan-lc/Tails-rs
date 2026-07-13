@@ -254,6 +254,17 @@ impl TypeChecker {
                 }
                 Ok(Type::String)
             }
+            Expression::TaggedTemplate {
+                tag,
+                expressions,
+                ..
+            } => {
+                self.check_expression(tag)?;
+                for expr in expressions {
+                    self.check_expression(expr)?;
+                }
+                Ok(Type::Any)
+            }
             Expression::NewExpression { callee, args } => {
                 self.check_expression(callee)?;
                 for arg in args {

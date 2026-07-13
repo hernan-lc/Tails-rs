@@ -90,4 +90,32 @@ impl CodeGenerator {
         }
         Ok(())
     }
+
+    pub(super) fn generate_tagged_template(
+        &mut self,
+        tag: &Expression,
+        quasis: &[String],
+        expressions: &[Expression],
+    ) -> Result<()> {
+        // Stack order for `Call`: [callee, arg0, arg1, ...] with callee on top.
+        // A tagged template calls `tag(strings, ...values)`, so push the
+        // strings array first (bottom), then each value, then the tag (top).
+        self.emit(Instruction::NewArray(quasis.len() as u32));
+        for (i, q) in quasis.iter().enumerate() {
+            self.emit(Instruction::Dup);
+            let idx = self.add_constant(Value::Integer(i as i64));
+            self.emit(Instruction::LoadConst(idx));
+            let q_idx = self.add_constant(Value::from_string(q.clone()));
+            self.emit(Instruction::LoadConst(q_idx));
+            self.emit(Instruction::SetProperty);
+        }
+        for expr in expressions {
+            self.generate_expression(expr)?;
+            self.emit(Instruction::ToString);
+        }
+        self.generate_expression(tag)?;
+        let arg_count = quasis.len() + expressions.len();
+        self.emit(Instruction::Call(arg_count as u16));
+        Ok(())
+    }
 }

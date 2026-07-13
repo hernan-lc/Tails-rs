@@ -529,28 +529,28 @@ pub fn create_crypto_module(
 }
 
 pub fn create_assert_module(
-    heap: &mut Vec<HeapValue>,
-    gc: &mut GarbageCollector,
+    _heap: &mut Vec<HeapValue>,
+    _gc: &mut GarbageCollector,
 ) -> PropertyStorage {
-    let assert_obj_idx = gc.allocate(
-        heap,
-        HeapValue::Object(JsObject {
-            properties: props! {
-                "strictEqual" => Value::NativeFunction(c::HEADERS_HAS),
-                "ok" => Value::NativeFunction(c::HEADERS_SET),
-                "equal" => Value::NativeFunction(c::HEADERS_HAS),
-                "deepEqual" => Value::NativeFunction(c::HEADERS_HAS),
-            },
-            prototype: None,
-            extensible: true,
-        }),
-    );
     props! {
-        "default" => Value::Object(assert_obj_idx),
-        "strictEqual" => Value::NativeFunction(c::HEADERS_HAS),
-        "ok" => Value::NativeFunction(c::HEADERS_SET),
-        "equal" => Value::NativeFunction(c::HEADERS_HAS),
-        "deepEqual" => Value::NativeFunction(c::HEADERS_HAS),
+        "default" => Value::NativeFunction(c::ASSERT),
+        "ok" => Value::NativeFunction(c::ASSERT),
+        "strictEqual" => Value::NativeFunction(c::ASSERT_STRICT_EQUAL),
+        "equal" => Value::NativeFunction(c::ASSERT_STRICT_EQUAL),
+        "notStrictEqual" => Value::NativeFunction(c::ASSERT_NOT_STRICT_EQUAL),
+        "notEqual" => Value::NativeFunction(c::ASSERT_NOT_EQUAL),
+        "deepStrictEqual" => Value::NativeFunction(c::ASSERT_DEEP_EQUAL),
+        "deepEqual" => Value::NativeFunction(c::ASSERT_DEEP_EQUAL),
+        "notDeepStrictEqual" => Value::NativeFunction(c::ASSERT_NOT_DEEP_STRICT_EQUAL),
+        "notDeepEqual" => Value::NativeFunction(c::ASSERT_NOT_DEEP_EQUAL),
+        "ifError" => Value::NativeFunction(c::ASSERT_IF_ERROR),
+        "fail" => Value::NativeFunction(c::ASSERT_FAIL),
+        "throws" => Value::NativeFunction(c::ASSERT_THROWS),
+        "doesNotThrow" => Value::NativeFunction(c::ASSERT_DOES_NOT_THROW),
+        "rejects" => Value::NativeFunction(c::ASSERT_REJECTS),
+        "doesNotReject" => Value::NativeFunction(c::ASSERT_DOES_NOT_REJECT),
+        "match" => Value::NativeFunction(c::ASSERT_MATCH),
+        "doesNotMatch" => Value::NativeFunction(c::ASSERT_NOT_MATCH),
     }
 }
 

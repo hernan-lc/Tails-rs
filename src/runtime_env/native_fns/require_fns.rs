@@ -97,6 +97,18 @@ pub(crate) fn native_require(
                 if let Some(cached) = interp.require_cache.get(module_name) {
                     return Ok(cached.clone());
                 }
+                // `assert` is both callable and a method bag, mirroring Node.
+                // Return the callable NativeFunction; its methods resolve via
+                // the `ASSERT` arm in `get_property`.
+                if module_name == wk::MOD_ASSERT {
+                    let result = Value::NativeFunction(
+                        crate::runtime_env::native_fns::constants::ASSERT,
+                    );
+                    interp
+                        .require_cache
+                        .insert(module_name.to_string(), result.clone());
+                    return Ok(result);
+                }
                 let exports = interp.native_loader.load_module(
                     module_name,
                     &mut interp.heap,

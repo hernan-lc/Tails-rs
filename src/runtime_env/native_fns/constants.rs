@@ -577,6 +577,20 @@ pub const FINALIZATION_REGISTRY_REGISTER: usize = 530;
 pub const ARRAY_BUFFER_CONSTRUCTOR: usize = 531;
 pub const ARRAY_BUFFER_BYTE_LENGTH: usize = 532;
 pub const ARRAY_BUFFER_IS_VIEW: usize = 533;
+pub const ASSERT_DEEP_EQUAL: usize = 534;
+pub const ASSERT_IF_ERROR: usize = 535;
+pub const ASSERT_FAIL: usize = 536;
+pub const ASSERT_THROWS: usize = 537;
+pub const ASSERT_DOES_NOT_THROW: usize = 538;
+pub const ASSERT_REJECTS: usize = 539;
+pub const ASSERT_MATCH: usize = 540;
+pub const ASSERT_NOT_STRICT_EQUAL: usize = 541;
+pub const ASSERT_NOT_EQUAL: usize = 542;
+pub const ASSERT_DOES_NOT_REJECT: usize = 543;
+pub const ASSERT_NOT_DEEP_STRICT_EQUAL: usize = 544;
+pub const ASSERT_NOT_DEEP_EQUAL: usize = 545;
+pub const ASSERT_NOT_MATCH: usize = 546;
+pub const HTTP_SERVER_SET_TIMEOUT: usize = 547;
 
 #[cfg(test)]
 mod tests {

@@ -507,6 +507,48 @@ impl Interpreter {
                         _ => {}
                     }
                 }
+                if *idx == c::ARRAY_BUFFER_CONSTRUCTOR {
+                    match key_str.as_str() {
+                        "isView" => return Ok(Value::NativeFunction(c::ARRAY_BUFFER_IS_VIEW)),
+                        "prototype" => return Ok(Value::Undefined),
+                        _ => {}
+                    }
+                }
+                if *idx == c::ASSERT {
+                    match key_str.as_str() {
+                        "ok" => return Ok(Value::NativeFunction(c::ASSERT)),
+                        "strictEqual" | "equal" => {
+                            return Ok(Value::NativeFunction(c::ASSERT_STRICT_EQUAL))
+                        }
+                        "notStrictEqual" | "notEqual" => {
+                            return Ok(Value::NativeFunction(c::ASSERT_NOT_STRICT_EQUAL))
+                        }
+                        "deepStrictEqual" | "deepEqual" => {
+                            return Ok(Value::NativeFunction(c::ASSERT_DEEP_EQUAL))
+                        }
+                        "notDeepStrictEqual" | "notDeepEqual" => {
+                            return Ok(Value::NativeFunction(c::ASSERT_NOT_DEEP_STRICT_EQUAL))
+                        }
+                        "ifError" => return Ok(Value::NativeFunction(c::ASSERT_IF_ERROR)),
+                        "fail" => return Ok(Value::NativeFunction(c::ASSERT_FAIL)),
+                        "throws" => return Ok(Value::NativeFunction(c::ASSERT_THROWS)),
+                        "doesNotThrow" => {
+                            return Ok(Value::NativeFunction(c::ASSERT_DOES_NOT_THROW))
+                        }
+                        "rejects" => return Ok(Value::NativeFunction(c::ASSERT_REJECTS)),
+                        "doesNotReject" => {
+                            return Ok(Value::NativeFunction(c::ASSERT_DOES_NOT_REJECT))
+                        }
+                        "match" => return Ok(Value::NativeFunction(c::ASSERT_MATCH)),
+                        "doesNotMatch" => return Ok(Value::NativeFunction(c::ASSERT_NOT_MATCH)),
+                        "partialDeepStrictEqual" => {
+                            return Ok(Value::NativeFunction(c::ASSERT_DEEP_EQUAL))
+                        }
+                        "assert" => return Ok(Value::NativeFunction(c::ASSERT)),
+                        "prototype" => return Ok(Value::Undefined),
+                        _ => {}
+                    }
+                }
                 // stream.Readable / Writable / Transform / PassThrough.prototype
                 if (*idx == c::STREAM_CONSTRUCTOR || *idx == c::STREAM_PASSTHROUGH_CONSTRUCTOR)
                     && key_str == wk::PROTOTYPE

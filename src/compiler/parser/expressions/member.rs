@@ -66,6 +66,21 @@ impl<'a> Parser<'a> {
                     property: Box::new(property),
                     computed: true,
                 });
+            } else if let Token::TemplateLiteral(parts) = self.peek().token.clone() {
+                self.advance();
+                let tl = self.parse_template_literal(parts)?;
+                let (quasis, expressions) = match tl.inner {
+                    Expression::TemplateLiteral {
+                        quasis,
+                        expressions,
+                    } => (quasis, expressions),
+                    _ => unreachable!(),
+                };
+                expr = self.spanned(Expression::TaggedTemplate {
+                    tag: Box::new(expr.inner),
+                    quasis,
+                    expressions,
+                });
             } else {
                 break;
             }
@@ -81,10 +96,11 @@ impl<'a> Parser<'a> {
                 continue;
             }
             let next = self.peek().token.clone();
-            if !matches!(
+            let is_call_suffix = matches!(
                 next,
                 Token::LeftParen | Token::QuestionDot | Token::Dot | Token::LeftBracket
-            ) {
+            ) || matches!(next, Token::TemplateLiteral(_));
+            if !is_call_suffix {
                 break;
             }
             expr = self.parse_member_chain(expr)?;

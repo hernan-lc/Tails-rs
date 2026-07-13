@@ -30,6 +30,7 @@ pub(super) fn native_http_create_server(
         "_listeners" => Value::Object(listeners_idx),
         "listen" => Value::NativeFunction(c::HTTP_SERVER_LISTEN),
         "close" => Value::NativeFunction(c::HTTP_SERVER_CLOSE),
+        "setTimeout" => Value::NativeFunction(c::HTTP_SERVER_SET_TIMEOUT),
         // Minimal EventEmitter surface used by express/Node http.Server
         "on" => Value::NativeFunction(c::EVENT_EMITTER_ON),
         "addListener" => Value::NativeFunction(c::EVENT_EMITTER_ON),
@@ -49,7 +50,15 @@ pub(super) fn native_http_create_server(
     Ok(Value::Object(idx))
 }
 
-// server.close() -> marks the server closed so the accept loop exits.
+// server.setTimeout(ms) — no-op for this single-threaded runtime, but
+// fastify configures server timeouts so the method must exist.
+pub(super) fn native_http_server_set_timeout(
+    _interp: &mut Interpreter,
+    _this: &Value,
+    _args: &[Value],
+) -> Result<Value> {
+    Ok(Value::Undefined)
+}
 pub(super) fn native_http_server_close(
     interp: &mut Interpreter,
     this: &Value,

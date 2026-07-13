@@ -377,6 +377,11 @@ pub enum Expression {
         quasis: Vec<String>,
         expressions: Vec<Expression>,
     },
+    TaggedTemplate {
+        tag: Box<Expression>,
+        quasis: Vec<String>,
+        expressions: Vec<Expression>,
+    },
     ClassExpression {
         name: Option<String>,
         superclass: Option<Box<Expression>>,
@@ -785,6 +790,11 @@ impl<'a> Parser<'a> {
                             self.advance();
                             (name, None)
                         } else {
+                            eprintln!(
+                                "[DEBUG param] failing token={:?} prev={:?}",
+                                self.peek().token,
+                                self.tokens.get(self.pos.wrapping_sub(1)).map(|t| &t.token)
+                            );
                             return Err(Error::ParseError(format!(
                                 "Expected parameter name, got {:?}",
                                 self.peek().token
@@ -860,12 +870,15 @@ impl<'a> Parser<'a> {
                 }
                 let param = match self.advance().token {
                     Token::Identifier(name) => name,
-                    token => {
-                        return Err(Error::ParseError(format!(
-                            "Expected parameter name, got {:?}",
-                            token
-                        )))
-                    }
+                    token => match token_keyword_string(&token) {
+                        Some(name) => name,
+                        None => {
+                            return Err(Error::ParseError(format!(
+                                "Expected parameter name, got {:?}",
+                                token
+                            )))
+                        }
+                    },
                 };
                 let type_annotation = if self.peek().token == Token::Colon {
                     self.advance();

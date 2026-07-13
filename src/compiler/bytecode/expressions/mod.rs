@@ -111,6 +111,11 @@ impl CodeGenerator {
                 quasis,
                 expressions,
             } => self.generate_template_literal(quasis, expressions),
+            Expression::TaggedTemplate {
+                tag,
+                quasis,
+                expressions,
+            } => self.generate_tagged_template(tag, quasis, expressions),
             Expression::ClassExpression {
                 name,
                 superclass,

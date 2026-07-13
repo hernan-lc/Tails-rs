@@ -908,6 +908,22 @@ pub static NATIVE_TABLE: &[NativeFn] = &[
     buffer_fns::native_array_buffer_constructor,
     buffer_fns::native_array_buffer_byte_length,
     buffer_fns::native_array_buffer_is_view,
+    // Assert methods (534-546)
+    assert_fns::native_assert_deep_equal,
+    assert_fns::native_assert_if_error,
+    assert_fns::native_assert_fail,
+    assert_fns::native_assert_throws,
+    assert_fns::native_assert_does_not_throw,
+    assert_fns::native_assert_rejects,
+    assert_fns::native_assert_match,
+    assert_fns::native_assert_not_strict_equal,
+    assert_fns::native_assert_not_equal,
+    assert_fns::native_assert_does_not_reject,
+    assert_fns::native_assert_not_deep_strict_equal,
+    assert_fns::native_assert_not_deep_equal,
+    assert_fns::native_assert_not_match,
+    // HTTP server no-op (547)
+    http_fns::native_http_server_set_timeout,
 ];
 
 #[cfg(test)]
