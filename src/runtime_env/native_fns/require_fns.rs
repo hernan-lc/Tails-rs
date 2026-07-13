@@ -222,13 +222,8 @@ pub(crate) fn native_require(
     let saved_module = interp.current_module.take();
     let saved_path = interp.current_module_path.take();
     let prev_exports = std::mem::take(&mut interp.module_exports);
-    let saved_globals = std::mem::take(&mut interp.globals);
     let saved_module_globals = interp.module_globals.take();
     let saved_module_globals_rc = interp.module_globals_rc.take();
-
-    // 8. Node-compatible: every built-in global is visible inside CJS modules.
-    // (A narrow allow-list previously omitted helpers some packages need.)
-    interp.globals = saved_globals.clone();
 
     // 9. Set module path and pre-register (for circular deps)
     interp.current_module_path = Some(module_path.clone());
@@ -316,8 +311,9 @@ pub(crate) fn native_require(
     interp.current_module = saved_module;
     let exec_exports = std::mem::replace(&mut interp.module_exports, prev_exports);
 
-    // Restore parent globals
-    interp.globals = saved_globals;
+    // Note: we intentionally do NOT restore globals to their pre-require state.
+    // In Tails-rs, module-level `const X = require(...)` must persist for nested
+    // functions to access via LoadGlobal. We only restore module_globals.
     interp.module_globals = saved_module_globals;
     interp.module_globals_rc = saved_module_globals_rc;
 

@@ -8,7 +8,7 @@ mod stmt_try_catch;
 
 use crate::compiler::parser::{
     ArrayBindingElement, ArrowFunctionBody, AstNode, BinaryOperator, BindingPattern, ClassMember,
-    CompoundAssignmentOp, Expression, SpannedNode, Statement, UnaryOperator, UpdateOperator, VarKind,
+    CompoundAssignmentOp, Expression, SpannedNode, Statement, UnaryOperator, UpdateOperator,
 };
 use crate::compiler::{
     ClassInfo, ClassMethodInfo, ClassMethodKind, CompiledFunction, CompiledModule, Instruction,
@@ -352,7 +352,7 @@ impl CodeGenerator {
                 Ok(())
             }
             Statement::VariableDeclaration {
-                kind,
+                kind: _,
                 declarations,
             } => {
                 for decl in declarations {
@@ -369,12 +369,12 @@ impl CodeGenerator {
                         }
                         self.generate_expression(init)?;
                         self.inferred_function_name = None;
-                        self.generate_destructuring_pattern_with_kind(&decl.id, &kind)?;
+                        self.generate_destructuring_pattern(&decl.id)?;
                     } else {
                         match &decl.id {
                             BindingPattern::Identifier(id) => {
                                 self.emit(Instruction::LoadUndefined);
-                                if self.scope_depth == 0 && matches!(kind, VarKind::Var) {
+                                if self.scope_depth == 0 {
                                     self.emit(Instruction::StoreGlobal(id.clone()));
                                 } else {
                                     if !self.locals.iter().any(|l| l == id) {
@@ -386,7 +386,7 @@ impl CodeGenerator {
                             }
                             _ => {
                                 self.emit(Instruction::LoadUndefined);
-                                self.generate_destructuring_pattern_with_kind(&decl.id, &kind)?;
+                                self.generate_destructuring_pattern(&decl.id)?;
                             }
                         }
                     }
@@ -575,17 +575,9 @@ impl CodeGenerator {
         &mut self,
         pattern: &BindingPattern,
     ) -> Result<()> {
-        self.generate_destructuring_pattern_with_kind(pattern, &VarKind::Var)
-    }
-
-    pub(crate) fn generate_destructuring_pattern_with_kind(
-        &mut self,
-        pattern: &BindingPattern,
-        kind: &VarKind,
-    ) -> Result<()> {
         match pattern {
             BindingPattern::Identifier(id) => {
-                if self.scope_depth == 0 && matches!(kind, VarKind::Var) {
+                if self.scope_depth == 0 {
                     self.emit(Instruction::StoreGlobal(id.clone()));
                 } else {
                     if !self.locals.iter().any(|l| l == id) {
