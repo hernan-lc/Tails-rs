@@ -91,6 +91,14 @@ impl<'a> Parser<'a> {
 
     pub(crate) fn parse_yield_statement(&mut self) -> Result<SpannedNode<Statement>> {
         self.expect(&Token::Yield)?;
+        // `yield* expr` — delegate to an iterable's iterator, yielding each
+        // of its values until the iterator is done.
+        let delegate = if self.peek().token == Token::Star {
+            self.advance();
+            true
+        } else {
+            false
+        };
         let value =
             if self.peek().token != Token::Semicolon && self.peek().token != Token::RightBrace {
                 Some(self.parse_expression()?.inner)
@@ -98,6 +106,6 @@ impl<'a> Parser<'a> {
                 None
             };
         self.expect_statement_semicolon()?;
-        Ok(self.spanned(Statement::YieldStatement(value)))
+        Ok(self.spanned(Statement::YieldStatement { value, delegate }))
     }
 }

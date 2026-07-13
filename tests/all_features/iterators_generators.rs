@@ -115,3 +115,34 @@ fn test_iterator_helpers() {
     assert!(r.is_ok());
     assert_eq!(r.unwrap(), Value::string("2,4,6,8,10|3,4,5|1,2,3|3,4,5"));
 }
+
+#[test]
+fn test_yield_delegation_generator() {
+    let mut rt = TailsRuntime::default();
+    let r = rt.eval(
+        r#"
+    function* inner() { yield 1; yield 2; yield 3; }
+    function* outer() { yield * inner(); yield 4; }
+    let result = "";
+    for (let v of outer()) { result = result + v; }
+    result;
+    "#,
+    );
+    assert!(r.is_ok());
+    assert_eq!(r.unwrap(), Value::string("1234"));
+}
+
+#[test]
+fn test_yield_delegation_array() {
+    let mut rt = TailsRuntime::default();
+    let r = rt.eval(
+        r#"
+    function* delegateArr() { yield * [10, 20, 30]; yield 40; }
+    let result = "";
+    for (let v of delegateArr()) { result = result + v + ","; }
+    result;
+    "#,
+    );
+    assert!(r.is_ok());
+    assert_eq!(r.unwrap(), Value::string("10,20,30,40,"));
+}

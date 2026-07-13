@@ -406,14 +406,51 @@ impl CodeGenerator {
                 self.emit(Instruction::Return);
                 Ok(())
             }
-            Statement::YieldStatement(value) => {
-                if let Some(expr) = value {
-                    self.generate_expression(expr)?;
+            Statement::YieldStatement { value, delegate } => {
+                if *delegate {
+                    // `yield* expr` — delegate to the iterable's iterator,
+                    // yielding each value until the iterator is done. The
+                    // iterator is stashed in a local so it survives the
+                    // generator suspension/resume that `Yield` performs.
+                    // This mirrors the `for...of` loop, which uses the same
+                    // GetIterator / IteratorNext pair.
+                    if let Some(expr) = value {
+                        self.generate_expression(expr)?;
+                    } else {
+                        self.emit(Instruction::LoadUndefined);
+                    }
+                    self.emit(Instruction::GetIterator);
+                    let iter_slot = self.current_local_slot();
+                    self.locals.push("__yield_star_iter".to_string());
+                    self.note_local_high_water();
+                    self.emit(Instruction::StoreLocal(iter_slot));
+                    let loop_start = self.instructions.len() as u32;
+                    self.emit(Instruction::LoadLocal(iter_slot));
+                    let iter_next_pos = self.instructions.len();
+                    self.emit(Instruction::IteratorNext(0)); // placeholder, patched below
+                    self.emit(Instruction::Yield);
+                    // On resume, `.next(v)` pushes `v` onto the stack;
+                    // discard it — delegation does not forward the received
+                    // value to the inner iterator (IteratorNext calls
+                    // `.next()` with no args).
+                    self.emit(Instruction::Pop);
+                    self.emit(Instruction::Jump(loop_start));
+                    let loop_end = self.instructions.len() as u32;
+                    if let Instruction::IteratorNext(ref mut target) =
+                        self.instructions[iter_next_pos]
+                    {
+                        *target = loop_end;
+                    }
+                    Ok(())
                 } else {
-                    self.emit(Instruction::LoadUndefined);
+                    if let Some(expr) = value {
+                        self.generate_expression(expr)?;
+                    } else {
+                        self.emit(Instruction::LoadUndefined);
+                    }
+                    self.emit(Instruction::Yield);
+                    Ok(())
                 }
-                self.emit(Instruction::Yield);
-                Ok(())
             }
             Statement::BlockStatement(stmts) => {
                 self.scope_depth += 1;

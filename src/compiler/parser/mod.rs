@@ -56,7 +56,13 @@ pub enum Statement {
         is_generator: bool,
     },
     ReturnStatement(Option<Expression>),
-    YieldStatement(Option<Expression>),
+    /// `yield [expr]` or `yield* expr` (delegation). `delegate` is true for
+    /// `yield*`, which iterates the expression's iterator and yields each
+    /// value until it is done.
+    YieldStatement {
+        value: Option<Expression>,
+        delegate: bool,
+    },
     IfStatement {
         condition: Expression,
         consequent: Box<SpannedNode<Statement>>,

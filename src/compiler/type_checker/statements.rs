@@ -354,7 +354,7 @@ impl TypeChecker {
                 self.check_statement(&body.inner)?;
                 Ok(Type::Void)
             }
-            &Statement::YieldStatement(_) => todo!(),
+            &Statement::YieldStatement { .. } => todo!(),
         }
     }
 }

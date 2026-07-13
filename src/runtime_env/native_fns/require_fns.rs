@@ -163,6 +163,20 @@ pub(crate) fn native_require(
         }
     };
 
+    // 2. Canonicalize the resolved path so that different relative
+    // specifiers mapping to the same physical file (e.g.
+    // `./compile/codegen` vs `../compile/validate/../codegen` vs a bare
+    // `ajv/dist/compile/codegen`) share a single cache entry. Without this,
+    // CommonJS module caching breaks: the same module loads multiple times
+    // under different `..`-laden keys, and the circular-dependency
+    // pre-registration in `module_registry` can hand out an incomplete
+    // (empty) exports snapshot — which is how `ajv-formats` saw
+    // `codegen.operators` as `undefined`.
+    let module_path = match std::fs::canonicalize(&module_path) {
+        Ok(abs) => abs.to_string_lossy().to_string(),
+        Err(_) => module_path,
+    };
+
     // 3. Check cache — return the same Value reference for identity preservation
     if let Some(cached) = interp.require_cache.get(&module_path) {
         return Ok(cached.clone());
