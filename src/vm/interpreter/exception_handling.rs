@@ -161,14 +161,16 @@ impl Interpreter {
             self.exception_handlers.pop();
             if handler.catch_pc != 0 {
                 self.stack.truncate(handler.stack_depth);
-                // Unwind frames that were pushed *inside* the try (their
-                // base_pointer sits above the stack depth recorded at TryJump).
-                // Use `>` not `>=` so we never pop the frame that owns the
-                // try/catch itself when stack_depth == base_pointer (e.g. 0).
+                // Unwind all frames pushed at or above the handler's recorded
+                // stack depth. Frames with base_pointer == stack_depth were
+                // created by function calls inside the try block (their
+                // base_pointer equals the stack depth at the Call, which is
+                // the same as the TryJump's recorded stack_depth), so they
+                // must also be popped.
                 while self
                     .call_stack
                     .last()
-                    .is_some_and(|f| f.base_pointer > handler.stack_depth)
+                    .is_some_and(|f| f.base_pointer >= handler.stack_depth)
                 {
                     self.call_stack.pop();
                 }
@@ -180,7 +182,7 @@ impl Interpreter {
                 while self
                     .call_stack
                     .last()
-                    .is_some_and(|f| f.base_pointer > handler.stack_depth)
+                    .is_some_and(|f| f.base_pointer >= handler.stack_depth)
                 {
                     self.call_stack.pop();
                 }

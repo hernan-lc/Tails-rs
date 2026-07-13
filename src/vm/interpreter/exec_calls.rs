@@ -214,6 +214,10 @@ impl Interpreter {
                                 }
                             }
                             self.reserve_frame_locals(base_pointer, local_count);
+                            // Clear exception handlers so the callee only sees its
+                            // own try/catch handlers. Restored on Return via the
+                            // CallFrame's exception_handlers_snapshot.
+                            self.exception_handlers = Vec::new();
                             *pc = bytecode_index;
                             return Ok(true);
                         }
@@ -400,6 +404,10 @@ impl Interpreter {
                                 }
                             }
                             self.reserve_frame_locals(base_pointer, local_count);
+                            // Clear exception handlers so the callee only sees its
+                            // own try/catch handlers. Restored on Return via the
+                            // CallFrame's exception_handlers_snapshot.
+                            self.exception_handlers = Vec::new();
                             *pc = bytecode_index;
                             return Ok(true);
                         }
@@ -679,6 +687,10 @@ impl Interpreter {
                                 self.stack.push(arg);
                             }
                             self.reserve_frame_locals(base_pointer, local_count);
+                            // Clear exception handlers so the callee only sees its
+                            // own try/catch handlers. Restored on Return via the
+                            // CallFrame's exception_handlers_snapshot.
+                            self.exception_handlers = Vec::new();
                             *pc = bytecode_index;
                             return Ok(true);
                         }

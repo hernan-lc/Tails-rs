@@ -157,7 +157,10 @@ async function _runSuite(suite: TestSuite, prefix: string): Promise<void> {
     const fullName = prefix ? prefix + ' > ' + suite.name : suite.name;
     if (suite.name) console.log('\n📦 ' + fullName);
 
-    for (const hook of suite.beforeAll) {
+    // Use indexed for loops instead of for...of to avoid iterator
+    // corruption when await suspends execution (Tails-rs VM limitation).
+    for (let i = 0; i < suite.beforeAll.length; i++) {
+        const hook = suite.beforeAll[i];
         try { await hook(); } catch (e) {
             const s = e instanceof Error ? e.message : String(e);
             _failures.push('[beforeAll in ' + fullName + '] ' + s);
@@ -166,12 +169,14 @@ async function _runSuite(suite: TestSuite, prefix: string): Promise<void> {
         }
     }
 
-    for (const test of suite.tests) {
+    for (let i = 0; i < suite.tests.length; i++) {
+        const test = suite.tests[i];
         if (test.skip) { console.log('  ⏭️  SKIPPED: ' + test.name); _skipped++; continue; }
 
         let beforeEachFailed = false;
         let beforeEachError = '';
-        for (const hook of suite.beforeEach) {
+        for (let j = 0; j < suite.beforeEach.length; j++) {
+            const hook = suite.beforeEach[j];
             try { await hook(); } catch (e) {
                 beforeEachFailed = true;
                 beforeEachError = e instanceof Error ? e.message : String(e);
@@ -201,7 +206,8 @@ async function _runSuite(suite: TestSuite, prefix: string): Promise<void> {
             _failed++;
         }
 
-        for (const hook of suite.afterEach) {
+        for (let j = 0; j < suite.afterEach.length; j++) {
+            const hook = suite.afterEach[j];
             try { await hook(); } catch (e) {
                 const s = e instanceof Error ? e.message : String(e);
                 console.log('     ⚠️  afterEach failed: ' + s);
@@ -209,9 +215,12 @@ async function _runSuite(suite: TestSuite, prefix: string): Promise<void> {
         }
     }
 
-    for (const child of suite.children) await _runSuite(child, fullName);
+    for (let i = 0; i < suite.children.length; i++) {
+        await _runSuite(suite.children[i], fullName);
+    }
 
-    for (const hook of suite.afterAll) {
+    for (let i = 0; i < suite.afterAll.length; i++) {
+        const hook = suite.afterAll[i];
         try { await hook(); } catch (e) {
             const s = e instanceof Error ? e.message : String(e);
             console.log('  ⚠️  [afterAll] ' + s);
@@ -223,7 +232,9 @@ export async function runTests(): Promise<{ passed: number; failed: number; skip
     _passed = 0; _failed = 0; _skipped = 0;
     _failures.length = 0;
     console.log('\n🧪 Running tests...\n');
-    for (const suite of _rootSuites) await _runSuite(suite, '');
+    for (let i = 0; i < _rootSuites.length; i++) {
+        await _runSuite(_rootSuites[i], '');
+    }
     console.log('\n' + '='.repeat(50));
     console.log('Results: ' + _passed + ' passed, ' + _failed + ' failed, ' + _skipped + ' skipped');
     console.log('='.repeat(50));

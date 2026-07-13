@@ -1,6 +1,15 @@
 // Embedded Test Harness for Tails-rs
-type TestFn = () => void | Promise<void>;
-type HookFn = () => void | Promise<void>;
+//
+// NOTE: This harness avoids `for...of` and `await` in loops because the
+// Tails-rs VM has two known issues:
+//   1. `for...of` + `await` corrupts the iterator state (reading '"next"')
+//   2. When `try/catch` catches a throw, local variables on the VM stack
+//      are lost (become undefined). Module-level variables are preserved.
+//
+// To work around #2, all test-running state that must survive a catch
+// boundary is stored at module (global) scope, not in locals.
+type TestFn = () => void;
+type HookFn = () => void;
 
 interface TestCase {
     name: string;
@@ -20,6 +29,7 @@ interface TestSuite {
     skip: boolean;
 }
 
+// Module-level state (survives try/catch boundaries)
 let _currentSuite: TestSuite | null = null;
 const _rootSuites: TestSuite[] = [];
 const _suiteStack: TestSuite[] = [];
@@ -27,6 +37,11 @@ let _passed = 0;
 let _failed = 0;
 let _skipped = 0;
 const _failures: string[] = [];
+// Per-test state (set before try/catch so catch block can read it)
+let _curTestName = '';
+let _curFullName = '';
+let _curStart = 0;
+let _curErrorMsg = '';
 
 function _getCurrentSuite(): TestSuite | null {
     if (_suiteStack.length > 0) return _suiteStack[_suiteStack.length - 1];
@@ -150,8 +165,14 @@ async function _runSuite(suite: TestSuite, prefix: string): Promise<void> {
     const fullName = prefix ? prefix + ' > ' + suite.name : suite.name;
     if (suite.name) console.log('\n📦 ' + fullName);
 
-    for (const hook of suite.beforeAll) {
-        try { await hook(); } catch (e) {
+    // Synchronous test execution using module-level state to avoid
+    // local-variable corruption after try/catch (Tails-rs VM limitation).
+
+    // beforeAll hooks
+    for (let i = 0; i < suite.beforeAll.length; i++) {
+        try {
+            suite.beforeAll[i]();
+        } catch (e) {
             const s = e instanceof Error ? e.message : String(e);
             _failures.push('[beforeAll in ' + fullName + '] ' + s);
             _failed += suite.tests.length;
@@ -159,13 +180,18 @@ async function _runSuite(suite: TestSuite, prefix: string): Promise<void> {
         }
     }
 
-    for (const test of suite.tests) {
+    // Tests
+    for (let i = 0; i < suite.tests.length; i++) {
+        const test = suite.tests[i];
         if (test.skip) { console.log('  ⏭️  SKIPPED: ' + test.name); _skipped++; continue; }
 
+        // beforeEach hooks
         let beforeEachFailed = false;
         let beforeEachError = '';
-        for (const hook of suite.beforeEach) {
-            try { await hook(); } catch (e) {
+        for (let j = 0; j < suite.beforeEach.length; j++) {
+            try {
+                suite.beforeEach[j]();
+            } catch (e) {
                 beforeEachFailed = true;
                 beforeEachError = e instanceof Error ? e.message : String(e);
                 break;
@@ -179,44 +205,60 @@ async function _runSuite(suite: TestSuite, prefix: string): Promise<void> {
             continue;
         }
 
-        const start = Date.now();
+        // Run test — store state at module level before try/catch
+        _curTestName = test.name;
+        _curFullName = fullName;
+        _curStart = Date.now();
+        _curErrorMsg = '';
         try {
-            await test.fn();
-            const elapsed = Date.now() - start;
-            console.log('  ✅ ' + test.name + ' (' + elapsed + 'ms)');
+            test.fn();
+            // Success — locals may be lost after try, read from module-level _cur*
+            const elapsed = Date.now() - _curStart;
+            console.log('  ✅ ' + _curTestName + ' (' + elapsed + 'ms)');
             _passed++;
         } catch (e) {
-            const elapsed = Date.now() - start;
-            const s = e instanceof Error ? e.message : String(e);
-            console.log('  ❌ ' + test.name + ' (' + elapsed + 'ms)');
-            console.log('     ' + s);
-            _failures.push('[' + fullName + '] ' + test.name + ': ' + s);
+            _curErrorMsg = e instanceof Error ? e.message : String(e);
+            const elapsed = Date.now() - _curStart;
+            console.log('  ❌ ' + _curTestName + ' (' + elapsed + 'ms)');
+            console.log('     ' + _curErrorMsg);
+            _failures.push('[' + _curFullName + '] ' + _curTestName + ': ' + _curErrorMsg);
             _failed++;
         }
 
-        for (const hook of suite.afterEach) {
-            try { await hook(); } catch (e) {
+        // afterEach hooks
+        for (let j = 0; j < suite.afterEach.length; j++) {
+            try {
+                suite.afterEach[j]();
+            } catch (e) {
                 const s = e instanceof Error ? e.message : String(e);
                 console.log('     ⚠️  afterEach failed: ' + s);
             }
         }
     }
 
-    for (const child of suite.children) await _runSuite(child, fullName);
+    // Child suites
+    for (let i = 0; i < suite.children.length; i++) {
+        _runSuite(suite.children[i], fullName);
+    }
 
-    for (const hook of suite.afterAll) {
-        try { await hook(); } catch (e) {
+    // afterAll hooks
+    for (let i = 0; i < suite.afterAll.length; i++) {
+        try {
+            suite.afterAll[i]();
+        } catch (e) {
             const s = e instanceof Error ? e.message : String(e);
             console.log('  ⚠️  [afterAll] ' + s);
         }
     }
 }
 
-async function runTests(): Promise<void> {
+function runTests(): void {
     _passed = 0; _failed = 0; _skipped = 0;
     _failures.length = 0;
     console.log('\n🧪 Running tests...\n');
-    for (const suite of _rootSuites) await _runSuite(suite, '');
+    for (let i = 0; i < _rootSuites.length; i++) {
+        _runSuite(_rootSuites[i], '');
+    }
     console.log('\n' + '='.repeat(50));
     console.log('Results: ' + _passed + ' passed, ' + _failed + ' failed, ' + _skipped + ' skipped');
     console.log('='.repeat(50));
