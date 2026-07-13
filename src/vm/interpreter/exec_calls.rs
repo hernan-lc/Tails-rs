@@ -512,20 +512,19 @@ impl Interpreter {
                                         };
                                         if cross_module {
                                             if let Some(ref ctor_mod) = super_module {
-                                                let result = self
-                                                    .construct_function_nested(
-                                                        *super_func_idx,
-                                                        &super_f_clone.closure,
-                                                        super_f_clone.bytecode_index,
-                                                        super_f_clone.local_count,
-                                                        super_scope,
-                                                        super_source,
-                                                        ctor_mod,
-                                                        this_val.clone(),
-                                                        constructor.clone(),
-                                                        args,
-                                                        *pc,
-                                                    )?;
+                                                let result = self.construct_function_nested(
+                                                    *super_func_idx,
+                                                    &super_f_clone.closure,
+                                                    super_f_clone.bytecode_index,
+                                                    super_f_clone.local_count,
+                                                    super_scope,
+                                                    super_source,
+                                                    ctor_mod,
+                                                    this_val.clone(),
+                                                    constructor.clone(),
+                                                    args,
+                                                    *pc,
+                                                )?;
                                                 self.stack.push(result);
                                                 *pc += 1;
                                                 return Ok(true);

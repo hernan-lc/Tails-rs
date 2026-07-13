@@ -28,8 +28,13 @@ tails <command> [OPTIONS]
 
 Commands:
   run <script.ts>       Run a TypeScript script (default)
+  test [directory]      Run tests in directory (default: tests/)
   build [OPTIONS]       Build native module to dist/
   clean                 Remove dist/ directory
+
+Test options:
+  Run tests in specified directory or tests/ by default
+  Test files: *.test.ts, *.test.js, *.spec.ts, *.spec.js
 
 Run options:
   --watch               Watch for file changes and re-run automatically

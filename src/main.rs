@@ -275,6 +275,10 @@ fn main() -> Result<()> {
             tails::cli::build::run_clean()?;
             return Ok(());
         }
+        Some("test") => {
+            let test_args: Vec<String> = args[1..].to_vec();
+            return tails::cli::test::run(test_args);
+        }
         Some("run") => {
             // Fall through to run mode with remaining args
         }
