@@ -138,17 +138,15 @@ impl CodeGenerator {
                 self.emit(Instruction::MakeClass(class_info_idx));
                 self.emit_computed_class_members(&computed_members)?;
 
-                if self.scope_depth == 0 {
-                    self.emit(Instruction::StoreGlobal(class_name));
-                } else {
-                    if !self.locals.iter().any(|l| l == &class_name) {
-                        self.locals.push(class_name.clone());
-                    }
-                    let slot = self
-                        .resolve_local(&class_name)
-                        .unwrap_or_else(|| self.last_local_slot());
-                    self.emit(Instruction::StoreLocal(slot));
+                // Class declarations are always lexically scoped (like let/const),
+                // never global properties, even at the top level.
+                if !self.locals.iter().any(|l| l == &class_name) {
+                    self.locals.push(class_name.clone());
                 }
+                let slot = self
+                    .resolve_local(&class_name)
+                    .unwrap_or_else(|| self.last_local_slot());
+                self.emit(Instruction::StoreLocal(slot));
                 Ok(true)
             }
             _ => Ok(false),
