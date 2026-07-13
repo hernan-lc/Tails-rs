@@ -53,6 +53,18 @@ impl CodeGenerator {
                     }
                 }
 
+                // Clean up catch-scope locals before the finally_pc marker. This
+                // ensures the cleanup Pop instructions only run inside the catch
+                // path (after the catch body), not in the normal no-exception path.
+                // Previously these Pops sat at/after finally_pc, causing the normal-path
+                // Jump (which targets finally_pc) to execute them and incorrectly
+                // consume a value from the enclosing scope (e.g. the for-of iterator).
+                let locals_added = self.locals.len() - prev_locals_count;
+                for _ in 0..locals_added {
+                    self.locals.pop();
+                    self.emit(Instruction::Pop);
+                }
+
                 let finally_pc = self.instructions.len() as u32;
 
                 if let Some(j) = jump_past_catch {
@@ -75,11 +87,6 @@ impl CodeGenerator {
                     }
                 }
 
-                let locals_added = self.locals.len() - prev_locals_count;
-                for _ in 0..locals_added {
-                    self.locals.pop();
-                    self.emit(Instruction::Pop);
-                }
                 self.scope_depth -= 1;
                 Ok(true)
             }
