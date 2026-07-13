@@ -22,3 +22,13 @@ pub(super) fn native_clear_immediate(
     }
     Ok(Value::Undefined)
 }
+
+pub(super) fn native_queue_microtask(
+    interp: &mut Interpreter,
+    _this: &Value,
+    args: &[Value],
+) -> Result<Value> {
+    let callback = args.first().cloned().unwrap_or(Value::Undefined);
+    interp.async_runtime.enqueue_microtask(callback);
+    Ok(Value::Undefined)
+}

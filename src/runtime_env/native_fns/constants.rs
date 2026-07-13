@@ -592,6 +592,9 @@ pub const ASSERT_NOT_DEEP_EQUAL: usize = 545;
 pub const ASSERT_NOT_MATCH: usize = 546;
 pub const HTTP_SERVER_SET_TIMEOUT: usize = 547;
 
+// queueMicrotask (548)
+pub const QUEUE_MICROTASK: usize = 548;
+
 #[cfg(test)]
 mod tests {
     use super::*;

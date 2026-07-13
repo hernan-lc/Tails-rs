@@ -109,6 +109,10 @@ impl Interpreter {
             "clearImmediate".into(),
             Value::NativeFunction(c::CLEAR_IMMEDIATE),
         );
+        self.globals.insert(
+            "queueMicrotask".into(),
+            Value::NativeFunction(c::QUEUE_MICROTASK),
+        );
 
         // CommonJS require() — NativeFunction(c::REQUIRE)
         self.globals

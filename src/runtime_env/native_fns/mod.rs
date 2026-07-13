@@ -770,10 +770,11 @@ pub static NATIVE_TABLE: &[NativeFn] = &[
     events_fns::native_event_emitter_get_max_listeners,
     events_fns::native_event_emitter_set_max_listeners,
     events_fns::native_event_emitter_prepend_once_listener,
-    // timers module (423-424)
+    // timers module (423-425)
     timers_fns::native_set_immediate,
     timers_fns::native_clear_immediate,
-    // querystring module (425-428)
+    timers_fns::native_queue_microtask,
+    // querystring module (426-429)
     querystring_fns::native_querystring_parse,
     querystring_fns::native_querystring_stringify,
     querystring_fns::native_querystring_encode,

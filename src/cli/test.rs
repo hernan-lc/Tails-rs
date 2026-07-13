@@ -111,7 +111,8 @@ fn run_test_file(file: &Path) -> Result<TestResult> {
     let mut runtime = crate::TailsRuntime::default();
 
     let result = runtime.eval(&script);
-    if let Err(_e) = result {
+    if let Err(e) = result {
+        eprintln!("Error evaluating test file {}: {}", file.display(), e);
         return Ok(TestResult {
             passed: 0,
             failed: 1,
