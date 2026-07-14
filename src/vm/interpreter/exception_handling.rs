@@ -19,24 +19,37 @@ impl Interpreter {
                     .pop()
                     .ok_or_else(|| Error::RuntimeError(super::ERR_STACK_UNDERFLOW.into()))?;
                 self.pending_exception = Some(value.clone());
-                while let Some(handler) = self.exception_handlers.last().cloned() {
-                    if handler.catch_pc != 0 {
-                        self.exception_handlers.pop();
-                        self.stack.truncate(handler.stack_depth);
-                        *pc = handler.catch_pc as usize;
-                        return Ok(true);
+                // Extract error name and message so dispatch_exception can
+                // build a correct stack trace and surface the right error
+                // kind if no handler is found.
+                let (error_name, message) = if let Value::Object(obj_idx) = &value {
+                    if let HeapValue::Object(obj) = &self.heap[*obj_idx] {
+                        let name = obj
+                            .properties
+                            .get(wk::NAME)
+                            .and_then(|v| match v {
+                                Value::String(s) => Some(s.as_ref().to_string()),
+                                Value::Cons(c) => Some(c.flatten().into()),
+                                _ => None,
+                            })
+                            .unwrap_or_else(|| wk::ERROR.to_string());
+                        let message = obj
+                            .properties
+                            .get(wk::MESSAGE)
+                            .and_then(|v| match v {
+                                Value::String(s) => Some(s.as_ref().to_string()),
+                                Value::Cons(c) => Some(c.flatten().into()),
+                                _ => None,
+                            })
+                            .unwrap_or_default();
+                        (name, message)
+                    } else {
+                        (wk::ERROR.to_string(), String::new())
                     }
-                    if handler.finally_pc != 0 {
-                        self.exception_handlers.pop();
-                        self.stack.truncate(handler.stack_depth);
-                        *pc = handler.finally_pc as usize;
-                        return Ok(true);
-                    }
-                }
-                return Err(Error::RuntimeError(format!(
-                    "Thrown: {}",
-                    self.format_rejection_reason(&value)
-                )));
+                } else {
+                    (wk::ERROR.to_string(), self.value_to_string(&value))
+                };
+                return self.dispatch_exception(pc, &error_name, &message);
             }
             Instruction::TryJump(catch_pc, finally_pc) => {
                 let handler = super::call_frame::ExceptionHandler {
