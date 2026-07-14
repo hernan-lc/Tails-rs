@@ -188,6 +188,24 @@ impl Interpreter {
                 ))));
             }
             Value::Object(obj_idx) => {
+                // Raw `HeapValue::Iterator` objects (from exec_get_iterator for
+                // Map/Set/etc.) have no property map.  Without this guard the
+                // slow‑path SpreadArray iterator protocol returns Undefined for
+                // `.next` and throws "undefined is not a function".
+                if let HeapValue::Iterator(_) = &self.heap[*obj_idx] {
+                    let key_str = match key_to_str(key) {
+                        Some(s) => s,
+                        None => return Ok(Value::Undefined),
+                    };
+                    if key_str == wk::NEXT {
+                        return Ok(Value::NativeFunction(c::ITERATOR_NEXT));
+                    }
+                    if key_str == wk::RETURN || key_str == "throw" {
+                        return Ok(Value::NativeFunction(c::ITERATOR_NEXT));
+                    }
+                    return Ok(Value::Undefined);
+                }
+
                 // `constructor` resolves through the prototype chain to a native
                 // constructor when the prototype is a built-in proto (streams,
                 // errors, buffers, typed arrays, arrays, dates, regexps,

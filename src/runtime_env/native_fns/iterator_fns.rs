@@ -2,7 +2,7 @@ use crate::errors::{Error, Result};
 use crate::objects::Value;
 use crate::props;
 use crate::runtime_env::native_fns::constants as c;
-use crate::vm::interpreter::{HeapValue, Interpreter, JsArray, JsObject};
+use crate::vm::interpreter::{HeapValue, Interpreter, JsArray, JsIterator, JsObject};
 
 // Array[Symbol.iterator]() - creates an iterator for an array
 pub(super) fn native_array_iterator(
@@ -305,12 +305,117 @@ pub(super) fn native_iterator_to_array(
     Ok(Value::Array(arr_idx))
 }
 
+/// Advance a raw `HeapValue::Iterator` by one step.
+/// These iterators are created by `exec_get_iterator` for built‑in
+/// collection types (Array, String, Cons, Map, Set) when the collection
+/// itself is not an Object with an iterator protocol.  They carry their
+/// iteration state inline (`kind`, `index`, `target`, `data`) so we can
+/// drive them without going through property access.
+///
+/// Takes the iterator state by value (cloned), returns the updated state
+/// alongside the next value so the caller can write it back without
+/// fighting the borrow checker (interp.heap is borrowed immutably for
+/// the target/data lookups).
+fn advance_raw_iterator(
+    interp: &mut Interpreter,
+    mut js_iter: JsIterator,
+) -> Result<(Option<Value>, JsIterator)> {
+    match js_iter.kind.as_str() {
+        "array" | "string" => {
+            let data_idx = match js_iter.data {
+                Some(Value::Array(idx)) => idx,
+                _ => return Ok((None, js_iter)),
+            };
+            let index = js_iter.index;
+            let done = if let HeapValue::Array(ref arr) = interp.heap[data_idx] {
+                index >= arr.elements.len()
+            } else {
+                true
+            };
+            if done {
+                return Ok((None, js_iter));
+            }
+            let value = if let HeapValue::Array(ref arr) = interp.heap[data_idx] {
+                arr.elements[index].clone()
+            } else {
+                return Ok((None, js_iter));
+            };
+            js_iter.index = index + 1;
+            Ok((Some(value), js_iter))
+        }
+        "set" => {
+            let set_idx = match js_iter.target {
+                Some(Value::Set(idx)) => idx,
+                _ => return Ok((None, js_iter)),
+            };
+            let index = js_iter.index;
+            let values: Vec<Value> = if let HeapValue::Set(ref set) = interp.heap[set_idx] {
+                set.values()
+            } else {
+                return Ok((None, js_iter));
+            };
+            if index >= values.len() {
+                return Ok((None, js_iter));
+            }
+            js_iter.index = index + 1;
+            Ok((Some(values[index].clone()), js_iter))
+        }
+        "map" => {
+            let map_idx = match js_iter.target {
+                Some(Value::Map(idx)) => idx,
+                _ => return Ok((None, js_iter)),
+            };
+            let index = js_iter.index;
+            let entries: Vec<(Value, Value)> = if let HeapValue::Map(ref map) = interp.heap[map_idx]
+            {
+                map.entries()
+            } else {
+                return Ok((None, js_iter));
+            };
+            if index >= entries.len() {
+                return Ok((None, js_iter));
+            }
+            js_iter.index = index + 1;
+            let (k, v) = &entries[index];
+            let pair_idx = interp.gc.allocate(
+                &mut interp.heap,
+                HeapValue::Array(JsArray {
+                    elements: vec![k.clone(), v.clone()],
+                }),
+            );
+            Ok((Some(Value::Array(pair_idx)), js_iter))
+        }
+        _ => Ok((None, js_iter)),
+    }
+}
+
 // Helper: advance an iterator by one step
 fn advance_iterator(interp: &mut Interpreter, iterator: &Value) -> Result<Option<Value>> {
     match iterator {
         Value::Object(iter_idx) => {
             let iter_idx = *iter_idx;
-            // Check if this is a built-in iterator
+            // If the heap slot is a raw HeapValue::Iterator (created by
+            // exec_get_iterator for non‑Array/String types), drive it directly.
+            // Clone the iterator state out, advance it, then write back.
+            let js_iter_clone = if let HeapValue::Iterator(ref js_iter) = interp.heap[iter_idx] {
+                js_iter.clone()
+            } else {
+                JsIterator {
+                    kind: String::new(),
+                    index: 0,
+                    target: None,
+                    data: None,
+                }
+            };
+            if let HeapValue::Iterator(_) = interp.heap[iter_idx] {
+                let (value, updated) = advance_raw_iterator(interp, js_iter_clone)?;
+                // Write back updated iterator state.
+                if let HeapValue::Iterator(ref mut slot) = interp.heap[iter_idx] {
+                    *slot = updated;
+                }
+                return Ok(value);
+            }
+            // Otherwise it is a built‑in Object‑style iterator.
             let iter_type = if let HeapValue::Object(ref obj) = interp.heap[iter_idx] {
                 obj.properties.get("__type").cloned()
             } else {
