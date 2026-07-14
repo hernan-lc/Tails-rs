@@ -369,6 +369,48 @@ pub(super) fn native_object_assign(
     Ok(target)
 }
 
+/// Internal key prefix for storing property attribute flags set by defineProperty.
+/// The stored value is an Integer whose low 3 bits encode the flags:
+///   bit 0 = enumerable, bit 1 = configurable, bit 2 = writable.
+/// Absent => all true (default for normal property assignment).
+const ATTR_KEY_PREFIX: &str = "__prop_attrs_";
+
+#[inline]
+fn attr_bits(enumerable: bool, configurable: bool, writable: bool) -> i64 {
+    (if enumerable { 1 } else { 0 })
+        | (if configurable { 2 } else { 0 })
+        | (if writable { 4 } else { 0 })
+}
+
+/// Read stored attribute flags for a property. Returns (enumerable, configurable, writable).
+/// Defaults to all-true when no attributes have been stored.
+fn read_attr_bits(properties: &crate::vm::interpreter::PropertyStorage, property: &str) -> (bool, bool, bool) {
+    let key = format!("{}{}", ATTR_KEY_PREFIX, property);
+    if let Some(Value::Integer(bits)) = properties.get(&key) {
+        let b = *bits;
+        return (
+            b & 1 != 0,
+            b & 2 != 0,
+            b & 4 != 0,
+        );
+    }
+    (true, true, true)
+}
+
+/// Inline helper: store attribute bits for a property on any PropertyStorage.
+/// Uses a packed integer so we don't need to allocate a HeapValue.
+#[inline]
+fn set_attr_bits(
+    properties: &mut crate::vm::interpreter::PropertyStorage,
+    property: &str,
+    enumerable: bool,
+    configurable: bool,
+    writable: bool,
+) {
+    let key = format!("{}{}", ATTR_KEY_PREFIX, property);
+    properties.insert(key, Value::Integer(attr_bits(enumerable, configurable, writable)));
+}
+
 fn define_property_on(
     interp: &mut Interpreter,
     target: &Value,
@@ -378,11 +420,35 @@ fn define_property_on(
     let Value::Object(desc_idx) = descriptor else {
         return Ok(());
     };
-    let (getter, setter, value, has_get, has_set, has_value) =
+    let (getter, setter, value, has_get, has_set, has_value, enumerable, configurable, writable) =
         if let crate::vm::interpreter::HeapValue::Object(desc) = &interp.heap[*desc_idx] {
             let has_get = desc.properties.contains_key("get");
             let has_set = desc.properties.contains_key("set");
             let has_value = desc.properties.contains_key("value");
+            let enumerable = desc
+                .properties
+                .get("enumerable")
+                .and_then(|v| match v {
+                    Value::Boolean(b) => Some(*b),
+                    _ => None,
+                })
+                .unwrap_or(true);
+            let configurable = desc
+                .properties
+                .get("configurable")
+                .and_then(|v| match v {
+                    Value::Boolean(b) => Some(*b),
+                    _ => None,
+                })
+                .unwrap_or(true);
+            let writable = desc
+                .properties
+                .get("writable")
+                .and_then(|v| match v {
+                    Value::Boolean(b) => Some(*b),
+                    _ => None,
+                })
+                .unwrap_or(true);
             (
                 desc.properties.get("get").cloned(),
                 desc.properties.get("set").cloned(),
@@ -390,6 +456,9 @@ fn define_property_on(
                 has_get,
                 has_set,
                 has_value,
+                enumerable,
+                configurable,
+                writable,
             )
         } else {
             return Ok(());
@@ -419,6 +488,13 @@ fn define_property_on(
                             tgt.properties.remove(&s_key);
                         }
                     }
+                    set_attr_bits(
+                        &mut tgt.properties,
+                        property,
+                        enumerable,
+                        configurable,
+                        writable,
+                    );
                 } else if has_value {
                     // Data descriptor replaces any existing accessor.
                     tgt.properties.remove(&g_key);
@@ -426,6 +502,13 @@ fn define_property_on(
                     if let Some(val) = value {
                         tgt.properties.insert(property.to_string(), val);
                     }
+                    set_attr_bits(
+                        &mut tgt.properties,
+                        property,
+                        enumerable,
+                        configurable,
+                        writable,
+                    );
                 }
             }
         }
@@ -447,12 +530,26 @@ fn define_property_on(
                             f.properties.remove(&s_key);
                         }
                     }
+                    set_attr_bits(
+                        &mut f.properties,
+                        property,
+                        enumerable,
+                        configurable,
+                        writable,
+                    );
                 } else if has_value {
                     f.properties.remove(&g_key);
                     f.properties.remove(&s_key);
                     if let Some(val) = value {
                         f.properties.insert(property.to_string(), val);
                     }
+                    set_attr_bits(
+                        &mut f.properties,
+                        property,
+                        enumerable,
+                        configurable,
+                        writable,
+                    );
                 }
             }
         }
@@ -554,7 +651,15 @@ pub(super) fn native_object_get_own_property_descriptors(
     // Accessor-only properties (stored as __getter_/__setter_ without a data
     // slot) must still appear — Object.getOwnPropertyDescriptors is how Zod
     // merges schema defs.
-    let mut entries: Vec<(String, Value, Option<Value>, Option<Value>)> = Vec::new();
+    // Each entry also carries an optional source-property Storage so we can
+    // read attribute flags stored by defineProperty.
+    let mut entries: Vec<(
+        String,
+        Value,
+        Option<Value>,
+        Option<Value>,
+        Option<usize>, // source obj heap index for attribute lookup
+    )> = Vec::new();
     match &obj_val {
         Value::Object(obj_idx) => {
             if let crate::vm::interpreter::HeapValue::Object(obj) = &interp.heap[*obj_idx] {
@@ -587,7 +692,7 @@ pub(super) fn native_object_get_own_property_descriptors(
                     // If this key is only present as data (accessors already
                     // removed), emit a data descriptor. If somehow both remain,
                     // prefer data so assignProp self-caching works.
-                    entries.push((k, v, None, None));
+                    entries.push((k, v, None, None, Some(*obj_idx)));
                 }
                 // Accessor-only properties (no data slot)
                 for name in accessor_names {
@@ -596,18 +701,19 @@ pub(super) fn native_object_get_own_property_descriptors(
                     }
                     let getter = getters.get(&name).cloned();
                     let setter = setters.get(&name).cloned();
-                    entries.push((name, Value::Undefined, getter, setter));
+                    entries.push((name, Value::Undefined, getter, setter, Some(*obj_idx)));
                 }
             }
         }
         Value::Array(arr_idx) => {
             if let crate::vm::interpreter::HeapValue::Array(arr) = &interp.heap[*arr_idx] {
                 for (i, v) in arr.elements.iter().enumerate() {
-                    entries.push((i.to_string(), v.clone(), None, None));
+                    entries.push((i.to_string(), v.clone(), None, None, None));
                 }
                 entries.push((
                     wk::LENGTH.to_string(),
                     Value::Float(arr.elements.len() as f64),
+                    None,
                     None,
                     None,
                 ));
@@ -617,18 +723,29 @@ pub(super) fn native_object_get_own_property_descriptors(
     }
 
     let mut result_props = PropertyStorage::new();
-    for (key, value, getter, setter) in entries {
+    for (key, value, getter, setter, src_obj_idx) in entries {
+        // Read stored attribute flags (from defineProperty) if available
+        let (enumerable, configurable, writable) = match src_obj_idx {
+            Some(idx) => {
+                if let crate::vm::interpreter::HeapValue::Object(src_obj) = &interp.heap[idx] {
+                    read_attr_bits(&src_obj.properties, &key)
+                } else {
+                    (true, true, true)
+                }
+            }
+            None => (true, true, true),
+        };
         let mut desc = PropertyStorage::new();
         if getter.is_some() || setter.is_some() {
             desc.insert("get".into(), getter.unwrap_or(Value::Undefined));
             desc.insert("set".into(), setter.unwrap_or(Value::Undefined));
-            desc.insert("enumerable".into(), Value::Boolean(true));
-            desc.insert("configurable".into(), Value::Boolean(true));
+            desc.insert("enumerable".into(), Value::Boolean(enumerable));
+            desc.insert("configurable".into(), Value::Boolean(configurable));
         } else {
             desc.insert("value".into(), value);
-            desc.insert("writable".into(), Value::Boolean(true));
-            desc.insert("enumerable".into(), Value::Boolean(true));
-            desc.insert("configurable".into(), Value::Boolean(true));
+            desc.insert("writable".into(), Value::Boolean(writable));
+            desc.insert("enumerable".into(), Value::Boolean(enumerable));
+            desc.insert("configurable".into(), Value::Boolean(configurable));
         }
         let desc_idx = interp.heap.len();
         interp.heap.push(crate::vm::interpreter::HeapValue::Object(

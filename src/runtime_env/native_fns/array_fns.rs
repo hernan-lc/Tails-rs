@@ -623,7 +623,88 @@ pub(super) fn native_array_from(
                 }
             }
         }
-        _ => {}
+        _ => {
+            // Handle array-like objects (e.g. { length: 3 }) and iterables.
+            // 1. Try array-like: read `length` and index properties.
+            // 2. Fall back to iterator protocol if Symbol.iterator exists.
+            let length_val = match &source {
+                Value::Object(obj_idx) => {
+                    if let crate::vm::interpreter::HeapValue::Object(obj) =
+                        &interp.heap[*obj_idx]
+                    {
+                        obj.properties.get("length").cloned()
+                    } else {
+                        None
+                    }
+                }
+                Value::Array(arr_idx) => {
+                    if let crate::vm::interpreter::HeapValue::Array(arr) = &interp.heap[*arr_idx] {
+                        Some(Value::Integer(arr.elements.len() as i64))
+                    } else {
+                        None
+                    }
+                }
+                _ => None,
+            };
+            if let Some(length_val) = length_val {
+                let length = match length_val {
+                    Value::Integer(n) => n.max(0) as usize,
+                    Value::Float(n) => (n as i64).max(0) as usize,
+                    _ => 0,
+                };
+                for i in 0..length {
+                    let elem = match &source {
+                        Value::Object(obj_idx) => {
+                            if let crate::vm::interpreter::HeapValue::Object(obj) =
+                                &interp.heap[*obj_idx]
+                            {
+                                obj.properties
+                                    .get(&i.to_string())
+                                    .cloned()
+                                    .unwrap_or(Value::Undefined)
+                            } else {
+                                Value::Undefined
+                            }
+                        }
+                        _ => Value::Undefined,
+                    };
+                    if let Some(ref callback) = map_fn {
+                        let mapped = interp.call_value(
+                            callback,
+                            &Value::Undefined,
+                            &[elem, Value::Integer(i as i64)],
+                        )?;
+                        elements.push(mapped);
+                    } else {
+                        elements.push(elem);
+                    }
+                }
+            } else {
+                // Fall back to iterator protocol
+                if let Ok(iterator) = interp.exec_get_iterator(source) {
+                    let mut index: usize = 0;
+                    loop {
+                        match interp.iterator_next_value(&iterator)? {
+                            Some(value) => {
+                                if let Some(ref callback) = map_fn {
+                                    let mapped = interp.call_value(
+                                        callback,
+                                        &Value::Undefined,
+                                        &[value, Value::Integer(index as i64)],
+                                    )?;
+                                    elements.push(mapped);
+                                } else {
+                                    elements.push(value);
+                                }
+                                index += 1;
+                            }
+                            None => break,
+                        }
+                    }
+                    interp.exec_iterator_close(iterator)?;
+                }
+            }
+        }
     }
     Ok(push_array!(interp, elements))
 }

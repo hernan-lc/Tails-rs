@@ -49,6 +49,7 @@ pub(super) fn is_user_visible_key(k: &str) -> bool {
         || k.starts_with("__sym_")
         || k.starts_with("__[[")
         || k.starts_with("__listeners_")
+        || k.starts_with("__prop_attrs_")
         || k == "__module_path"
         || k == "__[[Prototype]]__"
         || k.starts_with("@@symbol:")

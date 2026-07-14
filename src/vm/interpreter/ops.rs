@@ -490,6 +490,7 @@ impl Interpreter {
                     self.stack.last().cloned().unwrap_or(Value::Undefined)
                 {
                     if let Value::Array(source_idx) = source {
+                        // Fast path: source is an array — copy elements directly
                         if let HeapValue::Array(source_arr) = &self.heap[source_idx] {
                             let elements: Vec<Value> = source_arr.elements.clone();
                             if let HeapValue::Array(target_arr) = &mut self.heap[target_idx] {
@@ -497,6 +498,24 @@ impl Interpreter {
                                     target_arr.elements.push(elem);
                                 }
                             }
+                        }
+                    } else {
+                        // Slow path: use the iterator protocol (Symbol.iterator)
+                        // to support custom iterables, generators, etc.
+                        if let Ok(iterator) = self.exec_get_iterator(source) {
+                            loop {
+                                match self.iterator_next_value(&iterator)? {
+                                    Some(value) => {
+                                        if let HeapValue::Array(target_arr) =
+                                            &mut self.heap[target_idx]
+                                        {
+                                            target_arr.elements.push(value);
+                                        }
+                                    }
+                                    None => break,
+                                }
+                            }
+                            self.exec_iterator_close(iterator)?;
                         }
                     }
                 }

@@ -96,6 +96,9 @@ pub struct CompiledFunction {
     pub is_generator: bool,
     pub source_line: Option<usize>,
     pub is_arrow: bool,
+    /// The stack slots in the enclosing frame that this function captures.
+    /// Used by MakeClass to set up closures for class methods/constructor.
+    pub capture_slots: Vec<u16>,
 }
 
 #[cfg(test)]
@@ -268,4 +271,10 @@ pub enum Instruction {
     // Used for hoisted function declarations where siblings must be captured
     // after all are stored.
     SnapshotClosure(u16, Box<Vec<u16>>),
+    // SnapshotMethodClosures(class_info_idx, local_slot): after a class is stored
+    // in its local slot, set up closures for all methods/constructor by reading
+    // capture values from the current frame. Needed because MakeClass runs BEFORE
+    // StoreLocal, so enclosing-frame slots (including the class's own slot) are
+    // not yet populated when methods are created.
+    SnapshotMethodClosures(u32, u16),
 }

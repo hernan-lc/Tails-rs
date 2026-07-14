@@ -148,6 +148,13 @@ impl CodeGenerator {
                         .resolve_local(&class_name)
                         .unwrap_or_else(|| self.last_local_slot());
                     self.emit(Instruction::StoreLocal(slot));
+                    // After the class is stored in its local slot, snapshot
+                    // closures for the constructor and all methods from the
+                    // now-populated enclosing frame.
+                    self.emit(Instruction::SnapshotMethodClosures(
+                        class_info_idx,
+                        slot,
+                    ));
                 }
                 Ok(true)
             }

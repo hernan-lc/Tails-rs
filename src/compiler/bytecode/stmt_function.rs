@@ -75,6 +75,7 @@ impl CodeGenerator {
             is_generator: *is_generator,
             source_line: self.current_source_line,
             is_arrow: false,
+            capture_slots: outer_refs.iter().map(|(_, s)| *s).collect(),
         });
 
         let jump_over = self.instructions.len();
@@ -234,6 +235,7 @@ impl CodeGenerator {
                     is_generator: false,
                     source_line: self.current_source_line,
                     is_arrow: false,
+                    capture_slots: orefs.iter().map(|(_, s)| *s).collect(),
                 });
 
                 let jump_over = self.instructions.len();
