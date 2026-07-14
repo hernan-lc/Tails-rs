@@ -72,15 +72,13 @@ impl<'a> Parser<'a> {
                         ..=self.pos.min(self.tokens.len() - 1))
                         .map(|i| format!("{:?}", self.tokens[i].token))
                         .collect();
-                    return Err(Error::ParseError(
-                        format!(
-                            "Invalid arrow function parameter (got token {:?} at {}:{}) ctx=[{}]",
-                            self.peek().token,
-                            self.tokens[self.pos].span.line,
-                            self.tokens[self.pos].span.col,
-                            ctx.join(" ")
-                        ),
-                    ));
+                    return Err(Error::ParseError(format!(
+                        "Invalid arrow function parameter (got token {:?} at {}:{}) ctx=[{}]",
+                        self.peek().token,
+                        self.tokens[self.pos].span.line,
+                        self.tokens[self.pos].span.col,
+                        ctx.join(" ")
+                    )));
                 }
             };
             self.advance();

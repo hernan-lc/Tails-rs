@@ -504,9 +504,7 @@ impl Interpreter {
                         // to support custom iterables, generators, etc.
                         if let Ok(iterator) = self.exec_get_iterator(source) {
                             while let Some(value) = self.iterator_next_value(&iterator)? {
-                                if let HeapValue::Array(target_arr) =
-                                    &mut self.heap[target_idx]
-                                {
+                                if let HeapValue::Array(target_arr) = &mut self.heap[target_idx] {
                                     target_arr.elements.push(value);
                                 }
                             }
