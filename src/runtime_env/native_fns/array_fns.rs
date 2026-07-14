@@ -629,9 +629,7 @@ pub(super) fn native_array_from(
             // 2. Fall back to iterator protocol if Symbol.iterator exists.
             let length_val = match &source {
                 Value::Object(obj_idx) => {
-                    if let crate::vm::interpreter::HeapValue::Object(obj) =
-                        &interp.heap[*obj_idx]
-                    {
+                    if let crate::vm::interpreter::HeapValue::Object(obj) = &interp.heap[*obj_idx] {
                         obj.properties.get("length").cloned()
                     } else {
                         None

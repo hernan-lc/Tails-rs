@@ -287,24 +287,24 @@ impl Interpreter {
         for closure_var in closure.borrow().iter().cloned() {
             self.stack.push(closure_var);
         }
-                        for arg in args {
-                            self.stack.push(arg);
-                        }
-                        self.reserve_frame_locals(base_pointer, local_count);
+        for arg in args {
+            self.stack.push(arg);
+        }
+        self.reserve_frame_locals(base_pointer, local_count);
 
-                        // Clear exception handlers so the callee only sees its own
-                        // try/catch handlers. Parent handlers are restored when the
-                        // function returns (normally or via error propagation).
-                        self.exception_handlers = Vec::new();
+        // Clear exception handlers so the callee only sees its own
+        // try/catch handlers. Parent handlers are restored when the
+        // function returns (normally or via error propagation).
+        self.exception_handlers = Vec::new();
 
-                        let result = self.execute_from(ctor_module, bytecode_index);
+        let result = self.execute_from(ctor_module, bytecode_index);
 
-                        self.current_module = saved_module;
-                        self.current_module_path = saved_path;
-                        self.module_globals = saved_mg;
-                        self.module_globals_rc = saved_mg_rc;
-                        self.exception_handlers = saved_exception_handlers;
-                        result
+        self.current_module = saved_module;
+        self.current_module_path = saved_path;
+        self.module_globals = saved_mg;
+        self.module_globals_rc = saved_mg_rc;
+        self.exception_handlers = saved_exception_handlers;
+        result
     }
 
     pub(crate) fn call_native(

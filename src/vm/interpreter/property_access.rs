@@ -902,10 +902,7 @@ impl Interpreter {
     /// Walk the prototype chain starting at `proto_idx` and return the first
     /// constructor NativeFunction found, so `instance.constructor` resolves for
     /// built-in objects whose prototype is a native proto.
-    fn constructor_for_proto_chain(
-        &self,
-        proto_idx: Option<usize>,
-    ) -> Option<Value> {
+    fn constructor_for_proto_chain(&self, proto_idx: Option<usize>) -> Option<Value> {
         let mut current = proto_idx?;
         for _ in 0..64 {
             if let Some(ctor) = self.constructor_for_proto(current) {

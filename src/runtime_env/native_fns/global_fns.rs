@@ -8,7 +8,6 @@ use std::rc::Rc;
 
 use super::helpers::{to_f64, to_i64, to_string_value};
 
-
 pub(super) fn native_parse_int(
     _interp: &mut Interpreter,
     _this: &Value,

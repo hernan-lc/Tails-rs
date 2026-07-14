@@ -208,7 +208,9 @@ fn collect_identifiers_stmt(stmt: &Statement, out: &mut Vec<String>) {
         }
         Statement::ReturnStatement(Some(expr)) => collect_identifiers_expr(expr, out),
         Statement::ReturnStatement(None) => {}
-        Statement::YieldStatement { value: Some(expr), .. } => collect_identifiers_expr(expr, out),
+        Statement::YieldStatement {
+            value: Some(expr), ..
+        } => collect_identifiers_expr(expr, out),
         Statement::YieldStatement { value: None, .. } => {}
         Statement::IfStatement {
             condition,

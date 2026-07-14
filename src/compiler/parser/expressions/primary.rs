@@ -17,10 +17,7 @@ impl<'a> Parser<'a> {
         // Contextual keywords (`from`, `as`, `of`, …) are valid param names.
         let can_start_arrow_param = matches!(
             self.peek().token,
-            Token::Identifier(_)
-                | Token::Ellipsis
-                | Token::LeftBracket
-                | Token::LeftBrace
+            Token::Identifier(_) | Token::Ellipsis | Token::LeftBracket | Token::LeftBrace
         ) || token_keyword_string(&self.peek().token).is_some();
         if can_start_arrow_param {
             let saved = self.pos;
@@ -71,16 +68,20 @@ impl<'a> Parser<'a> {
                     properties.iter().map(|p| p.key.clone()).collect()
                 }
                 _ => {
-                    let ctx: Vec<String> = (self.pos.saturating_sub(8)..=self.pos.min(self.tokens.len()-1))
+                    let ctx: Vec<String> = (self.pos.saturating_sub(8)
+                        ..=self.pos.min(self.tokens.len() - 1))
                         .map(|i| format!("{:?}", self.tokens[i].token))
                         .collect();
-                    return Err(Error::ParseError(format!(
-                        "Invalid arrow function parameter (got token {:?} at {}:{}) ctx=[{}]",
-                        self.peek().token,
-                        self.tokens[self.pos].span.line,
-                        self.tokens[self.pos].span.col,
-                        ctx.join(" ")
-                    ).into()))
+                    return Err(Error::ParseError(
+                        format!(
+                            "Invalid arrow function parameter (got token {:?} at {}:{}) ctx=[{}]",
+                            self.peek().token,
+                            self.tokens[self.pos].span.line,
+                            self.tokens[self.pos].span.col,
+                            ctx.join(" ")
+                        )
+                        .into(),
+                    ));
                 }
             };
             self.advance();

@@ -642,7 +642,8 @@ impl CodeGenerator {
                             // property name at runtime.
                             self.generate_expression(computed)?;
                         } else {
-                            let key_idx = self.add_constant(Value::from_string(element.key.clone()));
+                            let key_idx =
+                                self.add_constant(Value::from_string(element.key.clone()));
                             self.emit(Instruction::LoadConst(key_idx));
                         }
                         self.emit(Instruction::GetProperty);

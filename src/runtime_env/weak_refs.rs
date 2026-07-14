@@ -78,10 +78,9 @@ pub(super) fn native_weak_ref_constructor(
         Value::Object(idx) => idx,
         other => {
             // Non-object targets (primitives) are held by value.
-            let idx = interp.gc.allocate(
-                &mut interp.heap,
-                HeapValue::Object(JsObject::new()),
-            );
+            let idx = interp
+                .gc
+                .allocate(&mut interp.heap, HeapValue::Object(JsObject::new()));
             if let HeapValue::Object(obj) = &mut interp.heap[idx] {
                 obj.properties.insert("__value".into(), other);
             }

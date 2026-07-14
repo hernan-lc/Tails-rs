@@ -20,7 +20,8 @@ impl CodeGenerator {
                 let constructor_func_idx = self.compile_class_constructor(body)?;
 
                 let mut methods = Vec::new();
-                let mut computed_members: Vec<(u32, bool, ClassMethodKind, Expression)> = Vec::new();
+                let mut computed_members: Vec<(u32, bool, ClassMethodKind, Expression)> =
+                    Vec::new();
                 for member in body {
                     match member {
                         ClassMember::Method {
@@ -31,12 +32,8 @@ impl CodeGenerator {
                             computed,
                             ..
                         } => {
-                            let func_idx = self.compile_function(
-                                Some(mname.clone()),
-                                params,
-                                mbody,
-                                false,
-                            )?;
+                            let func_idx =
+                                self.compile_function(Some(mname.clone()), params, mbody, false)?;
                             if let Some(key) = computed {
                                 computed_members.push((
                                     func_idx,
@@ -151,10 +148,7 @@ impl CodeGenerator {
                     // After the class is stored in its local slot, snapshot
                     // closures for the constructor and all methods from the
                     // now-populated enclosing frame.
-                    self.emit(Instruction::SnapshotMethodClosures(
-                        class_info_idx,
-                        slot,
-                    ));
+                    self.emit(Instruction::SnapshotMethodClosures(class_info_idx, slot));
                 }
                 Ok(true)
             }

@@ -631,11 +631,9 @@ pub(super) fn native_typed_array_buffer(
         .map(|b| Value::Integer(*b as i64))
         .collect();
     let arr_idx = interp.heap.len();
-    interp
-        .heap
-        .push(crate::vm::interpreter::HeapValue::Array(
-            crate::vm::interpreter::JsArray { elements: bytes },
-        ));
+    interp.heap.push(crate::vm::interpreter::HeapValue::Array(
+        crate::vm::interpreter::JsArray { elements: bytes },
+    ));
     Ok(Value::Array(arr_idx))
 }
 

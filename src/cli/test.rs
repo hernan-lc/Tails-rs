@@ -1,8 +1,8 @@
-use std::path::{Path, PathBuf};
 use anyhow::Result;
+use std::path::{Path, PathBuf};
 
-use crate::Value;
 use crate::vm::interpreter::heap_types::HeapValue;
+use crate::Value;
 
 const TEST_HARNESS: &str = include_str!("../../tests/harness/embedded-harness.ts");
 
@@ -73,7 +73,10 @@ pub fn run(args: Vec<String>) -> Result<()> {
     }
 
     println!("\n================== TEST SUMMARY ==================");
-    println!("Total: {} passed, {} failed, {} skipped", total_passed, total_failed, total_skipped);
+    println!(
+        "Total: {} passed, {} failed, {} skipped",
+        total_passed, total_failed, total_skipped
+    );
     println!("==================================================");
 
     if total_failed > 0 || had_errors {
@@ -176,18 +179,20 @@ fn discover_test_files(dir: &Path) -> Vec<PathBuf> {
 }
 
 fn is_test_file(path: &Path) -> bool {
-    let name = path.file_name()
+    let name = path
+        .file_name()
         .map(|n| n.to_string_lossy().to_string())
         .unwrap_or_default();
-    let parent = path.parent()
+    let parent = path
+        .parent()
         .and_then(|p| p.file_name())
         .map(|n| n.to_string_lossy().to_string())
         .unwrap_or_default();
 
-    name.starts_with("test") 
-        || name.ends_with(".test.ts") 
+    name.starts_with("test")
+        || name.ends_with(".test.ts")
         || name.ends_with(".test.js")
-        || name.ends_with(".spec.ts") 
+        || name.ends_with(".spec.ts")
         || name.ends_with(".spec.js")
         || parent == "test"
         || parent == "tests"

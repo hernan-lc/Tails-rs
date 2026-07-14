@@ -25,7 +25,11 @@ fn for_of_with_try_catch_in_body() {
         Object.keys(ids).length;
     "#,
     );
-    assert!(r.is_ok(), "for-of with try/catch should not corrupt iterator: {:?}", r);
+    assert!(
+        r.is_ok(),
+        "for-of with try/catch should not corrupt iterator: {:?}",
+        r
+    );
     assert_eq!(r.unwrap(), tails::Value::Integer(9));
 }
 
@@ -48,7 +52,11 @@ fn for_of_with_try_catch_nonempty_catch() {
         result[1] + "," + result[3] + "," + result[4];
     "#,
     );
-    assert!(r.is_ok(), "for-of with try/catch (non-empty catch) should work: {:?}", r);
+    assert!(
+        r.is_ok(),
+        "for-of with try/catch (non-empty catch) should work: {:?}",
+        r
+    );
     assert_eq!(r.unwrap(), tails::Value::string("ok,caught,ok"));
 }
 
@@ -73,7 +81,11 @@ fn for_of_with_try_catch_finally() {
         out.join(",") + "|" + log.join(",");
     "#,
     );
-    assert!(r.is_ok(), "for-of with try/catch/finally should work: {:?}", r);
+    assert!(
+        r.is_ok(),
+        "for-of with try/catch/finally should work: {:?}",
+        r
+    );
     assert_eq!(r.unwrap(), tails::Value::string("a,b,c|f,f,f"));
 }
 
@@ -140,6 +152,10 @@ fn for_of_with_nested_try_catch() {
         sum;
     "#,
     );
-    assert!(r.is_ok(), "nested try/catch inside for-of should work: {:?}", r);
+    assert!(
+        r.is_ok(),
+        "nested try/catch inside for-of should work: {:?}",
+        r
+    );
     assert_eq!(r.unwrap(), tails::Value::Integer(104)); // 1 + 100 + 3
 }

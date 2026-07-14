@@ -180,7 +180,12 @@ impl Interpreter {
     }
 
     /// Find a catch/finally handler and transfer control to it.
-    fn dispatch_exception(&mut self, pc: &mut usize, error_name: &str, message: &str) -> Result<bool> {
+    fn dispatch_exception(
+        &mut self,
+        pc: &mut usize,
+        error_name: &str,
+        message: &str,
+    ) -> Result<bool> {
         while let Some(handler) = self.exception_handlers.last().cloned() {
             self.exception_handlers.pop();
             if handler.catch_pc != 0 {

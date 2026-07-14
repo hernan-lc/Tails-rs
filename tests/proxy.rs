@@ -426,7 +426,10 @@ fn test_new_target_meta_property() {
         a.kind + "|" + (b === undefined);
     "#,
     );
-    assert_eq!(result.unwrap(), tails::objects::Value::from_string("ctor|true".to_string()));
+    assert_eq!(
+        result.unwrap(),
+        tails::objects::Value::from_string("ctor|true".to_string())
+    );
 }
 
 #[test]

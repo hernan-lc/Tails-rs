@@ -384,15 +384,14 @@ fn attr_bits(enumerable: bool, configurable: bool, writable: bool) -> i64 {
 
 /// Read stored attribute flags for a property. Returns (enumerable, configurable, writable).
 /// Defaults to all-true when no attributes have been stored.
-fn read_attr_bits(properties: &crate::vm::interpreter::PropertyStorage, property: &str) -> (bool, bool, bool) {
+fn read_attr_bits(
+    properties: &crate::vm::interpreter::PropertyStorage,
+    property: &str,
+) -> (bool, bool, bool) {
     let key = format!("{}{}", ATTR_KEY_PREFIX, property);
     if let Some(Value::Integer(bits)) = properties.get(&key) {
         let b = *bits;
-        return (
-            b & 1 != 0,
-            b & 2 != 0,
-            b & 4 != 0,
-        );
+        return (b & 1 != 0, b & 2 != 0, b & 4 != 0);
     }
     (true, true, true)
 }
@@ -408,7 +407,10 @@ fn set_attr_bits(
     writable: bool,
 ) {
     let key = format!("{}{}", ATTR_KEY_PREFIX, property);
-    properties.insert(key, Value::Integer(attr_bits(enumerable, configurable, writable)));
+    properties.insert(
+        key,
+        Value::Integer(attr_bits(enumerable, configurable, writable)),
+    );
 }
 
 fn define_property_on(

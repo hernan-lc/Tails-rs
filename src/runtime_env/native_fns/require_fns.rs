@@ -74,7 +74,8 @@ pub(crate) fn native_require(
         if let Some(cached) = interp.require_cache.get("safe-regex2") {
             return Ok(cached.clone());
         }
-        let fn_val = Value::NativeFunction(crate::runtime_env::native_fns::constants::SAFE_REGEX_TRUE);
+        let fn_val =
+            Value::NativeFunction(crate::runtime_env::native_fns::constants::SAFE_REGEX_TRUE);
         interp
             .require_cache
             .insert("safe-regex2".into(), fn_val.clone());
@@ -101,9 +102,8 @@ pub(crate) fn native_require(
                 // Return the callable NativeFunction; its methods resolve via
                 // the `ASSERT` arm in `get_property`.
                 if module_name == wk::MOD_ASSERT {
-                    let result = Value::NativeFunction(
-                        crate::runtime_env::native_fns::constants::ASSERT,
-                    );
+                    let result =
+                        Value::NativeFunction(crate::runtime_env::native_fns::constants::ASSERT);
                     interp
                         .require_cache
                         .insert(module_name.to_string(), result.clone());

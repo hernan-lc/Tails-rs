@@ -255,9 +255,7 @@ impl TypeChecker {
                 Ok(Type::String)
             }
             Expression::TaggedTemplate {
-                tag,
-                expressions,
-                ..
+                tag, expressions, ..
             } => {
                 self.check_expression(tag)?;
                 for expr in expressions {

@@ -616,7 +616,10 @@ impl Interpreter {
                 // looking for a "." sub-key.
                 let is_top_level_condition = !map.contains_key(".")
                     && map.keys().any(|k| {
-                        matches!(k.as_str(), "require" | "import" | "node" | "default" | "types")
+                        matches!(
+                            k.as_str(),
+                            "require" | "import" | "node" | "default" | "types"
+                        )
                     });
                 if is_top_level_condition {
                     return self.resolve_condition(

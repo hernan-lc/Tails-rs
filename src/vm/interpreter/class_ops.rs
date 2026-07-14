@@ -125,23 +125,23 @@ impl Interpreter {
             let owner = self.current_module.clone();
             let src_file = self.current_module_path.clone();
             let src_line = self.current_source_line(self.current_pc);
-            let method_base_pointer =
-                self.call_stack.last().map(|f| f.base_pointer).unwrap_or(0);
-            let method_closure: Rc<RefCell<Vec<Value>>> = if method_func_info.capture_slots.is_empty() {
-                Rc::new(RefCell::new(Vec::new()))
-            } else {
-                let snapshot: Vec<Value> = method_func_info
-                    .capture_slots
-                    .iter()
-                    .map(|slot| {
-                        self.stack
-                            .get(method_base_pointer + *slot as usize)
-                            .cloned()
-                            .unwrap_or(Value::Undefined)
-                    })
-                    .collect();
-                Rc::new(RefCell::new(snapshot))
-            };
+            let method_base_pointer = self.call_stack.last().map(|f| f.base_pointer).unwrap_or(0);
+            let method_closure: Rc<RefCell<Vec<Value>>> =
+                if method_func_info.capture_slots.is_empty() {
+                    Rc::new(RefCell::new(Vec::new()))
+                } else {
+                    let snapshot: Vec<Value> = method_func_info
+                        .capture_slots
+                        .iter()
+                        .map(|slot| {
+                            self.stack
+                                .get(method_base_pointer + *slot as usize)
+                                .cloned()
+                                .unwrap_or(Value::Undefined)
+                        })
+                        .collect();
+                    Rc::new(RefCell::new(snapshot))
+                };
             let method_heap_idx = self.gc.allocate(
                 &mut self.heap,
                 HeapValue::Function(JsFunction {
@@ -251,16 +251,13 @@ impl Interpreter {
             let method_heap_idx = if method_info.is_static {
                 // Static methods are properties of the constructor
                 if let HeapValue::Function(ctor_func) = &self.heap[ctor_heap_idx] {
-                    ctor_func
-                        .properties
-                        .get(&method_info.name)
-                        .and_then(|v| {
-                            if let Value::Function(idx) = v {
-                                Some(*idx)
-                            } else {
-                                None
-                            }
-                        })
+                    ctor_func.properties.get(&method_info.name).and_then(|v| {
+                        if let Value::Function(idx) = v {
+                            Some(*idx)
+                        } else {
+                            None
+                        }
+                    })
                 } else {
                     None
                 }

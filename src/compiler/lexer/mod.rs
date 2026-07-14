@@ -59,9 +59,7 @@ fn tokenize_template_literal(
                     }
                 }
                 Some((_, c)) => expr_src.push(c),
-                None => {
-                    return Err(Error::ParseError("Unterminated template expression".into()))
-                }
+                None => return Err(Error::ParseError("Unterminated template expression".into())),
             }
         }
         Ok(expr_src)
