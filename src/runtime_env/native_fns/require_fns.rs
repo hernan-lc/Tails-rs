@@ -14,6 +14,13 @@ pub(crate) fn native_require(
     _this: &Value,
     args: &[Value],
 ) -> Result<Value> {
+    // Prevent stack overflow on deep CJS dependency trees (express →
+    // body-parser → iconv-lite → …). If the remaining stack is under ~512 KB
+    // allocate a fresh 4 MB stack and run the rest of the require there.
+    // Without this, the recursive `require → execute → require → …` chain
+    // overflows the 8 MB main-thread stack long before JavaScript's own
+    // 10 000-frame call-stack limit is reached.
+    fn require_impl(interp: &mut Interpreter, args: &[Value]) -> Result<Value> {
     let specifier = match args.first() {
         Some(Value::String(s)) => s.to_string(),
         Some(Value::Cons(c)) => c.flatten(),
@@ -354,6 +361,18 @@ pub(crate) fn native_require(
         .require_cache
         .insert(module_path.clone(), result.clone());
     Ok(result)
+    } // end of require_impl
+
+    // Call require_impl with stack overflow protection. If the remaining
+    // stack is less than 1 MB, stacker will switch to a fresh 8 MB stack
+    // for the duration of the closure.
+    let red_zone: usize = 512 * 1024; // 512 KB remaining triggers growth
+    let new_stack: usize = 8 * 1024 * 1024; // 8 MB new stack
+    let mut result = Ok(Value::Undefined);
+    stacker::maybe_grow(red_zone, new_stack, || {
+        result = require_impl(interp, args);
+    });
+    result
 }
 
 /// `module.createRequire(filename)` — returns a `require` function bound to
@@ -382,3 +401,5 @@ fn extract_object_properties(interp: &Interpreter, obj: &Value) -> PropertyStora
     }
     props
 }
+
+

@@ -1,7 +1,29 @@
 use super::*;
 
 impl Interpreter {
+    /// Stack-overflow-safe entry point for bytecode execution.
+    ///
+    /// Every JS function call, module load, generator resume, and
+    /// `Reflect.construct` ultimately flows through here. Wrapping at this
+    /// single chokepoint with `stacker::maybe_grow` ensures that deep
+    /// dependency trees (express → body-parser → iconv-lite → …) cannot
+    /// overflow the Rust thread stack regardless of how many nested
+    /// `call_value` / `require` / generator-resume frames accumulate.
     pub(crate) fn execute_from(
+        &mut self,
+        module: &CompiledModule,
+        start_pc: usize,
+    ) -> Result<Value> {
+        let red_zone: usize = 512 * 1024;     // grow when < 512 KB remain
+        let new_stack: usize = 4 * 1024 * 1024; // allocate 4 MB segments
+        let mut result: Result<Value> = Ok(Value::Undefined);
+        stacker::maybe_grow(red_zone, new_stack, || {
+            result = self.execute_from_inner(module, start_pc);
+        });
+        result
+    }
+
+    fn execute_from_inner(
         &mut self,
         module: &CompiledModule,
         start_pc: usize,
@@ -283,11 +305,10 @@ impl Interpreter {
                 // Phase 8.3: Inline LoadGlobal / StoreGlobal on the hot path
                 // to avoid cascading dispatch for these very common instructions.
                 Instruction::LoadGlobal(name) => {
-                    let val = self.globals.get(name.as_str()).cloned().or_else(|| {
-                        self.module_globals
-                            .as_ref()
-                            .and_then(|mg| mg.borrow().get(name.as_str()).cloned())
-                    });
+                    let val = self.module_globals
+                        .as_ref()
+                        .and_then(|mg| mg.borrow().get(name.as_str()).cloned())
+                        .or_else(|| self.globals.get(name.as_str()).cloned());
 
                     // Non-arrow functions expose the ES `arguments` object.
                     let val = val.or_else(|| {

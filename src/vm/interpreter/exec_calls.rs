@@ -490,12 +490,25 @@ impl Interpreter {
     ) -> Result<bool> {
         match &constructor {
             Value::Function(func_idx) => {
-                let proto_idx = if let Value::Object(proto_obj_idx) =
-                    self.get_property(&constructor, &Value::from_string("prototype".to_string()))?
-                {
-                    Some(proto_obj_idx)
-                } else {
-                    None
+                let proto_idx = match self.get_property(
+                    &constructor,
+                    &Value::from_string("prototype".to_string()),
+                )? {
+                    Value::Object(idx)
+                    | Value::Array(idx)
+                    | Value::Function(idx)
+                    | Value::Promise(idx)
+                    | Value::Proxy(idx)
+                    | Value::Generator(idx)
+                    | Value::TypedArray(idx)
+                    | Value::Map(idx)
+                    | Value::Set(idx)
+                    | Value::WeakMap(idx)
+                    | Value::WeakSet(idx)
+                    | Value::Date(idx)
+                    | Value::RegExp(idx)
+                    | Value::Buffer(idx) => Some(idx),
+                    _ => None,
                 };
                 let new_obj_heap_idx = self.gc.allocate(
                     &mut self.heap,

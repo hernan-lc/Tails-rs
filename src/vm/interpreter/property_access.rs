@@ -260,7 +260,7 @@ impl Interpreter {
                         }
                     }
                     if let Some(proto_idx) = obj.prototype {
-                        let proto_val = Value::Object(proto_idx);
+                        let proto_val = self.value_from_heap_idx(proto_idx);
                         return self.get_property_with_this(&proto_val, key, this);
                     }
                 }
@@ -1167,7 +1167,20 @@ impl Interpreter {
         };
 
         let proto_idx = match &right_proto {
-            Value::Object(idx) => *idx,
+            Value::Object(idx)
+            | Value::Array(idx)
+            | Value::Function(idx)
+            | Value::Promise(idx)
+            | Value::Proxy(idx)
+            | Value::Generator(idx)
+            | Value::TypedArray(idx)
+            | Value::Map(idx)
+            | Value::Set(idx)
+            | Value::WeakMap(idx)
+            | Value::WeakSet(idx)
+            | Value::Date(idx)
+            | Value::RegExp(idx)
+            | Value::Buffer(idx) => *idx,
             _ => return Ok(Value::Boolean(false)),
         };
 

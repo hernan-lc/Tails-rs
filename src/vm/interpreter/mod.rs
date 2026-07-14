@@ -478,6 +478,81 @@ impl Interpreter {
         err
     }
 
+    pub(crate) fn get_prototype_idx(&self, val: &Value) -> Option<usize> {
+        match val {
+            Value::Object(idx) => {
+                if let HeapValue::Object(obj) = &self.heap[*idx] {
+                    obj.prototype
+                } else {
+                    None
+                }
+            }
+            Value::Function(idx) => {
+                if let HeapValue::Function(f) = &self.heap[*idx] {
+                    if let Some(proto) = f.properties.get("__[[Prototype]]__") {
+                        match proto {
+                            Value::Object(p)
+                            | Value::Function(p)
+                            | Value::Array(p)
+                            | Value::Proxy(p)
+                            | Value::Promise(p)
+                            | Value::Generator(p)
+                            | Value::TypedArray(p)
+                            | Value::Map(p)
+                            | Value::Set(p)
+                            | Value::WeakMap(p)
+                            | Value::WeakSet(p)
+                            | Value::Date(p)
+                            | Value::RegExp(p)
+                            | Value::Buffer(p) => Some(*p),
+                            _ => None,
+                        }
+                    } else {
+                        self.function_proto_idx
+                    }
+                } else {
+                    None
+                }
+            }
+            Value::Array(idx) => {
+                if let HeapValue::Array(_) = &self.heap[*idx] {
+                    self.array_proto_idx
+                } else {
+                    None
+                }
+            }
+            Value::TypedArray(_) => self.typed_array_proto_idx,
+            Value::Date(_) => self.date_proto_idx,
+            Value::RegExp(_) => self.regexp_proto_idx,
+            Value::Buffer(_) => self.buffer_proto_idx,
+            Value::Boolean(_) => self.boolean_proto_idx,
+            Value::Integer(_) | Value::Float(_) => self.number_proto_idx,
+            Value::String(_) | Value::Cons(_) => self.string_proto_idx,
+            Value::BigInt(_) => self.bigint_proto_idx,
+            Value::Symbol(_) => self.symbol_proto_idx,
+            _ => None,
+        }
+    }
+
+    pub(crate) fn value_from_heap_idx(&self, idx: usize) -> Value {
+        match &self.heap[idx] {
+            HeapValue::Object(_) => Value::Object(idx),
+            HeapValue::Function(_) => Value::Function(idx),
+            HeapValue::Array(_) => Value::Array(idx),
+            HeapValue::Promise(_) => Value::Promise(idx),
+            HeapValue::Proxy(_) => Value::Proxy(idx),
+            HeapValue::Generator(_) => Value::Generator(idx),
+            HeapValue::TypedArray(_) => Value::TypedArray(idx),
+            HeapValue::Map(_) => Value::Map(idx),
+            HeapValue::Set(_) => Value::Set(idx),
+            HeapValue::WeakMap(_) => Value::WeakMap(idx),
+            HeapValue::WeakSet(_) => Value::WeakSet(idx),
+            HeapValue::Date(_) => Value::Date(idx),
+            HeapValue::RegExp(_) => Value::RegExp(idx),
+            _ => Value::Object(idx),
+        }
+    }
+
     pub fn get_global(&self, name: &str) -> Option<Value> {
         self.globals.get(name).cloned()
     }
