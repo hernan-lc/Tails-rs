@@ -100,6 +100,7 @@ mod http_fns {
         "http",
         native_http_create_server,
         native_http_server_listen,
+        native_http_server_set_timeout,
         native_http_server_close,
         native_http_req_on,
         native_http_res_write_head,
