@@ -617,6 +617,70 @@ pub fn tokenize(source: &str) -> Result<Vec<SpannedToken>> {
                                     '\'' => str.push('\''),
                                     '"' => str.push('"'),
                                     '`' => str.push('`'),
+                                    '0' => str.push('\0'),
+                                    'b' => str.push('\x08'),
+                                    'f' => str.push('\x0c'),
+                                    'v' => str.push('\x0b'),
+                                    'x' => {
+                                        // Hex escape \xXX → U+00XX
+                                        let mut hex = String::new();
+                                        for _ in 0..2 {
+                                            if let Some(&(_, hc)) = chars.peek() {
+                                                if hc.is_ascii_hexdigit() {
+                                                    hex.push(hc);
+                                                    chars.next();
+                                                    col += 1;
+                                                } else {
+                                                    break;
+                                                }
+                                            } else {
+                                                break;
+                                            }
+                                        }
+                                        match u8::from_str_radix(&hex, 16) {
+                                            Ok(byte) => str.push(byte as char),
+                                            Err(_) => {
+                                                // Malformed hex escape: keep the raw form.
+                                                str.push('\\');
+                                                str.push('x');
+                                                str.push_str(&hex);
+                                            }
+                                        }
+                                    }
+                                    'u' => {
+                                        // Unicode escape \uXXXX → U+XXXX
+                                        let mut hex = String::new();
+                                        for _ in 0..4 {
+                                            if let Some(&(_, hc)) = chars.peek() {
+                                                if hc.is_ascii_hexdigit() {
+                                                    hex.push(hc);
+                                                    chars.next();
+                                                    col += 1;
+                                                } else {
+                                                    break;
+                                                }
+                                            } else {
+                                                break;
+                                            }
+                                        }
+                                        match u32::from_str_radix(&hex, 16) {
+                                            Ok(cp) => match char::from_u32(cp) {
+                                                Some(ch) => str.push(ch),
+                                                None => {
+                                                    // Invalid codepoint: keep the raw form.
+                                                    str.push('\\');
+                                                    str.push('u');
+                                                    str.push_str(&hex);
+                                                }
+                                            },
+                                            Err(_) => {
+                                                // Malformed unicode escape: keep the raw form.
+                                                str.push('\\');
+                                                str.push('u');
+                                                str.push_str(&hex);
+                                            }
+                                        }
+                                    }
                                     _ => {
                                         str.push('\\');
                                         str.push(c);
