@@ -503,16 +503,11 @@ impl Interpreter {
                         // Slow path: use the iterator protocol (Symbol.iterator)
                         // to support custom iterables, generators, etc.
                         if let Ok(iterator) = self.exec_get_iterator(source) {
-                            loop {
-                                match self.iterator_next_value(&iterator)? {
-                                    Some(value) => {
-                                        if let HeapValue::Array(target_arr) =
-                                            &mut self.heap[target_idx]
-                                        {
-                                            target_arr.elements.push(value);
-                                        }
-                                    }
-                                    None => break,
+                            while let Some(value) = self.iterator_next_value(&iterator)? {
+                                if let HeapValue::Array(target_arr) =
+                                    &mut self.heap[target_idx]
+                                {
+                                    target_arr.elements.push(value);
                                 }
                             }
                             self.exec_iterator_close(iterator)?;

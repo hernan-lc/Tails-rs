@@ -79,8 +79,7 @@ impl<'a> Parser<'a> {
                             self.tokens[self.pos].span.line,
                             self.tokens[self.pos].span.col,
                             ctx.join(" ")
-                        )
-                        .into(),
+                        ),
                     ));
                 }
             };

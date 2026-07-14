@@ -29,7 +29,7 @@ impl Interpreter {
                             .get(wk::NAME)
                             .and_then(|v| match v {
                                 Value::String(s) => Some(s.as_ref().to_string()),
-                                Value::Cons(c) => Some(c.flatten().into()),
+                                Value::Cons(c) => Some(c.flatten()),
                                 _ => None,
                             })
                             .unwrap_or_else(|| wk::ERROR.to_string());
@@ -38,7 +38,7 @@ impl Interpreter {
                             .get(wk::MESSAGE)
                             .and_then(|v| match v {
                                 Value::String(s) => Some(s.as_ref().to_string()),
-                                Value::Cons(c) => Some(c.flatten().into()),
+                                Value::Cons(c) => Some(c.flatten()),
                                 _ => None,
                             })
                             .unwrap_or_default();

@@ -642,6 +642,10 @@ pub(super) fn native_object_get_own_property_descriptor(
     native_reflect_get_own_property_descriptor(interp, _this, args)
 }
 
+/// One entry in the `Object.getOwnPropertyDescriptors` accumulator:
+/// `(key, value, getter, setter, source_obj_idx)`.
+type PropertyDescriptorEntry = (String, Value, Option<Value>, Option<Value>, Option<usize>);
+
 pub(super) fn native_object_get_own_property_descriptors(
     interp: &mut Interpreter,
     _this: &Value,
@@ -655,13 +659,7 @@ pub(super) fn native_object_get_own_property_descriptors(
     // merges schema defs.
     // Each entry also carries an optional source-property Storage so we can
     // read attribute flags stored by defineProperty.
-    let mut entries: Vec<(
-        String,
-        Value,
-        Option<Value>,
-        Option<Value>,
-        Option<usize>, // source obj heap index for attribute lookup
-    )> = Vec::new();
+    let mut entries: Vec<PropertyDescriptorEntry> = Vec::new();
     match &obj_val {
         Value::Object(obj_idx) => {
             if let crate::vm::interpreter::HeapValue::Object(obj) = &interp.heap[*obj_idx] {

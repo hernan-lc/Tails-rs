@@ -213,11 +213,11 @@ impl Interpreter {
                 }
             }
             _ => {
-                return Err(self.err_at_location(Error::TypeError(format!(
+                Err(self.err_at_location(Error::TypeError(format!(
                     "{} is not a function\n{}",
                     self.value_to_string(callee),
                     self.call_stack_backtrace()
-                ))));
+                ))))
             }
         }
     }

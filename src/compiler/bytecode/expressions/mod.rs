@@ -149,7 +149,10 @@ impl CodeGenerator {
                 self.generate_expression(expression)?;
                 Ok(())
             }
-            Expression::MetaProperty { .. } => Ok(self.emit(Instruction::GetNewTarget)),
+            Expression::MetaProperty { .. } => {
+                self.emit(Instruction::GetNewTarget);
+                Ok(())
+            }
         }
     }
 

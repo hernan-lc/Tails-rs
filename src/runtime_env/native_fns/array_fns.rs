@@ -681,23 +681,18 @@ pub(super) fn native_array_from(
                 // Fall back to iterator protocol
                 if let Ok(iterator) = interp.exec_get_iterator(source) {
                     let mut index: usize = 0;
-                    loop {
-                        match interp.iterator_next_value(&iterator)? {
-                            Some(value) => {
-                                if let Some(ref callback) = map_fn {
-                                    let mapped = interp.call_value(
-                                        callback,
-                                        &Value::Undefined,
-                                        &[value, Value::Integer(index as i64)],
-                                    )?;
-                                    elements.push(mapped);
-                                } else {
-                                    elements.push(value);
-                                }
-                                index += 1;
-                            }
-                            None => break,
+                    while let Some(value) = interp.iterator_next_value(&iterator)? {
+                        if let Some(ref callback) = map_fn {
+                            let mapped = interp.call_value(
+                                callback,
+                                &Value::Undefined,
+                                &[value, Value::Integer(index as i64)],
+                            )?;
+                            elements.push(mapped);
+                        } else {
+                            elements.push(value);
                         }
+                        index += 1;
                     }
                     interp.exec_iterator_close(iterator)?;
                 }
